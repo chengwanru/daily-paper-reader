@@ -56,11 +56,20 @@
 
   async function loadLocalSecretPayloadFromDisk() {
     if (!isLocalDebugHost()) return null;
-    const res = await fetch(getLocalApiUrl('/api/local/secret'), { cache: 'no-store' });
-    if (!res.ok) return null;
-    const data = await res.json().catch(() => null);
-    if (!data || !data.ok || !data.exists || !data.payload) return null;
-    return data.payload;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    try {
+      const res = await fetch(getLocalApiUrl('/api/local/secret'), {
+        cache: 'no-store',
+        signal: controller.signal,
+      });
+      if (!res.ok) return null;
+      const data = await res.json().catch(() => null);
+      if (!data || !data.ok || !data.exists || !data.payload) return null;
+      return data.payload;
+    } finally {
+      clearTimeout(timeout);
+    }
   }
 
   async function saveLocalSecretPayloadToDisk(payload, secretPlain) {
@@ -1958,6 +1967,20 @@
     }
 
     if (!overlay) return;
+    try {
+      window.DPRSecretSetup = window.DPRSecretSetup || {};
+      const earlyOpenStep2 = function () {
+        setupOverlay(true);
+        openSecretOverlay(overlay);
+        const formalOpenStep2 = window.DPRSecretSetup && window.DPRSecretSetup.openStep2;
+        if (typeof formalOpenStep2 === 'function' && formalOpenStep2 !== earlyOpenStep2) {
+          formalOpenStep2();
+        }
+      };
+      window.DPRSecretSetup.openStep2 = earlyOpenStep2;
+    } catch {
+      // 初始化早期兜底入口失败时，后续 setupOverlay 仍会尝试注册正式入口。
+    }
 
     // 检查是否已经存在 secret.private（用于区分“解锁”与“初始化”）
     (async () => {
