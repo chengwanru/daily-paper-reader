@@ -169,15 +169,23 @@
         return candidateBase + '/' + normalizePath(path);
       }
 
+      function shouldLoadStylesheetFromCdn(path, useCdn) {
+        if (!useCdn) return false;
+        // KaTeX CSS 会继续请求 fonts/*.woff2。EdgeOne Pages 当前未给字体返回
+        // Access-Control-Allow-Origin，本地/GitHub Pages 跨域引用会被浏览器拦截。
+        return !/\/katex\.min\.css$/i.test(normalizePath(path));
+      }
+
       function appendStylesheet(path, useCdn) {
         return new Promise(function (resolve) {
+          var useRemoteStylesheet = shouldLoadStylesheetFromCdn(path, useCdn);
           var finished = false;
           var link = document.createElement('link');
           var timer = window.setTimeout(function () {
             if (finished) return;
             finished = true;
             link.remove();
-            if (useCdn) {
+            if (useRemoteStylesheet) {
               console.warn('[DPR] CDN CSS 加载超时，回退本地：' + path);
               appendStylesheet(path, false).then(resolve);
             } else {
@@ -185,7 +193,7 @@
             }
           }, ASSET_TIMEOUT_MS);
           link.rel = 'stylesheet';
-          link.href = useCdn ? cdnUrl(path) : localUrl(path);
+          link.href = useRemoteStylesheet ? cdnUrl(path) : localUrl(path);
           link.onload = function () {
             if (finished) return;
             finished = true;
@@ -197,7 +205,7 @@
             finished = true;
             window.clearTimeout(timer);
             link.remove();
-            if (useCdn) {
+            if (useRemoteStylesheet) {
               console.warn('[DPR] CDN CSS 加载失败，回退本地：' + path);
               appendStylesheet(path, false).then(resolve);
             } else {
