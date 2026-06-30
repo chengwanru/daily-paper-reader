@@ -1,0 +1,368 @@
+Title: Supervise What Survives: Geometry-Guided VLA Adaptation from Synthetic Robot Videos
+
+URL Source: https://arxiv.org/pdf/2606.24448v1
+
+Published Time: Wed, 24 Jun 2026 01:01:49 GMT
+
+Number of Pages: 14
+
+Markdown Content:
+# Supervise What Survives: Geometry-Guided VLA Adaptation from Synthetic Robot Videos 
+
+Danze Chen Yanzhe Chen Qiming Huang Zhijun Cao Chen Gao Mike Zheng Shou †
+
+Show Lab, National University of Singapore 
+
+Abstract: Vision-Language-Action (VLA) models require large-scale video-action pairs, yet real teleoperation remains scarce. While generated robot videos offer a scalable alternative, existing methods treat them as real robot data by re-covering pseudo-actions from synthesized pixels. We argue that deriving low-level control from generated visuals is a mismatched abstraction. A video cap-tures only geometry : the spatial trajectory representing the where of a task. Areal demonstration captures control : the exact motor commands representing the 
+
+how . Human-to-robot video generation preserves these unequally: the visible ge-ometry survives the generation process, while the underlying control signals are lost. This Asymmetric Preservation Principle dictates a clean rule: this sur-viving geometry should solely supervise visual perception, leaving control to real demonstrations. Following this principle, we propose GRA (Geometry-guided 
+
+Representation Alignment), which extracts the geometric content as future 2D end-effector waypoints, computed from the source human video through pose es-timation, retargeting, simulation, and calibrated projection, and routes them to the VLA vision backbone via an auxiliary 2D head. The action head is trained on real demonstrations only. During fine-tuning, the waypoint loss persists as a spa-tial representation anchor that prevents the backbone from losing its geometric grounding. On real-robot tasks, GRA outperforms pseudo-action baselines under matched data budgets and narrows the gap to policies trained with substantially more real demonstrations, suggesting that correctly routed geometry bridges gen-erated videos to robot policies more reliably than recovered actions. 
+
+Keywords: Vision-Language-Action Models, Robot Manipulation, Synthetic Robot Videos, Geometry-Guided Representation Alignment 
+
+## 1 Introduction 
+
+Vision-Language-Action (VLA) models [1, 2, 3, 4] unify perception and control but face a severe data bottleneck due to the scarcity of paired video-action data [5, 6]: real teleoperation requires dedicated hardware, trained operators, and substantial collection time. Human manipulation videos are abundant, and recent human-to-robot video generation methods [7, 8, 9] make it increasingly feasible to synthesize robot execution videos at scale. However, while these models synthesize visual sequences, they cannot synthesize physical actions. This missing half of the data equation forces us to re-evaluate the exact information these synthetic videos contain, raising a critical question: what supervision can purely visual generated videos reliably provide, and where should it enter the VLA? 
+
+Existing methods answer this by treating generated videos as demonstrations missing their action labels. Prior work recovers pseudo-actions from synthesized frames using inverse dynamics [10] or retargeting [9], feeding the resulting pairs into the VLA’s action head [11]. We argue this creates a fundamental video-action mismatch . Video generation optimizes for visual plausibility, not phys-ical control laws. Forcing the action head to map visually hallucinated pixels to rigid real-world control signals conflates features with physical execution, inevitably degrading policy performance. 
+
+> †
+
+Corresponding author: mike.zheng.shou@gmail.com              
+
+> arXiv:2606.24448v1 [cs.RO] 23 Jun 2026 Human Video Generated Robot Video
+> (b) Existing Methods: Pseudo-Action Recovery (c) Our Approach (GRA): Geometry Supervision
+> IDM / Retargeting
+> VLA Action Head
+> Extract from Human Video
+> Pretrain VLA
+> Vision Backbone
+> Scalable
+> Efficient
+> Human-to-Robot
+> Generation
+> Cheap
+> Diverse Lack Action Labels
+> Distorted Action Labels Future 2D
+> EE Waypoints
+> Maintain geometric fidelity &
+> prevent representation collapse
+> Real Robot
+> Demonstrations
+> Co-train VLA Action Head
+> Let geometry guide perception,
+> real data ground control
+> (a) H2R-Generated Videos
+> How should
+> generated videos
+> enter VLA training?
+
+Figure 1: Illustration of Motivation. (a) Human-to-robot generation produces robot videos at scale, but the generated videos lack action labels. (b) Existing methods recover pseudo-actions from the generated pixels and feed them to the action head, inheriting distorted control signals. (c) GRA routes future 2D end-effector waypoints, extracted from the source human video, to the vision backbone, while the action head trains on real robot demonstrations alone. To resolve this mismatch, we must analyze the generation process itself. A video captures only 
+
+geometry , namely the spatial structure (end-effector trajectories, object arrangements, and coarse motion directions) representing where manipulation unfolds. A real demonstration captures control ,which consists of the exact motor commands representing how to execute it. Video generation is fundamentally a visual synthesis process. It captures the appearance of manipulation, not the physics that drives it. The human-to-robot generation process therefore transfers visible geometric structure reliably, but loses the underlying control signals. We formalize this as the Asymmetric Preservation Principle and derive a simple design rule: supervision should follow what survives, rather than reconstruct what is erased. Geometry should guide perception; real demonstrations should ground control. We propose GRA (Geometry-guided Representation Alignment). It routes geometric supervision to the VLA vision backbone via an auxiliary 2D head. Future 2D end-effector waypoints are com-puted from the source human video through pose estimation, retargeting, physics simulation, and calibrated camera projection, then used to supervise the backbone on generated observations. The action head trains exclusively on real demonstrations. During fine-tuning, the waypoint objective persists as a spatial representation anchor , preventing the backbone from drifting toward action-predictive features at the cost of spatial structure. On real-robot Franka tasks, GRA outperforms pseudo-action baselines under matched data budgets and narrows the gap to policies trained on real robot data alone with substantially more demonstrations. Our contributions are summarized as follows: • Asymmetric Preservation. We formulate the Asymmetric Preservation Principle : generated videos preserve spatial structure more reliably than control dynamics, and should be treated as geometric witnesses rather than control traces. • Supervision Routing. We propose GRA , which routes human-derived geometry to the VLA backbone as future 2D waypoint supervision, independent of synthesized pixels, while learning actions only from real demonstrations. • Representational Anchoring. We demonstrate that action fine-tuning can erode geometry-aware representations; a persistent spatial representation anchor mitigates this drift and is essential to GRA’s effectiveness. 22 Related Work 
+
+VLA Models and Adaptation VLA models [1, 2, 3, 4, 12, 13, 14, 15, 16, 17] couple large-scale vision-language pretraining with action prediction and benefit from cross-embodiment data [6, 5, 18]. Early designs cast actions as discrete tokens within an autoregressive multimodal model [1, 4], while more recent variants adopt continuous regression or diffusion-based heads for higher-frequency control [19, 2, 3]. Adapting these models to specific hardware still relies on real teleoperation, which is costly to collect at scale. Recent work therefore investigates parameter-efficient fine-tuning [19, 20] and principled data allocation [21]. We address an orthogonal axis: how to consume synthetic robot videos so that real-data demand is reduced rather than diluted. 
+
+Synthetic Data for VLA Two sources of synthetic robot data dominate. Simulation provides paired state-action data via domain randomization [22] or via demo-conditioned generation [23], but requires task-specific assets. Human-to-robot video generation [24, 7, 8, 25] instead synthe-sizes robot footage from human demonstrations at scale, with no action labels. The dominant paradigm consumes the generated frames by first recovering pseudo-actions, via inverse dynam-ics [10], latent action tokens [26, 27], or geometric retargeting [9, 11, 28, 29], and then training the action head on the pseudo-labelled frames. A smaller line instead extracts non-action supervi-sion [30, 31, 32, 33, 34]: 2D waypoint regression from edited human videos, sparse path tokens, future-frame prediction, and hand-centric video pretraining. GRA belongs to this second line and applies it to fully synthesized robot videos under the Asymmetric Preservation Principle, with a persistent anchor that maintains geometric structure during action fine-tuning. 
+
+Representation Preservation in Fine-tuning Task-specific fine-tuning risks catastrophic forget-ting of pretrained structure [35]. In VLA systems, action-regression gradients can specifically re-shape vision features away from spatial understanding, eroding the spatial priors that downstream control depends on. Mitigations include parameter-efficient updates that limit drift [20, 19], spa-tial grounding objectives that align visual features with task-relevant geometry [36, 37, 38, 39, 40], and structured auxiliary supervision that anchors the representation throughout fine-tuning [41, 42]. GRA falls into the third category: its spatial anchor uses projected end-effector waypoints as a task-relevant geometric signal, preserving the spatial representations that geometric pretraining builds. 
+
+## 3 Method 
+
+GRA realizes the Asymmetric Preservation Principle through a two-stage protocol (Fig. 2): a vision backbone is first trained on generated frames with 2D waypoint targets, and an action head is then fine-tuned on real demonstrations while a persistent waypoint loss maintains the spatial structure built in Stage 1. Waypoint targets are derived from the source human video, decoupled from the generated pixels. 
+
+3.1 Task Setup 
+
+We build on OpenVLA-OFT [19], which extends OpenVLA [1] with a continuous-action L1-regression head. The policy contains a vision backbone ϕv that maps an input image to visual tokens in the language-model embedding space, and an action head ϕa that consumes these tokens after a Llama-2 7B language model conditioned on the task instruction l. The policy outputs chunks of L = 24 delta-action steps ∆at ∈ R7, encoding relative end-effector translation, roll-pitch-yaw rotation, and a gripper command, all normalized to [−1, 1] . We use K = 8 as the future-waypoint horizon for spatial supervision; L and K are independent. The spatial supervision target at frame t is the future K-step 2D end-effector trajectory: 
+
+yt = ( pt+1 , p t+2 , . . . , p t+K ), pτ ∈ R2, (1) where pτ is the end-effector position in normalized image coordinates. Training uses two pools: 
+
+Dsyn = {(Ist , y st )} of generated robot frames with waypoint labels (Sec. 3.2), and Dreal =
+
+3Text Prompt 
+
+DiT  
+
+> Front
+> Human
+> ✖N
+> H2R Video Generation
+> Human RGB-D Frames
+> Geometric Waypoint Derivation
+> Intrinsic
+> Extrinsic
+> Detection and Segmentation
+> Grounding DINO
+> SAM2
+> Pose Estimation
+> HaMeR
+> Simulation
+> Mujoco
+> Projection
+> Synthetic
+> 2D Waypoints
+> Synthetic
+> Robot Frames
+> 2-Stage VLA Training
+
+Llama 2 7B 
+
+> MLP Projector
+
+2D Aux Head  
+
+> Synthetic
+> 2D Waypoints
+> Stage 1: Geometric Pretraining
+> Real Robot
+> Frames MLP Projector
+
+2D Aux Head   
+
+> Spatial Anchor
+> Tokenizer
+> Text Prompt
+> L1 Action Head
+> Stage 2: Action Fine-tuning
+> DinoV2 DinoV2 SigLIP SigLIP
+> Real Robot
+
+Figure 2: Overview of GRA. Top: a human-to-robot video generator produces a robot frame Ist
+
+from a human demonstration; an independent geometric path extracts 2D end-effector waypoints yst
+
+from the source human video. Stage 1: the vision backbone ϕv and a 2D auxiliary head h2D are trained on (Ist , y st ) to predict future waypoints under Ls 
+
+> 2D
+
+. Stage 2: the action head ϕa is added and the policy is fine-tuned on real robot data with L = Lact + λLr 
+
+> 2D
+
+; h2D continues from Stage 1 as a spatial representation anchor. 
+
+{(Irt , l, ∆at, y rt )} of real teleoperation trajectories with delta actions and projected waypoints. Gen-erated frames are produced by Wan 2.2 [24] conditioned on third-person human demonstrations. 
+
+3.2 Geometric Waypoint Derivation 
+
+Waypoint targets yst are produced from the source human video and a physics simulator, without reading any generated pixel: 
+
+Φ : V src −→ (p1, p 2, . . . , p T ), Φ = πcam ◦ FK ◦ IK ◦ HaMeR ◦ Detect . (2) Grounding DINO [43] detects hands; SAM2 [44] refines bounding boxes into segmentation masks; HaMeR [45] estimates 3D hand keypoints. The 3D hand trajectory is retargeted to the robot frame (wrist →EE position, palm normal →EE orientation, thumb-index distance →gripper width) and re-played in MuJoCo [46] on a virtual Franka twin to enforce joint limits and collisions. Future K-step 3D EE positions are then projected to image coordinates with calibrated camera intrinsics and ex-trinsics, yielding yst .The supervision target yst and the visual input Ist thus originate from separate sources, but they remain temporally aligned: the generated robot video preserves the frame indexing of the source human demonstration, so the waypoint label derived from source frame t is paired with the generated robot frame Ist at the same index. For Dreal , waypoints yrt are obtained by projecting recorded proprioceptive EE positions through the same camera model. 
+
+3.3 Stage 1: Geometric Pretraining 
+
+Stage 1 trains the vision side of the policy on generated frames with a 2D-waypoint regression objective. A three-layer MLP head h2D takes the mean-pooled projected visual tokens from ϕv and predicts the future K-step 2D waypoints ˆyt ∈ RK×2:
+
+Ls 
+
+> 2D
+
+= E(Ist , y st )∼D syn 
+
+ ∥h2D (ϕv (Ist )) − yst ∥22
+
+. (3) In this stage we update ϕv via LoRA (rank 32) together with the full h2D ; the language model and the action head are not in the Stage-1 forward path, so generated frames pass only through the visual stack. Training runs for 5K steps. 43.4 Stage 2: Action Fine-tuning with Spatial Anchor 
+
+Stage 2 fine-tunes the policy on real demonstrations only; generated frames do not enter this stage. The action head ϕa is added now and learns delta actions from real teleoperation, while the auxil-iary head h2D from Stage 1 continues to receive a parallel waypoint signal that anchors the spatial structure already built. The total loss combines L1 delta-action regression with the waypoint loss from Stage 1, now evaluated on real frames: 
+
+L = Lact + λLr 
+
+> 2D
+
+, (4) where 
+
+Lact = E(Irt , l, ∆at)∼D real 
+
+ ∥ϕa(ϕv (Irt ), l ) − ∆at∥1
+
+, (5) 
+
+Lr 
+
+> 2D
+
+= E(Irt , y rt )∼D real 
+
+ ∥h2D (ϕv (Irt )) − yrt ∥22
+
+. (6) The waypoint targets yrt are obtained from the recorded EE proprioception of the same trajectory, so Lr 
+
+> 2D
+
+adds no extra labelling cost on top of teleoperation. We set λ = 0 .5 and apply LoRA (rank 32) to ϕv and the language model; h2D is initialised from its Stage-1 weights and ϕa from random weights, both fully updated. Training runs for 10K steps. The auxiliary loss Lr 
+
+> 2D
+
+acts as a spatial representation anchor : it continually re-imposes a waypoint-prediction objective on ϕv during action fine-tuning, counteracting the drift that action-regression gradients would otherwise induce on the spatial features built in Stage 1. We test this mechanism directly in Sec. 4.4 by removing Lr 
+
+> 2D
+
+while keeping the Stage-1 initialisation. 
+
+## 4 Experiments 
+
+We address three questions in real-robot experiments: (i) whether GRA outperforms pseudo-action baselines under a matched real-data budget; (ii) what mechanism drives the gain; and (iii) which GRA components contribute. 
+
+4.1 Setup Pick up the mango and place it on the blue  plate       
+
+> Pick up the gray cup and place it on the green coaster
+> Pick up the orange cube and place it on the green pad
+> (a) Real -world Experimental Setup (b) Visualization of Real -robot Tasks Execution
+> Franka
+> Research 3
+> RealSense
+> D435
+> Workspace
+
+Figure 3: Illustration of (a) the real-robot experimental setup and (b) rollout examples of the three pick-and-place tasks. 
+
+Hardware & Tasks. All experiments are performed on a 7-DoF Franka Research 3 with a fixed third-person RealSense D435 camera. We evaluate three tabletop pick-and-place tasks ( cube →pad ,
+
+cup →coaster , and mango →plate ), each evaluated over 30 trials. We report per-task success rate and the 3-task mean. The setup and the three tasks are illustrated in Fig. 3. 5Data. For each task we use Nreal =25 real teleoperated trajectories and Nsyn =75 generated videos. Generated videos are produced by Wan 2.2 [24] conditioned on third-person human videos, at 480 ×640 resolution, 81 frames. 
+
+Baselines. All baselines use the OpenVLA-OFT architecture [19] with identical hyperparam-eters (batch size 16, learning rate 5×10 −4, LoRA rank 32). Real-only : 10K steps on Dreal 
+
+with Nreal =25 . Real-only (full) : same recipe with Nreal =100 , serving as an upper-reference. 
+
+DreamGen-style [10]: IDM-recovered pseudo delta-actions on generated frames jointly trained with real data, 10K steps. MimicDreamer-style [9]: delta-action labels obtained by geometric re-targeting on generated frames, 10K steps of joint behaviour cloning. GRA (ours) : 5K Stage 1 pretraining + 10K Stage 2 cotraining; K=8 , λ=0 .5.
+
+4.2 Main Results 
+
+Table 1: Main results. Closed-loop success rate on three real-robot pick-and-place tasks. We report successful trials and the corresponding success rate (%). The Mean column shows the 3-task average; the small coloured number is the absolute change vs. the matched-budget Real-only baseline. Best per task within the matched-budget setting in bold .Method Cube → Pad Cup → Coaster Mango → Plate Overall 
+
+Succ. Rate Succ. Rate Succ. Rate Rate + / -
+
+Upper reference: Nreal =100 
+
+Real-only (full) 22 73.3 19 63.3 27 90.0 75.6 +14.5 
+
+Matched-budget setting: Nreal =25 , Nsyn =75 
+
+Real-only 18 60.0 14 46.7 23 76.7 61.1 DreamGen-style 14 46.7 11 36.7 19 63.3 48.9 −12.2 
+
+MimicDreamer-style 16 53.3 12 40.0 21 70.0 54.4 −6.7 
+
+GRA (ours) 20 66.7 17 56.7 25 83.3 68.9 +7.8 
+
+(i) Geometric routing outperforms pseudo-action labelling. GRA achieves the highest matched-budget mean ( 68 .9% , +7 .8 pt over Real-only) and is best on all three tasks, while using generated videos only as geometric supervision for the visual backbone. 
+
+(ii) Pseudo-action supervision hurts in our setting. Both pseudo-action baselines fall below Real-only ( −12 .2 pt for DreamGen-style, −6.7 pt for MimicDreamer-style), consistently across all three tasks. This is consistent with the precision sensitivity of delta actions, where small pseudo-label biases can compound during closed-loop execution. 
+
+Closing the gap to the full-data reference. GRA narrows the gap to the 100-demo Real-only reference from 14 .5 pt to 6.7 pt while using 4× fewer real demonstrations. 
+
+4.3 Diagnosing the Information Asymmetry 
+
+We examine why through three diagnostics that follow the data path: what generated frames pre-serve, what the trained backbone retains, and how the action head behaves. 
+
+Preservation gap (data). We first measure how spatial vs. control information transfers from gen-erated to real frames. We instantiate two frozen encoders: (i) an off-the-shelf SigLIP, as a no-fine-tuning reference; (ii) the GRA Stage-1 backbone, after our 5K-step waypoint pretraining. On top of each, we train two lightweight MLP probes (2-layer, 256 hidden units): a waypoint predictor (single-frame features → 2K-dim output) and a delta-action predictor (two consecutive frames con-catenated → 7-dim output). Each probe is trained with real frames as input ( R → R, in-domain) and with generated frames as input ( S → R, transfer); both variants are evaluated on the same real-6validation split. Since waypoint and ∆action targets live on different scales, we report normalized 
+
+L1 error in σ-units of validation labels (smaller is better). Three patterns emerge from Fig. 4. (i) Native asymmetry in vision features. On the off-the-shelf SigLIP, the in-domain probe error is 0.14 σ for waypoints versus 0.63 σ for ∆actions; spatial structure is approximately 4× more readily recoverable, even before any fine-tuning. (ii) Transfer asymmetry. A syn-trained waypoint probe attains 0.41 σ on real frames (only 0.31 σ above its in-domain bound on the Stage-1 backbone), whereas a syn-trained ∆action probe degrades to 1.38 σ
+
+on real frames, more than 3× the waypoint error and exceeding the in-domain ∆action error itself; this indicates substantially weaker cross-domain transfer for control than for spatial waypoints. (iii) Routing asymmetry. Stage-1 waypoint pretraining further reduces in-domain waypoint error (to 
+
+0.10 σ) yet increases ∆action error (to 0.82 σ), suggesting that the supervision route reshapes which information remains accessible in the backbone. 
+
+Figure 4: Information preservation gap measured with frozen vision features (mean over three tasks). 
+
+(a) Probe error under in-domain ( R → R) and generated-to-real ( S → R) evaluation for waypoint and 
+
+∆action targets. (b) Preservation gap, nL 1(S → R) − nL 1(R → R) ; lower is better. 
+
+Spatial probing (backbone). Having shown the asymmetry exists in the data, we next test whether the trained vision backbone retains accessible spatial structure. After training, we freeze each method’s ϕv and fit an MLP probe (mean-pooled features → 2D current end-effector pixel loca-tion) on held-out real frames. Since no method directly supervises this projection during training, the probe measures intrinsic spatial perception. We report mean ± standard deviation of L1 error over five random splits in the left columns of Tab. 2. As a no-fine-tuning reference, the off-the-shelf SigLIP encoder achieves 0.039 ± 0.004 (25 .7% within 10 px), confirming that all trained backbones add task-relevant spatial features beyond generic pretraining. Table 2: Diagnostic measurements on the trained vision backbone and the action head. Left: 
+
+spatial-readout L1 pixel error (mean ±std over five random splits; lower L1 / higher % <10 px is better). Right: per-step action error (lower is better). Best per column in bold .                                  
+
+> Spatial readout (frozen probe) Per-step action error
+> Method L1↓%<10 px ↑Pos. (mm) ↓Total L1↓
+> Real-only 0.022 ±0.003 51.3 11.09 0.090 DreamGen-style 0.029 ±0.018 47.7 10.04 0.080 MimicDreamer-style 0.020 ±0.003 51.5 13.36 0.071
+> GRA (ours) 0.020 ±0.002 50.4 9.26 0.060
+
+Two findings stand out from the spatial-readout columns. (i) GRA matches the strongest baseline. 
+
+GRA’s L1 (0.020 ) ties MimicDreamer-style on the mean and is the most consistent across seeds (std 
+
+0.002 ); the two methods stay within 1.1 pt on % <10 px. (ii) The backbone need not dominate to support strong control. MimicDreamer-style attains comparable probe accuracy yet its closed-loop 7success is 14 .5 pt below GRA (Tab. 1). We read this as designed equivalence rather than dominance :because GRA externalises spatial supervision into the auxiliary head h2D , the backbone reaches probing accuracy on par with the strongest pseudo-action baseline without needing to dominate it. 
+
+Action head contamination. Finally, we test whether pseudo-action supervision actively degrades the action head via a teacher-forcing protocol: for held-out real trajectories, we feed ground-truth observations to each policy and record predicted delta actions at every step, isolating per-step action quality from compounding errors. Per-step results are reported in the right columns of Tab. 2. Two observations follow from the per-step columns. (i) Position drift is reduced by 17% relative to Real-only ( 9.26 vs. 11 .09 mm) and 30% relative to MimicDreamer-style ( 13 .36 mm), showing that geometric pretraining sharpens spatial perception in a way that translates to per-step action accuracy. 
+
+(ii) Total L1 error drops from 0.090 on Real-only to 0.060 on GRA , suggesting that the action head benefits from spatial pretraining while avoiding synthetic pseudo-action noise. 
+
+4.4 Ablation Study 
+
+Table 3: Component ablations on cup →coaster .Variant SR (%) 
+
+GRA full 56.7 
+
+w/o Stage 1 (anchor only) 43.3 w/o Anchor (drop Lr 
+
+> 2D
+
+) 46.7 w/o Geometric Path (delta-action target) 36.7 All baselines achieve their lowest suc-cess rates on cup →coaster (Tab. 1), so we ablate GRA on this task. Tab. 3 shows that all three components con-tribute. (i) Stage 1 pretraining is the foundation. Removing it ( w/o Stage 1 :initialize from base OpenVLA-7B with 
+
+λ=0 .5 during cotraining) drops success to 43 .3% , below Real-only ( 46 .7% ). (ii) The anchor helps preserve Stage-1 structure. Removing 
+
+Lr 
+
+> 2D
+
+(w/o Anchor : λ=0 during Stage 2) reduces success to 46 .7% , suggesting that the persistent waypoint loss helps retain spatial features during action fine-tuning. (iii) The supervision content matters. Replacing waypoint targets with retargeted EE delta-action targets, while keeping the same auxiliary-routing design ( w/o Geometric Path ), performs worst ( 36 .7% , below Real-only), indicat-ing that routing synthetic supervision through the backbone is insufficient if the supervision content is itself control-side noisy. 
+
+## 5 Limitations and Conclusion 
+
+Limitations. GRA addresses one part of the synthetic-to-real stack: how generated videos should be routed into a VLA when only part of their signal is trustworthy. Its limits therefore lie both upstream and downstream. Upstream, the spatial-control asymmetry is observed empirically; characterising it across generators and extending “what survives” beyond geometry remain open problems. Down-stream, closed-loop performance remains tied to the scale of real action data; lifting this ceiling will require future generators or action decoders that yield trustworthy control signals. 
+
+Conclusion. We studied how generated robot videos should enter VLA training. The Asymmetric Preservation Principle identifies a structural gap between what video generation preserves reliably (spatial geometry) and what it fails to preserve reliably (control dynamics). GRA routes synthetic supervision accordingly: geometric targets supervise the vision backbone, while action learning re-mains grounded in real demonstrations. Under a matched real-data budget, this routing outperforms pseudo-action baselines on three real-robot tasks and narrows the gap to a Real-only policy trained with 4× more demonstrations. More broadly, our results suggest that synthetic-to-real pipelines should supervise what survives generation, rather than reconstruct what generation erases. 
+
+## 6 Acknowledgement 
+
+We thank Kevin Yuchen Ma and Guian Fang for their support in generating the reference data. We are also grateful to Qi Lv and Xiaokang Liu for their valuable advice and insightful discussions. 8References 
+
+[1] M. J. Kim, K. Pertsch, S. Karamcheti, T. Xiao, A. Balakrishna, S. Nair, R. Rafailov, E. Foster, G. Lam, P. Sanketi, et al. Openvla: An open-source vision-language-action model. arXiv preprint arXiv:2406.09246 , 2024. [2] K. Black, N. Brown, D. Driess, A. Esmail, M. Equi, C. Finn, N. Fusai, L. Groom, K. Hausman, B. Ichter, et al. π 0: A vision-language-action flow model for general robot control. arXiv preprint arXiv:2410.24164 , 2024. [3] P. Intelligence, K. Black, N. Brown, J. Darpinian, K. Dhabalia, D. Driess, A. Esmail, M. Equi, C. Finn, N. Fusai, et al. π0.5: a vision-language-action model with open-world generalization. 
+
+arXiv preprint arXiv:2504.16054 , 2025. [4] B. Zitkovich, T. Yu, S. Xu, P. Xu, T. Xiao, F. Xia, J. Wu, P. Wohlhart, S. Welker, A. Wahid, et al. Rt-2: Vision-language-action models transfer web knowledge to robotic control. In 
+
+Conference on Robot Learning , pages 2165–2183. PMLR, 2023. [5] A. Khazatsky, K. Pertsch, S. Nair, A. Balakrishna, S. Dasari, S. Karamcheti, S. Nasiriany, M. K. Srirama, L. Y. Chen, K. Ellis, et al. Droid: A large-scale in-the-wild robot manipulation dataset. arXiv preprint arXiv:2403.12945 , 2024. [6] A. O’Neill, A. Rehman, A. Maddukuri, A. Gupta, A. Padalkar, A. Lee, A. Pooley, A. Gupta, A. Mandlekar, A. Jain, et al. Open x-embodiment: Robotic learning datasets and rt-x models. In 2024 IEEE International Conference on Robotics and Automation (ICRA) , pages 6892– 6903. IEEE, 2024. [7] Y. Song, C. Liu, W. Mao, and M. Z. Shou. Mitty: Diffusion-based human-to-robot video generation. arXiv preprint arXiv:2512.17253 , 2025. [8] M. Lepert, J. Fang, and J. Bohg. Phantom: Training robots without robots using only human videos. arXiv preprint arXiv:2503.00779 , 2025. [9] H. Li, I. Zhang, R. Ouyang, X. Wang, Z. Zhu, Z. Yang, Z. Zhang, B. Wang, C. Ni, W. Qin, et al. Mimicdreamer: Aligning human and robot demonstrations for scalable vla training. 
+
+arXiv preprint arXiv:2509.22199 , 2025. [10] J. Jang, S. Ye, Z. Lin, J. Xiang, J. Bjorck, Y. Fang, F. Hu, S. Huang, K. Kundalia, Y.-C. Lin, et al. Dreamgen: Unlocking generalization in robot learning through video world models. 
+
+arXiv preprint arXiv:2505.12705 , 2025. [11] J. Bjorck, F. Casta˜ neda, N. Cherniadev, X. Da, R. Ding, L. Fan, Y. Fang, D. Fox, F. Hu, S. Huang, et al. Gr00t n1: An open foundation model for generalist humanoid robots. arXiv preprint arXiv:2503.14734 , 2025. [12] G. R. Team, S. Abeyruwan, J. Ainslie, J.-B. Alayrac, M. G. Arenas, T. Armstrong, A. Balakr-ishna, R. Baruch, M. Bauza, M. Blokzijl, et al. Gemini robotics: Bringing ai into the physical world. arXiv preprint arXiv:2503.20020 , 2025. [13] K. Pertsch, K. Stachowicz, B. Ichter, D. Driess, S. Nair, Q. Vuong, O. Mees, C. Finn, and S. Levine. Fast: Efficient action tokenization for vision-language-action models. arXiv preprint arXiv:2501.09747 , 2025. [14] Z. Bai, C. Gao, and M. Z. Shou. Evolve-vla: Test-time training from environment feedback for vision-language-action models. arXiv preprint arXiv:2512.14666 , 2025. [15] W. Zhang, H. Liu, Z. Qi, Y. Wang, X. Yu, J. Zhang, R. Dong, J. He, H. Wang, Z. Zhang, et al. Dreamvla: a vision-language-action model dreamed with comprehensive world knowledge. 
+
+Advances in Neural Information Processing Systems , 38:24195–24228, 2026. 9[16] H. Yuan, Z. Liang, A. Chen, Y. Wang, H. Li, P. Lin, Y. Huang, Z. Lei, T. Zhang, J. Zhang, et al. Qwen-robotmanip technical report: Alignment unlocks scale for robotic manipulation foundation models. arXiv preprint arXiv:2606.17846 , 2026. [17] P. Yang, H. Ci, Y. Chen, Q. Lv, H. Cai, and M. Z. Shou. Actionmap: Robot policy learning via voxel action heatmap. arXiv preprint arXiv:2606.06904 , 2026. [18] H. R. Walke, K. Black, T. Z. Zhao, Q. Vuong, C. Zheng, P. Hansen-Estruch, A. W. He, V. My-ers, M. J. Kim, M. Du, et al. Bridgedata v2: A dataset for robot learning at scale. In Conference on Robot Learning , pages 1723–1736. PMLR, 2023. [19] M. J. Kim, C. Finn, and P. Liang. Fine-tuning vision-language-action models: Optimizing speed and success. arXiv preprint arXiv:2502.19645 , 2025. [20] E. J. Hu, Y. Shen, P. Wallis, Z. Allen-Zhu, Y. Li, S. Wang, L. Wang, W. Chen, et al. Lora: Low-rank adaptation of large language models. Iclr , 1(2):3, 2022. [21] Y. Chen, K. Y. Ma, Q. Lv, Y. Lin, Z. Bai, C. Gao, and M. Z. Shou. Escaping the diversity trap in robotic manipulation via anchor-centric adaptation. arXiv preprint arXiv:2605.07381 , 2026. [22] J. Tobin, R. Fong, A. Ray, J. Schneider, W. Zaremba, and P. Abbeel. Domain randomization for transferring deep neural networks from simulation to the real world. In 2017 IEEE/RSJ international conference on intelligent robots and systems (IROS) , pages 23–30. IEEE, 2017. [23] A. Mandlekar, S. Nasiriany, B. Wen, I. Akinola, Y. Narang, L. Fan, Y. Zhu, and D. Fox. Mimicgen: A data generation system for scalable robot learning using human demonstrations. 
+
+arXiv preprint arXiv:2310.17596 , 2023. [24] A. Wang, B. Ai, B. Wen, C. Mao, C.-W. Xie, D. Chen, F. Yu, H. Zhao, J. Yang, J. Zeng, et al. Wan: Open and advanced large-scale video generative models. arXiv preprint arXiv:2503.20314 , 3(4):6, 2025. [25] H. Ci, X. Liu, P. Yang, Y. Song, and M. Z. Shou. H2r-grounder: A paired-data-free paradigm for translating human interaction videos into physically grounded robot videos. arXiv preprint arXiv:2512.09406 , 2025. [26] Z. Chen, Y. Li, Z. Liang, X. Chen, et al. Moto: Latent motion token as the bridging language for robot manipulation. arXiv preprint arXiv:2412.04445 , 2024. [27] S. Ye, J. Jang, B. Jeon, S. J. Joo, J. Yang, B. Peng, A. Mandlekar, R. Tan, Y.-W. Chao, B. Y. Lin, L. Liden, K. Lee, J. Gao, L. Zettlemoyer, D. Fox, and M. Seo. Latent action pretraining from videos. In Y. Yue, A. Garg, N. Peng, F. Sha, and R. Yu, editors, International Conference on Learning Representations , volume 2025, pages 28213–28239, 2025. [28] J. Liang, P. Tokmakov, R. Liu, S. Sudhakar, P. Shah, R. Ambrus, and C. Vondrick. Video generators are robot policies. arXiv preprint arXiv:2508.00795 , 2025. [29] A. Allshire, H. Choi, J. Zhang, D. McAllister, A. Zhang, C. M. Kim, T. Darrell, P. Abbeel, J. Malik, and A. Kanazawa. Visual imitation enables contextual humanoid control. arXiv preprint arXiv:2505.03729 , 2025. [30] M. Lepert, J. Fang, and J. Bohg. Masquerade: Learning from in-the-wild human videos using data-editing. arXiv preprint arXiv:2508.09976 , 2025. [31] Y. Li, Y. Deng, J. Zhang, J. Jang, M. Memmel, C. Garrett, F. Ramos, D. Fox, A. Li, A. Gupta, et al. Hamster: Hierarchical action models for open-world robot manipulation. In International Conference on Learning Representations , volume 2025, pages 24040–24068, 2025. 10 [32] Y. Hu, Y. Guo, P. Wang, X. Chen, Y.-J. Wang, J. Zhang, K. Sreenath, C. Lu, and J. Chen. Video prediction policy: A generalist robot policy with predictive visual representations. arXiv preprint arXiv:2412.14803 , 2024. [33] H. Luo, Y. Feng, W. Zhang, S. Zheng, Y. Wang, H. Yuan, J. Liu, C. Xu, Q. Jin, and Z. Lu. Being-h0: vision-language-action pretraining from large-scale human videos. arXiv preprint arXiv:2507.15597 , 2025. [34] X. Qiu, Y. Wang, J. Cai, Z. Chen, C. Lin, T.-H. Wang, and C. Gan. Lucibot: Automated robot policy learning from generated videos. arXiv preprint arXiv:2503.09871 , 2025. [35] J. Kirkpatrick, R. Pascanu, N. Rabinowitz, J. Veness, G. Desjardins, A. A. Rusu, K. Milan, J. Quan, T. Ramalho, A. Grabska-Barwinska, et al. Overcoming catastrophic forgetting in neural networks. Proceedings of the national academy of sciences , 114(13):3521–3526, 2017. [36] D. Qu, H. Song, Q. Chen, Y. Yao, X. Ye, Y. Ding, Z. Wang, J. Gu, B. Zhao, D. Wang, et al. Spatialvla: Exploring spatial representations for visual-language-action model. arXiv preprint arXiv:2501.15830 , 2025. [37] S. Nair, A. Rajeswaran, V. Kumar, C. Finn, and A. Gupta. R3m: A universal visual represen-tation for robot manipulation. arXiv preprint arXiv:2203.12601 , 2022. [38] S. Karamcheti, S. Nair, A. S. Chen, T. Kollar, C. Finn, D. Sadigh, and P. Liang. Language-driven representation learning for robotics. arXiv preprint arXiv:2302.12766 , 2023. [39] I. Radosavovic, T. Xiao, S. James, P. Abbeel, J. Malik, and T. Darrell. Real-world robot learning with masked visual pre-training. In Conference on Robot Learning , pages 416–426. PMLR, 2023. [40] X. Chen, Y. Chen, Y. Fu, N. Gao, J. Jia, W. Jin, H. Li, Y. Mu, J. Pang, Y. Qiao, et al. Internvla-m1: A spatially guided vision-language-action framework for generalist robot policy. arXiv preprint arXiv:2510.13778 , 2025. [41] Y. Chen, K. Q. Lin, and M. Z. Shou. Code2video: A code-centric paradigm for educational video generation. arXiv preprint arXiv:2510.01174 , 2025. [42] N. Kachaev, M. Kolosov, D. Zelezetsky, A. K. Kovalev, and A. I. Panov. Don’t blind your vla: Aligning visual representations for ood generalization. arXiv preprint arXiv:2510.25616 ,2025. [43] S. Liu, Z. Zeng, T. Ren, F. Li, H. Zhang, J. Yang, Q. Jiang, C. Li, J. Yang, H. Su, et al. Grounding dino: Marrying dino with grounded pre-training for open-set object detection. In 
+
+European conference on computer vision , pages 38–55. Springer, 2024. [44] N. Ravi, V. Gabeur, Y.-T. Hu, R. Hu, C. Ryali, T. Ma, H. Khedr, R. R¨ adle, C. Rolland, L. Gustafson, et al. Sam 2: Segment anything in images and videos. In International Confer-ence on Learning Representations , volume 2025, pages 28085–28128, 2025. [45] G. Pavlakos, D. Shan, I. Radosavovic, A. Kanazawa, D. Fouhey, and J. Malik. Reconstructing hands in 3d with transformers. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 9826–9836, 2024. [46] E. Todorov, T. Erez, and Y. Tassa. Mujoco: A physics engine for model-based control. In 
+
+IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) , 2012. 11 A Implementation Details 
+
+Table 4 consolidates the settings for the two stages of GRA and the three baselines (Real-only, DreamGen-style, MimicDreamer-style). All five runs use the same OpenVLA-OFT backbone [19] and the same optimiser, batch size, learning rate, and LoRA configuration; they differ only in the number of optimisation steps, the parameters that receive gradients, and the supervision route. Table 4: Training hyperparameters.                                 
+
+> Item Setting Optimiser AdamW, β= (0 .9,0.999) , wd 0.01 , bf16 Batch size 16 Learning rate 5×10 −4, cosine schedule LoRA rank / alpha 32 / 64 Hardware 1×H200
+> Stage 1 (GRA pretrain on Dsyn )Steps 5 K (200 warmup) LoRA on ϕv
+> Waypoint horizon K8
+> Stage 2 (GRA cotrain) and baselines Steps 10 K (500 warmup) LoRA on ϕv+ LM Action chunk L24 Anchor weight λ(GRA only) 0.5
+
+The auxiliary spatial head h2D is a 3-layer MLP with hidden dimensions 1024 → 512 → 256 , GELU activations, dropout 0.1, and a final linear projection to 2K = 16 outputs; Stage 2 cotraining loads its Stage 1 weights as the initialisation and continues to update all of its parameters. The synthetic robot videos at Stage 1 are produced by a Wan-2.2 model [24] fine-tuned with low-rank adapters under the recipe of Mitty [7]: starting from the released Mitty adapter, the adapter is further fine-tuned on the source human episodes used in this work and then run in inference mode to generate the videos. Fine-tuning and inference both run in bf16 mixed precision under the DiffSynth backend, with the task instruction ( “pick up X and place on Y” ) as the text prompt and conditioning frames sampled from the source human demonstration. A single shared adapter is reused across all three tasks, with only the conditioning frames changing between them; resolution, frame count, and frame rate are reported in the main-paper data description. 
+
+## B Data Pipeline and IDM Implementation 
+
+The five-stage source-to-waypoint pipeline is described in main-paper Sec. 3.2; this section lists the implementation choices that did not fit into the main text. Hand detection uses Ground-ing DINO [43] with the text prompt “hand” at confidence threshold 0.4, followed by SAM 2 [44], which refines the predicted bounding box into a segmentation mask used as a sanity filter against false positives from background humans. Hand reconstruction runs HaMeR [45] with its ViT-B backbone and the official MANO output head, producing 21 3D joints in the camera frame. Re-targeting and replay place the retargeted EE trajectory in MuJoCo with the official Franka MJCF model, which provides the kinematic constraints used during inverse kinematics. The DreamGen-style baseline additionally requires an inverse-dynamics model that produces per-step pseudo-actions on generated frames, with one such IDM trained per task. The IDM is a frozen SigLIP-base encoder followed by a 4-layer MLP that maps two consecutive 224 ×224 frames to a 7-dimensional output (position delta, orientation delta, binary gripper). Training uses the real teleoperation episodes for that task, an 80/20 episode-level split, AdamW with learning rate 10 −3
+
+and batch size 64 , and runs for 30 epochs. The trained IDM is then applied frame-by-frame to 12 each generated video, and the resulting per-step pseudo-actions are paired with the corresponding generated frames as the synthetic-side training data for the DreamGen-style baseline. 
+
+## C Evaluation Protocol 
+
+The hardware setup and the three tasks are described in main-paper Sec. 4.1. At inference time the action chunk size is L = 24 and the policy is rolled out in a receding-horizon fashion: at each control step the chunk is predicted and only the first action is executed before re-querying. Commands are issued to the robot at 10 Hz, and each trial times out at 30 s. A trial is counted as a success when the object is placed on or in the target region with the gripper released, judged by the experimenter at trial end; borderline cases—the object touches the target but slips off, or the gripper opens before contact—are recorded as failures. The same experimenter scores all four methods on the same trials. The three diagnostic probes in main-paper Sec. 4.3 share a common offline evaluation set: held-out real teleoperation trajectories not used in any training. The probes for the information preservation gap are 2-layer MLPs with hidden width 256 , GELU activations, and dropout 0.1, each trained for 
+
+5 K steps with Adam at learning rate 10 −3; the five random splits used to compute the mean ±std are episode-level, so frames from the same episode never appear in both training and validation, and errors are normalised to σ-units using the per-target standard deviation on the validation split, which makes waypoint and ∆a errors comparable on a single axis. The spatial readout probe shares this architecture and training schedule and is fitted on top of the frozen mean-pooled visual tokens of each method’s vision backbone, with the current 2D EE pixel location as the target. For the teacher-forcing per-step error , the position component is reported in millimetres after un-normalising the predicted ∆at back to the original action range; the total ℓ1 is the un-weighted ℓ1 over the full 7-DoF action. 
+
+## D Stage 1 Spatial Probe: Sanity Check 
+
+This section verifies that Stage 1 pretraining converges and that the spatial probe h2D generalises to held-out episodes from the Stage 1 corpus. For each task, six episodes are held out and evaluated against the geometric ground truth on the predicted K=8 future EE waypoints. The aggregate errors are reported in Table 5: all three tasks land within ∼3–5 % of image width, well below the spatial scale of the manipulation region. Table 5: Stage 1 sanity check: held-out waypoint MAE.         
+
+> Task MAE (px) Rel. (%) Cube 23.2 4.8 Cup 18.5 3.8 Mango 19.7 4.1
+
+To complement the aggregate error, three held-out episodes per task are visualised at five equi-spaced time steps drawn from the contact and post-contact phases of each rollout (Fig. 5). At every panel the K=8 future EE waypoints are rendered as eight dots connected by a polyline; red marks the geometric ground truth from the source-to-waypoint pipeline, and blue marks the prediction of 
+
+h2D . The blue waypoints stay tightly aligned with red across the approach, contact, and lift phases, including frames in which the gripper partially occludes the wrist. 13 Figure 5: Stage 1 spatial probe predictions on held-out episodes. Each task block shows three held-out episodes (rows) at five equi-spaced time steps (columns); the language instruction for the task is given above the block. At every panel the K=8 future EE waypoints are shown as eight dots connected by a polyline; red is the geometric ground truth from the source-to-waypoint pipeline, blue is the prediction of h2D .14

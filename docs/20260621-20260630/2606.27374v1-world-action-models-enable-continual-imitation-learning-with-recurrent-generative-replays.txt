@@ -1,0 +1,728 @@
+Title: World Action Models Enable Continual Imitation Learning with Recurrent Generative Replays
+
+URL Source: https://arxiv.org/pdf/2606.27374v1
+
+Published Time: Fri, 26 Jun 2026 01:30:47 GMT
+
+Number of Pages: 21
+
+Markdown Content:
+# World Action Models Enable Continual Imitation Learning with Recurrent Generative Replays 
+
+Manish Kumar Govind, Dominick Reilly, Smit Patel, Hieu Le, Srijan Das 
+
+Department of Computer Science University of North Carolina at Charlotte, United States 
+
+{mgovind, sdas24 }@charlotte.edu https://manishgovind.github.io/REGEN/ 
+
+Abstract: Going beyond predicting robot actions, World Action Models (WAMs) can also generate future visual observations. We build on this generative capabil-ity to propose Recurrent Generative Replay (R EGEN ), a continual imitation learn-ing framework that synthesizes pseudo-replay trajectories, enabling a robot policy to rehearse previously learned tasks without storing their original human demon-strations. During continual adaptation, R EGEN recursively queries the WAM to synthesize pseudo-replay trajectories conditioned only on prior task instructions and current-task observations. Experiments in both simulation and real-world ma-nipulation settings show that R EGEN reduces catastrophic forgetting by up to 50% 
+
+relative to sequential fine-tuning, while approaching the performance of privileged experience replay methods that require access to real replay data. Finally, we ana-lyze the factors limiting generated replay, identifying long-horizon visual degrada-tion and action-observation inconsistency as the primary bottlenecks. Our results establish WAMs as a promising foundation for continual robot learning without stored demonstrations. 
+
+Keywords: Continual Imitation Learning, World Action Model, Generative Re-play, Robot Control 
+
+“A robot that can imagine its past can continue learning its future.” 
+
+## 1 Introduction 
+
+Recently, World Action Models (WAMs) have emerged as a promising paradigm for robot imitation learning by unifying perception , prediction , and control within a single generative framework [1, 2, 3, 4]. As WAMs become general-purpose robot policies, continual adaptation to new tasks becomes inevitable. Yet, like other learned policies, they suffer from catastrophic forgetting when fine-tuned sequentially [5, 6, 7]. This raises a key question: can the same generative capabilities that make WAMs powerful also serve as a mechanism for retaining previously learned skills? 
+
+Existing approaches for mitigating catastrophic forgetting span two generations of robot policies: conventional visuomotor policies [8, 9] and more recent Vision-Language-Action (VLA) mod-els [10, 11, 12]. Across both paradigms, experience replay has emerged as the dominant continual learning strategy, where demonstrations from previous tasks are stored and replayed during adapta-tion to new tasks [13, 14, 15, 16, 17]. While highly effective, these approaches fundamentally rely on access to ground-truth demonstrations from prior tasks. This assumption is becoming increas-ingly impractical in modern robot learning. Earlier progress in robotics was driven by open datasets of robot demonstrations [18, 19, 20], whereas the emerging paradigm is centered around pretrained robot foundation models trained on large-scale proprietary datasets that are rarely released pub-licly [11, 12, 1]. Consequently, what we desire for continual learning is a replay mechanism that does not depend on access to true demonstrations from previous tasks. 
+
+> arXiv:2606.27374v1 [cs.RO] 25 Jun 2026
+
+WAMs are uniquely positioned to address exactly this challenge. By jointly modeling actions to-gether with future visual observations of the scene [1, 2, 3, 4], WAMs expose a generative interface capable of synthesizing trajectories for previously learned tasks conditioned only on their language instructions and current observations. In this work, we leverage this property to enable continual imitation learning without access to any real demonstrations from previous tasks as shown in Fig-ure 1. Learned Tasks  
+
+> WAM
+> Mitigate Catastrophic Forgetting
+> T1 T2
+> Hallucinates
+> Learned Task
+> Demos
+> Practical to Memory -Constrained Robots
+> New Task
+> T3
+> New task -T3
+> T1: Put the bowl in
+> cabinet.
+> T2: Push the Plate to
+> the front of stove.
+> Previously Learned
+> Task Instructions
+> Replay
+> Synthesized
+> Tasks
+> Base WAM
+> Policy
+> T2
+> Base WAM
+> Policy
+> T1
+> Sequential Finetuning
+> Base Policy
+> trained on
+> T1, T2
+> No Replay Buffer required
+> Continually
+> adapt to T3
+> No access to previous Tasks
+> Catastrophic
+> Forgetting
+
+…
+
+> Recurrent Generative Replay (Ours)
+
+Figure 1: Overview of R EGEN . Sequential fine-tuning of WAMs leads to catastrophic forgetting (top). REGEN leverages the WAM’s generative capabilities to hallucinate pseudo-demonstrations of previously learned tasks, replaying them along-side new task data to mitigate forgetting without storing any prior-task demonstrations. (bottom). Consequently, we propose Re current 
+
+Gen erative Replay (REGEN ), the first continual learning framework that leverages the WAM itself as a native generative replay mechanism. When adapting to a new task, REGEN generates pseudo-demonstrations for previous tasks by conditioning the WAM on prior task instructions and initial visual observations, then recurrently feeding back its own generated future observations. This yields completed synthetic trajectories of previous tasks. These pseudo-demonstrations are then combined with the new-task demonstrations during fine-tuning to substantially mitigate catastrophic forgetting without requiring human-collected demonstrations of past tasks. We evaluate R EGEN in both simulated [13] and real-world environments, where it reduces forgetting by over 50% relative to naive sequential fine-tuning and approaches the performance of experience replay methods that rely on privileged access to human-collected demonstrations from previous tasks. Critically, our analysis reveals that the effectiveness of R EGEN is fundamentally tied to two key limitations of current WAMs: (i) degradation in the visual fidelity of future observations during long-horizon recurrent generation, and (ii) 
+
+inconsistencies between predicted future observations and the corresponding generated actions. These findings indicate that, while R EGEN is not yet a complete substitute for real replay, the re-maining performance gap is primarily governed by the generative limitations of WAMs themselves. Consequently, improving the fidelity and consistency of WAM generation represents a key direction for closing the gap between pseudo-replay and real experience replay. We summarize our contributions as follows: • We propose Recurrent Generative Replay , the first replay-based continual imitation learning framework that leverages the generative capabilities of WAMs to synthesize re-play trajectories without storing real demonstrations from previous tasks. • We demonstrate that R EGEN substantially mitigates catastrophic forgetting in both simu-lated and real-world manipulation settings while preserving strong forward transfer. • We identify the primary limitations preventing generated replay from matching real ex-perience replay, namely long-horizon degradation in visual generation and inconsistencies between predicted observations and actions, highlighting key future directions for WAMs. 
+
+## 2 Related Work 
+
+Continual Imitation Learning. Continual learning aims to acquire a sequence of tasks without catastrophically forgetting previously learned skills [5]. Existing approaches fall into three cate-2gories: regularization-based methods that constrain weight updates [21, 22], rehearsal-based meth-ods that retain real samples from prior tasks [23], and architecture-based methods that allocate task-specific parameters [24, 25]. Prior work [13] adapts these to lifelong robot manipulation, and recent methods extend them with skill discovery, knowledge-distillation, or task-specific adapters combined with replay [15, 26, 27, 28]; a parallel line of work develops continual learning frame-works for VLAs which also replay [17, 29, 16]. Across this line of work, forgetting is mitigated by storing real demonstrations, regularizing weights, or partitioning parameters. R EGEN is orthogonal: rather than maintaining a growing buffer of real trajectories, it leverages the world-action model itself to simulate past tasks, providing replay examples without retaining any real demonstrations. 
+
+Generative Replay Unlike replay-based methods, generative replay synthesizes pseudo-samples for rehearsal [30]. In robotics, CRIL [31], t-DGR [32], and [33] train generative models on past data to prevent forgetting. In contrast, R EGEN generates trajectories from current task data to facilitate continual learning. R EGEN shares this current-data insight but targets continual imitation learning. By leveraging a unified world-action model [2] for both action and future-frame prediction, R EGEN 
+
+avoids model-based planning and eliminates the need for separate dynamics models. 
+
+World Models for robot control World models learn predictive representations of environment dynamics, originally proposed for sample-efficient reinforcement learning (RL) [34] and popular-ized by the Dreamer framework [35, 36]. While traditionally used for RL, the recent scaling of internet-level video data has enabled a new class of world-action models (WAMs) for imitation learning [2, 3, 37, 1, 38, 39]. WAMs leverage unified architectures to jointly predict actions and future observations. While these models internalize physical causality, adapting such high-capacity architectures to non-stationary task streams remains an open continual learning challenge. 
+
+## 3 Preliminaries: World Action Models 
+
+We consider robotic policies learned through imitation learning from expert demonstrations. For each task T k, specified by a natural language instruction ℓk, we assume access to a distribution of demonstrations Dk = {(ℓk, τ ki )}Nk
+
+> i=1
+
+, where each trajectory is defined as τ = {(ot, at)}Tt=1 with observation ot and action at at time step t. Each observation consists of multi-view RGB images 
+
+I1 
+
+> t
+
+, . . . , Int and the robot proprioceptive state qt.WAMs are policies that jointly model future actions and future visual observations conditioned on language instructions and current observation. Unlike conventional policies that predict only actions, WAMs build upon generative video foundation models [40, 41, 42, 43], enabling both control and explicit prediction of future scene dynamics. Formally, at each time step t, a WAM parameterized by θ models the joint conditional distribution 
+
+(˜ at:t+H , ˜ot+H , ˜rt) ∼ πθ (· | ot, ℓ ) , (1) where ˜at:t+H denotes a predicted action chunk of horizon H, ˜ot+H is the predicted future observa-tion, and ˜rt ∈ [0 , 1] estimates task progress. Specifically, ˜rt predicts the terminal reward R(oT , aT )
+
+from the current state and serves as a dense proxy for proximity to task completion. The model parameters θ are optimized over D using a combination of behavioral cloning losses for actions, generative objectives for future observations, and regression losses for reward prediction. 
+
+## 4 Method 
+
+In this section, we first present the continual learning problem formulation and then introduce our proposed framework for continual adaptation of WAMs, Recurrent Generative Replay (REGEN ). 
+
+4.1 Problem Formulation 
+
+We consider continual adaptation of a pretrained WAM policy. Specifically, let πθ0 denote a base policy trained on a set of previously learned tasks Tprev = {T 1, T2, . . . , TM }. Our goal is to adapt 
+
+πθ0 to a novel task Tk, where k > M , while preserving performance on all tasks in Tprev . This results into an updated policy πθk .3For each previous task Ti ∈ T prev , we assume access only to the task-level language instruction 
+
+ℓi; no action-observation trajectories from previous tasks are retained. In contrast, for the current task Tk, we assume access to both the task instruction ℓk and a distribution of expert demonstrations 
+
+Dk = {(ℓk, τ nk )}Nk
+
+> n=1
+
+, where τ nk denotes the n-th demonstration trajectory for task Tk. Conse-quently, continual learning must be performed using demonstrations from the current task alone, while relying only on language instructions to preserve previously acquired behaviors. A straightforward approach is to fine-tune the policy solely on Dk. However, because this objective contains no explicit information about previous tasks, it can lead to catastrophic forgetting. Replay-based continual learning methods mitigate this issue by jointly training on stored demonstrations from prior tasks and current-task data. Although such approaches are infeasible in our setting due to the absence of previous trajectories, WAMs provide a unique advantage in this regime. Since WAMs jointly model future actions and future visual observations, they expose a generative interface capable of simulating prior task dynamics conditioned only on task instructions. We leverage this property to enable continual robot learning without storing or replaying ground-truth demonstrations from previous tasks. 
+
+4.2 Recurrent Generative Replay 𝑜 !:#
+
+𝜋 !              
+
+> Pretrained
+> WAM Polic y
+> 𝑎 "!:!#$
+> Action chunk Future observation
+> “Put the bowl on
+> the stove”
+> Previous Task
+> Instruction ( 𝑙 𝑖 )
+> Continue until
+> Termination
+> (timestep 𝑻 )
+> Initialization
+> Recurrent
+> Generation
+> “Put the bowl on the stove”
+> 𝑜 !𝑜 "𝑜 #𝑜 $
+> “Put the cheese in the bowl ”
+> 𝑜 "!𝑜 ""𝑜 "#𝑜 "$
+> 𝑎 "!𝑎 ""𝑎 "#𝑎 "$
+> Pseudo -Trajectory Construction New Task Demonstration
+
+𝜋 !
+
+> (t=1)
+> 𝑎 "!
+> ⋯
+
+𝜋 !
+
+> (t=2)
+> 𝑎 ""
+
+𝜋 !
+
+> (t=3)
+> 𝑎 "#
+
+𝜋 !    
+
+> (t=4)
+> 𝑎 "%𝑜 ##𝑜 #%
+> 𝑜 #"𝑜 #!
+> ⋯
+> Initial
+> observations
+> from new task
+> 𝑙 &𝑙 &𝑙 &𝑙 &
+> 𝑜 #&
+> 𝑜 "!#$
+> ⋯
+
+Figure 2: Overview of the pseudo-trajectory generation process. Left: unrolled view of the R E-GEN . Right: REGEN rolls out πθ recurrently to construct a pseudo-trajectory for a previous task. The policy is seeded with new-task observations and the previous task’s instruction ℓi (initialization, blue), then each generated observation is fed back to produce the next (˜ ot, ˜at) pair (recurrent gener-ation, green) until timestep T . For simplicity, we illustrate the process with H = 1 .Given the current task Tk with demonstrations Dk and a pretrained policy πθ , R EGEN generates pseudo-demonstrations for each previous task Ti (i ≤ M ) by conditioning πθ on the corresponding task instruction ℓi and initializing the rollout from a real observation sampled from Tk, as illus-trated in Figure 2. At each rollout step, the model predicts an action chunk together with a future observation, which are recurrently fed back into the model to synthesize a pseudo-demonstration tra-jectory. Overall, pseudo-demonstration generation proceeds in three stages: initialization, recurrent generation, and termination, described below. 
+
+Initialization Phase ( 0 ≤ t < H ). The rollout is initialized using one full action chunk from the current-task demonstrations, since at least one real observation context is required before recursive generation can begin. During this phase, the model conditions on real observations sampled from 
+
+Dk, i.e., oin  
+
+> t
+
+= ot for 0 ≤ t < H .
+
+Recurrent Generation Phase ( H ≤ t ≤ Tmax ). After initialization, real observations are no longer used. Instead, the model recursively conditions on its own previously generated observations to produce a fully generative rollout: 
+
+oin  
+
+> t
+
+=
+
+(ot, 0 ≤ t < H, 
+
+˜ot where (˜ at−H:t, ˜ot) ∼ πθ
+
+ · | oin  
+
+> t−H
+
+, ℓ i
+
+ , H ≤ t ≤ Tmax . (2) This recursive feedback of generated observations induces a recurrent rollout process, enabling re-construction of prior-task trajectories without storing any previous task demonstrations. 4Termination. Trajectory generation terminates either at a maximum horizon Tmax or earlier when the goal-reward head consistently predicts task completion. Specifically, generation stops when the predicted goal reward ˜rt exceeds 0.99 for three consecutive rollout steps and attains 1.0 at least once within that interval. 
+
+Pseudo-Trajectory Construction. At each rollout step, the input observation is paired with the first action of the predicted action chunk to construct a pseudo-trajectory: 
+
+˜τ i =   oin  
+
+> t
+
+, ˜at
+
+ Ti 
+
+> t=0
+
+, (3) where ˜at denotes the first action of the chunk predicted at time step t, and Ti ≤ Tmax is the generated trajectory length for task Ti. The pseudo-demonstration set is formed by aggregating generated rollouts across all previous tasks, i.e., Rk = SMi=1 ˜τ i. The policy is then updated via behavioral cloning using the combined training set D+ 
+
+> k
+
+= Dk ∪ R k.
+
+Training Objective. The WAM policy is trained on the union of current-task demonstrations and replayed pseudo-trajectories, D+ 
+
+> k
+
+, in order to acquire the new task while retaining performance on previous tasks: 
+
+min  
+
+> θ
+
+E(ot,at,ℓ )∼D +
+
+> k
+
+[LBC (πθ (ot, ℓ ), at)] , (4) where LBC denotes the behavioral cloning loss. The task instruction ℓ corresponds to ℓk for samples from the current-task dataset Dk, and to ℓi for pseudo-trajectories generated for previous task Ti. In this way, R EGEN mitigates catastrophic forgetting by approximating the trajectory distributions of previous tasks without storing ground-truth demonstrations. 
+
+## 5 Experimental Results 
+
+We conduct experiments in both simulation and real-world environments to evaluate the effective-ness of the pseudo-trajectories generated by R EGEN . We further perform representation analyses to characterize the quality of the generated trajectories and assess their deviation from perfect demon-strations. 
+
+5.1 Implementation Details & Evaluation Metrics 
+
+We instantiate Cosmos-Policy [2] as the underlying WAM, initialized from Cosmos-Predict2-2B [40]. The model conditions on third-person RGB and wrist-camera observations, the current proprioceptive state, and a language instruction, and jointly predicts an action chunk of horizon 
+
+H = 16 at each timestep. Unless otherwise specified, we adopt the training hyperparameters of Cosmos-Policy. The base policy is trained for 10 K iterations, and each continual learning stage fine-tunes the policy for 2K iterations from the checkpoint of the previous stage. For replay generation, we synthesize 10 pseudo-trajectories per previous task in Tprev . Additional architectural details, hyperparameters and ablations are provided in the Appendix. For evaluation, we report three standard continual learning metrics: Forward Transfer (FWT) [13, 15], Negative Backward Transfer (NBT) [29], and Area Under the Curve (AUC) [13, 15]. All metrics are computed using task success rates. Let N denote the total number of tasks in the continual learning sequence, and let ri,j denote the success rate on task j after training up to task i. Then, FWT measures the ability to acquire new tasks, while NBT quantifies forgetting on previously learned tasks: 
+
+FWT = 1
+
+N
+
+> N
+
+X
+
+> n=1
+
+rn,n , NBT = 1
+
+N − 1 
+
+> N−1
+
+X
+
+> n=1
+
+NBT n, NBT n = 1
+
+N − n
+
+> N
+
+X
+
+> p=n+1
+
+ rn,n − rp,n 
+
+rn,n 
+
+
+
+Higher FWT indicates stronger forward transfer, whereas lower NBT corresponds to reduced for-getting. Finally, AUC measures overall performance across both current and previously learned tasks: 
+
+AUC = 1
+
+N
+
+> N
+
+X
+
+> n=1
+
+1
+
+N − n + 1 rn,n +
+
+> N
+
+X
+
+> p=n+1
+
+rp,n 
+
+!
+
+.
+
+5Higher AUC indicates better overall continual learning performance. 
+
+5.2 LIBERO Simulated Environment Setting. We conduct our simulation experiments on LIBERO benchmark [13]. We use three dif-ferent task suites that capture distinct forms of distribution shift:(LIBERO-Spatial, LIBERO-Object, LIBERO-Goal). Each suite contains 10 tasks, with 50 high-quality human-teleoperated demonstra-tions per task. Our continual learning setup involves two stages, similar to [15, 44] (1) a base stage and (2) a continual learning stage. In the base stage, six tasks are used for pretraining. During continual learning, the remaining four tasks are introduced sequentially, with one new task added at each continual learning stage. We follow the task ordering defined for each benchmark suite in [29]. 
+
+Baseline Methods. We compare R EGEN against the following continual learning approaches: 1. Sequential Fine-Tuning (Seq-FT) [13]: fine-tunes the base policy on each new task with-out any forgetting mitigation. 2. Sequential LoRA (Seq-LoRA) : a parameter-efficient variant of Seq-FT using LoRA [45] fine-tuning instead of full-model updates. 3. Elastic Weight Consolidation (EWC) [21]: a regularization based approach which penal-izes changes to parameters important for prior tasks. 4. PackNet [24]: an iterative pruning approach that frees up redundant parameters after train-ing each task and uses them to learn new tasks, keeping previously allocated parameters frozen. 5. Experience Replay (ER) [13]: a replay-based method that stores real demonstrations of prior tasks and mixes them with current-task data during training. We include ER only as an upper-bound reference, since it violates our no-real-data assumption. 6. Rollouts-as-Replay (RAR) : like R EGEN , stores no real trajectories; at each stage we roll out previous-task policies in the simulator and use the rollouts as replay data, isolating 
+
+simulator-rendered from model-generated replay. Table 1: Comparison of R EGEN with traditional continual learning methods on LIBERO bench-marks. LIBERO-Object LIBERO-Goal Method FWT ↑ NBT ↓ AUC ↑ FWT ↑ NBT ↓ AUC ↑                                                                        
+
+> Seq-FT [13] 92.7 82.6 24.9 90.6 100 10.3 Seq-LoRA [46] 93.5 99.9 11.1 83 99.6 9.3 EWC [47] 94.9 87.5 25.1 83.6 99.4 9.9 PackNet [24] 95.5 99.7 11.5 92 100 10.5 ER [23] 95.7 4.8 93.4 94.0 7.2 92.4
+> RAR 96.9 3.0 95.2 92.8 15.4 82.6
+> REGEN (ours) 95.3 26.1 65.5 90.6 44.9 40.8 LIBERO-Spatial Method FWT ↑NBT ↓AUC ↑
+> Seq-FT [13] 87.4 99.8 10.8 Seq-LoRA [46] 80 99.6 8.9 EWC [47] 86.4 99.9 10.3 PackNet [24] 87.2 100 10.4 ER [23] 86.4 -0.28 87.8
+> RAR 87 -0.02 85.8
+> REGEN †(ours) 87.2 17.6 76.9
+
+Results. Table 1 reports continual learning performance on the three LIBERO benchmark suites. Firstly, Sequential finetuning (Seq-FT) of WAMs achieves strong forward transfer but suffers from near-complete forgetting of previously learned tasks, consistent with prior observations in behavior cloning approaches [13, 15, 28]. While Seq-FT fully adapts to new tasks but forgets prior ones, the non-replay baselines (Seq-LoRA, EWC, and PackNet) retain partial knowledge of previous tasks but cannot perform them reliably. Next, ER yields the strongest overall retention and highest AUC, confirming that replaying real trajectories remains the most effective strategy for mitigating for-getting. However, we treat ER as a reference rather than a directly comparable baseline, since it assumes access to stored demonstrations from previous tasks, which violates the constraints of our setting. RAR mitigates forgetting by replaying simulator-collected rollouts, achieving performance close to ER with minimal forgetting and without storing real replay buffers. While effective in sim-ulation, such approaches are impractical in real-world robotics, where replay generation requires re-deploying the robot and re-interacting with the environment to collect trajectories. 6Table 2: VLA vs WAM: continual learning performance on LIBERO-Goal. Policy Method FWT ↑ NBT ↓ AUC ↑            
+
+> π0.5[12] Seq-FT 96.8 88 35.5 Cosmos-Policy [2] Seq-FT 90.6 100 10.3
+> REGEN (ours) 90.6 38.7 40.8
+
+Table 3: Results of R EGEN in real-world ma-nipulation environment. Method FWT ↑ NBT ↓ AUC ↑
+
+Seq-FT 50 96.3 13.8 
+
+REGEN (ours) 80 60.5 53.8 
+
+In contrast, R EGEN substantially reduces forgetting using only pseudo-trajectories generated by the WAM itself, without storing any real demonstrations. Compared to sequential fine-tuning, replay-ing pseudo-trajectories preserves forward transfer while significantly improving retention, reducing NBT by more than 50% across multiple suites. These results demonstrate that the generative capa-bilities of WAMs can serve as an effective form of implicit memory for continual robot learning. For LIBERO-Spatial, we introduce a variant denoted as REGEN †, where replay generation is initialized using object configurations sampled from previous tasks. This modification is necessary because the benchmark evaluates spatial generalization across object arrangements, and replay generation requires the corresponding objects to be present in the scene. For example, trajectories involving an object absent from the current environment cannot be reliably synthesized. 
+
+VLA vs. WAM Continual Learning. Compared to pretrained VLAs such as π0.5 [12], forgetting in WAMs is initially more severe; however, Table 2 shows that large-scale pretraining alone does not eliminate catastrophic forgetting. Despite being trained on substantially larger robotic datasets [18], 
+
+π0.5 still exhibits significant degradation on previously learned tasks during continual adaptation. In contrast, R EGEN achieves stronger retention using only generated pseudo-replays, by leverag-ing the joint action-observation generative modeling capability unique to WAMs. Unlike standard VLAs [10, 12, 48], WAMs can explicitly generate future observations, enabling replay without additional data collection or storage. These results suggest that WAMs provide a more suitable foundation for lifelong robot learning. 
+
+5.3 Real-world Single-arm Manipulation Setting. We conduct all real-world experiments on an xArm7 robotic manipulator. Our setup is shown in Figure 3. We evaluate R EGEN on three real-world manipulation tasks with a shared pick-and-place structure but different object-goal combinations: (T1) Put carrot in bowl: 
+
+place the carrot inside the bowl; (T2) Put carrot on plate: place the carrot on the plate; and 
+
+(T3) Put eggplant in bowl: place the eggplant inside the bowl. Tasks are introduced sequen-tially in the order T1 → T2 → T3 , with continual adaptation performed between stages. We collect 50 teleoperated demonstrations per task at a control frequency of 15 Hz. Evalu-ation metrics are averaged across the two continual learning stages, and each policy is evalu-ated over 10 randomized trials with varying object placements and initial gripper configurations. Primary Camera  
+
+> Wrist Camera xArm7
+> w/gripper
+> Tabletop
+> with objects (C )
+> (b)
+> (a) (d)
+
+Figure 3: Real-world setting. a), b), c) illustrate tasks T1, T2, and T3, respectively. d) Our real-robot setup consists of an xArm7 manipulator, a wrist-mounted gripper camera, and a third-person RGB-D camera. 
+
+Results. Table 3 reports the real-world contin-ual learning results. R EGEN substantially out-performs sequential fine-tuning, reducing NBT from 96 .3 to 60 .5 (approximately 40% less forgetting) while improving FWT from 50 to 
+
+80 . We attribute the improved forward transfer to the regularizing effect of replayed pseudo-trajectories, particularly in the low-data regime where the base policy is initialized from a sin-gle task and therefore exhibits a limited prior over manipulation behaviors. These results demonstrate that R EGEN extends effectively beyond simulation and provides a practical ap-proach for continual learning on real robotic systems. 75.4 REGEN Analyses 
+
+We further analyze how R EGEN preserves the policy’s internal representations and behaviors throughout continual learning and study two key design choices in pseudo-trajectory generation. 0.00 0.05 0.10 0.15 0.20 0.25 0.30 0.35 0.40 
+
+> Mean L2 centroid distance from base policy
+> Seq-FT
+> ER
+> REGEN
+> 0.30
+> 0.04
+> 0.12
+
+(a) Ground Truth Seq-FT REGEN  
+
+> Start
+> End
+
+(b) 
+
+Figure 4: (a) Action representation drift from the base policy after the first continual learning stage between Seq-FT, ER, and R EGEN (b) XY-projection of trajectories predicted by Seq-FT and R EGEN 
+
+on a previously seen task, compared with the ground-truth demonstration. 
+
+Action representation drift. Figure 4a measures the drift in action representations after the first continual learning stage. Across six base-stage tasks, we compute the centroid of the action latent representations under both the base policy and the continually adapted policy, and report the mean 
+
+ℓ2 distance between them. Seq-FT exhibits substantial representation drift (up to 0.3), consistent with its severe catastrophic forgetting. In contrast, both ER ( 0.04 ) and R EGEN (0.12 ) maintain sig-nificantly lower drift despite R EGEN relying solely on generated pseudo-trajectories. These results suggest that R EGEN effectively preserves the action representations learned by the base policy. 
+
+Visualization of predicted actions. In Fig. 4b, we additionally compare action trajectories gener-ated by Seq-FT and R EGEN against ground-truth demonstrations on a previously learned evaluation task by projecting trajectories onto the XY plane. Seq-FT produces trajectories that deviate substan-tially from the ground-truth behavior, exhibiting erratic motion patterns indicative of catastrophic forgetting. In contrast, trajectories generated by R EGEN closely match the ground-truth trajectory in both shape and temporal progression, indicating that the policy retains the underlying structure of previously acquired manipulation skills. 
+
+Number of replays. We study the effect of the number of pseudo-replays from R EGEN on con-tinual learning performance. On LIBERO-Object (Tab. 4), we find that 10 replay examples per task achieve lower NBT than 5 replays while maintaining comparable FWT and AUC, indicating that additional replay diversity improves backward transfer. 
+
+Termination criterion. We compare two stopping criteria for pseudo-trajectory generation: afixed-horizon rule that always rolls out to a maximum of H steps, and a goal-reward-based rule that terminates when a function defined on the WAM’s predicted value indicates task success. Ta-ble 5 reports the PSNR values for trajectories generated under both rules on LIBERO-Goal. The goal-reward-based rule yields higher-fidelity pseudo-trajectories (PSNR 20 .3), since early termina-tion avoids extending the rollout into low-quality frames generated through recursive prediction. We therefore adopt the goal-reward criterion in R EGEN . Specifically, the reward function operates over a sliding window of 3 consecutive value predictions and signals task success when at least one prediction reaches 1.0 and the remaining exceed 0.99 .
+
+## 6 Limitations of R EGEN & Future Direction 
+
+Although R EGEN substantially mitigates catastrophic forgetting without access to previous-task data, a performance gap remains relative to the privileged ER baseline. We identify the primary bottleneck as the limited generative fidelity of current WAMs. 
+
+Visual fidelity of generated observations. The first limitation concerns the quality of pseudo-trajectories generated across successive continual learning stages. Figure 5 (Left) shows a monotonic 8Table 4: Effect of the number of pseudo-replays on LIBERO-Object. # No. of Replays FWT ↑ NBT ↓ AUC ↑
+
+5 96.5 33 62.5 10 96.1 31 62.3 Table 5: Effect of the termination crite-rion in R EGEN .Termination criterion PSNR ( ↑)Fixed Horizon with H=200 18.4 Fixed Horizon with H=150 19.5 Goal-reward function 20.3 S1 S2 S3 S4          
+
+> Continual learning stages
+> 16
+> 18
+> 20
+> 22
+> 24
+> PSNR
+> REGEN
+> S1 S2 S3 S4
+> Continual learning stages
+> 0
+> 10
+> 20
+> 30
+> 40
+> 50
+> 60
+> NBT
+> REGEN RAR
+> S1 S2 S3 S4
+> Continual learning stages
+> 0
+> 20
+> 40
+> 60
+> 80
+> 100
+> % Successful Trajs.  83
+> 65 62
+> 44
+> 42
+> 20
+> 30
+> 38
+> Imagined Grounded Actions
+
+Figure 5: (Left) PSNR (with std) of generated trajectories from R EGEN across CL stages on LIBERO-Goal. (Middle) NBT comparison between R EGEN and RAR. (Right) successful imag-ined trajectories vs. successful action grounded trajectories on LIBERO-Goal. decline in the PSNR of synthesized trajectories as continual adaptation progresses, with qualitative examples of this degradation across stages shown in Appendix C.3. We attribute this degradation to two compounding factors: (i) visual artifacts and blurriness in generated observations that are recursively reused as conditioning inputs for future prediction, and (ii) accumulation of errors as the model is repeatedly updated over continual learning stages. Importantly, the reduction in PSNR correlates with increased NBT, suggesting that lower-fidelity pseudo-trajectories provide progres-sively weaker supervisory signals for retaining previously learned behaviors. This observation is further supported by the comparison with RAR. Replacing simulator-generated replay trajectories with WAM-generated pseudo-trajectories leads to a substantial drop in continual learning perfor-mance (Fig. 5, middle), indicating that generative fidelity is a key limiting factor for replay quality. 
+
+Mismatch between predicted states and actions. A second limitation arises from inconsistencies between generated future observations and the corresponding predicted actions. Figure 5 (Right) compares the imagined success rate, evaluated from generated observations, with the grounded suc-cess rate obtained by executing the predicted actions in the simulator. At Stage 1, the model achieves an imagined success rate of 83% but only a grounded success rate of 42% . This discrepancy indicates that the WAM frequently predicts visually plausible successful outcomes while generating actions that are physically insufficient to accomplish the task (See Appendix C.4). We hypothesize that this decoupling stems from degradation in generated observations, which weakens the alignment between visual predictions and action dynamics. Consequently, improving the generative consis-tency and visual fidelity of WAMs remains a future direction for narrowing the performance gap to experience replay. 
+
+## 7 Conclusion 
+
+We presented Recurrent Generative Replay (R EGEN ), the first continual learning framework to leverage the generative capabilities of WAMs as a native replay mechanism. By synthesizing pseudo-demonstrations conditioned on prior task instructions, current visual observations, and its own generated observations, R EGEN mitigates catastrophic forgetting without requiring access to stored demonstrations from previous tasks. Experiments in both simulation and real-world manip-ulation demonstrate its effectiveness for continual robot learning. Finally, our analysis identifies long-horizon degradation in generated observations as the primary bottleneck, highlighting an im-portant direction for future advances in WAMs and generative replay. 9Acknowledgments 
+
+This work was supported in part by the National Science Foundation (IIS-2245652) and the Univer-sity of North Carolina at Charlotte. Computational resources were provided by the NSF National AI Research Resource Pilot (NAIRR240338) and NCShare. 
+
+## References 
+
+[1] S. Ye, Y. Ge, K. Zheng, S. Gao, S. Yu, G. Kurian, S. Indupuru, Y. L. Tan, C. Zhu, J. Xi-ang, A. Malik, K. Lee, W. Liang, N. Ranawaka, J. Gu, Y. Xu, G. Wang, F. Hu, A. Narayan, J. Bjorck, J. Wang, G. Kim, D. Niu, R. Zheng, Y. Xie, J. Wu, Q. Wang, R. Julian, D. Xu, Y. Du, Y. Chebotar, S. Reed, J. Kautz, Y. Zhu, L. J. Fan, and J. Jang. World action models are zero-shot policies, 2026. URL https://arxiv.org/abs/2602.15922 .[2] M. J. Kim, Y. Gao, T.-Y. Lin, Y.-C. Lin, Y. Ge, G. Lam, P. Liang, S. Song, M.-Y. Liu, C. Finn, et al. Cosmos policy: Fine-tuning video models for visuomotor control and planning. arXiv preprint arXiv:2601.16163 , 2026. [3] L. Li, Q. Zhang, Y. Luo, S. Yang, R. Wang, F. Han, M. Yu, Z. Gao, N. Xue, X. Zhu, Y. Shen, and Y. Xu. Causal world modeling for robot control. arXiv preprint arXiv:2601.21998 , 2026. [4] A. Ye, B. Wang, C. Ni, G. Huang, G. Zhao, H. Li, H. Li, J. Li, J. Lv, J. Liu, M. Cao, P. Li, Q. Deng, W. Mei, X. Wang, X. Chen, X. Zhou, Y. Wang, Y. Chang, Y. Li, Y. Zhou, Y. Ye, Z. Liu, and Z. Zhu. Gigaworld-policy: An efficient action-centered world-action model. arXiv preprint arXiv:2603.17240 , 2026. [5] R. M. French. Catastrophic forgetting in connectionist networks. Trends in cognitive sciences ,3(4):128–135, 1999. [6] Y. Luo, Z. Yang, F. Meng, Y. Li, J. Zhou, and Y. Zhang. An empirical study of catastrophic forgetting in large language models during continual fine-tuning. IEEE/ACM Transactions on Audio, Speech, and Language Processing , 33:3776–3786, 2025. doi:10.1109/TASLPRO.2025. 3606231. [7] I. Shenfeld, J. Pari, and P. Agrawal. Rl’s razor: Why online reinforcement learning forgets less. In International Conference on Learning Representations (ICLR) , 2026. [8] C. Chi, Z. Xu, S. Feng, E. Cousineau, Y. Du, B. Burchfiel, R. Tedrake, and S. Song. Diffusion policy: Visuomotor policy learning via action diffusion, 2024. URL https://arxiv.org/ abs/2303.04137 .[9] T. Zhao, V. Kumar, S. Levine, and C. Finn. Learning fine-grained bimanual manipulation with low-cost hardware. In Proceedings of Robotics: Science and Systems (RSS) , 2023. [10] M. J. Kim, K. Pertsch, S. Karamcheti, T. Xiao, A. Balakrishna, S. Nair, R. Rafailov, E. Foster, G. Lam, P. Sanketi, Q. Vuong, T. Kollar, B. Burchfiel, R. Tedrake, D. Sadigh, S. Levine, P. Liang, and C. Finn. Openvla: An open-source vision-language-action model, 2024. URL 
+
+https://arxiv.org/abs/2406.09246 .[11] K. Black, N. Brown, D. Driess, A. Esmail, M. Equi, C. Finn, N. Fusai, L. Groom, K. Haus-man, B. Ichter, S. Jakubczak, T. Jones, L. Ke, S. Levine, A. Li-Bell, M. Mothukuri, S. Nair, K. Pertsch, L. X. Shi, J. Tanner, Q. Vuong, A. Walling, H. Wang, and U. Zhilinsky. π0: A vision-language-action flow model for general robot control, 2024. URL https://arxiv. org/abs/2410.24164 .[12] P. Intelligence, K. Black, N. Brown, J. Darpinian, K. Dhabalia, D. Driess, A. Esmail, M. Equi, C. Finn, N. Fusai, M. Y. Galliker, D. Ghosh, L. Groom, K. Hausman, B. Ichter, S. Jakubczak, T. Jones, L. Ke, D. LeBlanc, S. Levine, A. Li-Bell, M. Mothukuri, S. Nair, K. Pertsch, A. Z. 10 Ren, L. X. Shi, L. Smith, J. T. Springenberg, K. Stachowicz, J. Tanner, Q. Vuong, H. Walke, A. Walling, H. Wang, L. Yu, and U. Zhilinsky. π0.5: a vision-language-action model with open-world generalization, 2025. URL https://arxiv.org/abs/2504.16054 .[13] B. Liu, Y. Zhu, C. Gao, Y. Feng, Q. Liu, Y. Zhu, and P. Stone. Libero: Benchmarking knowl-edge transfer for lifelong robot learning. Advances in Neural Information Processing Systems ,36:44776–44791, 2023. [14] Y. Zhu, P. Stone, and Y. Zhu. Bottom-up skill discovery from unsegmented demonstrations for long-horizon robot manipulation. IEEE Robotics and Automation Letters , 7(2):4126–4133, 2022. [15] W. Wan, Y. Zhu, R. Shah, and Y. Zhu. Lotus: Continual imitation learning for robot manip-ulation through unsupervised skill discovery, 2024. URL https://arxiv.org/abs/2311. 02058 .[16] Y. Liu, H. Li, S. Tian, Y. Qin, Y. Chen, Y. Zheng, Y. Huang, and D. Zhao. Towards long-lived robots: Continual learning vla models via reinforcement fine-tuning, 2026. URL https: //arxiv.org/abs/2602.10503 .[17] Y. Wu, G. Wang, Z. Yang, T. Deng, M. Yao, B. Sheil, and H. Wang. Continually evolving skill knowledge in vision language action model, 2026. URL https://arxiv.org/abs/2511. 18085 .[18] O. X.-E. Collaboration, A. O’Neill, A. Rehman, A. Gupta, A. Maddukuri, A. Gupta, A. Padalkar, A. Lee, A. Pooley, A. Gupta, A. Mandlekar, A. Jain, A. Tung, A. Bewley, A. Her-zog, A. Irpan, A. Khazatsky, A. Rai, A. Gupta, A. Wang, A. Kolobov, A. Singh, A. Garg, A. Kembhavi, A. Xie, A. Brohan, A. Raffin, A. Sharma, A. Yavary, A. Jain, A. Balakr-ishna, A. Wahid, B. Burgess-Limerick, B. Kim, B. Sch¨ olkopf, B. Wulfe, B. Ichter, C. Lu, C. Xu, C. Le, C. Finn, C. Wang, C. Xu, C. Chi, C. Huang, C. Chan, C. Agia, C. Pan, C. Fu, C. Devin, D. Xu, D. Morton, D. Driess, D. Chen, D. Pathak, D. Shah, D. B¨ uchler, D. Ja-yaraman, D. Kalashnikov, D. Sadigh, E. Johns, E. Foster, F. Liu, F. Ceola, F. Xia, F. Zhao, F. V. Frujeri, F. Stulp, G. Zhou, G. S. Sukhatme, G. Salhotra, G. Yan, G. Feng, G. Schiavi, G. Berseth, G. Kahn, G. Yang, G. Wang, H. Su, H.-S. Fang, H. Shi, H. Bao, H. B. Amor, H. I. Christensen, H. Furuta, H. Bharadhwaj, H. Walke, H. Fang, H. Ha, I. Mordatch, I. Ra-dosavovic, I. Leal, J. Liang, J. Abou-Chakra, J. Kim, J. Drake, J. Peters, J. Schneider, J. Hsu, J. Vakil, J. Bohg, J. Bingham, J. Wu, J. Gao, J. Hu, J. Wu, J. Wu, J. Sun, J. Luo, J. Gu, J. Tan, J. Oh, J. Wu, J. Lu, J. Yang, J. Malik, J. Silv´ erio, J. Hejna, J. Booher, J. Tompson, J. Yang, J. Salvador, J. J. Lim, J. Han, K. Wang, K. Rao, K. Pertsch, K. Hausman, K. Go, K. Gopalakrishnan, K. Goldberg, K. Byrne, K. Oslund, K. Kawaharazuka, K. Black, K. Lin, K. Zhang, K. Ehsani, K. Lekkala, K. Ellis, K. Rana, K. Srinivasan, K. Fang, K. P. Singh, K.-H. Zeng, K. Hatch, K. Hsu, L. Itti, L. Y. Chen, L. Pinto, L. Fei-Fei, L. Tan, L. J. Fan, L. Ott, L. Lee, L. Weihs, M. Chen, M. Lepert, M. Memmel, M. Tomizuka, M. Itkina, M. G. Castro, M. Spero, M. Du, M. Ahn, M. C. Yip, M. Zhang, M. Ding, M. Heo, M. K. Srirama, M. Sharma, M. J. Kim, M. Z. Irshad, N. Kanazawa, N. Hansen, N. Heess, N. J. Joshi, N. Suenderhauf, N. Liu, N. D. Palo, N. M. M. Shafiullah, O. Mees, O. Kroemer, O. Bastani, P. R. Sanketi, P. T. Miller, P. Yin, P. Wohlhart, P. Xu, P. D. Fagan, P. Mitrano, P. Sermanet, P. Abbeel, P. Sun-daresan, Q. Chen, Q. Vuong, R. Rafailov, R. Tian, R. Doshi, R. Mart’in-Mart’in, R. Baijal, R. Scalise, R. Hendrix, R. Lin, R. Qian, R. Zhang, R. Mendonca, R. Shah, R. Hoque, R. Ju-lian, S. Bustamante, S. Kirmani, S. Levine, S. Lin, S. Moore, S. Bahl, S. Dass, S. Sonawani, S. Tulsiani, S. Song, S. Xu, S. Haldar, S. Karamcheti, S. Adebola, S. Guist, S. Nasiriany, S. Schaal, S. Welker, S. Tian, S. Ramamoorthy, S. Dasari, S. Belkhale, S. Park, S. Nair, S. Mir-chandani, T. Osa, T. Gupta, T. Harada, T. Matsushima, T. Xiao, T. Kollar, T. Yu, T. Ding, T. Davchev, T. Z. Zhao, T. Armstrong, T. Darrell, T. Chung, V. Jain, V. Kumar, V. Vanhoucke, V. Guizilini, W. Zhan, W. Zhou, W. Burgard, X. Chen, X. Chen, X. Wang, X. Zhu, X. Geng, X. Liu, X. Liangwei, X. Li, Y. Pang, Y. Lu, Y. J. Ma, Y. Kim, Y. Chebotar, Y. Zhou, Y. Zhu, 11 Y. Wu, Y. Xu, Y. Wang, Y. Bisk, Y. Dou, Y. Cho, Y. Lee, Y. Cui, Y. Cao, Y.-H. Wu, Y. Tang, Y. Zhu, Y. Zhang, Y. Jiang, Y. Li, Y. Li, Y. Iwasawa, Y. Matsuo, Z. Ma, Z. Xu, Z. J. Cui, Z. Zhang, Z. Fu, and Z. Lin. Open X-Embodiment: Robotic learning datasets and RT-X mod-els. https://arxiv.org/abs/2310.08864 , 2023. [19] Q. Bu, J. Cai, L. Chen, X. Cui, Y. Ding, S. Feng, X. He, X. Huang, et al. Agibot world colosseo: A large-scale manipulation platform for scalable and intelligent embodied systems. In 2025 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) . IEEE, 2025. [20] Y. Tian, Y. Yang, Y. Xie, Z. Cai, X. Shi, N. Gao, H. Liu, X. Jiang, Z. Qiu, F. Yuan, Y. Li, P. Wang, J. Cai, J. Zeng, H. Dong, and J. Pang. Interndata-a1: Pioneering high-fidelity synthetic data for pre-training generalist policy. arXiv preprint arXiv:2511.16651 , 2025. [21] J. Kirkpatrick, R. Pascanu, N. Rabinowitz, J. Veness, G. Desjardins, A. A. Rusu, K. Milan, J. Quan, T. Ramalho, A. Grabska-Barwinska, et al. Overcoming catastrophic forgetting in neural networks. Proceedings of the national academy of sciences , 114(13):3521–3526, 2017. [22] F. Zenke, B. Poole, and S. Ganguli. Continual learning through synaptic intelligence. In D. Precup and Y. W. Teh, editors, Proceedings of the 34th International Conference on Ma-chine Learning , volume 70 of Proceedings of Machine Learning Research , pages 3987–3995. PMLR, 06–11 Aug 2017. URL https://proceedings.mlr.press/v70/zenke17a.html .[23] A. Chaudhry, M. Rohrbach, M. Elhoseiny, T. Ajanthan, P. K. Dokania, P. H. Torr, and M. Ran-zato. On tiny episodic memories in continual learning. arXiv preprint arXiv:1902.10486 ,2019. [24] A. Mallya and S. Lazebnik. Packnet: Adding multiple tasks to a single network by iterative pruning, 2018. URL https://arxiv.org/abs/1711.05769 .[25] A. A. Rusu, N. C. Rabinowitz, G. Desjardins, H. Soyer, J. Kirkpatrick, K. Kavukcuoglu, R. Pascanu, and R. Hadsell. Progressive neural networks. arXiv preprint arXiv:1606.04671 ,2016. [26] K. Roy, A. Dissanayake, B. Tidd, and P. Moghadam. M2distill: Multi-modal distillation for lifelong imitation learning. In 2025 IEEE International Conference on Robotics and Automa-tion (ICRA) , pages 1429–1435, 2025. doi:10.1109/ICRA55743.2025.11128857. [27] Z. Liu, J. Zhang, K. Asadi, Y. Liu, D. Zhao, S. Sabach, and R. Fakoor. Tail: Task-specific adapters for imitation learning with large pretrained models, 2024. URL https://arxiv. org/abs/2310.05905 .[28] R. R¨ omer, Y. Zhang, Y. Li, and A. P. Schoellig. Clare: Continual learning for vision-language-action models via autonomous adapter routing and expansion. IEEE Robotics and Automation Letters , page 1–8, 2026. ISSN 2377-3774. doi:10.1109/lra.2026.3693992. URL http://dx. doi.org/10.1109/LRA.2026.3693992 .[29] H. Liu, C. Kim, B. Liu, M. Liu, and Y. Zhu. Pretrained vision-language-action models are surprisingly resistant to forgetting in continual learning, 2026. URL https://arxiv.org/ abs/2603.03818 .[30] H. Shin, J. K. Lee, J. Kim, and J. Kim. Continual learning with deep generative replay, 2017. URL https://arxiv.org/abs/1705.08690 .[31] C. Gao, H. Gao, S. Guo, T. Zhang, and F. Chen. Cril: Continual robot imitation learning via generative and prediction model. In 2021 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) , pages 6747–5754. IEEE, 2021. 12 [32] W. Yue, B. Liu, and P. Stone. t-dgr: A trajectory-based deep generative replay method for continual learning in decision making. arXiv preprint arXiv:2401.02576 , 2024. [33] M. Pan, W. Zhang, G. Chen, X. Zhu, S. Gao, Y. Wang, and X. Yang. Continual visual rein-forcement learning with a life-long world model. In Joint European Conference on Machine Learning and Knowledge Discovery in Databases , pages 146–162. Springer, 2025. [34] D. Ha and J. Schmidhuber. Recurrent world models facilitate policy evolu-tion. In Advances in Neural Information Processing Systems 31 , pages 2451– 2463. Curran Associates, Inc., 2018. URL https://papers.nips.cc/paper/ 7512-recurrent-world-models-facilitate-policy-evolution . https: //worldmodels.github.io .[35] D. Hafner, T. Lillicrap, J. Ba, and M. Norouzi. Dream to control: Learning behaviors by latent imagination, 2020. URL https://arxiv.org/abs/1912.01603 .[36] D. Hafner, J. Pasukonis, J. Ba, and T. Lillicrap. Mastering diverse domains through world models, 2024. URL https://arxiv.org/abs/2301.04104 .[37] AgiBot-World-Contributors, Q. Bu, J. Cai, L. Chen, X. Cui, Y. Ding, S. Feng, S. Gao, X. He, X. Hu, X. Huang, S. Jiang, Y. Jiang, C. Jing, H. Li, J. Li, C. Liu, Y. Liu, Y. Lu, J. Luo, P. Luo, Y. Mu, Y. Niu, Y. Pan, J. Pang, Y. Qiao, G. Ren, C. Ruan, J. Shan, Y. Shen, C. Shi, M. Shi, M. Shi, C. Sima, J. Song, H. Wang, W. Wang, D. Wei, C. Xie, G. Xu, J. Yan, C. Yang, L. Yang, S. Yang, M. Yao, J. Zeng, C. Zhang, Q. Zhang, B. Zhao, C. Zhao, J. Zhao, and J. Zhu. Agibot world colosseo: A large-scale manipulation platform for scalable and intelligent embodied systems, 2025. URL https://arxiv.org/abs/2503.06669 .[38] C. Zhu, R. Yu, S. Feng, B. Burchfiel, P. Shah, and A. Gupta. Unified world models: Coupling video and action diffusion for pretraining on large robotic datasets, 2025. URL https:// arxiv.org/abs/2504.02792 .[39] M. Team, C. Xiang, F. Bao, H. Liu, H. Tan, H. Bi, J. Li, J. Liu, J. Pang, K. Jing, L. Liu, M. Cai, R. Cui, R. Zhao, R. Wang, S. Huang, Y. Feng, Y. Rong, Z. Wang, and J. Zhu. Motubrain: An advanced world action model for robot control, 2026. URL https://arxiv.org/abs/ 2604.27792 .[40] NVIDIA. Cosmos-predict2: World simulation model for physical ai, 2025. URL https: //github.com/nvidia-cosmos/cosmos-predict2 .[41] T. Wan, A. Wang, B. Ai, B. Wen, C. Mao, C.-W. Xie, D. Chen, F. Yu, H. Zhao, J. Yang, et al. Wan: Open and advanced large-scale video generative models. arXiv preprint arXiv:2503.20314 , 2025. [42] T. Seedance, D. Chen, L. Chen, X. Chen, Y. Chen, Z. Chen, Z. Chen, F. Cheng, T. Cheng, Y. Cheng, et al. Seedance 2.0: Advancing video generation for world complexity. arXiv preprint arXiv:2604.14148 , 2026. [43] Z. Zheng, X. Peng, Y. Lou, C. Shen, T. Young, X. Guo, B. Wang, H. Xu, H. Liu, M. Jiang, W. Li, Y. Wang, A. Ye, G. Ren, Q. Ma, W. Liang, X. Lian, X. Wu, Y. Zhong, Z. Li, C. Gong, G. Lei, L. Cheng, L. Zhang, M. Li, R. Zhang, S. Hu, S. Huang, X. Wang, Y. Zhao, Y. Wang, Z. Wei, and Y. You. Open-sora 2.0: Training a commercial-level video generation model in $200k, 2026. URL https://arxiv.org/abs/2503.09642 .[44] F. Yu, M. Tiezzi, T. Apicella, C. Beyan, and V. Murino. Lifelong imitation learning with multimodal latent replay and incremental adjustment, 2026. URL https://arxiv.org/abs/ 2603.10929 .13 [45] E. J. Hu, Y. Shen, P. Wallis, Z. Allen-Zhu, Y. Li, S. Wang, L. Wang, and W. Chen. Lora: Low-rank adaptation of large language models. In International Conference on Learning Rep-resentations , 2022. URL https://openreview.net/forum?id=nZeVKeeFYf9 .[46] D. Lee, M. Yoo, W. K. Kim, W. Choi, and H. Woo. Incremental learning of retrievable skills for efficient continual task adaptation. Advances in Neural Information Processing Systems ,37:17286–17312, 2024. [47] A. D. Edwards, H. Sahni, Y. Schroecker, and C. L. Isbell. Imitating latent policies from obser-vation, 2019. URL https://arxRobotiv.org/abs/1805.07914 .[48] Q. Bu, Y. Yang, J. Cai, S. Gao, G. Ren, M. Yao, P. Luo, and H. Li. Univla: Learning to act anywhere with task-centric latent actions, 2025. URL https://arxiv.org/abs/2505. 06111 .[49] C. Raffel, N. Shazeer, A. Roberts, K. Lee, S. Narang, M. Matena, Y. Zhou, W. Li, and P. J. Liu. Exploring the limits of transfer learning with a unified text-to-text transformer, 2023. URL 
+
+https://arxiv.org/abs/1910.10683 .[50] T. Karras, M. Aittala, T. Aila, and S. Laine. Elucidating the design space of diffusion-based generative models, 2022. URL https://arxiv.org/abs/2206.00364 .
+
+## Appendix A Implementation Details 
+
+We provide the implementation details of the base WAM and the R EGEN algorithm. 
+
+A.1 Base WAM implementation 
+
+In REGEN , we use Cosmos-Policy [2] as our WAM, initialized from Cosmos-Predict2-2B weights [40]. Cosmos-Policy is built on a latent video diffusion model that, conditioned on the current observation (primary RGB image, wrist RGB image, and robot proprioceptive state) and a natural-language task instruction, jointly predicts an action chunk, future observations, and a reward value. Visual observations are encoded with the Wan2.1 spatiotemporal VAE tokenizer [41], and language instructions are encoded with a pretrained T5-XXL encoder [49]. All actions and propri-oceptive states are normalized to [−1, +1] before being converted into latent frames. The model is trained to jointly denoise the action chunk, future observation, and reward value latents under a flow-matching diffusion objective [50]. We follow the policy model training strategy of Cosmos-Policy. 
+
+A.2 Pseudo code of R EGEN 
+
+Algorithm 1 summarizes R EGEN : In each continual learning stage, we generate pseudo-trajectories for every previous task by recurrently rolling out the current WAM policy, then update the policy on a mixture of pseudo-trajectories and new-task demonstrations. 
+
+## B Training Details 
+
+In this section, we detail the training settings for continual learning in both simulation (i.e. LIBERO [38]) and real-world environments. 14 Algorithm 1 Recurrent Generative Replay (R EGEN ): Pseudo-Trajectory Generation and policy up-date during continual learning 
+
+Require: Current task Tk, current-task demonstrations Dk, pretrained policy πθ , previous-task in-structions {ℓi}Mi=1 , chunk length H, max horizon Tmax , goal-reward threshold δ, replays per task N , number of training iterations I, Trajectory Termination function T ERMINATE  
+
+> 1:
+
+Rk ← ∅ ▷ Initialize pseudo-trajectories set  
+
+> 2:
+
+for each previous task Ti, i = 1 , . . . , M do  
+
+> 3:
+
+for n = 1 to N do  
+
+> 4:
+
+˜τ ← ∅ , t ← 0 
+
+> 5:
+
+Vwin ← empty deque of size 3 
+
+> 6:
+
+while t < T max and not TERMINATE (Vwin , δ) do  
+
+> 7:
+
+if t < H then  
+
+> 8:
+
+oin ← ot ▷ Real observation from Dk 
+
+> 9:
+
+else  
+
+> 10:
+
+oin ← ˜ot ▷ Predicted observation from WAM  
+
+> 11:
+
+end if  
+
+> 12:
+
+(˜ at:t+H , ˜ot+H , ˜vt) ∼ πθ
+
+ · | oin , ℓ i
+
+ 
+
+> 13:
+
+˜τ ← ˜τ ∪ { (oin , ˜at)} 
+
+> 14:
+
+append ˜vt to Vwin  
+
+> 15:
+
+t ← t + 1  
+
+> 16:
+
+end while  
+
+> 17:
+
+Rk ← R k ∪ { ˜τ } 
+
+> 18:
+
+end for  
+
+> 19:
+
+end for  
+
+> 20:
+
+// Policy update with mixed data ( D+ 
+
+> k
+
+= Dk ∪ R k) 
+
+> 21:
+
+for iteration = 1 to I do  
+
+> 22:
+
+Sample mini-batch from D+ 
+
+> k
+> 23:
+
+θ ← θ − η ∇θ L(θ) 
+
+> 24:
+
+end for  
+
+> 25:
+
+return updated policy πθ
+
+B.1 Our Continual Learning Setting Base stage. In LIBERO, the base stage consists of the six tasks of each suite where as in real-world setting, the base stage includes only one task. 
+
+Continual learning stage. In each subsequent stage, the policy is fine-tuned from previous stage policy checkpoint on a mixture of new-task real demonstrations and R EGEN -generated pseudo-trajectories of previous tasks. We provide the task ordering used for each LIBERO benchmark below, covering both the base-stage tasks and the order in which tasks are introduced during the continual learning stages. The same ordering is used across all compared methods for fair comparison. 
+
+LIBERO-Object Task Order 
+
+Base stage: 
+
+1. Pick up the alphabet soup and place it in the basket. 2. Pick up the cream cheese and place it in the basket. 3. Pick up the salad dressing and place it in the basket. 4. Pick up the BBQ sauce and place it in the basket. 5. Pick up the ketchup and place it in the basket. 6. Pick up the tomato sauce and place it in the basket. 
+
+Continual learning stage: 
+
+7. Pick up the butter and place it in the basket. 8. Pick up the milk and place it in the basket. 9. Pick up the chocolate pudding and place it in the basket. 10. Pick up the orange juice and place it in the basket. 15 LIBERO-Goal Task Order 
+
+Base stage: 
+
+1. Open the middle drawer of the cabinet. 2. Put the bowl on the stove. 3. Put the wine bottle on top of the cabinet. 4. Open the top drawer and put the bowl inside. 5. Put the bowl on top of the cabinet. 6. Push the plate to the front of the stove. 
+
+Continual learning stage: 
+
+7. Put the cream cheese in the bowl. 8. Turn on the stove. 9. Put the bowl on the plate. 10. Put the wine bottle on the rack. 
+
+LIBERO-Spatial Task Order 
+
+Base stage: 
+
+1. Pick up the black bowl between the plate and the ramekin and place it on the plate. 2. Pick up the black bowl next to the ramekin and place it on the plate. 3. Pick up the black bowl from table center and place it on the plate. 4. Pick up the black bowl on the cookie box and place it on the plate. 5. Pick up the black bowl in the top drawer of the wooden cabinet and place it on the plate. 6. Pick up the black bowl on the ramekin and place it on the plate. 
+
+Continual learning stage: 
+
+7. Pick up the black bowl next to the cookie box and place it on the plate. 8. Pick up the black bowl on the stove and place it on the plate. 9. Pick up the black bowl next to the plate and place it on the plate. 10. Pick up the black bowl on the wooden cabinet and place it on the plate.             
+
+> B.2 Training Hyperparameters
+> Table 6 presents the detailed hyperparamters used during training and inference in all our simulation and real-world experiments.
+> B.3 Evaluation LIBERO. After each continual learning stage, we evaluate the policy on all tasks observed up to that point. For each task, we run 50 trials with randomized initial states and report the average success rate. From these per-task success rates, we compute the three continual learning metrics: FWT, NBT, and AUC as defined in Sec. 5.1.
+> Real-world. We evaluate on three real-world manipulation tasks introduced sequentially, with 10
+> trials per task from randomized object placements and initial gripper configurations. Rollouts are scored using a partial-scoring rubric: 50 points for touching the target object and 50 points for reaching the goal. 16
+
+Table 6: Hyperparameters used in R EGEN framework. 
+
+Hyperparameter Value 
+
+Training 
+
+Input image resolution 224 × 224 
+
+Action dim 7Proprio dim 9Action chunk ( H) 16 
+
+Use wrist image True Normalize actions, proprio True Optimizer Adam Peak learning rate 1 × 10 −4
+
+Warm-up steps 1,000 
+
+Cosine decay steps 30 ,000 
+
+Batch size per GPU 40 
+
+No. of GPUs 4
+
+Gradient accumulation steps 12 
+
+Augmentations random crop, color jitter, gaussian blur Base-stage iterations 10 K
+
+CL-stage iterations (per stage) 2K
+
+Max replay episodes per previous task 10 
+
+Inference 
+
+Denoising steps (actions) 5
+
+Denoising steps (observations, value) 1
+
+Action chunk 16 
+
+## C Additional Visualizations 
+
+C.1 Examples of generated pseudo-trajectories 
+
+In Figure 6, we visualize pseudo-trajectories generated by R EGEN are visually similar to true expert demonstrations, supporting the use of these synthesized trajectories as replay data. 
+
+C.2 Qualitative results of R EGEN 
+
+Figure 7 compares qualitative rollouts of R EGEN and Seq-FT on previous tasks across LIBERO and the real-world benchmarks. 
+
+C.3 Visualization of R EGEN trajectories across continual learning stages 
+
+We visualize the pseudo-trajectories generated by R EGEN across successive continual learning stages in Figure 8. 
+
+C.4 Inconsistency between predicted observations and actions 
+
+We show representative examples of the inconsistency between the WAM’s predicted observations and actions in Figure 9. 17 (a) Open the middle drawer of the cabinet. 
+
+(b) Put the bowl on the stove. 
+
+(c) Pick up the black bowl between the plate and the ramekin and place it on the plate. 
+
+(d) Pick up the black bowl on the cookie box and place it on the plate. 
+
+Figure 6: Visualization of pseudo-trajectories. Green frames represents ground-truth expert demonstrations and blue frames correspond to pseudo-trajectories generated by R EGEN .18 New Task 
+
+> rollout
+> Seq-FT
+> REGEN
+
+(a) LIBERO-Goal: evaluation on task 1 (“open the middle drawer of the cabinet”) after training on task 8 (“turn on the stove”). New Task 
+
+> rollout
+> Seq-FT
+> REGEN
+
+(b) LIBERO-Object: evaluation on task 2 (“Pick up the cream cheese and place it in the basket.”) after training on task 10 (“pick up the orange juice and place it in the basket”). New Task 
+
+> rollout
+> Seq-FT
+> REGEN
+
+(c) LIBERO-Spatial: evaluation on task 6 (“Pick up the black bowl on the ramekin and place it on the plate.”) after training on task 7 (“Pick up the black bowl next to the cookie box and place it on the plate.”). New Task 
+
+> rollout
+> Seq-FT
+> REGEN
+
+(d) Real-world: evaluation on Task 2 (“put the carrot on the plate”) after training on Task 3 (“put the eggplant in the bowl”). 
+
+Figure 7: Qualitative comparison on previously seen tasks after continual learning. In (a)-(d), 
+
+Top: current CL-stage task rollout. Middle: Seq-FT rollout on the previous task, demonstrating catastrophic forgetting by executing the current task instead or failing to accomplish the previous task. Bottom: REGEN successful rollouts on the previous task, retaining task-relevant behavior. 19 CL-stage1 
+
+> CL-stage2
+> CL-stage3
+> CL-stage4
+
+Figure 8: Degradation of pseudo-trajectory visual observation quality across CL stages. Gen-erated trajectories for the task “put the bowl on top of the cabinet” show progressively increasing blur. 20 (a) Push the plate infront of the stove  
+
+> (b) Pick up the black bowl from table center and place it on the plate.
+
+Figure 9: Inconsistency between predicted observations and actions. Top row: future observa-tions imagined by the WAM, which appear to successfully complete the task. Bottom row: execut-ing the predicted actions in the simulator fails to represent the imagined future observation, revealing that the WAM generates visually plausible outcomes without ensuring that the corresponding actions are physically sufficient. 21

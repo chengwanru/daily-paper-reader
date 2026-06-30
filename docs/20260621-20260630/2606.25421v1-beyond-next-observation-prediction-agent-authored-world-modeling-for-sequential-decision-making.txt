@@ -1,0 +1,697 @@
+Title: Beyond Next-Observation Prediction: Agent-Authored World Modeling for Sequential Decision Making
+
+URL Source: https://arxiv.org/pdf/2606.25421v1
+
+Published Time: Thu, 25 Jun 2026 00:35:58 GMT
+
+Number of Pages: 16
+
+Markdown Content:
+# Beyond Next-Observation Prediction: Agent-Authored World Modeling for Sequential Decision Making 
+
+Guangfeng Cai 1, Kaibing Yang 1, Shuo He 2, Yu Li 1,Shengtian Yang 1, Jiaqi Lv 1, Lei Feng 1*1Southeast University, 2Meituan 
+
+{cgfeng,fenglei}@seu.edu.cn 
+
+Abstract 
+
+Recent studies on world modeling for Large Language Model (LLM) agents typically formulate the learning objective as next-observation prediction. However, this objec-tive ties supervision to what a transition hap-pens to reveal, which may omit the dynam-ics most relevant to the agent’s current deci-sion. To bridge this gap, we propose Agent-Authored World Modeling (AAWM), a training procedure that constructs supervision from the policy’s own decision needs. Specifically, at each state, the agent identifies what it needs to understand about the environment before act-ing. These needs drive the retrieval of relevant transition evidence across trajectories, which is then synthesized into training targets that capture decision-oriented dynamics instead of reconstructing the next observation. This aligns the training objective with the dynamics the pol-icy needs before acting, not with the contents of the next observation. Experimental results vali-date the effectiveness of AAWM across multi-ple environments and training settings. These results show that decision-aware world-model targets provide a more effective learning signal than next-observation prediction. 
+
+1 Introduction 
+
+LLM agents (Achiam et al., 2023; Team et al., 2025; Glm et al., 2024; Liu et al., 2024) have in-creasingly operated in partially observed environ-ments that require multi-turn interactions to gather information and complete tasks. In such settings, success depends not only on choosing fluent ac-tions but also on representing environment dynam-ics: which actions are valid, which state variables persist, and which observations matter for the next decision. Recent work therefore fine-tunes large language models to predict the environment’s next 
+
+> *
+
+Corresponding author. Interaction trajectories           
+
+> 𝑜 1𝑜 2𝑎 1𝑜 𝑡 +1𝑎 𝑡 𝑜 𝑡
+> Next -Observation Prediction Agent -Authored World Modeling (Ours)
+> You should memorize
+> all resulting
+> observations.
+> (𝑜 1,𝑎 1)𝑜 2→
+> (𝑜 𝑡 ,𝑎 𝑡 )𝑜 𝑡 +1→
+> What world model
+> do I need for
+> better decisions?
+> Ibelieve ... any mistake ?
+> Does x affect y or ...?
+> I want to know ...
+> Here’s the
+> knowledge
+> you need
+> Enviro nment -driven
+> For observation reconstruction
+> Agent -driven
+> For decision -making
+> Target sheet
+> Target Blueprint
+
+Figure 1: Comparison between next observation predic-tion and AAWM. Next-observation prediction trains on the observation returned by each action, so the target is determined by what the environment happens to re-veal. AAWM asks the policy what it needs to know before acting and writes targets that describe the dynam-ics needed for decision making. 
+
+response, treating this objective as world model-ing (Zhang et al., 2025; Li et al., 2025). The un-derlying assumption is that better prediction of the next environment output will produce better action selection. 
+
+This assumption overlooks a key difference be-tween prediction and decision: the policy often needs the state information that affects its next action rather than a full reconstruc-tion of the next observation (Nair et al., 2020). Moreover, Li et al. (2024) showed that optimiz-ing a model for goal-directed behavior will reduce its predictive accuracy, suggesting that prediction quality and decision quality are not the same ob-jective. This raises a core target selection problem: 
+
+what environment dynamics does the policy need in the world modeling target before acting? 
+
+Prior work has mostly addressed this problem by changing the form of the target. Some methods compress observations into semantic future repre-1
+
+> arXiv:2606.25421v1 [cs.CL] 24 Jun 2026
+
+sentations (Berg et al., 2025), summarize transition-level state changes (Chae et al., 2025), or add task information for downstream planning (Qiao et al., 2024). These targets are often more compact or more planning-friendly than raw next observations, but their content is still determined by the transition exposed in the dataset. As a result, the training target remains environment-driven rather than decision-driven: it reflects what the environment happened to reveal, instead of what the policy needs to understand before acting. 
+
+To address this problem, we propose AAWM (Agent-Authored World Modeling), a training pro-cedure that constructs training targets from the pol-icy’s current decision needs. Figure 1 illustrates the difference from next observation prediction. At each state, the policy first articulates its beliefs about environment dynamics and open questions whose answers could change the next action. These statements serve as retrieval queries over a pool of transition records, gathering evidence about the queried dynamics from other trajectories. The re-trieved evidence, together with the current transi-tion and the policy’s statements, is then synthesized into a natural-language target describing decision-oriented dynamics. Fine-tuning on these targets encourages the policy to represent the dynamics that matter for action selection instead of only re-constructing the next observation. We evaluate AAWM on ALFWorld and Web-Shop at two model scales. With the same imi-tation learning and reinforcement learning setup, AAWM consistently outperforms next-observation world modeling, with gains of up to 6.3 and 6.2 success-rate points on the two environments. A sep-arate AgentGym evaluation (Xi et al., 2025) across four environments confirms that AAWM is the only world modeling initialization that improves over imitation learning in every setting. Compo-nent ablations show that Self-Probing, Transition Retrieval, and world modeling fine-tuning each contribute to the final gain. Training analysis fur-ther shows that AAWM-initialized policies sustain broader decision-oriented reasoning during rein-forcement learning while task success continues to rise. Our contributions are summarized as follows: • We identify target selection as a central prob-lem in world modeling for language agents: training targets should capture the dynamics that affect action choice, not only reconstruct environment responses. • We instantiate this principle as AAWM, a world modeling procedure in which the pol-icy’s own beliefs and uncertainties determine what the training target addresses. • We demonstrate that AAWM outperforms next-observation world modeling across two environments, two model scales, and both su-pervised and reinforcement learning settings. 
+
+2 Related Work 
+
+LLMs as decision-making agents. LLM agents have been widely studied for sequential decision making in software engineering (Yang et al., 2024), embodied interaction (Wang et al., 2023), web nav-igation (Gur et al., 2024; Yang et al., 2024), and GUI operation (Zhang and Zhang, 2024; Hong et al., 2024). Prompting methods such as chain-of-thought reasoning and ReAct (Yao et al., 2022b) structure intermediate reasoning traces to decom-pose complex tasks, while self-reflection mecha-nisms such as Reflexion (Shinn et al., 2023) incor-porate verbal feedback from prior failures to revise action selection. Memory (Park et al., 2023), re-trieval (Nakano et al., 2021), and tool-use (Gou et al., 2024; Schick et al., 2023) mechanisms fur-ther extend agent capabilities by supplying external context or executable operations during interaction. However, these methods improve how the policy selects actions at inference time but do not change the supervision used to train the policy. 
+
+World models for LLM agents. World models have been widely used to provide future informa-tion and auxiliary supervision for sequential de-cision making. In LLM agents, recent work has instantiated this idea through transition-level state change summarization (Chae et al., 2025), seman-tic compression (Berg et al., 2025), result state prediction (Guo et al., 2025), action simulation (Yu et al., 2025), and knowledge injection (Qiao et al., 2024). A related line of work involves the agent more directly in world-model construction. Chen et al. (2025) internalizes environment dynamics from the agent’s own rollouts; Wang et al. (2026) re-inforces explicit prediction of environment states during multi-turn interactions; Hu et al. (2025) re-constructs the thinking process with world-model simulation; and Zhang et al. (2025) generate addi-tional interaction data from the agent’s own actions and train on the resulting outcomes. 2Transition 
+
+Bank 
+
+> 𝑎 1
+
+𝑜 1 𝑎 1 𝑜 𝑡 
+
+𝑎 𝑡     
+
+> 𝑜 𝑎 𝑜 𝑛𝑒𝑥𝑡
+> 𝑜 ′𝑎 ′𝑜 𝑛𝑒𝑥𝑡
+> ′
+> I want to know …
+> I'm unsure whether
+> including size and
+> color in the search
+> terms ensures they
+> are applied as filters. 𝑎 1
+> I believe that …
+> I think specifying
+> price constraints in
+> the search query will
+> filter results to
+> items under $70.
+
+𝑎 𝑡 
+
+> ′
+
+𝑎 𝑡 
+
+> ′′
+
+𝑜 𝑡 +1
+
+> ′
+
+𝑜 𝑡 +1
+
+𝑜 𝑡 +1
+
+> ′′
+
+𝑜 2 𝑎 2             
+
+> Confirmed Patterns 𝑷 𝒕 Open Questions 𝑸 𝒕
+> Which parts
+> of my world
+> model need
+> verification?
+> Which gaps
+> in my world
+> model need
+> to be filled?
+> 𝑜 1𝑎 1𝑜 𝑛𝑒𝑥𝑡
+> 1
+> 𝑜 𝑘 𝑎 𝑘 𝑜 𝑛𝑒𝑥𝑡
+> 𝑘
+> 𝑜 1𝑎 1𝑜 𝑛𝑒𝑥𝑡
+> 1
+> 𝑜 𝑘 𝑎 𝑘 𝑜 𝑛𝑒𝑥𝑡
+> 𝑘
+> 𝑜 ′′ 𝑎 ′′ 𝑜 𝑛𝑒𝑥𝑡
+> ′′
+
+Retrieved Transitions 
+
+> Offline Trajectories
+
+Dynamics 
+
+Synthesis 
+
+Self -Probing   
+
+> 𝑜 𝑡 at
+> Transitions
+> retrieved by 𝒑 𝟏
+> Transitions
+> retrieved by 𝒒 𝟏
+> Immediate
+> Transitions
+> Retrieve
+
+World Modeling Targets  
+
+> The search engine does not apply price
+> constraints as filters, as …
+> Including color and size as attributes in the
+> query string fails to filter results.
+
+Figure 2: AAWM target construction pipeline. At a decision context 𝑜 𝑡 , the policy produces confirmed patterns 𝑃 𝑡 
+
+and open questions 𝑄 𝑡 through Self-Probing. Each proposition retrieves evidence from the transition bank 𝒯 , and the immediate transitions ℐ𝑡 provide local evidence from the same context. Dynamics Synthesis combines these inputs into world modeling targets that correct mistaken beliefs and answer open questions when evidence permits. 
+
+Despite this progress, the content of the training target is still determined by what each transition happens to reveal, which may omit the dynamics most relevant to the agent’s current decision. Our work therefore aims to dynamically adjust the pol-icy’s target to its current beliefs and open questions. 
+
+3 Preliminaries 
+
+Problem setup. We consider a partially observed text environment ℰ in which a language-model pol-icy 𝜋 𝜃 interacts through textual observations and actions. At step 𝑡 , the policy receives the deci-sion context 𝑜 𝑡 and samples an action 𝑎 𝑡 ∼ 𝜋 𝜃 (· | 
+
+𝑜 𝑡 ). The environment returns the next observa-tion 𝑜 𝑡 +1 , producing trajectories 𝒟 = {𝜏 𝑖 } with 
+
+𝜏 𝑖 = ( 𝑜 0, 𝑎 0, 𝑜 1, . . . , 𝑜 𝑇 ), and we write 𝒰 (𝒟 ) = 
+
+{(𝑜 𝑡 , 𝑎 𝑡 , 𝑜 𝑡 +1 )} for the set of all one-step transition records. From these records we maintain two col-lections. The global transition pool 𝒯 contains records from all trajectories as a single retrievable collection. The immediate transition set ℐ𝑡 ⊆ 𝒯 
+
+contains records originating from the same context 
+
+𝑜 𝑡 , including the logged transition and additional transitions obtained by executing alternative ac-tions from that context. 
+
+World modeling objective. A standard text world model predicts the environment response conditioned on the current context and action. For each transition record, a textual outcome target 
+
+¯𝑜 𝑡 +1 = 𝑔 (𝑜 𝑡 +1 ) is constructed from the next obser-vation, where 𝑔 may be the identity map, a state change extractor, or a summarizer. The next re-sponse prediction objective is to minimize 
+
+ℒobs (𝜃 ) = −∑︁ 
+
+(𝑜 𝑡 ,𝑎 𝑡 ,𝑜 𝑡 +1 )
+
+∈ 𝒰 (𝒟 )
+
+log 𝑝 𝜃 (¯ 𝑜 𝑡 +1 | 𝑜 𝑡 , 𝑎 𝑡 ) (1) This objective is useful when the next observa-tion contains the dynamics needed for control, but the dynamics that determine a good action can be sparse, implicit, or distributed across earlier transi-tions. Before acting, the policy may need to verify whether its current understanding of the environ-ment is correct and to resolve specific gaps in that understanding. These needs reflect the state of the policy’s own world model, not the content of the next observation. AAWM addresses this by constructing world model targets from the policy’s decision-oriented modeling needs. 
+
+4 Agent-Authored World Modeling 
+
+To align the world modeling objective with what the policy needs before acting, AAWM constructs targets from the policy’s current decision context, with an overview of the pipeline shown in Figure 2. 
+
+Self-Probing elicits the policy’s current beliefs and open questions. Transition Retrieval selects supporting records from 𝒯 . Dynamics Synthesis 
+
+combines the probes, the immediate transitions, and the retrieved transitions into a fine-tuning tar-get. The following subsections describe these stages in detail. 34.1 Self-Probing 
+
+Instead of defining target content from the next observation, AAWM elicits the policy’s model-ing needs at context 𝑜 𝑡 . Specifically, the policy is prompted to produce two sets of propositions: 
+
+(𝑃 𝑡 , 𝑄 𝑡 ) ∼ 𝜋 𝜃 (· | 𝑜 𝑡 ), (2) where 𝑃 𝑡 = {𝑝 1 
+
+> 𝑡
+
+, . . . , 𝑝 𝑛 𝑡 } are confirmed patterns 
+
+and 𝑄 𝑡 = {𝑞 1 
+
+> 𝑡
+
+, . . . , 𝑞 𝑛 𝑡 } are open questions .Confirmed patterns specify parts of the policy’s current understanding that may require verification or correction against retrieved transitions. Open questions identify dynamics that the pol-icy has not yet resolved and whose answers could affect the next action. Together, (𝑃 𝑡 , 𝑄 𝑡 ) determine what the training target should contain and drive the subsequent re-trieval and synthesis steps. The prompt template is in Appendix D. 
+
+4.2 Transition Retrieval 
+
+Since the required dynamics may be absent from the immediate transition set ℐ𝑡 , we retrieve relevant transitions from the global transition pool 𝒯 .For each proposition 𝑟 ∈ 𝑃 𝑡 ∪ 𝑄 𝑡 , AAWM retrieves 𝐾 transitions from 𝒯 using maximal marginal relevance (Carbonell and Goldstein, 1998), which balances relevance to 𝑟 with diversity across the selected records, ensuring the evidence covers different aspects of the queried dynamics instead of redundant records. The retrieved set is 
+
+ℛ𝑡 =⋃︁ 
+
+> 𝑟 ∈𝑃 𝑡 ∪𝑄 𝑡
+
+Retrieve( 𝑟, 𝒯 ; 𝐾 ). (3) Implementation details are in Appendix E. 
+
+4.3 Dynamics Synthesis 
+
+Given the policy’s acting needs specified by the probes and the transition evidence grounded by retrieval, the final stage synthesizes an agent-authored world-modeling target. Specifically, an external instruction-following model 𝑓 syn receives the current context 𝑜 𝑡 , con-firmed patterns 𝑃 𝑡 , open questions 𝑄 𝑡 , the imme-diate transitions ℐ𝑡 from the same context, and the retrieved transitions ℛ𝑡 from the global pool: 
+
+𝑦 𝑡 = 𝑓 syn (𝑜 𝑡 , 𝑃 𝑡 , 𝑄 𝑡 , ℐ𝑡 , ℛ𝑡 ) . (4) The model is instructed to correct any unsupported beliefs, resolve open questions the evidence per-mits, and summarize the dynamics most relevant to action selection. The resulting 𝑦 𝑡 thus describes environment dynamics shaped by what the policy needs before acting. The synthesis prompt is in Appendix D, and the synthesis model is described in Section 5.1. 
+
+4.4 World Modeling 
+
+Let 𝒟 A = {(𝑜 𝑡 , 𝑦 𝑡 )} denote the dataset produced by Dynamics Synthesis. AAWM fine-tunes the policy with the agent-authored world-modeling ob-jective 
+
+ℒA(𝜃 ) = −∑︁ 
+
+> (𝑜 𝑡 ,𝑦 𝑡 )∈𝒟 A
+
+log 𝑝 𝜃 (𝑦 𝑡 | 𝑜 𝑡 ) , (5) where the subscript A denotes AAWM. The target therefore updates the policy toward the dynamics specified by its own decision needs. The result-ing parameters initialize the subsequent imitation learning and reinforcement learning stages. 
+
+5 Experiments 
+
+5.1 Setup Environments and evaluation. We evaluate on ALFWorld (Shridhar et al., 2020) and Web-Shop (Yao et al., 2022a). ALFWorld is a textual em-bodied environment with six household task types, Pick, Clean, Cool, Look, Heat, and Pick2. Web-Shop is an HTML shopping environment where the agent searches, inspects, and purchases prod-ucts according to user instructions. ALFWorld re-ports success rate for each task type and the aggre-gate All , while WebShop reports success rate Succ. 
+
+and reward score Score . We follow the environ-ment configuration and evaluation protocol from the open-source repository (Feng et al., 2026). 
+
+Baseline. We use Implicit World Modeling (IWM) as the world modeling baseline, a repre-sentative next observation prediction method for language agents (Zhang et al., 2025). Given the current observation and action (𝑜 𝑡 , 𝑎 𝑡 ), IWM trains the model to predict the next observation. Follow-ing the original IWM setting, the target is the raw textual observation on ALFWorld and an offline summary of the next observation on WebShop. 
+
+World modeling data. We draw world modeling data from AgentTraj-L (Xi et al., 2025) and keep all successful trajectories executable in the open-source repository (Feng et al., 2026) as 𝒟 . At every action step, we execute the logged action and three 4additional actions from the same state, producing four transitions that form ℐ𝑡 and populate 𝒯 . Both IWM and AAWM share the same 𝒟 and 𝒯 within each backbone scale. Trajectory counts and action-sampling details are provided in Appendix A.1. 
+
+Models and target construction. We train the policy at two scales, Qwen2.5-1.5B-Instruct and Qwen2.5-7B-Instruct (Qwen et al., 2025). Self-Probing uses the policy backbone at the cor-responding scale, and Transition Retrieval em-beds records with Qwen3-Embedding-0.6B (Yang et al., 2025). We use Qwen3-30B-A3B-Instruct-2507 (Yang et al., 2025) only for target con-struction, where it produces WebShop observation summaries for IWM and synthesized targets for AAWM. This keeps the target construction model shared between the two world modeling methods. 
+
+Training protocol. Both IWM and AAWM first initialize the policy by supervised fine-tuning on their respective world modeling targets, followed by a lightweight imitation learning stage on 32 tra-jectories from 𝒟 for one epoch. All RL rows then run Group Relative Policy Optimization (GRPO; Shao et al., 2024). Table 1 reports prompting baselines and trained-policy results at each backbone scale. Within each backbone, all trained rows share the same trajectory source, transition pool, imitation data, and GRPO budget. Base denotes downstream training without world modeling initialization. We report mean and stan-dard deviation over three seeds. More details are in Appendix A.1. 
+
+5.2 Main Results 
+
+Table 1 shows that AAWM consistently improves over the world-modeling baseline on both agen-tic benchmarks and at both backbone scales. Al-though closed-source prompting models remain competitive, with Gemini-2.5-Pro (Team et al., 2023) and GPT-4o (Achiam et al., 2023) reaching 60.3% and 48.0% success on ALFWorld and 35.9% and 23.7% on WebShop, post-training narrows and then reverses this gap for the Qwen-family models. Among the trained methods, AAWM achieves the strongest overall performance. 
+
+AAWM provides a stronger initialization than next observation prediction. At the 1.5B scale, Base reaches 74.0% success on ALFWorld, while IWM improves it to 76.8% and AAWM further improves it to 83.1%. WebShop shows the same or-dering, with success increasing from 59.4% (Base) to 67.2% (IWM) and 73.4% (AAWM). At the 7B scale, AAWM again achieves the strongest aggre-gate performance, reaching 90.1% on ALFWorld and 76.6% on WebShop. 
+
+AAWM consistently outperforms on the harder tasks. The ALFWorld breakdown shows that the aggregate gain is concentrated on the more difficult categories. Pick and Clean are easier for most meth-ods, and they are the only categories where IWM slightly exceeds AAWM: Pick at 1.5B and Clean at 7B. On the harder categories, the ordering reverses and the margins become larger. At 1.5B, AAWM improves over IWM by 11.0 points on Cool, 10.6 on Pick2, and 7.5 on Look. At 7B, the gains are 9.0 points on Look, 7.4 on Cool, and 6.0 on Pick2. These tasks require reasoning over multi-step pre-conditions and persistent object states, which are difficult to recover from a single observation. This is where Self-Probing and cross-trajectory retrieval are expected to be most useful, because they expose decision-relevant dynamics beyond the immediate observation. 
+
+AAWM produces a more decision-oriented ini-tialization. A further question is whether this advantage comes from the world modeling targets themselves or from their interaction with the im-itation learning stage. To isolate this, we remove the imitation learning stage so that world modeling alone carries the full initialization budget before GRPO (Appendix B). IWM then drops sharply on ALFWorld, while AAWM stays close to GRPO from the backbone and still improves WebShop. Since both methods share the same Qwen3-30B-A3B-Instruct-2507 construction model on Web-Shop and differ only in target content, this gap reflects the nature of the targets rather than model capacity. AAWM depends far less on action imita-tion because its targets already describe the dynam-ics the policy needs when selecting actions. 
+
+5.3 Ablation Studies 
+
+AAWM rests on two design assumptions: Self-Probing directs the target toward decision-oriented dynamics, and Transition Retrieval supplies evi-dence beyond the current state. Table 2 tests both by removing each component at 1.5B, with all rows sharing the same imitation learning stage. Full AAWM improves ALFWorld from 12.0% to 24.7% and WebShop from 4.2% to 10.7% over Base. 5Backbone Method ALFWorld WebShop Pick Look Clean Heat Cool Pick2 All Score Succ. 
+
+Prompting 
+
+Closed-source Models GPT-4o 75.3 60.8 31.2 56.7 21.6 49.8 48.0 31.8 23.7 Gemini-2.5-Pro 92.8 63.3 62.1 69.0 26.6 58.7 60.3 42.5 35.9 Qwen2.5-1.5B-Instruct Qwen2.5 5.9 5.5 3.3 9.7 4.2 0.0 4.1 23.1 5.2 ReAct 17.4 20.5 15.7 6.2 7.7 2.0 12.8 40.1 11.3 Reflexion 35.3 22.2 21.7 13.6 19.4 3.7 21.8 55.8 21.9 Qwen2.5-7B-Instruct Qwen2.5 33.4 21.6 19.3 6.9 2.8 3.2 14.8 26.4 7.8 ReAct 48.5 35.4 34.3 13.2 18.2 17.6 31.2 46.2 19.5 Reflexion 62.0 41.6 44.9 30.9 36.3 23.8 42.7 58.1 28.8 
+
+Imitation Learning initialized by World Modeling 
+
+Qwen2.5-1.5B-Instruct Base 18.4 ±3.6 6.8 ±2.4 13.7 ±5.8 11.6 ±3.8 8.8 ±4.8 3.7 ±2.1 12.0 ±2.6 26.6 ±4.9 4.2 ±1.2 
+
+IWM 5.9 ±3.4 1.6 ±1.1 3.2 ±1.8 2.4 ±1.5 1.5 ±1.0 0.7 ±0.5 3.1 ±1.2 21.6 ±3.3 2.1 ±0.5 
+
+AAWM (Ours) 31.4 ±4.0 17.6 ±5.0 28.7 ±6.6 27.3 ±4.8 24.2 ±5.8 4.8 ±3.0 24.7 ±2.6 25.7 ±2.5 10.7 ±1.2 
+
+Qwen2.5-7B-Instruct Base 50.3 ±3.2 11.4 ±2.4 28.6 ±3.6 27.3 ±3.1 18.2 ±2.8 9.7 ±2.2 28.4 ±2.8 19.9 ±2.2 11.3 ±2.1 
+
+IWM 69.4 ±5.2 31.7 ±5.8 55.3 ±6.4 51.6 ±5.6 40.5 ±6.1 19.6 ±4.6 49.6 ±4.8 27.4 ±5.3 9.0 ±3.5 
+
+AAWM (Ours) 70.5 ±5.6 35.7 ±6.2 60.4 ±6.8 55.6 ±5.9 52.9 ±6.4 14.7 ±5.0 53.4 ±5.0 37.0 ±2.9 16.3 ±2.3 
+
+Imitation Learning then Reinforcement Learning initialized by World Modeling 
+
+Qwen2.5-1.5B-Instruct Base 82.1 ±7.3 61.5 ±2.7 81.9 ±7.5 85.1 ±6.3 58.9 ±1.6 59.0 ±7.7 74.0 ±4.6 71.1 ±4.7 59.4 ±2.7 
+
+IWM 94.4 ±1.5 64.5 ±7.7 78.6 ±4.6 80.2 ±4.5 60.7 ±3.8 61.3 ±7.0 76.8 ±2.8 77.0 ±3.0 67.2 ±4.1 
+
+AAWM (Ours) 93.3 ±4.6 72.0 ±7.7 86.9 ±5.2 88.7 ±2.2 71.7 ±3.1 71.9 ±2.8 83.1 ±1.7 81.5 ±1.1 73.4 ±3.6 
+
+Qwen2.5-7B-Instruct Base 93.0 ±4.2 66.7 ±3.7 92.8 ±6.0 91.2 ±1.7 79.3 ±5.4 68.6 ±2.4 84.6 ±1.3 80.8 ±4.9 70.6 ±4.8 
+
+IWM 92.6 ±2.2 76.3 ±2.2 94.4 ±5.2 93.7 ±5.5 74.1 ±5.2 77.4 ±7.7 86.7 ±2.0 82.2 ±1.9 73.2 ±2.5 
+
+AAWM (Ours) 95.2 ±5.6 85.3 ±2.9 93.1 ±2.5 94.1 ±5.5 81.5 ±7.6 83.4 ±7.6 90.1 ±2.0 84.2 ±0.9 76.6 ±2.1 
+
+Table 1: Main results on ALFWorld and WebShop. In trained panels, Base denotes no world modeling initialization, IWM denotes next-observation world modeling, and AAWM denotes Agent-Authored World Modeling. Trained rows report mean ±std over three seeds; bold marks the best within each backbone and condition. 
+
+Method ALFWorld WebShop 
+
+Imitation Learning initialized by World Modeling 
+
+Base 12.0 ±2.6 4.2 ±1.2 
+
+AAWM (Ours) 24.7 ±2.6 10.7 ±1.2 
+
+w/o Transition Retrieval 19.3 ±2.4 7.5 ±1.6 
+
+w/o Self-Probing 18.0 ±1.6 7.0 ±3.1 
+
+Table 2: Ablation at Qwen2.5-1.5B-Instruct. All rows use the same lightweight imitation learning stage and are evaluated without GRPO. Base denotes imitation learn-ing without world modeling initialization. ALFWorld reports aggregate success rate, and WebShop reports success rate. Cells report mean ±std over three seeds. 
+
+Retrieved evidence supplies dynamics beyond the current state. Removing Transition Re-trieval lowers the results to 19.3% on ALFWorld and 7.5% on WebShop. Without retrieved evidence, 
+
+Dynamics Synthesis sees only the immediate transi-tions at the current state, which often do not contain enough information to resolve the policy’s open questions. 
+
+Self-Probing tells synthesis which dynamics to address. Removing Self-Probing lowers the re-sults further to 18.0% and 7.0%. Without the pol-icy’s confirmed patterns and open questions, the synthesis model has no explicit signal about what the target should cover. The two components to-gether outperform either alone, confirming that both are necessary to shift the training target from environment-driven content to decision-driven con-tent. 
+
+5.4 Evaluation on More Environments 
+
+The main experiments use two environments with GRPO. To test whether decision-oriented targets remain beneficial across a broader set of environ-ments under supervised training alone, we eval-uate on four environments from AgentGym (Xi et al., 2025). All methods train Qwen2.5-1.5B-Instruct on the same mixture of AgentTraj-L tra-jectories from TextCraft, SciWorld, WebShop, and ALFWorld, and use the same imitation learning stage. We also include IWM-Summary, a vari-ant that uses the same Qwen3-30B-A3B model as AAWM to summarize observations before predic-tion, which controls for the capacity of the construc-tion model. Data counts and evaluation settings are 6in Appendix A.2. Table 3 reports success rate in each environ-ment and the weighted aggregate All. Base reaches an All of 61.1%. The two next observation vari-ants do not give a consistent improvement. IWM falls to 59.6%, because predicting raw observations helps SciWorld but hurts WebShop and ALFWorld. IWM-Summary recovers WebShop and improves SciWorld for an All of 61.4%, yet it drops sharply on ALFWorld to 20.0%. AAWM instead reaches the best result in all four environments, with an All of 69.3% and the largest single gain of 21.0 points on SciWorld. It is the only world modeling initialization that improves over Base in every envi-ronment. Because all methods share the backbone, the trajectory mixture, and the imitation learning stage, this consistency confirms that targets shaped by the policy’s decision needs provide a more reli-able learning signal than targets derived from the next observation, regardless of the specific environ-ment. 
+
+6 Analysis 
+
+The experiments show that AAWM consistently outperforms next-observation prediction. We now investigate two mechanism questions: whether the AAWM initialization leads to more effective explo-ration during GRPO rather than faster output col-lapse, and whether Self-Probing produces decision-relevant propositions that Dynamics Synthesis re-solves with grounded evidence. 
+
+Training dynamics. A policy that converges faster could be collapsing to a narrow output dis-tribution or exploring more effectively. We distin-guish these two explanations by tracking success rate and response entropy during GRPO, along-side response length and rollout content. Figure 3 shows the WebShop dynamics, and Appendix C re-ports the matching ALFWorld curves. The success curves show that AAWM learns faster. On Web-Shop all three methods stay low during the first ten steps, after which AAWM rises much more rapidly than Base and IWM and keeps the highest success rate for most of training, and ALFWorld follows the same trend. We then ask whether this faster con-vergence comes from premature collapse or from more effective exploration. The entropy curves support exploration, since AAWM maintains the highest response entropy for most of training even while its success rate rises fastest. Its outputs are also longer on average, with 167.6 tokens on Web-0                 
+
+> 25
+> 50
+> 75
+> Success rate (%)
+> 010 20 30 40 50 60 70 80 90 100 110 120 130 140 150
+> Training step
+> 1.2
+> 1.6
+> 2.0
+> Response entropy
+> Base IWM AAWM
+
+Figure 3: GRPO training dynamics on WebShop under the imitation learning then reinforcement learning set-ting initialized by world modeling. The backbone is Qwen2.5-1.5B-Instruct. The top panel shows success rate, and the bottom panel shows response entropy. Bold curves show time weighted EMA smoothing with coeffi-cient 0.95. AAWM converges faster while maintaining higher response entropy during training. 
+
+Shop and 98.7 on ALFWorld against 121.4 and 57.8 for IWM, and the extra tokens appear mainly in the reasoning trace. Representative rollouts in Appendix G confirm that the AAWM initialized policy reasons about environment mechanisms be-fore acting, including object persistence, action preconditions, and product attributes. These obser-vations indicate that AAWM induces richer and more useful exploration during GRPO, organized around decision-oriented dynamics. By contrast, IWM improves over Base but keeps lower entropy and a smaller gain, which suggests that next obser-vation prediction is less effective at encouraging active reasoning about environment mechanisms. 
+
+Alignment of Self-Probing and Synthesis. 
+
+AAWM rests on two assumptions. Self-Probing 
+
+should produce propositions that target decision-oriented dynamics rather than surface observa-tions, and Dynamics Synthesis should answer those propositions with information grounded in transi-tion evidence. We test both with an LLM as judge evaluation over all (𝑜 𝑡 , 𝑞, 𝑦 𝑡 ) triples from data con-struction, where 𝑜 𝑡 is the observation, 𝑞 is a single proposition, and 𝑦 𝑡 is the synthesis output. The judge scores each triple on three dimensions (Ta-ble 4). Decision helpfulness ¯𝑑 1 measures whether 7Method TextCraft SciWorld WebShop ALFWorld All 
+
+Prompting 
+
+Qwen2.5 18.3 ±1.5 11.7 ±3.1 21.3 ±0.8 3.5 ±1.8 13.0 ±0.5 
+
+Imitation Learning initialized by World Modeling 
+
+Base 31.7 ±1.5 70.2 ±2.8 94.5 ±0.9 33.3 ±2.0 61.1 ±1.8 
+
+IWM 31.3 ±1.5 79.8 ±2.8 83.0 ±2.5 30.2 ±2.3 59.6 ±2.4 
+
+IWM-Summary 32.3 ±2.1 84.2 ±2.8 94.5 ±2.3 20.0 ±2.2 61.4 ±2.0 
+
+AAWM (Ours) 35.7 ±1.2 91.2 ±1.8 97.5 ±0.5 36.0 ±1.8 69.3 ±1.3 
+
+Table 3: Results on four AgentGym environments at Qwen2.5-1.5B-Instruct. All trained rows share the same AgentTraj-L trajectory mixture and imitation learning stage. All is weighted by the number of evaluation tasks per environment. Cells report success rate (%), mean ±std over three seeds.            
+
+> Metric ALFWorld WebShop
+> ¯𝑑 1Decision helpfulness 0.96 1.00
+> ¯𝑑 𝑃
+> 2Confirmed pattern correction 0.19 0.25
+> ¯𝑑 𝑄
+> 2Open question resolution 0.96 0.99
+
+Table 4: LLM-as-judge evaluation of Self-Probing and 
+
+Dynamics Synthesis . Each cell reports the fraction of 
+
+(𝑜 𝑡 , 𝑞, 𝑦 𝑡 ) triples satisfying the criterion. The judge is Qwen3-30B-A3B-Instruct-2507. 
+
+the proposition targets a mechanism that could af-fect action choice. Confirmed pattern correction 
+
+¯𝑑 𝑃  
+
+> 2
+
+measures whether the synthesis finds and cor-rects a factual error in a confirmed pattern. Open question resolution ¯𝑑 𝑄  
+
+> 2
+
+measures whether the syn-thesis gives a definite answer to an open question. The judge prompt is in Appendix D. Nearly every proposition targets decision-oriented dynamics, with ¯𝑑 1 ≥ 0.96 , so Self-Probing usually asks about mechanisms that can affect the next action rather than surface obser-vations. Confirmed pattern correction is less fre-quent, at 0.19 on ALFWorld and 0.25 on WebShop, which is expected because the score is positive only when a confirmed pattern contains an error that the synthesis then corrects. When the policy raises an open question, the synthesis resolves it in al-most all cases, with ¯𝑑 𝑄  
+
+> 2
+
+≥ 0.96 . Together these results confirm that the AAWM training signal is decision-oriented already at the data construction stage, which directly explains the stronger explo-ration observed above. Representative triples are in Appendix F. 
+
+Sensitivity to the number of propositions. We finally vary the number of confirmed patterns and open questions 𝑛 produced at each state (Ap-pendix A.3). Increasing 𝑛 from 1 to 3 clearly im-proves both environments, which confirms that a single proposition does not cover the dynamics needed for action selection, while moving from 3 to 5 adds little. We therefore use 𝑛 = 3 in all main experiments as a compact setting that captures most of the benefit. 
+
+7 Conclusion 
+
+World model training for language agents has typ-ically predicted the next environment output, but prediction accuracy and decision quality serve dif-ferent goals. AAWM addresses this gap by letting the policy state what it understands and what re-mains uncertain, then constructing training targets from these statements. Under matched training budgets, AAWM consistently outperforms next-observation world modeling across two environ-ments, two model scales, and both supervised and reinforcement learning settings, with a separate AgentGym evaluation confirming the same result across four additional environment mixtures. A nat-ural extension is to repeat Self-Probing after each training round so that targets evolve with the pol-icy’s understanding. More broadly, these results suggest that world model targets should be evalu-ated by the decisions they help the policy make. 
+
+Limitations 
+
+AAWM runs Self-Probing once during data con-struction, so the training target reflects the policy’s beliefs at that point rather than its beliefs as training proceeds. Repeating Self-Probing after each train-ing round could turn the target into a curriculum that follows the policy’s changing understanding, at the cost of additional construction compute, and 8we leave this to future work. Our experiments also cover text-only environ-ments. Extending AAWM to multimodal settings, where a vision language policy must model dynam-ics from both images and text, is a natural next step that we have not yet explored. 
+
+Ethical Considerations 
+
+This work studies world-model training for lan-guage agents in sandboxed benchmark environ-ments. Because the proposed method improves sequential decision-making ability, similar tech-niques could potentially be misused in open-ended web, GUI, or tool-use settings where autonomous actions may have external consequences. In addi-tion, synthesized world-model targets may reflect incomplete or biased transition evidence, which could lead agents to learn overconfident or incor-rect environment dynamics. Our experiments do not deploy agents in real-world systems, and prac-tical deployment would require additional safe-guards, monitoring, and validation of generated targets. 
+
+References 
+
+Josh Achiam, Steven Adler, Sandhini Agarwal, Lama Ahmad, Ilge Akkaya, Florencia Leoni Aleman, Diogo Almeida, Janko Altenschmidt, Sam Altman, Shyamal Anadkat, and 1 others. 2023. Gpt-4 techni-cal report. arXiv preprint arXiv:2303.08774 .Jacob Berg, Chuning Zhu, Yanda Bao, Ishan Durugkar, and Abhishek Gupta. 2025. Semantic world models. 
+
+arXiv preprint arXiv:2510.19818 .Jaime Carbonell and Jade Goldstein. 1998. The use of mmr, diversity-based reranking for reordering doc-uments and producing summaries. In Proceedings of the 21st annual international ACM SIGIR confer-ence on Research and development in information retrieval , pages 335–336. Hyungjoo Chae, Namyoung Kim, Kai Ong, Minju Gwak, Gwanwoo Song, Jihoon Kim, Sunghwan Kim, Dongha Lee, and Jinyoung Yeo. 2025. Web agents with world models: Learning and leveraging environ-ment dynamics in web navigation. In International Conference on Learning Representations , volume 2025, pages 63707–63738. Shiqi Chen, Tongyao Zhu, Zian Wang, Jinghan Zhang, Kangrui Wang, Siyang Gao, Teng Xiao, Yee Whye Teh, Junxian He, and Manling Li. 2025. Internalizing world models via self-play finetuning for agentic rl. 
+
+arXiv preprint arXiv:2510.15047 .Lang Feng, Zhenghai Xue, Tingcong Liu, and Bo An. 2026. Group-in-group policy optimization for llm agent training. Advances in Neural Information Pro-cessing Systems , 38:46375–46408. Team Glm, Aohan Zeng, Bin Xu, Bowen Wang, Chen-hui Zhang, Da Yin, Dan Zhang, Diego Rojas, Guanyu Feng, Hanlin Zhao, and 1 others. 2024. Chatglm: A family of large language models from glm-130b to glm-4 all tools. arXiv preprint arXiv:2406.12793 .Zhibin Gou, Zhihong Shao, Yeyun Gong, Yujiu Yang, Minlie Huang, Nan Duan, Weizhu Chen, and 1 others. 2024. Tora: A tool-integrated reasoning agent for mathematical problem solving. In International Con-ference on Learning Representations , volume 2024, pages 48362–48395. Shangmin Guo, Omar Darwiche Domingues, Raphaël Avalos, Aaron Courville, and Florian Strub. 2025. World modelling improves language model agents. 
+
+arXiv preprint arXiv:2506.02918 .Izzeddin Gur, Hiroki Furuta, Austin Huang, Mustafa Safdari, Yutaka Matsuo, Douglas Eck, and Alek-sandra Faust. 2024. A real-world webagent with planning, long context understanding, and program synthesis. In International Conference on Learning Representations , volume 2024, pages 52690–52717. Wenyi Hong, Weihan Wang, Qingsong Lv, Jiazheng Xu, Wenmeng Yu, Junhui Ji, Yan Wang, Zihan Wang, Yuxiao Dong, Ming Ding, and 1 others. 2024. Coga-gent: A visual language model for gui agents. In Pro-ceedings of the IEEE/CVF conference on computer vision and pattern recognition , pages 14281–14290. Mengkang Hu, Bowei Xia, Yuran Wu, Ailing Yu, Yude Zou, Qiguang Chen, Shijian Wang, Jiarui Jin, Kexin Li, Wenxiang Jiao, and 1 others. 2025. Agent2world: Learning to generate symbolic world models via adaptive multi-agent feedback. arXiv preprint arXiv:2512.22336 .Margaret Li, Weijia Shi, Artidoro Pagnoni, Peter West, and Ari Holtzman. 2024. Predicting vs. acting: A trade-off between world modeling & agent modeling. 
+
+arXiv preprint arXiv:2407.02446 .Yixia Li, Hongru Wang, Jiahao Qiu, Zhenfei Yin, Dong-dong Zhang, Cheng Qian, Zeping Li, Pony Ma, Guan-hua Chen, and Heng Ji. 2025. From word to world: Can large language models be implicit text-based world models? arXiv preprint arXiv:2512.18832 .Aixin Liu, Bei Feng, Bing Xue, Bingxuan Wang, Bochao Wu, Chengda Lu, Chenggang Zhao, Chengqi Deng, Chenyu Zhang, Chong Ruan, and 1 others. 2024. Deepseek-v3 technical report. arXiv preprint arXiv:2412.19437 .Suraj Nair, Silvio Savarese, and Chelsea Finn. 2020. Goal-aware prediction: Learning to model what mat-ters. In International Conference on Machine Learn-ing , pages 7207–7219. PMLR. 
+
+9Reiichiro Nakano, Jacob Hilton, Suchir Balaji, Jeff Wu, Long Ouyang, Christina Kim, Christopher Hesse, Shantanu Jain, Vineet Kosaraju, William Saunders, and 1 others. 2021. Webgpt: Browser-assisted question-answering with human feedback. arXiv preprint arXiv:2112.09332 .Joon Sung Park, Joseph O’Brien, Carrie Jun Cai, Mered-ith Ringel Morris, Percy Liang, and Michael S Bern-stein. 2023. Generative agents: Interactive simulacra of human behavior. In Proceedings of the 36th an-nual acm symposium on user interface software and technology , pages 1–22. Shuofei Qiao, Runnan Fang, Ningyu Zhang, Yuqi Zhu, Xiang Chen, Shumin Deng, Yong Jiang, Pengjun Xie, Fei Huang, and Huajun Chen. 2024. Agent planning with world knowledge model. volume 37, pages 114843–114871. Qwen, :, An Yang, Baosong Yang, Beichen Zhang, Binyuan Hui, Bo Zheng, Bowen Yu, Chengyuan Li, Dayiheng Liu, Fei Huang, Haoran Wei, Huan Lin, Jian Yang, Jianhong Tu, Jianwei Zhang, Jianxin Yang, Jiaxi Yang, Jingren Zhou, and 25 oth-ers. 2025. Qwen2.5 technical report. Preprint ,arXiv:2412.15115. Timo Schick, Jane Dwivedi-Yu, Roberto Dessì, Roberta Raileanu, Maria Lomeli, Eric Hambro, Luke Zettle-moyer, Nicola Cancedda, and Thomas Scialom. 2023. Toolformer: Language models can teach themselves to use tools. Advances in neural information process-ing systems , 36:68539–68551. Zhihong Shao, Peiyi Wang, Qihao Zhu, Runxin Xu, Junxiao Song, Xiao Bi, Haowei Zhang, Mingchuan Zhang, YK Li, Yang Wu, and 1 others. 2024. Deepseekmath: Pushing the limits of mathematical reasoning in open language models. arXiv preprint arXiv:2402.03300 .Noah Shinn, Federico Cassano, Ashwin Gopinath, Karthik Narasimhan, and Shunyu Yao. 2023. Re-flexion: Language agents with verbal reinforcement learning. Advances in neural information processing systems , 36:8634–8652. Mohit Shridhar, Xingdi Yuan, Marc-Alexandre Côté, Yonatan Bisk, Adam Trischler, and Matthew Hausknecht. 2020. Alfworld: Aligning text and em-bodied environments for interactive learning. arXiv preprint arXiv:2010.03768 .Gemini Team, Rohan Anil, Sebastian Borgeaud, Jean-Baptiste Alayrac, Jiahui Yu, Radu Soricut, Johan Schalkwyk, Andrew M Dai, Anja Hauth, Katie Mil-lican, and 1 others. 2023. Gemini: a family of highly capable multimodal models. arXiv preprint arXiv:2312.11805 .Kimi Team, Yifan Bai, Yiping Bao, Y Charles, Cheng Chen, Guanduo Chen, Haiting Chen, Huarong Chen, Jiahao Chen, Ningxin Chen, and 1 others. 2025. Kimi k2: Open agentic intelligence. arXiv preprint arXiv:2507.20534 .Guanzhi Wang, Yuqi Xie, Yunfan Jiang, Ajay Man-dlekar, Chaowei Xiao, Yuke Zhu, Linxi Fan, and Anima Anandkumar. 2023. Voyager: An open-ended embodied agent with large language models. arXiv preprint arXiv:2305.16291 .Kangrui Wang, Pingyue Zhang, Zihan Wang, Yaning Gao, Linjie Li, Qineng Wang, Hanyang Chen, Yip-ing Lu, Zhengyuan Yang, Lijuan Wang, and 1 others. 2026. Vagen: Reinforcing world model reasoning for multi-turn vlm agents. Advances in Neural Infor-mation Processing Systems , 38:172871–172933. Zhiheng Xi, Yiwen Ding, Wenxiang Chen, Boyang Hong, Honglin Guo, Junzhe Wang, Xin Guo, Ding-wen Yang, Chenyang Liao, Wei He, and 1 others. 2025. Agentgym: Evaluating and training large lan-guage model-based agents across diverse environ-ments. In Proceedings of the 63rd Annual Meeting of the Association for Computational Linguistics (Vol-ume 1: Long Papers) , pages 27914–27961. An Yang, Anfeng Li, Baosong Yang, Beichen Zhang, Binyuan Hui, Bo Zheng, Bowen Yu, Chang Gao, Chengen Huang, Chenxu Lv, and 1 others. 2025. Qwen3 technical report. arXiv preprint arXiv:2505.09388 .John Yang, Carlos E Jimenez, Alexander Wettig, Kilian Lieret, Shunyu Yao, Karthik Narasimhan, and Ofir Press. 2024. Swe-agent: Agent-computer interfaces enable automated software engineering. Advances in Neural Information Processing Systems , 37:50528– 50652. Shunyu Yao, Howard Chen, John Yang, and Karthik Narasimhan. 2022a. Webshop: Towards scalable real-world web interaction with grounded language agents. Advances in Neural Information Processing Systems , 35:20744–20757. Shunyu Yao, Jeffrey Zhao, Dian Yu, Nan Du, Izhak Shafran, Karthik Narasimhan, and Yuan Cao. 2022b. React: Synergizing reasoning and acting in language models. arXiv preprint arXiv:2210.03629 .Xiao Yu, Baolin Peng, Ruize Xu, Michel Galley, Hao Cheng, Suman Nath, Jianfeng Gao, and Zhou Yu. 2025. Dyna-think: Synergizing reasoning, acting, and world model simulation in ai agents. arXiv preprint arXiv:2506.00320 .Kai Zhang, Xiangchao Chen, Bo Liu, Tianci Xue, Zeyi Liao, Zhihan Liu, Xiyao Wang, Yuting Ning, Zhaorun Chen, Xiaohan Fu, and 1 others. 2025. Agent learning via early experience. arXiv preprint arXiv:2510.08558 .Zhuosheng Zhang and Aston Zhang. 2024. You only look at screens: Multimodal chain-of-action agents. In Findings of the Association for Computational Linguistics: ACL 2024 , pages 3132–3149. 
+
+10 A Experimental Details 
+
+A.1 Main Experiment Details Trajectory selection. AgentTraj-L is a collec-tion of high-quality agent trajectories released with AgentGym (Xi et al., 2025). For the main ALF-World and WebShop experiments, we select com-plete trajectories whose action sequences can be executed from start to finish in the GiGPO open-source evaluation code and reach a successful out-come. The selected set 𝒟 contains 1,655 trajecto-ries with 19,039 action steps for ALFWorld, and 1,027 trajectories with 4,971 action steps for Web-Shop. 
+
+Transition collection. We build the transition bank from every action step in 𝒟 . At each step, we execute the action in the trajectory and three ad-ditional actions from the same state, so each step contributes exactly four one-step transitions. For ALFWorld, the three additional actions are sampled uniformly without replacement from the admissi-ble action set after removing the trajectory action and help . For WebShop, two additional actions are sampled from the matched policy backbone with temperature 0.8, and one additional action is sam-pled uniformly from the admissible action set after removing the trajectory action. Sampled actions are canonicalized and deduplicated. If a policy sampled action cannot be executed or duplicates an existing action, we replace it with an unused admissible action. This procedure produces exactly three additional actions for every step. The final transition bank contains 76,156 one-step transitions for ALFWorld and 19,884 one-step transitions for WebShop. 
+
+Supervised fine-tuning settings. World model fine-tuning and imitation learning both use full-parameter supervised fine-tuning. The learning rate is 1 × 10 −5. The effective batch size is 16 for ALF-World and 8 for WebShop. The world modeling stage uses two epochs for both IWM and AAWM. The imitation learning stage uses one epoch. The imitation learning subset contains 32 trajectories from 𝒟 , with 429 action steps for ALFWorld and 158 action steps for WebShop. For each action step, the model is supervised to generate the action content in the format <action>...</action> .
+
+GRPO settings. We use GRPO for all reinforce-ment learning experiments and follow the public implementation of Feng et al. (2026). For ALF-World, the maximum prompt length is 2048 tokens, the maximum response length is 512 tokens, and each episode allows up to 50 environment steps. For WebShop, the maximum prompt length is 4096 tokens, the maximum response length is 512 to-kens, and each episode allows up to 15 environment steps. Both environments use a rule-based reward of 10 for success and 0 for failure, with a penalty of −0.1 for invalid actions. The actor learning rate is 1 × 10 −6. For group-based RL, the group size is 8 and each rollout samples 16 groups, giving 128 environments in total. The rollout temperature is 1.0, the validation temperature is 0.4, and the KL coefficient is 0.01. The mini batch size is 256 for ALFWorld and 64 for WebShop. 
+
+A.2 Multi-Environment Evaluation Details 
+
+The multi-environment experiment uses the Agent-Gym evaluation code and is separate from the main ALFWorld and WebShop setting. It trains on the full AgentTraj-L train split for TextCraft, SciWorld, WebShop, and ALFWorld, and evaluates on the full AgentTraj-L eval split for each environment. No additional branch transitions are collected in this experiment, because the mixed train split already provides broad transition coverage across environ-ments. For AAWM, the immediate transition set 
+
+ℐ𝑡 contains only the original one-step transition at the corresponding step. The training data contain 2,420 trajectories for ALFWorld, 3,930 for WebShop, 374 for TextCraft, and 2,120 for SciWorld, for a total of 8,844 trajec-tories. Evaluation uses 200 tasks each for ALF-World, WebShop, and SciWorld, and 100 tasks for TextCraft. The backbone is Qwen2.5-1.5B-Instruct. All supervised runs use full fine-tuning with learn-ing rate 1×10 −5 and effective batch size 32. IWM, IWM-Summary, and AAWM use two epochs of world model fine-tuning followed by one epoch of imitation learning. Base only uses one epoch of imitation learning without world model fine-tuning. The IWM-Summary baseline summarizes observa-tions in all four environments using Qwen3-30B-A3B-Instruct-2507 before next-observation predic-tion. Evaluation uses greedy decoding with tem-perature 0.0. The maximum numbers of interaction rounds are 20 for TextCraft, 30 for SciWorld, 6 for WebShop, and 30 for ALFWorld. 
+
+A.3 Sensitivity to Self-Probing Propositions 
+
+Table 5 varies the number of confirmed patterns and open questions 𝑛 produced at each state. Increasing 
+
+𝑛 from 1 to 3 gives a clear improvement on both environments, showing that a single proposition 11 𝑛 ALFWorld WebShop 1 10.7 ±2.2 7.8 ±0.8     
+
+> 324.7 ±2.6 10.7 ±1.2
+> 526.0 ±1.2 11.7 ±0.8
+
+Table 5: Sensitivity to the number of Self-Probing propo-sitions 𝑛 at Qwen2.5-1.5B-Instruct. Each setting uses the same world model fine-tuning and lightweight imi-tation learning protocol and is evaluated without GRPO. ALFWorld reports aggregate success rate, and WebShop reports success rate. Cells report mean ±std over three seeds. 
+
+is insufficient to cover the dynamics needed for action selection. Increasing 𝑛 from 3 to 5 yields smaller additional gains. We therefore use 𝑛 = 3 
+
+in all main experiments as a compact setting that captures most of the benefit. 
+
+B Reinforcement Learning without Imitation Learning 
+
+We isolate whether world modeling initialization remains useful when GRPO starts without the lightweight imitation learning stage. Table 6 com-pares direct GRPO from the backbone with GRPO from the two world modeling initializations at Qwen2.5-1.5B-Instruct. Without imitation learning, IWM reaches only 13.2% on ALFWorld and 54.2% on WebShop. This is far below direct GRPO from the backbone on ALFWorld and also lower on WebShop. By con-trast, AAWM reaches 70.6% on ALFWorld and 63.8% on WebShop. It therefore preserves the direct GRPO performance on ALFWorld and im-proves WebShop over the base row. This shows that AAWM relies less on imitation learning than next observation prediction. A likely reason is that AAWM trains on decision-oriented dynamics, so its world modeling target is closer to the infor-mation used by the policy during reinforcement learning. 
+
+C Additional Training Dynamics 
+
+Figure 4 shows the ALFWorld training dynam-ics under the same imitation learning then rein-forcement learning setting as Figure 3. AAWM reaches higher success earlier than Base and IWM, while also maintaining higher response entropy through most of training. This matches the Web-Shop pattern and shows that the faster improvement of AAWM does not come from early output col-lapse. Instead, the initialization supports broader         
+
+> Method ALFWorld WebShop
+> Reinforcement Learning initialized by World Modeling
+> Base 71.6 ±2.8 58.6 ±3.8
+> IWM 13.2 ±3.2 54.2 ±2.7
+> AAWM (Ours) 70.6 ±2.7 63.8 ±2.7
+
+Table 6: Direct reinforcement learning at Qwen2.5-1.5B-Instruct. All rows start GRPO without the lightweight imitation learning stage. Base denotes GRPO directly from the backbone. IWM and AAWM denote GRPO from the corresponding world model-ing initialization. ALFWorld reports aggregate success rate, and WebShop reports success rate. Cells report mean ±std over three seeds. 
+
+and more effective exploration during GRPO. 
+
+D Prompt Templates 
+
+This appendix reproduces the prompt templates used in Self-Probing and Dynamics Synthesis (Sec-tions 4.1 and 4.3) and evaluation (Section 6). Curly-brace tokens ( {...} ) denote runtime variables.   
+
+> Self-Probing prompt
+> {decision_context}
+> You are an agent operating in an interactive environ-ment. Before taking your next action, externalize your understanding — your internal model of how this envi-ronment operates. Output exactly in this format — two categories, each with 2 to 3 statements: [CONFIRMED PATTERNS] Cause-and-effect relationships, requirements, or con-straints you believe to be true about how this envi-ronment operates. State them as general rules you’ve inferred, not observations you currently see. [OPEN QUESTIONS] Specific uncertainties about environment mechanics whose answers would affect which action you choose next. Format: Each statement on its own line. No numbering, no bullet points. Your statements will be verified and answered, then provided back to you to inform your current decision. For this environment, output exactly {max_beliefs}
+> confirmed pattern(s) and exactly {max_questions}
+> open question(s). Do not output extra statements.
+
+The variables max_beliefs and max_questions 
+
+are set to 𝑛 , the per-state proposition count reported in Section 5.1. 12 0                 
+
+> 30
+> 60
+> 90
+> Success rate (%)
+> 010 20 30 40 50 60 70 80 90 100 110 120 130 140 150
+> Training step
+> 0.3
+> 0.6
+> 0.9
+> Response entropy
+> Base IWM AAWM
+
+Figure 4: GRPO training dynamics on ALFWorld un-der the imitation learning then reinforcement learning setting initialized by world modeling. The backbone is Qwen2.5-1.5B-Instruct. The top panel shows suc-cess rate, and the bottom panel shows response entropy. Bold curves show time-weighted EMA smoothing with coefficient 0.95. AAWM reaches higher success earlier while preserving broader exploration. 
+
+Dynamics Synthesis prompt 
+
+{decision_context} 
+
+— Agent’s Current Understanding — [CONFIRMED PATTERNS] 
+
+{confirmed_patterns} 
+
+[OPEN QUESTIONS] 
+
+{open_questions} 
+
+— Retrieved Evidence — 
+
+{retrieved_transition_evidence} 
+
+— Current Step Outcome — 
+
+{immediate_transitions} 
+
+Internalize the retrieved evidence and the current step outcomes shown above, then perform the following task. Write as if stating knowledge directly — do not reference or cite the evidence records. Your task: 1. Correct any confirmed patterns that appear to be wrong. 2. Answer the open questions where possible. 3. Synthesize the key environment dynamics most relevant to the current task goal and action selection. Requirements: – Describe cause-effect relationships specific to this environment — not general knowledge any agent would already possess. – Focus on dynamics bearing on the current task goal and the situation at hand. – DO NOT contradict the facts observed in the current and prior steps. – DO NOT include action suggestions or plans. – Write a concise, coherent paragraph with no preamble or closing remarks. 
+
+The retrieved_transition_evidence field groups 𝐾 retrieved transitions under the proposi-tion that retrieved them: 
+
+Retrieved transition formatting 
+
+For confirmed pattern 1: Record 1: State: “ {observation_t} ”Action: “ {action_t} ”Result: “ {observation_t1} ”. . . Record 𝐾 :State: “ {observation_t} ”Action: “ {action_t} ”Result: “ {observation_t1} ”. . . For open question 𝑛 :Record 1: State: “ {observation_t} ”Action: “ {action_t} ”Result: “ {observation_t1} ”. . . Record 𝐾 :State: “ {observation_t} ”Action: “ {action_t} ”Result: “ {observation_t1} ”
+
+Probing effectiveness judge prompt 
+
+You are judging one proposition about an interactive text environment and one synthesis paragraph. Input fields: – state_context: task and current environment context. – type: P or Q. – proposition: a single confirmed pattern (P) or open question (Q). – synthesis_output: a paragraph written after seeing transition evidence. Definitions: P means the agent states a dynamics pattern it believes to hold. Q means the agent asks about a dynamics point it wants resolved. 
+
+<sample> 
+
+state_context: 
+
+{state_context} 
+
+type: 
+
+{type} 
+
+proposition: 
+
+{proposition} 
+
+synthesis_output: 
+
+{synthesis_output} </sample> 
+
+Dimensions for judgment: D1 Decision-Helpfulness: Output 1 if the proposition concerns an environment mechanism, precondition, dependency, constraint, or action effect that could mean-ingfully inform task completion or current/future action choices. Output 0 if it is only a surface description, tautology, generic observation, formatting detail, or irrelevant fact. 
+
+13 Algorithm 1 Per-query MMR retrieval (run inde-pendently for each proposition). 
+
+Require: Proposition embedding 𝑞 ; transition index 𝒯 ; recall pool size 𝑅 ; final hits 𝐾 ; trade-off 𝜆 
+
+1: 𝐶 ← top-𝑅 from 𝒯 by ⟨𝑞, 𝑐 ⟩, excluding same-episode hits 2: 𝑆 ← ∅ 
+
+3: while |𝑆 | < 𝐾 do 
+
+4: for each 𝑐 ∈ 𝐶 ∖ 𝑆 do 
+
+5: score( 𝑐 ) ← 𝜆 ⟨𝑞, 𝑐 ⟩ − (1 −𝜆 ) max 𝑠 ∈𝑆 ⟨𝑐, 𝑠 ⟩
+
+6: 𝑐 * ← arg max 𝑐 score( 𝑐 )
+
+7: 𝑆 ← 𝑆 ∪ { 𝑐 *}
+
+8: return 𝑆 
+
+D2 Synthesis Contribution: – If type=P, output 1 only when the proposition contains an error, inaccuracy, or over-confident unsupported claim, and synthesis_output explicitly corrects it. Oth-erwise output 0, including when a correct P is merely restated or extended. – If type=Q, output 1 only when synthesis_output gives a definite answer to the open question. Output 0 if it is silent, hedged, partial, or only restates the question. Instruction: Return strict JSON only, with fields in this order. The two score fields must be integers, either 0 or 1: 
+
+{"rationale":"<=50 words","d1_decision_helpfulness":0, "d2_synthesis_contribution":1} 
+
+E Transition Retrieval Details 
+
+Each proposition 𝑞 ∈ 𝑃 𝑡 ∪ 𝑄 𝑡 from Self-Probing acts as an independent retrieval query against the transition pool 𝒯 (Section 4.2). Transitions are em-bedded with Qwen3-Embedding-0.6B and indexed with FAISS inner-product search over normalized embeddings. Each indexed unit is a single transi-tion record (𝑜 𝑡 , 𝑎 𝑡 , 𝑜 𝑡 +1 ).
+
+Per-query MMR. For each proposition 𝑞 , we first retrieve a recall pool of 𝑅 candidates by embed-ding similarity, then apply maximal marginal rele-vance to select the final 𝐾 transitions that balance relevance to 𝑞 with diversity among the selected set. Algorithm 1 describes the procedure. Each proposition is processed independently; there is no cross-query deduplication, so the same transition may appear under different propositions. When retrieving for a state from trajectory 𝜏 𝑖 , transitions originating from the same episode and overlapping step are excluded. 
+
+Hyperparameters. Table 7 lists the retrieval con-figuration. The recall pool 𝑅 is larger than the fi-nal 𝐾 to give MMR room to diversify within each proposition’s candidate set.       
+
+> Parameter Value Recall pool per query ( 𝑅 )15 Final hits per query ( 𝐾 )3MMR trade-off ( 𝜆 )0.5 Embedding model Qwen3-Embedding-0.6B Index type FAISS inner product
+
+Table 7: Transition retrieval hyperparameters. 
+
+F Self-Probing and Dynamics Synthesis Pairs 
+
+This appendix presents four representative triples produced during AAWM data construction. Each case displays the task, the current observation, one confirmed pattern and one open question elicited by Self-Probing, and the corresponding responses in the synthesis output. Where synthesis sentences unrelated to the displayed propositions are omitted, the omission is marked with an ellipsis. 
+
+ALFWorld Case 1 
+
+Task. Clean some potato and put it in microwave. 
+
+Observation. You arrive at sinkbasin 1. On the sinkbasin 1, you see nothing. 
+
+Confirmed pattern. “I believe cleaning a potato with the sinkbasin 1 will remove dirt from it.” 
+
+Open question. “I don’t know if the sinkbasin 1 can clean the potato without it being on the sink.” 
+
+Synthesis. The environment permits cleaning an item while holding it at the sinkbasin without placing it on the sink first, as demonstrated by successful cleaning actions (e.g., clean potato 1 with sinkbasin 1 )when the sinkbasin’s contents do not include the item being cleaned. The sinkbasin’s current empty state does not block the cleaning action, and the potato remains in inventory during cleaning, resulting in a clean potato ready for microwave use. 
+
+ALFWorld Case 2 
+
+Task. Clean some spoon and put it in drawer. 
+
+Observation. You open the drawer 3. The drawer 3 is open. In it, you see nothing. 
+
+Confirmed pattern. “I think the inventory action reveals items the agent is currently holding.” 
+
+Open question. “I’m unsure whether the examine 
+
+action reveals hidden items in a drawer.” 
+
+Synthesis. The examine action does not reveal hidden items in a drawer, as it only confirms the visible state (e.g., “drawer 4 is open. In it, you see nothing”), which is already known after opening. . . . The inventory 
+
+action only displays items the agent is currently holding, not environmental objects like spoons on countertops or in drawers, so it cannot indicate the spoon’s location without prior pickup. 
+
+14 WebShop Case 1 
+
+Task. Find me machine wash men’s t-shirts with long sleeve with color: black, and size: xx-large, and price lower than $70.00. 
+
+Observation. Search. 
+
+Confirmed pattern. “I think specifying price con-straints in the search query will filter results to items under $70.” 
+
+Open question. “I’m unsure whether including size and color in the search terms ensures they are applied as filters.” 
+
+Synthesis. The search engine does not apply price constraints (e.g., price < 70.00 ) as filters, as re-sults include items exceeding the price limit. Includ-ing color and size as attributes (e.g., color:black ,
+
+size:xx-large ) in the query string fails to filter results, as non-matching items still appear. . . . 
+
+WebShop Case 2 
+
+Task. Find me wide leg, slim fit, straight leg, loose fit women’s shorts with color: red, and size: xx-large, and price lower than $40.00. 
+
+Observation. Back to Search | < Prev | color | black | blue | dark gray | gray | navy | red | silver | size | small | medium | large | x-large | xx-large | Burband Womens High Waist Bike Shorts Tummy Control Workout Yoga Pants Running Exercise Running Shorts with Side Pockets | Price: $6.82 | Rating: N.A. | Description | Features | Reviews | Buy Now 
+
+Confirmed pattern. “I think color and size filters ap-ply to the search results, not individual product pages.” 
+
+Open question. “I’m unsure whether changing color/size filters after clicking a product affects the current product’s display.” 
+
+Synthesis. The product detail page displays color and size filters that directly modify the current product’s available variants (e.g., clicking “red” selects the red color option for this specific product, not the search results), while “Back to Search” returns to the original filtered search results without altering the applied crite-ria. This confirms that color/size selections on product detail pages are product-specific, not global search fil-ters, and “Back to Search” resets to the search context with the same filters active. 
+
+G RL Rollout Reasoning 
+
+During reinforcement learning, AAWM-initialized policies (Qwen2.5-7B-Instruct) frequently produce reasoning traces that reference specific environ-ment mechanisms before selecting an action. This appendix presents four rollout excerpts illustrating this pattern, with the complete reasoning trace for each step. 
+
+ALFWorld Case 1 
+
+Task. Put a hot cup in cabinet. 
+
+Observation. You arrive at microwave 1. The mi-crowave 1 is closed. 
+
+Reasoning. The goal is to put a hot cup in a cabinet, and we have the cup in our inventory. To achieve this, we need to heat the cup in the microwave. The current observation shows the microwave is closed, but the microwave can be used to heat the cup regardless of its state (closed or open) when the cup is in inventory. Heating the cup in the microwave will make it hot, and we can then move it to a cabinet. Since we have the cup and are at the microwave, the immediate next step is to heat the cup. 
+
+Action. heat cup 2 with microwave 1 
+
+ALFWorld Case 2 
+
+Task. Put a clean spatula in diningtable. 
+
+Observation. You arrive at sinkbasin 1. On the sinkbasin 1, you see nothing. 
+
+Reasoning. Cleaning the spatula 1 with the sinkbasin 1 is a valid action that directly transforms the spatula into a clean state. The environment validates that this action works as expected (e.g., spatulas are successfully cleaned when executed on a sinkbasin with them in inventory), and the current environment state shows the spatula is in inventory and the sinkbasin is empty (no evidence of prior cleaning attempts or water requiring preconditions), making cleaning the immediate step to achieve the goal. 
+
+Action. clean spatula 1 with sinkbasin 1 
+
+WebShop Case 1 
+
+Task. Find me gluten free, protein serving pantry sta-ples with flavor name: flax seeds, and size: 4.25 ounce (pack of 12), and price lower than $70.00. 
+
+Observation. Back to Search | < Prev | flavor name | country ranch | multi-seeds | original almond | . . . | flax seeds | honey cinnamon | size | 4.25 ounce (pack of 1) | . . . | 4.25 ounce (pack of 12) | 7.7 ounce (pack of 1) | Blue Diamond Almonds Nut Thins Gluten Free Cracker Crisps, Hint of Sea Salt, 4.25 Oz Boxes (Pack of 12) | Price: $34.44 | Rating: N.A. | Description | Features | Reviews | Buy Now 
+
+Reasoning. The current product listing (Blue Diamond Almonds) already satisfies the size and price criteria (4.25 ounce pack of 12 for $34.44), but the flavor is not “flax seeds” as specified in the goal. The action to correct this is to change the flavor filter to “flax seeds” by clicking on the “flax seeds” option in the flavor menu. This will update the product listing to show only items with the correct flavor, ensuring the goal’s flavor requirement is met. 
+
+Action. click[flax seeds] 
+
+WebShop Case 2 
+
+Task. Find me loose fit women’s tops, tees & blouses with short sleeve, long sleeve with color: c5-wine, and 
+
+15 size: large, and price lower than $40.00.    
+
+> Observation. Back to Search | < Prev | size | small | medium | large | x-large | xx-large | color | a1-blue | a2-black | a2-wine | . . . | c5-army green | c5-black | c5-blue | c5-gray | c5-green | c5-purple | c5-red | . . .
+> Reasoning. The product “FABIURT Summer Tops for Women” has already been filtered by c5-wine color, so it remains to select the size large. The size option “large” is listed in the available size options and does not conflict with the color choice. Selecting size large will satisfy the goal of finding products in size large while maintaining the color c5-wine.
+> Action. click[large]
+
+H Use of Scientific Artifacts 
+
+Our experiments use publicly available research artifacts. ALFWorld, WebShop, and the Agent-Gym codebase are released under MIT licenses. The Qwen2.5-1.5B-Instruct, Qwen2.5-7B-Instruct, Qwen3-Embedding-0.6B, and Qwen3-30B-A3B-Instruct-2507 models are released under Apache-2.0 licenses. The verl-agent (GiGPO) codebase is also released under Apache-2.0. The AgentTraj-L dataset does not specify an explicit license on its public dataset page; we therefore use it only for research experiments and do not redistribute the original trajectories or any derivative training tar-gets. Should we release code, prompts, or trained checkpoints, we will do so under terms compatible with the licenses of the underlying artifacts. 16

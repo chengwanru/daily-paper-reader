@@ -1,0 +1,412 @@
+Title: Compression and Retrieval: Implicit Memory Retrieval for Video World Models
+
+URL Source: https://arxiv.org/pdf/2606.23105v1
+
+Published Time: Tue, 23 Jun 2026 03:35:13 GMT
+
+Number of Pages: 12
+
+Markdown Content:
+# Compression and Retrieval: Implicit Memory Retrieval for Video World Models 
+
+# ZHAN PENG ∗, Huazhong University of Science and Technology, China 
+
+# JIE MA, HUJING Digital Media & Entertainment Group, China 
+
+# HUIQIANG SUN, Huazhong University of Science and Technology, China 
+
+# CHONG GAO ∗, Sun Yat-sen University, China 
+
+# ZHIJIE XUE, ZHIYU PAN, and ZHIGUO CAO †, Huazhong University of Science and Technology, China 
+
+# JUN LIANG † and JING LI, HUJING Digital Media & Entertainment Group, China (a) Single Image Scene Exploration 
+
+(b) History Video Extension 
+
+(c) Hard -cut Video 
+
+Input 
+
+Camera Trajectory 
+
+Fig. 1. Teaser. We propose Compression and Retrieval , an attention-driven implicit memory retrieval mechanism that operates flexibly and globally across the historical context. This figure illustrates three key applications enabled by our model’s memory capabilities. Beyond performing single-image scene exploration, our approach also supports video-to-video generation while maintaining scene consistency. Notably, our method uniquely facilitates the synthesis of hard-cut videos, where the generated camera trajectories are discontinuous relative to the input context. In the visualization, blue paths represent the context trajectories, while red segments denote the trajectories of the generated videos. As demonstrated, our method consistently preserves scene consistency across all three settings, showcasing exceptional memory retrieval performance and precise control over complex camera trajectories. 
+
+Video world models hold promise for simulating interactive envi-ronments, yet maintaining consistent long-term memory across complex camera trajectories remains a critical challenge. Existing methods typically rely on computationally expensive context scaling or rigid heuristic retrieval mechanisms, which lacks generalization to varying camera trajectories and environments. In this paper, we 
+
+> ∗
+
+Work done during an internship at HUJING Digital Media & Entertainment Group 
+
+> †
+
+Corresponding authors Authors’ Contact Information: Zhan Peng, Huazhong University of Science and Tech-nology, China; Jie Ma, HUJING Digital Media & Entertainment Group, China; Huiqiang Sun, Huazhong University of Science and Technology, China; Chong Gao, Sun Yat-sen University, China; Zhijie Xue; Zhiyu Pan; Zhiguo Cao, Huazhong University of Science and Technology, China; Jun Liang; Jing Li, HUJING Digital Media & Entertainment Group, China. 
+
+propose Compression and Retrieval (CaR), an attention-driven im-plicit memory retrieval mechanism to overcome these limitations. By injecting viewpoint information via positional encoding, our method performs flexible memory retrieval through attention com-putation. To efficiently process extended contexts with minimal computational overhead, we further introduce a lightweight con-text compression network. Furthermore, we construct SceneFly, a large-scale synthetic dataset featuring realistic camera trajecto-ries and frame-level annotations to train and evaluate long-horizon video world models. Extensive experiments demonstrate that our ap-proach achieves state-of-the-art results on established benchmarks and exhibits strong generalization to open-domain scenes. Project page: https://github.com/Orange-3DV-Team/CaR  
+
+> arXiv:2606.23105v1 [cs.CV] 22 Jun 2026 •Zhan Peng, Jie Ma, Huiqiang Sun, Chong Gao, Zhijie Xue, Zhiyu Pan, Zhiguo Cao, Jun Liang, and Jing Li
+
+(a) Full Context (b) Explicit Retrieval (c) Implicit Retrieval    
+
+> Autoregressive Video Diffusion Transformer Autoregressive Video Diffusion Transformer
+> Camera
+> Poses
+> Compression Selection
+> Memory Retrieval
+> Autoregressive Video
+> Diffusion Transformer
+> Camera
+> Poses
+> Fig. 2. Comparison of Memory Paradigms. (1) Scaling up the context window to utilize the entire context as memory is computationally prohibitive, rendering it impractical. (2) Explicit retrieval relies on hand-crafted heuristic rules; the rigidity of these rules severely restricts the model’s generalization across diverse camera trajectories and scenes. (3) In contrast, our implicit retrieval is an attention-driven mechanism where the model performs retrieval directly within the global context, yielding both greater flexibility and superior performance.
+
+1 Introduction 
+
+Diffusion-based video generation [Hong et al . 2022; Kong et al . 2024; Wan et al . 2025; Wu et al . 2025b; Yang et al . 2025] is evolving into interactive world models capable of simulating complex visual envi-ronments [Hong et al . 2025; Team et al . 2026], offering significant potential for long-horizon applications in autonomous driving [Gao et al . 2024; Hu et al . 2023] and embodied intelligence [Wu et al . 2026; Yang et al . 2023]. However, serving as reliable simulators for these tasks introduces a fundamental challenge: the model must maintain a robust long-term memory of the environment. Specifically, when previously observed regions re-enter the field of view after complex camera trajectories, the model must render them again consistently, even from entirely novel viewpoints. Existing approaches expose a fundamental trade-off between memory coverage and efficiency. Full-context models [Hong et al .2025; Team et al . 2026] retain all recent frames, but the quadratic cost of temporal attention makes long histories increasingly im-practical, as shown in Fig.2(a). Retrieval-based models reduce this cost by selecting a small subset of history according to heuristic rules, such as field-of-view (FoV) [Yu et al . 2025a] or feature similar-ity [Chen et al . 2026a], as shown in Fig.2(b). These explicit retrieval rules are efficient when the target resembles a stored view, but they separate retrieval from generation and impose a fixed notion of rel-evance. Consequently, they can discard useful evidence under large viewpoint changes, discontinuous trajectories, or scene-dependent occlusions. The central challenge is therefore to preserve access to the full history while allowing the generation model itself to determine which memory is relevant. To overcome these limitations, we propose CaR, an attention-driven implicit memory retrieval mechanism that operates flexibly and globally across the historical context. Rather than selecting frames before generation, CaR concatenates compressed context tokens with the target video tokens and retrieves memory through attention. We encode each token with its camera projection ma-trix so that context–target interactions depend on relative view-point geometry. A zero-initialized Retrieval Attention branch learns this geometry-aware interaction in parallel with the pretrained self-attention branch, preserving the base model while adding cam-era control and long-term retrieval. Because global attention over uncompressed history remains expensive, a dual-branch context encoder combines low-resolution scene structure with details ex-tracted from high-resolution VAE latents, reducing the number of context tokens by approximately 97%. Training such a model requires trajectories that repeatedly revisit scene regions with accurate camera poses. Existing video collec-tions provide limited revisiting behavior or noisy pose estimates, so we construct SceneFly using Unreal Engine 5. SceneFly contains diverse indoor, outdoor, and stylized environments, stochastic long-range camera trajectories, and exact frame-level camera annotations. Training on SceneFly and the real-world SpatialVid dataset, CaR outperforms full-context and explicit-retrieval baselines on video extension and scene revisiting. It also supports hard cuts between discontinuous viewpoints, a setting that removes local frame conti-nuity and directly tests retrieval from long-term memory. Our contributions are threefold: 
+
+• We propose Compression and Retrieval, an attention-driven implicit memory retrieval mechanism for scene-consistent interactive video generation. 
+
+• We introduce SceneFly, a large-scale revisiting synthetic dataset with frame-level camera annotations designed for training and evaluating memory capability. 
+
+• Our method achieves state-of-the-art results on established benchmarks and demonstrates strong generalization to open-domain scenes. 
+
+2 Related Work 
+
+Long Video Generation. Modern video diffusion models [Brooks et al . 2024; Kong et al . 2024; Wan et al . 2025; Wu et al . 2025b; Yang et al . 2025] commonly combine Diffusion Transformers (DiTs) [Pee-bles and Xie 2023] with rectified flow [Esser et al . 2024; Lipman et al .2023; Liu et al . 2023a]. However, their temporal attention cost limits the duration that can be jointly generated. Autoregressive meth-ods extend videos segment by segment [Chen et al . 2024; Guo et al .2025; Henschel et al . 2025; Lu et al . 2024], while context-compression Compression and Retrieval: Implicit Memory Retrieval for Video World Models •
+
+methods summarize earlier segments [Chen et al . 2026b; Zhang et al .2025a,b]. These techniques improve duration but primarily rely on text as control and do not address the retrieval of scene content along prescribed camera trajectories. 
+
+Camera-Controlled Video Generation. Integrating camera param-eters into video generation enables fine-grained viewpoint con-trol [Bai et al . 2025c; Guo et al . 2024; Liu et al . 2025]. Early work [Liu et al . 2023b] establishes the viability of camera-conditioned genera-tion via zero-shot novel view synthesis, and subsequent methods encode camera poses through dedicated modules [Bai et al . 2025b; He et al . 2025; Wang et al . 2024; Yu et al . 2025b, 2024; Zheng et al .2024] or construct 3D geometric caches [Ren et al . 2025] to scaffold world-consistent generation. PRoPE [Li et al . 2025c] embeds camera projection matrices into attention, and UCPE [Zhang et al . 2026] generalizes this relative encoding across DiT blocks. Combined with causal generation [Huang et al . 2026; Yin et al . 2025], these mod-els can follow long camera paths, but content outside the active causal window is no longer directly accessible. We build on relative camera encoding for a different purpose: retrieving compressed ob-servations from the complete history when old viewpoints become relevant again. 
+
+Video World Models. Interactive world models [Alonso et al . 2024; Bruce et al . 2024; HunyuanWorld 2025; HY-World 2026; Li et al .2025a; NVIDIA et al . 2025; Valevski et al . 2025; Yu et al . 2025c] re-quire both camera controllability and long-term historical memory. Lingbot-World [Team et al . 2026] and RELIC [Hong et al . 2025] expand the temporal context, whereas Context-as-Memory [Yu et al . 2025a] retrieves frames using field-of-view overlap and Hy-DRA [Chen et al . 2026a] uses feature-similarity ranking. These methods adopt explicit retrieval : fixed, hand-crafted criteria decide which frames to retrieve, making the selection opaque to the gen-eration model. Geometry-based methods [Li et al . 2025b; Wu et al .2025a] instead store observations in explicit 3D structures, making performance dependent on reconstruction quality. In contrast, CaR introduces implicit memory retrieval , which retains a compressed global history and lets geometry-aware attention learn a soft, token-level retrieval policy jointly with video generation. 
+
+3 Method 
+
+We propose CaR, an implicit memory retrieval mechanism. In this section, we describe the implementation of our approach. Sec. 3.1 introduces the preliminaries related to video generation. Sec. 3.2 details the Implicit Memory Retrieval mechanism, focusing on how viewpoint information is injected into the latents and how global re-trieval is performed within the context. Sec. 3.3 describes a learnable method to compress the context more compactly to save resources. Finally, Sec. 3.4 introduces our long-video dataset collected using Unreal Engine 5, which features precise camera pose annotations, diverse scenes, and caption annotations. 
+
+3.1 Preliminaries 
+
+Video Diffusion Model. CaR builds upon a pretrained text-to-video latent diffusion model formulated within the Rectified Flow framework [Esser et al . 2024]. Given an input video 𝑉 0, a video variational autoencoder (VAE) first encodes it into a clean latent rep-resentation 𝑧 0. A noisy latent 𝑧 𝑡 is subsequently derived by linearly interpolating between 𝑧 0 and standard Gaussian noise 𝜖 ∼ N ( 0, 1)
+
+at a randomly sampled timestep 𝑡 :
+
+𝑧 𝑡 = (1 − 𝑡 )𝑧 0 + 𝑡𝜖. (1) During training, the noisy latent 𝑧 𝑡 is processed by a Transformer-based diffusion model (DiT) [Peebles and Xie 2023], which predicts the instantaneous velocity field 𝑣 Θ (𝑧 𝑡 , 𝑡 ) governing the ordinary differential equation (ODE) d𝑧 𝑡 = 𝑣 Θ (𝑧 𝑡 , 𝑡 ) d𝑡 . The network is opti-mized using the Flow Matching objective: 
+
+L𝐹 𝑀 = E𝑧 0,𝑡,𝜖 || 𝑣 Θ (𝑧 𝑡 , 𝑡 ) − 𝑢 𝑡 (𝑧 0 |𝜖 )|| 2, (2) where 𝑢 𝑡 (𝑧 0 | 𝜖 ) denotes the target velocity vector connecting 𝑧 0 and 
+
+𝜖 . At inference, the generation process is initialized with pure noise 
+
+𝑧 1 and sequentially solved via Euler integration along a decreasing timestep schedule {𝑡 𝑖 }, with 𝑡 0 = 1 and 𝑡 𝑛 = 0:
+
+𝑧 𝑡 𝑖 +1 = 𝑧 𝑡 𝑖 + 𝑣 Θ (𝑧 𝑡 𝑖 , 𝑡 𝑖 ) · ( 𝑡 𝑖 +1 − 𝑡 𝑖 ). (3) Finally, the estimated latent 𝑧 0 is decoded back into the pixel space by the VAE to synthesize the output video. 
+
+Camera Representation. Each frame’s camera is parameterized by extrinsics (R, t) ∈ SE (3) and shared intrinsics K ∈ R3×3. We compose these into a 4 × 4 projective matrix: 
+
+P =
+
+KR Kt 0⊤ 1
+
+
+
+∈ R4×4. (4) This matrix is the transformation for computing camera coordinates from world coordinates. 
+
+3.2 Implicit Memory Retrieval 
+
+Motivation. As analyzed in Sec. 1, explicit memory retrieval relies on hand-crafted filtering rules, which restricts the model’s flexibil-ity and degrades its generalization across various trajectories and scenes. To eliminate this reliance on manual rules, we aim to enable the model to learn global implicit retrieval within the full context. Specifically, we enable the model to utilize the attention mechanism for retrieval, which necessitates accounting for spatial relevance in addition to semantic correlations. Consequently, effective implicit retrieval necessitates assigning a camera pose-based "identity" to the features, thereby equipping the model with essential spatial awareness. Inspired by PRoPE [Li et al . 2025c] and UCPE [Zhang et al . 2026], we employ a relative encoding mechanism to capture relative spatial relationships, thereby enhancing the model’s implicit retrieval capabilities. 
+
+Relative Pose Encoding. For each token 𝑖 with 𝑑 channels, we construct a per-token transformation matrix for half of its channels from its camera’s projective matrix P𝑖 to replace the standard RoPE: 
+
+D𝑖 = I𝑑 /8 ⊗ P𝑖 ∈ R𝑑 /2×𝑑 /2, (5) where ⊗ means Kronecker product and 𝐼 𝑑 /8 is an identity matrix. We apply D𝑖 to queries and its inverse D−1 
+
+> 𝑖
+
+to keys and values via batched matrix-vector products, yielding the attention: 
+
+𝑂 = D ⊙ Attn  D⊤ ⊙ 𝑄, D−1 ⊙ 𝐾, D−1 ⊙ 𝑉  , (6) • Zhan Peng, Jie Ma, Huiqiang Sun, Chong Gao, Zhijie Xue, Zhiyu Pan, Zhiguo Cao, Jun Liang, and Jing Li VAE ❄               
+
+> Compressed  Context
+> 3D Conv & SiLU
+> Self A1en2on
+> Fla1en
+> 🔥
+> ResNet
+> &
+> Projec/on
+> Self A5en/on
+> Cross A5en/on
+> FFN
+> Retrieval
+> A5en/on
+> 🔥
+> ❄
+> ❄
+> Patchify
+> 3D Conv
+> 🔥 🔥
+> 🔥
+> Downsample
+> QKV
+> HR Compression Layers
+> Detail Branch Coarse Branch
+> VAE ❄
+> RoPE Pose Encoding
+> Dec.
+> D!"D#
+> Rela2ve Pose Encoding
+> Implicit Memory Retrieval
+> ⊕
+> Context Sink Noise
+> Fig. 3. Overview of CaR. A dual-branch compression network converts the historical video into compact context tokens. The context, an uncompressed sink frame, and noisy target tokens are then processed by two parallel attention branches: standard self-attention preserves the pretrained video prior, while Retrieval Attention uses relative camera poses to retrieve relevant history and control the target viewpoint.
+
+where ⊙ denotes the batched matrix-vector product. The key insight is that each dot product in the attention score naturally resolves to a relative projective transformation: 
+
+D𝑖 D−1 
+
+> 𝑗
+
+= I𝑑 /8 ⊗
+
+
+
+P𝑖 P−1
+
+> 𝑗
+
+
+
+, (7) When two viewpoints are close, the relative projective transfor-mation P𝑖 P−1 
+
+> 𝑗
+
+approaches the identity matrix, reducing to standard attention. Conversely, when there is a large deviation between the two viewpoints, the relative projective transformation exerts a sup-pressive effect, thereby diminishing the attention scores. 
+
+Memory Retrieval. Leveraging the properties of relative pose encoding, we enable the model to perform retrieval directly within the attention mechanism, called Retrieval Attention. Specifically, the attention scores of latents irrelevant to the current viewpoint are suppressed, whereas those of highly relevant latents are relatively amplified. This naturally up-weights features from geometrically similar views, as illustrated in the Fig. 3. Consequently, this property effectively filters features from nearby viewpoints without requiring any explicit frame selection or hand-designed retrieval criteria. To preserve the inherent capabilities of the base model, we intro-duce a zero-initialized Retrieval Attention branch in parallel with the standard self-attention mechanism. The original self-attention retains the standard RoPE, while the Retrieval Attention employs the relative pose encoding. This dual-branch architecture ensures that implicit memory retrieval and camera control capabilities are integrated into the model without compromising the performance of the base model. In general, implicit memory retrieval leverages relative pose en-coding to inject camera poses directly into the attention operation, executing the retrieval process via an independent Retrieval Atten-tion module. Our paradigm obviates the need for explicit frame se-lection or hand-crafted retrieval criteria, thereby promoting greater flexibility and generalization to novel camera trajectories and di-verse scenes. 
+
+3.3 Context Compression 
+
+Implicit retrieval fundamentally changes the role of context compres-sion. Explicit methods encode only frames selected by a predefined rule, whereas CaR preserves the complete history and lets the gen-erator determine relevance for each target query. Keeping every historical latent at its original resolution, however, would reintro-duce the quadratic cost of full-context attention. Compression must therefore make global access affordable without prematurely de-ciding which observations will matter to a future, unknown target view. It should remove redundancy while preserving the generator’s freedom to retrieve. This objective differs from conventional video compression, which reconstructs each input frame. Our compressed history instead serves as memory for generation across potentially large viewpoint changes. It must retain global layout and coarse geometry to locate observed regions, as well as textures, boundaries, and thin structures to reproduce their appearance. Aggressive pixel-space downsam-pling preserves structure but removes fine details, while compress-ing only high-resolution VAE latents places a greater burden on the learnable encoder. A single representation therefore struggles to preserve both forms of evidence within a compact token budget. We address this trade-off with two complementary paths. The coarse branch downsamples the context by (2, 4, 4) before apply-ing the frozen VAE, efficiently preserving scene layout and long-range structure. The detail branch first VAE-encodes the original-resolution context and then applies a lightweight latent downsam-pler, retaining appearance cues lost by pixel-space compression. Their outputs form a compact memory sequence containing both structural and fine-grained evidence. Compression and Retrieval: Implicit Memory Retrieval for Video World Models •                                                                                            
+
+> Table 1. Quantitative Comparison Results. Empowered by the Implicit Memory Retrieval mechanism, our model achieves the best memory capabilities and the highest visual quality. Conversely, the suboptimal results of CaM and HyDRA highlight the inherent rigidity of Explicit Retrieval methods that rely on hand-crafted heuristics. Furthermore, the performance degradation observed with naive downsampling (Ours-DS) confirms the necessity of our Context Compression module. Finally, our favorable comparisons against the heavily parameterized LingBot-World further underscore the superiority of our approach.
+> Dataset Method Video Extension Comparison Scene Revisiting Comparison PSNR ↑SSIM ↑LPIPS ↓FVD ↓PSNR ↑SSIM ↑LPIPS ↓FVD ↓
+> SceneFly Lingbot [Team et al. 2026] 16.37 0.516 0.450 143.2 15.63 0.470 0.499 87.2 CaM [Yu et al. 2025a] 21.45 0.627 0.171 53.1 19.39 0.584 0.271 46.7 HyDRA [Chen et al. 2026a] 21.25 0.620 0.176 54.2 20.38 0.610 0.235 43.3 Ours-DS 19.56 0.561 0.246 149.6 18.03 0.527 0.345 274.6 Ours 22.91 0.693 0.140 52.7 21.23 0.672 0.209 42.1
+> SpatialVid Lingbot [Team et al. 2026] 17.59 0.577 0.342 122.5 16.11 0.568 0.360 93.7 CaM [Yu et al. 2025a] 18.00 0.565 0.278 94.9 18.88 0.621 0.292 50.6 HyDRA [Chen et al. 2026a] 17.81 0.560 0.291 105.7 19.90 0.648 0.244 44.3 Ours-DS 17.22 0.543 0.347 169.6 16.07 0.555 0.429 537.3 Ours 18.17 0.593 0.271 92.6 20.77 0.699 0.231 41.2
+
+Relative to the latent tokens before Context Compression, this configuration reduces the context token count by approximately 97%, decoupling historical coverage from attention cost. Ours-DS in Table 1 shows that compression rate alone is insufficient: naive downsampling reaches a similar token budget but discards retrieval-relevant evidence, whereas the dual-branch memory better recon-structs revisited content. 
+
+3.4 Data Pipeline 
+
+Long-term memory requires more than long videos: training must revisit previously observed regions from new viewpoints while pre-senting both relevant and distracting history. Real videos [Wang et al .2025] offer visual diversity but typically lack reliable camera poses and controlled revisit trajectories. Existing synthetic data [Yu et al .2025a] provides accurate poses, yet often has limited scene or mo-tion diversity and insufficient variation in target-context relevance. These limitations allow models to exploit short-range continuity instead of learning retrieval. SceneFly is designed for implicit retrieval. It contains approxi-mately 1,000 minutes of video from 100 diverse indoor, outdoor, and stylized UE5 scenes, with exact frame-level intrinsics and extrin-sics. Independently composed camera motions create long trajecto-ries with substantial viewpoint changes and revisits. Each target is paired with context clips spanning strong, partial, and no FoV over-lap: overlapping views provide reusable evidence, partial overlap requires geometric reasoning, and disjoint views serve as distractors. Varying the context length exposes the model to different retrieval difficulties without explicitly labeling which frame to use. We collect trajectories through automated NavMesh exploration, construct target–context pairs by graded FoV overlap, and caption only target appearance with Qwen3-VL [Bai et al . 2025a], excluding camera-motion descriptions. Please refer to Appendix B for full construction details. 
+
+4 Experiments 4.1 Experiment Settings 
+
+Implementation Details. We build CaR on Wan2.2-TI2V-5B and generate 81-frame videos at 832 × 480 resolution. CaM [Yu et al .2025a] and HyDRA [Chen et al . 2026a] are reimplemented under the same backbone, data, and output settings. We train for over 100,000 iterations using 16 NVIDIA H20 GPUs. Context clips are encoded as continuous sequences during training, whereas inference may use discontinuous context clips. 
+
+Evaluation Settings. Our evaluation metrics include: (1) Fréchet Video Distance (FVD) for video quality assessment, and (2) PSNR, SSIM, and LPIPS for quantifying memory capability by measuring pixel-level and perceptual differences between frames. To evaluate our method, we hold out 560 videos of our SceneFly dataset, which contains diverse scenes, as the test set. By evaluating on this dataset featuring complex camera revisiting trajectories, we can effectively assess the model’s generalization capabilities to novel trajectories. Furthermore, to evaluate the model’s performance on real-world datasets, we also conduct tests on the SpatialVid dataset. 
+
+Evaluation Methods. We compare our method with existing ap-proaches across two primary tasks: (1) Video Extension , which evalu-ates the generation of scene-consistent continuations; and (2) Scene Revisiting , an essential capability for video world models that com-pares new and previously generated frames. To quantify the latter, we employ a round-trip camera trajectory (rotating 𝑛 ◦ and returning) to facilitate direct PSNR, SSIM, and LPIPS calculations.Furthermore, our method uniquely supports Camera Hard Cut generation, syn-thesizing videos with discontinuous viewpoint transitions. By en-forcing abrupt camera shifts for subsequent clips and independently VAE-encoding past contexts, this setting acts as a pure text-to-video (T2V) task devoid of local reference frames. This rigorously tests the model’s spatial generalization and memory capabilities. As ex-isting baselines lack this functionality, we exclusively present our method’s results for this highly demanding task. 
+
+4.2 Quantitative Results 
+
+As shown in Table 1, the quantitative metrics demonstrate the clear advantages of our CaR over existing approaches. Across the com-plex camera trajectories of SceneFly and the diverse scenes of Spa-tialVid, our method effectively retrieves and utilizes relevant context information, whereas other methods suffer from limited context accessibility. Despite its massive parameter count, Lingbot struggles • Zhan Peng, Jie Ma, Huiqiang Sun, Chong Gao, Zhijie Xue, Zhiyu Pan, Zhiguo Cao, Jun Liang, and Jing Li GT  …      
+
+> Ours
+> …
+> Ours -DS
+> …
+> HyDRA
+> …
+> CaM
+> …
+> HyDRA
+> …
+> Ours
+> …
+> (a) Video Extension Comparison (b) Scene Revisiting Comparison
+> Ours -DS
+> …
+> CaM
+> …
+> …
+> Lingbot
+> Context Video Input Image Input Image
+
+Fig. 4. Qualitative Comparison Results. Compared to existing baselines, our CaR achieves the best memory capabilities and the highest visual quality, strongly validating the efficacy of the proposed Implicit Memory Retrieval. 
+
+with precise camera control and exhibits poor scene consistency, likely due to the restricted context length used during its training phase. Furthermore, the suboptimal performance of CaM and Hy-DRA stems from their reliance on explicit retrieval; the rigidity of their fixed heuristic rules fails to adapt to highly variable camera trajectories and environments. In contrast, our method employs im-plicit retrieval, delegating the entire retrieval process to the model. These superior results strongly validate the effectiveness of our approach. Furthermore, the significant performance degradation observed with naive downsampling (Ours-DS) strongly validates the necessity of our proposed Context Compression Network. 
+
+4.3 Qualitative Results 
+
+In Figure 4, we show our approach against other state-of-the-art methods across two distinct tasks. As demonstrated, our method achieves significantly superior scene consistency compared to both CaM and HyDRA. Furthermore, despite the considerably larger parameter scale of LingBot-World, it struggles to maintain scene consistency, thereby highlighting the inherent limitations of its full-context strategy. In Figure 5, we present the qualitative results for the Camera Hard Cut task. As illustrated, our method successfully synthesizes scene-consistent videos with hard shot transitions conditioned on highly discontinuous camera poses. This compellingly demonstrates our model’s exceptional memory retrieval capabilities and its gen-eralization to complex camera trajectories. 
+
+4.4 Ablation Study 
+
+Position Encoding. We conduct this ablation study specifically on the Camera Hard Cut task. As a significantly more challeng-ing setting, it serves as a rigorous testbed to thoroughly evaluate the model’s memory retrieval capabilities (Table 2). Specifically, we evaluate the position encoding mechanism under three distinct configurations: (1) Standard RoPE: Lacking viewpoint information, this baseline renders the model incapable of retrieving memory History  
+
+> Hard Cut
+> …
+> …
+> Result History
+> …
+> Result
+> …
+> Hard Cut
+
+Fig. 5. Visual Result of Camera Hard Cut. Conditioned on the available context and discontinuous camera poses, our model successfully synthesizes videos with hard shot transitions without image reference. This compellingly demonstrates its memory retrieval capabilities and precise camera control. 
+
+or controlling the camera, confirming the necessity of a dedicated encoding scheme for memory retrieval. (2) Backbone Substitution: Directly replacing RoPE with relative pose encoding within the DiT backbone compromises the inherent capabilities of the base model, thereby justifying the need for an independent implicit retrieval module. (3) Absolute Pose Encoding: Similar to CaM and HyDRA, this variant adds encoded absolute camera poses directly to the DiT latents. However, it fails to capture the relative geometric rela-tionships among latents, struggling to maintain spatial awareness under varying camera trajectories. This finding strongly validates the superiority of our proposed relative pose encoding. Finally, the slightly degraded FVD performance of our method can be attributed to the increased complexity of our relative pose encoding, which induces a more pronounced shift in the generated video distribution compared to the base model. Compression and Retrieval: Implicit Memory Retrieval for Video World Models •Right                                                      
+
+> View A View B View C View B View D View B View A
+> High Low
+> Up Down Right Left Left
+> View A  View B
+> Context Noise
+> Fig. 6. Retrieval Attention visualization. The first five columns correspond to context clips along A →B→C→B→D→B, and column 6 is self-attention for the B →A target. The model assigns stronger attention to context views that are closer to the target viewpoint: A →B receives the highest context response, B↔C receives an intermediate response, and B ↔D is most suppressed. Table 2. Ablation on Positional Encoding Strategy. Experimental results demonstrate the necessity of Relative Pose Encoding.
+> Method PSNR ↑SSIM ↑LPIPS ↓FVD ↓
+> RoPE 14.44 0.415 0.541 196.6 w/o Retrival Attention 13.49 0.416 0.572 445.1 CaM & HyDRA 15.52 0.490 0.476 117.2
+> Ours 17.75 0.551 0.332 144.0
+> Table 3. Ablation on Sink Strategy. When applying our method to long image-to-video generation, introducing the initial frame as a sink latent effectively mitigates the drift.
+> Method PSNR ↑SSIM ↑LPIPS ↓FVD ↓
+> w/o sink 15.97 0.472 0.436 153.2 tail 16.73 0.497 0.397 154.5 Ours 17.75 0.551 0.332 144.0
+
+Sink Strategy. Extending our method to long video generation introduces visual drift, driven by autoregressive error accumulation and the loss of fine-grained details from extreme context compres-sion. To mitigate this, we prepend an independently encoded, un-compressed anchor frame to the noisy latents. Table 3 compares two anchor selection strategies: (1)Tail Sink: Selects the context frame whose camera pose is closest to the target’s final frame. While pro-viding head-and-tail structural references, this frame is inherently model-generated, meaning the fundamental issue of error accumula-tion persists. (2)Initial Sink(Ours): Utilizes the user-provided initial image. As an error-free ground truth, this reference effectively ar-rests artifact accumulation, yielding significantly more stable and superior visual quality. 
+
+4.5 Attention Logit Visualization 
+
+Setup. We visualize Retrieval Attention to examine whether the injected camera poses enable the model to retrieve memory ac-cording to viewpoint relevance. We construct a controlled round-trip trajectory over four views arranged in an L-shaped layout: A→B→C→B→D→B→A. View B lies to the right of A and strongly overlaps it; C lies above B and has only partial overlap with the A–B axis; D lies farther to the right of B and outside the field of view of A. The first five clips form the compressed context and serve as attention keys, while the final B →A clip is the generation target and provides the queries. In Fig. 6, columns 1–5 show the attention logits assigned to the context clips, and column 6 shows target self-attention. 
+
+Results. The responses follow the relative camera geometry. Clip 1 (A →B) receives the strongest context response because it covers nearly the same region as the target. Clips 2–3 (B ↔C) receive in-termediate responses because they share evidence around B but deviate along the vertical branch. Clips 4–5 (B ↔D) are most sup-pressed because they move away from the target viewing range. The ordering self > A–B context > B–C context > B–D context shows that the attention strength varies consistently with viewpoint prox-imity. This pose-guided attention behavior realizes implicit memory retrieval without manually specifying which context frames should be selected. 
+
+Analysis. This pattern reflects the central advantage of implicit retrieval. Long histories contain directly useful views, partial evi-dence, and distractors. Uniform aggregation can introduce irrelevant content, whereas hand-designed top-𝑘 retrieval makes a discrete, ir-reversible decision before generation. Retrieval Attention instead as-signs continuous, query-dependent weights: relative pose encoding provides pairwise geometry, while learned visual features determine generative utility. In particular, the intermediate B ↔C responses show that the model can retain partial evidence rather than merely selecting or rejecting entire frames. This behavior is consistent with Sec. 3.2, where retrieval is learned inside the generator and can combine evidence across views. 
+
+5 conclusion 
+
+In this work, we propose CaR, an attention-driven implicit mem-ory retrieval mechanism. This highly flexible paradigm eliminates the reliance on hand-crafted heuristics, enabling direct information retrieval across the entire context. Furthermore, our model main-tains exceptional generation performance even when operating on highly compact contexts. Empowered by implicit memory retrieval, our approach successfully synthesizes scene-consistent long videos under complex camera trajectories, and is remarkably capable of generating hard-cut videos with discontinuous camera motions. • Zhan Peng, Jie Ma, Huiqiang Sun, Chong Gao, Zhijie Xue, Zhiyu Pan, Zhiguo Cao, Jun Liang, and Jing Li 
+
+References 
+
+Eloi Alonso, Adam Jelley, Vincent Micheli, Anssi Kanervisto, Amos Storkey, Tim Pearce, and François Fleuret. 2024. Diffusion for World Modeling: Visual Details Matter in Atari. In NeurIPS .Jianhong Bai, Menghan Xia, Xiao Fu, Xintao Wang, Lianrui Mu, Jinwen Cao, Zuozhu Liu, Haoji Hu, Xiang Bai, Pengfei Wan, et al . 2025b. ReCamMaster: Camera-Controlled Generative Rendering from a Single Video. In Proceedings of the IEEE/CVF Interna-tional Conference on Computer Vision . 14834–14844. Jianhong Bai, Menghan Xia, Xintao Wang, Ziyang Yuan, Zuozhu Liu, Haoji Hu, Pengfei Wan, and Di ZHANG. 2025c. SynCamMaster: Synchronizing Multi-Camera Video Generation from Diverse Viewpoints. In ICLR .Shuai Bai, Yuxuan Cai, Ruizhe Chen, Keqin Chen, Xionghui Chen, Zesen Cheng, Liang-hao Deng, Wei Ding, Chang Gao, Chunjiang Ge, Wenbin Ge, Zhifang Guo, Qidong Huang, Jie Huang, Fei Huang, Binyuan Hui, Shutong Jiang, Zhaohai Li, Mingsheng Li, Mei Li, Kaixin Li, Zicheng Lin, Junyang Lin, Xuejing Liu, Jiawei Liu, Chenglong Liu, Yang Liu, Dayiheng Liu, Shixuan Liu, Dunjie Lu, Ruilin Luo, Chenxu Lv, Rui Men, Lingchen Meng, Xuancheng Ren, Xingzhang Ren, Sibo Song, Yuchong Sun, Jun Tang, Jianhong Tu, Jianqiang Wan, Peng Wang, Pengfei Wang, Qiuyue Wang, Yuxuan Wang, Tianbao Xie, Yiheng Xu, Haiyang Xu, Jin Xu, Zhibo Yang, Mingkun Yang, Jianxin Yang, An Yang, Bowen Yu, Fei Zhang, Hang Zhang, Xi Zhang, Bo Zheng, Humen Zhong, Jingren Zhou, Fan Zhou, Jing Zhou, Yuanzhi Zhu, and Ke Zhu. 2025a. Qwen3-VL Technical Report. arXiv preprint arXiv:2511.21631 (2025). Tim Brooks, Bill Peebles, Connor Holmes, Will DePue, Yufei Guo, Li Jing, David Schnurr, Joe Taylor, Troy Luhman, Eric Luhman, et al . 2024. Video generation models as world simulators. OpenAI Blog 1 (2024), 1. Jake Bruce, Michael Dennis, Ashley Edwards, Jack Parker-Holder, Yuge Shi, Edward Hughes, Matthew Lai, Aditi Mavalankar, Richie Steigerwald, Chris Apps, et al . 2024. Genie: Generative Interactive Environments. In ICML .Kaijin Chen, Dingkang Liang, Xin Zhou, Yikang Ding, Xiaoqiang Liu, Pengfei Wan, and Xiang Bai. 2026a. Out of Sight but Not Out of Mind: Hybrid Memory for Dynamic Video World Models. arXiv preprint arXiv:2603.25716 (2026). Shuo Chen, Cong Wei, Sun Sun, Ping Nie, Kai Zhou, Ge Zhang, Ming-Hsuan Yang, and Wenhu Chen. 2026b. Context Forcing: Consistent Autoregressive Video Generation with Long Context. arXiv preprint arXiv:2602.06028 (2026). Xinyuan Chen, Yaohui Wang, Lingjun Zhang, Shaobin Zhuang, Xin Ma, Jiashuo Yu, Yali Wang, Dahua Lin, Yu Qiao, and Ziwei Liu. 2024. SEINE: Short-to-Long Video Diffusion Model for Generative Transition and Prediction. In ICLR .Patrick Esser, Sumith Kulal, Andreas Blattmann, Rahim Entezari, Jonas Müller, Harry Saini, Yam Levi, Dominik Lorenz, Axel Sauer, Frederic Boesel, et al . 2024. Scal-ing rectified flow transformers for high-resolution image synthesis. In Forty-first international conference on machine learning .Shenyuan Gao, Jiazhi Yang, Li Chen, Kashyap Chitta, Yihang Qiu, Andreas Geiger, Jun Zhang, and Hongyang Li. 2024. Vista: A generalizable driving world model with high fidelity and versatile controllability. Advances in Neural Information Processing Systems 37 (2024), 91560–91596. Yuwei Guo, Ceyuan Yang, Anyi Rao, Zhengyang Liang, Yaohui Wang, Yu Qiao, Ma-neesh Agrawala, Dahua Lin, and Bo Dai. 2024. ANIMATEDIFF: ANIMATE YOUR PERSONALIZED TEXT-TO-IMAGE DIFFUSION MODELS WITHOUT SPECIFIC TUNING. In ICLR .Yuwei Guo, Ceyuan Yang, Ziyan Yang, Zhibei Ma, Zhijie Lin, Zhenheng Yang, Dahua Lin, and Lu Jiang. 2025. Long Context Tuning for Video Generation. In ICCV .Hao He, Yinghao Xu, Yuwei Guo, Gordon Wetzstein, Bo Dai, Hongsheng Li, and Ceyuan Yang. 2025. CameraCtrl: Enabling Camera Control for Video Diffusion Models. In 
+
+ICLR .Roberto Henschel, Levon Khachatryan, Hayk Poghosyan, Daniil Hayrapetyan, Vahram Tadevosyan, Zhangyang Wang, Shant Navasardyan, and Humphrey Shi. 2025. StreamingT2V: Consistent, Dynamic, and Extendable Long Video Generation from Text. In CVPR .Wenyi Hong, Ming Ding, Wendi Zheng, Xinghan Liu, and Jie Tang. 2022. CogVideo: Large-scale Pretraining for Text-to-Video Generation via Transformers. arXiv preprint arXiv:2205.15868 (2022). Yicong Hong, Yiqun Mei, Chongjian Ge, Yiran Xu, Yang Zhou, Sai Bi, Yannick Hold-Geoffroy, Mike Roberts, Matthew Fisher, Eli Shechtman, et al . 2025. Relic: Interactive video world model with long-horizon memory. arXiv preprint arXiv:2512.04040 
+
+(2025). Anthony Hu, Lloyd Russell, Hudson Yeo, Zak Murez, George Fedoseev, Alex Kendall, Jamie Shotton, and Gianluca Corrado. 2023. Gaia-1: A generative world model for autonomous driving. arXiv preprint arXiv:2309.17080 (2023). Xun Huang, Zhengqi Li, Guande He, Mingyuan Zhou, and Eli Shechtman. 2026. Self forcing: Bridging the train-test gap in autoregressive video diffusion. Advances in Neural Information Processing Systems 38 (2026), 167283–167308. Team HunyuanWorld. 2025. HunyuanWorld 1.0: Generating Immersive, Explorable, and Interactive 3D Worlds from Words or Pixels. arXiv preprint (2025). Team HY-World. 2026. HY-World 2.0: A Multi-Modal World Model for Reconstructing, Generating, and Simulating 3D Worlds. arXiv preprint (2026). Weijie Kong, Qi Tian, Zijian Zhang, Rox Min, Zuozhuo Dai, Jin Zhou, Jiangfeng Xiong, Xin Li, Bo Wu, Jianwei Zhang, et al . 2024. Hunyuanvideo: A systematic framework for large video generative models. arXiv preprint arXiv:2412.03603 (2024). Jiaqi Li, Junshu Tang, Zhiyong Xu, Longhuang Wu, Yuan Zhou, Shuai Shao, Tianbao Yu, Zhiguo Cao, and Qinglin Lu. 2025a. Hunyuan-GameCraft: High-dynamic Interactive Game Video Generation with Hybrid History Condition. https://arxiv.org/abs/2506. 17201 Runjia Li, Philip Torr, Andrea Vedaldi, and Tomas Jakab. 2025b. VMem: Consistent Interactive Video Scene Generation with Surfel-Indexed View Memory. In ICCV .Ruilong Li, Brent Yi, Junchen Liu, Hang Gao, Yi Ma, and Angjoo Kanazawa. 2025c. Cam-eras as Relative Positional Encoding. In Advances in Neural Information Processing Systems , Vol. 38. 15984–16009. Yaron Lipman, Ricky TQ Chen, Heli Ben-Hamu, Maximilian Nickel, and Matt Le. 2023. Flow Matching for Generative Modeling. In ICLR .Ruoshi Liu, Rundi Wu, Basile Van Hoorick, Pavel Tokmakov, Carl Chatterjee, Lorenzo Seidenschwarz, Carl Vondrick, Relja Arandjelovic, Mathilde Caron, and Alexander G Schwing. 2023b. Zero-1-to-3: Zero-shot One Image to 3D Object. In ICCV .Tianqi Liu, Zihao Huang, Zhaoxi Chen, Guangcong Wang, Shoukang Hu, Liao Shen, Huiqiang Sun, Zhiguo Cao, Wei Li, and Ziwei Liu. 2025. Free4D: Tuning-free 4D Scene Generation with Spatial-Temporal Consistency. arXiv preprint arXiv:2503.20785 (2025). Xingchao Liu, Chengyue Gong, and Qiang Liu. 2023a. Flow Straight and Fast: Learning to Generate and Transfer Data with Rectified Flow. In ICLR .Yu Lu, Yuanzhi Liang, Linchao Zhu, and Yi Yang. 2024. FreeLong: Training-Free Long Video Generation with SpectralBlend Temporal Attention. In NeurIPS .NVIDIA, Niket Agarwal, Arslan Ali, Maciej Bala, Yogesh Balaji, Erik Barker, Tiffany Cai, Prithvijit Chattopadhyay, Yongxin Chen, Yin Cui, Yifan Ding, et al . 2025. Cosmos World Foundation Model Platform for Physical AI. arXiv preprint arXiv:2501.03575 
+
+(2025). William Peebles and Saining Xie. 2023. Scalable diffusion models with transformers. In 
+
+ICCV . 4195–4205. Xuanchi Ren, Tianchang Shen, Jiahui Huang, Huan Ling, Yifan Lu, Merlin Nimier-David, Thomas Müller, Alexander Keller, Sanja Fidler, and Jun Gao. 2025. GEN3C: 3D-Informed World-Consistent Video Generation with Precise Camera Control. In 
+
+Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition .6121–6132. Robbyant Team, Zelin Gao, Qiuyu Wang, Yanhong Zeng, Jiapeng Zhu, Ka Leong Cheng, Yixuan Li, Hanlin Wang, Yinghao Xu, Shuailei Ma, Yihang Chen, Jie Liu, Yansong Cheng, Yao Yao, Jiayi Zhu, Yihao Meng, Kecheng Zheng, Qingyan Bai, Jingye Chen, Zehong Shen, Yue Yu, Xing Zhu, Yujun Shen, and Hao Ouyang. 2026. Advancing Open-source World Models. arXiv preprint arXiv:2601.20540 (2026). Dani Valevski, Yaniv Leviathan, Moab Arar, and Shlomi Fruchter. 2025. Diffusion Models Are Real-Time Game Engines. In ICLR .Team Wan, Ang Wang, Baole Ai, Bin Wen, Chaojie Mao, Chen-Wei Xie, Di Chen, Feiwu Yu, Haiming Zhao, Jianxiao Yang, Jianyuan Zeng, Jiayu Wang, Jingfeng Zhang, Jingren Zhou, Jinkai Wang, Jixuan Chen, Kai Zhu, Kang Zhao, Keyu Yan, Lianghua Huang, Mengyang Feng, Ningyi Zhang, Pandeng Li, Pingyu Wu, Ruihang Chu, Ruili Feng, Shiwei Zhang, Siyang Sun, Tao Fang, Tianxing Wang, Tianyi Gui, Tingyu Weng, Tong Shen, Wei Lin, Wei Wang, Wei Wang, Wenmeng Zhou, Wente Wang, Wenting Shen, Wenyuan Yu, Xianzhong Shi, Xiaoming Huang, Xin Xu, Yan Kou, Yangyu Lv, Yifei Li, Yijing Liu, Yiming Wang, Yingya Zhang, Yitong Huang, Yong Li, You Wu, Yu Liu, Yulin Pan, Yun Zheng, Yuntao Hong, Yupeng Shi, Yutong Feng, Zeyinzi Jiang, Zhen Han, Zhi-Fan Wu, and Ziyu Liu. 2025. Wan: Open and Advanced Large-Scale Video Generative Models. arXiv preprint arXiv:2503.20314 (2025). Jiahao Wang, Yufeng Yuan, Rujie Zheng, Youtian Lin, Jian Gao, Lin-Zhuo Chen, Yajie Bao, Yi Zhang, Chang Zeng, Yanxi Zhou, et al . 2025. Spatialvid: A large-scale video dataset with spatial annotations. arXiv preprint arXiv:2509.09676 (2025). Zhouxia Wang, Ziyang Yuan, Xintao Wang, Tianshui Chen, Menghan Xia, Ping Luo, and Ying Shan. 2024. MotionCtrl: A Unified and Flexible Motion Controller for Video Generation. In ACM SIGGRAPH Conference Papers . 1–11. Bing Wu, Chang Zou, Changlin Li, Duojun Huang, Fang Yang, Hao Tan, Jack Peng, Jianbing Wu, Jiangfeng Xiong, Jie Jiang, et al. 2025b. HunyuanVideo 1.5 Technical Report. arXiv:2511.18870 [cs.CV] https://arxiv.org/abs/2511.18870 Tong Wu, Shuai Yang, Ryan Po, Yinghao Xu, Ziwei Liu, Dahua Lin, and Gordon Wet-zstein. 2025a. Video World Models with Long-term Spatial Memory. arXiv preprint arXiv:2506.05284 (2025). Wei Wu, Fan Lu, Yunnan Wang, Shuai Yang, Shi Liu, Fangjing Wang, Qian Zhu, He Sun, Yong Wang, Shuailei Ma, Yiyu Ren, Kejia Zhang, Hui Yu, Jingmei Zhao, Shuai Zhou, Zhenqi Qiu, Houlong Xiong, Ziyu Wang, Zechen Wang, Ran Cheng, Yong-Lu Li, Yongtao Huang, Xing Zhu, Yujun Shen, and Kecheng Zheng. 2026. A Pragmatic VLA Foundation Model. arXiv preprint arXiv:2601.18692 (2026). Sherry Yang, Yilun Du, Kamyar Ghasemipour, Jonathan Tompson, Leslie Kaelbling, Dale Schuurmans, and Pieter Abbeel. 2023. Learning interactive real-world simulators. 
+
+arXiv preprint arXiv:2310.06114 (2023). Zhuoyi Yang, Jiayan Teng, Wendi Zheng, Ming Ding, Shiyu Huang, Jiazheng Xu, Yuan-ming Yang, Wenyi Hong, Xiaohan Zhang, Guanyu Feng, et al . 2025. CogVideoX: Compression and Retrieval: Implicit Memory Retrieval for Video World Models •              
+
+> Text-to-Video Diffusion Models with An Expert Transformer. In ICLR .Tianwei Yin, Qiang Zhang, Richard Zhang, William T Freeman, Fredo Durand, Eli Shechtman, and Xun Huang. 2025. From Slow Bidirectional to Fast Autoregressive Video Diffusion Models. In CVPR .Jiwen Yu, Jianhong Bai, Yiran Qin, Quande Liu, Xintao Wang, Pengfei Wan, Di Zhang, and Xihui Liu. 2025a. Context as memory: Scene-consistent interactive long video generation with memory retrieval. In Proceedings of the SIGGRAPH Asia 2025 Con-ference Papers . 1–11. Jiwen Yu, Yiran Qin, Xintao Wang, Pengfei Wan, Di Zhang, and Xihui Liu. 2025c. GameFactory: Creating New Games with Generative Interactive Videos. In ICCV .Mark Yu, Wenbo Hu, Jinbo Xing, and Ying Shan. 2025b. TrajectoryCrafter: Redirecting Camera Trajectory for Monocular Videos via Diffusion Models. arXiv preprint arXiv:2503.05638 (2025). Wangbo Yu, Jinbo Xing, Li Yuan, Wenbo Hu, Xiaoyu Li, Zhipeng Huang, Xiangjun Gao, Tien-Tsin Wong, Ying Shan, and Yonghong Tian. 2024. ViewCrafter: Taming Video Diffusion Models for High-fidelity Novel View Synthesis. arXiv preprint arXiv:2409.02048 (2024). Cheng Zhang, Boying Li, Meng Wei, Yan-Pei Cao, Camilo Cruz Gambardella, Dinh Phung, and Jianfei Cai. 2026. Unified Camera Positional Encoding for Controlled Video Generation. In CVPR .Lvmin Zhang, Shengqu Cai, Muyang Li, Gordon Wetzstein, and Maneesh Agrawala. 2025a. Frame Context Packing and Drift Prevention in Next-Frame-Prediction Video Diffusion Models. Advances in Neural Information Processing Systems 38 (2025), 30546–30566. Lvmin Zhang, Shengqu Cai, Muyang Li, Chong Zeng, Beijia Lu, Anyi Rao, Song Han, Gordon Wetzstein, and Maneesh Agrawala. 2025b. Pretraining Frame Preserva-tion for Lightweight Autoregressive Video History Embedding. arXiv preprint arXiv:2512.23851 (2025). Guangcong Zheng, Teng Li, Rui Jiang, Yehao Lu, Tao Wu, and Xi Li. 2024. CamI2V: Camera-Controlled Image-to-Video Diffusion Model. arXiv preprint arXiv:2410.15957
+> (2024).
+
+A Effect of Compression Ratio 
+
+We investigate the impact of different compression ratios on gen-eration quality and efficiency. The compression ratio is denoted as 
+
+𝑇 ×𝐻 ×𝑊 , representing the temporal, height, and width downsam-pling factors. Our default configuration uses 2×4×4. We compare it against a more aggressive 4×8×8 setting and a less aggressive 
+
+1×2×2 setting. As shown in Table 4, the 2×4×4 ratio achieves the best trade-off between generation quality and efficiency. The 1×2×2
+
+ratio retains more spatial details but incurs higher latency and GPU memory overhead with marginal quality gains, while the 4×8×8
+
+ratio reduces cost at the expense of generation quality. 
+
+Table 4. Effect of Compression Ratio. Ablation on compression ratios (𝑇 ×𝐻 ×𝑊 ). Our default 2×4×4 achieves the best quality–efficiency trade-off. 
+
+Ratio PSNR ↑ SSIM ↑ LPIPS ↓ FVD ↓ Latency ↓ Mem. ↓
+
+1×2×2 18.02 0.563 0.340 148.4 24.08s 31.19GB 
+
+2×4×4 (default) 17.75 0.551 0.332 144.0 3.32s 17.83GB 
+
+4×8×8 17.42 0.541 0.324 141.1 1.98s 17.34GB 
+
+B SceneFly Data Construction Pipeline 
+
+Training long-term scene memory requires videos that leave and revisit scene regions under diverse camera motions, together with accurate frame-level camera poses. Existing datasets provide lim-ited scene diversity, monotonous trajectories, noisy pose estimates, or too few revisiting sequences to support controlled training and evaluation. SceneFly addresses these limitations with an automated Unreal Engine 5 pipeline that generates long exploration videos, exact camera annotations, target–context training pairs, and motion-agnostic captions. This section complements the overview in Fig-ure 7 with implementation-level details of the SceneFly pipeline. We describe (i) the scene corpus and the atomic camera motion library, (ii) the Navigation-Mesh-based exploration algorithm that turns these primitives into long videos, (iii) the FoV-overlap-driven scheme that assembles target–context training pairs, and (iv) the caption protocol that decouples textual cues from camera motion. 
+
+Scene Corpus and Atomic Motion Library. SceneFly is built upon 100 high-fidelity Unreal Engine 5 scenes carefully curated from public marketplaces and in-house assets, spanning indoor en-vironments (apartments, museums, offices), outdoor environments (urban streets, parks, natural landscapes), and stylized worlds (car-toonish, sci-fi, post-apocalyptic). The resulting dataset contains approximately 1,000 minutes of rendered video. To produce tra-jectories that mimic real user exploration, we predefine a library of atomic camera motions that includes pure translations along all six cardinal directions, yaw/pitch rotations of varying magnitude, orbits around a focal point, dolly-in/out maneuvers, and idle hover-ing. Each atomic motion is parameterized by speed, amplitude, and duration, all of which are drawn from scene-aware ranges so that the resulting motion remains physically plausible (e.g., translation speeds are scaled by the local free-space radius of the scene). This atomic library is the source of the trajectory richness reported in the main paper. 
+
+Automated Navigation Mesh and Free Exploration. For every scene, we automatically build a Navigation Mesh (NavMesh) by invoking UE5’s recast-based navigation generator on a bounding volume that tightly encloses the scene’s playable region. The gener-ator rejects geometry that is non-walkable (steep slopes, occluded ceilings, inside-collider regions), yielding a polygonal mesh that ex-actly represents all camera-reachable areas. A virtual camera agent is then spawned on this NavMesh and explores it through a stochastic policy: at each decision step, the agent samples a new atomic motion from the library together with a NavMesh-feasible target waypoint, and the engine’s path-finding routine produces a collision-free path to that waypoint. Whenever the agent risks leaving the mesh or colliding with thin geometry, the policy automatically resamples a new motion, ensuring uninterrupted long-horizon recordings. Each long video is then assembled from a sequence of 81 -frame atomic clips, with motion types resampled independently between clips so that abrupt changes of viewing intent occur frequently. Per-frame camera extrinsics and intrinsics are logged in lock-step with the renderer, providing exact ground-truth poses. 
+
+Training Pair Construction. Once a long video is collected, we transform it into multiple supervised training pairs through a graded FoV-overlap selection scheme. For each long video, we treat every atomic clip as a possible target 𝑉 𝑡𝑔𝑡 and consider all other clips of the same video as context candidates. We project the camera frustum of the target’s middle frame onto each candidate’s frames and compute a frame-wise FoV intersection-over-union; the candidate’s overlap score is the maximum value across its frames. Candidates are then partitioned into three buckets— strong overlap , moderate overlap ,and disjoint —and we sample context clips per pair from a mixture distribution that is intentionally skewed toward the strong and moderate buckets, while still preserving a small but non-trivial • Zhan Peng, Jie Ma, Huiqiang Sun, Chong Gao, Zhijie Xue, Zhiyu Pan, Zhiguo Cao, Jun Liang, and Jing Li Camera Trajectory 
+
+> Pan
+> Orbit
+> Zoom
+> ...
+
+Ⅰ. Raw Data Ⅲ. Training Data Pair 
+
+> Target Video
+
+Ⅲ. Caption System prompt: 
+
+> Describe the scene presented in the video
+> in detail.
+> No Camera References: …
+> No Spatial Relations: …
+> Limit: Under 200 words.
+> 3D Scene
+
+UE5 Navigation Mesh 
+
+> History Video
+
+… …
+
+Ⅳ. Caption Ⅱ. Trajectory Filtering   
+
+> Fig. 7. Overview of the SceneFly Data Construction Pipeline. Our pipeline leverages the built-in navigation mesh system of UE5 to drive a camera that randomly explores each scene and renders long videos with camera trajectory. Training pairs are then constructed by sampling a target clip and assembling its context with a bias toward high FoV overlap. Finally, each target clip is precisely captioned by Qwen3-VL.
+
+fraction of disjoint clips. This graded mixture is critical: the high-overlap clips supply the supervision signal for memory retrieval, the moderate clips drive the model to learn fine-grained spatial relevance, and the disjoint clips act as distractors that prevent the attention from collapsing onto trivially close frames. Finally, we randomize the number of selected context clips for each pair, so that a single long video produces training samples spanning a wide range of context lengths and difficulty levels. 
+
+Caption Protocol. Captioning targets the target clip only and is performed by Qwen3-VL with a structured prompt template. The template instructs the model to enumerate scene-level attributes— dominant objects, surface materials, lighting condition, time of day, and spatial layout—while explicitly forbidding any vocabulary that describes camera behavior (e.g., pan , zoom , dolly , tracking shot , hand-held ). Each caption is then passed through a lightweight rule-based filter that detects residual motion-related tokens; flagged captions are regenerated with a stricter prompt until clean, ensuring that cam-era dynamics are conveyed exclusively through the trajectory input rather than leaking through text. Compared to off-the-shelf video captions, this protocol produces shorter, motion-agnostic descrip-tions that prevent the model from short-circuiting camera control with linguistic cues. 
+
+C Open-Domain Results 
+
+Driven by our model’s inherent capacity and the diversity of the SceneFly dataset, our method exhibits remarkable zero-shot gen-eralization to open-domain scenarios. For validation, we curate stylistically diverse images from the internet—spanning real-world photographs, artistic renderings, and stylized illustrations—and use them as anchor frames for extended video synthesis. We use approx-imately round-trip trajectories: for most scenes, the camera’s yaw and pitch are returned to zero near the end of the trajectory, while its translation remains unconstrained. Thus, the final view recovers the initial viewing orientation without necessarily returning to the original camera position, providing a challenging test of whether the model can preserve scene structure under combined rotational and translational changes. As shown in Figures 8 and 9, our method preserves robust memory retention and structural fidelity across a wide variety of open-domain environments. 
+
+D Visual Result of No History Content Overlap 
+
+We further investigate a corner case in which the target trajec-tory has no spatial overlap with the available history—i.e., the target views something that has never been observed before. In this regime, no useful information can be retrieved from the context, so the model has to rely on the text prompt to synthesize plausible content. As shown in Figure 10, our model gracefully falls back to following the textual instruction in this setting, generating coherent content con-sistent with the prompt while still respecting the specified camera trajectory. History 
+
+…
+
+…
+
+…   
+
+> GT Result
+> Prompt: The video describes a fairytale -style log cabin with a blue tiled roof …
+> Fig. 10. Visual Result of No History Content Overlap. When the target trajectory shares no overlap with the historical context, the generated result follows the text instruction.
+
+E Limitations 
+
+Our method has several limitations. First, SceneFly primarily em-phasizes camera motion and scene revisiting but contains relatively few independently moving objects. As a result, CaR is more effective at preserving static scene structure than modeling objects whose position or appearance changes over time. Historical observations Compression and Retrieval: Implicit Memory Retrieval for Video World Models •Prompt: A low -poly geometric mountain landscape at sunset. 
+
+## Prompt: A cosy independent bookshop with floor -to -ceiling shelves. 
+
+## Prompt: A suspension bridge over a city river at night in black and white. 
+
+## Prompt: A pour -over coffee brewing on a cafe counter with steam rising. 
+
+## Prompt: A dreamcore pink -pastel bedroom with floating objects. 
+
+## Prompt: A vibrant pixel -art floating island game world.  
+
+> Fig. 8. Open-Domain Results (1).
+
+of such objects may become outdated, and retrieving them without explicit motion reasoning can introduce temporal inconsistencies or recover an incorrect object state. Extending the training data with diverse dynamic scenes and incorporating motion-aware mem-ory updates would help distinguish persistent scene content from time-varying states. Second, although retrieved history can anchor revisited regions, we do not introduce a dedicated anti-drift mecha-nism. Errors may therefore accumulate during long autoregressive rollouts, causing reduced sharpness, color shifts, or gradual devi-ations from the original scene appearance. Finally, CaR does not operate in real time because each segment requires iterative dif-fusion sampling and attention over the compressed history. Step distillation, consistency-based training, and adaptive context compu-tation are promising directions for reducing sampling and retrieval costs. • Zhan Peng, Jie Ma, Huiqiang Sun, Chong Gao, Zhijie Xue, Zhiyu Pan, Zhiguo Cao, Jun Liang, and Jing Li Prompt: Golden autumn leaves scattered on a sunlit surface. 
+
+## Prompt: A snow -capped mountain summit rising above dramatic clouds. 
+
+## Prompt: A mountain goat on rocky alpine hillside under clear sky. 
+
+## Prompt: Golden and orange autumn leaves in a sunlit deciduous forest. 
+
+## Prompt: A village scene rendered in oil painting style, warm afternoon light, impressionist brush strokes, 
+
+## cobblestone street. 
+
+## Prompt: A serene Japanese tea ceremony room with tatami mats.

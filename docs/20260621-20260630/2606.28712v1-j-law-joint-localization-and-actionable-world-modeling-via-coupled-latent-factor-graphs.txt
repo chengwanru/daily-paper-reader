@@ -1,0 +1,367 @@
+Title: J-LAW: Joint Localization and Actionable World Modeling via Coupled Latent Factor Graphs
+
+URL Source: https://arxiv.org/pdf/2606.28712v1
+
+Published Time: Tue, 30 Jun 2026 00:23:55 GMT
+
+Number of Pages: 5
+
+Markdown Content:
+> 1
+
+# J-LAW: Joint Localization and Actionable World Modeling via Coupled Latent Factor Graphs 
+
+Guanqun Cao , IEEE Member , Liang Chen , IEEE Senior Member 
+
+Abstract —Classical SLAM estimates metric poses and a ge-ometric map but produces no actionable predictive model for planning. Action-conditioned world models learn compact latent dynamics for planning but ignore global metric consistency and accumulate drift under open-loop rollout. We argue these are two views of the same estimation problem and propose J-LAW (Joint Localization and Actionable World Modeling) in this letter: a coupled factor graph that jointly optimizes metric object poses, latent world states, and latent landmark embeddings. The bridge is a pose-conditioned latent encoder and a learned pose–latent coupling factor, so that better localization improves the world model and vice versa. We cast observation, action-conditioned prediction, metric odometry, pose–latent coupling, latent loop closure, and latent landmark observation as probabilistic factors in a single MAP objective. Real-data experiments on PushT and WildGS show that coupled graph correction substantially reduces latent prediction RMSE and endpoint drift relative to open-loop rollout, while latent loop closure improves global trajectory consistency. J-LAW yields a map that is simultaneously metric (poses) and actionable (latent landmarks for planning). 
+
+Index Terms —latent world models, factor graph smoothing, joint localization and prediction, JEPA, loop closure 
+
+I. I NTRODUCTION 
+
+Two essentials are needed for a mobile agent to operate in the real world at once: where it is (localization) and what will happen next (world modeling). These are traditionally solved by separate systems. 
+
+Simultaneous Localization and Mapping (SLAM) esti-mates metric poses and a geometric map (point cloud, occu-pancy grid). It is globally consistent—loop closures correct drift—but the output is a description of the environment, not predictive: the generated map does not tell the agent what will happen next if it takes an action. 
+
+Action-conditioned world models (specifically, Joint Em-bedding Predictive Architectures (JEPAs)) learn a latent pre-dictor Pθ (zt, a t) that supports planning. The representation is actionable but not globally consistent: open-loop rollout accumulates drift, there is no notion of loop closure, and the latent embedding lacks metric geometry. We aim to joinly solve the dual problems of localization and world modeling, and propose J-LAW , a coupled factor graph (Fig. 1) that simultaneously estimates metric poses 
+
+X = {xt}, latent world states Z = {zt}, and latent landmark embeddings M = {mk}. The coupling is bidirectional: metric pose constrains the latent state through a learned pose–latent 
+
+G. Cao is with Geely Technology Europe, Pumpgatan 1, 417 55 Gothenburg Sweden (e-mail: Guanqun.Cao@ieee.org). L. Chen is with the State Key Laboratory of Information Engineering in Surveying, Mapping and Remote Sensing (LIESMARS) , Wuhan University, China, (e-mail: l.chen@whu.edu.cn). zt
+
+xt       
+
+> ItItItItIt
+> a1a2a3a4
+> X-block
+> Z-block
+
+J-LAW: Coupled Latent Factor Graph                       
+
+> ggggg
+> fθfθfθfθ
+> hθhθhθhθhθ
+> LC
+> Latent node zt
+> Pose node xt∈SE(3)
+> Observation g(It,zt)
+> Transition fθ(zt,at)
+> Coupling hθ(xt)↔zt
+> Loop closure
+
+z1 z2 z3 z4 z5
+
+x1 x2 x3 x4 x5
+
+Fig. 1. J-LAW coupled factor graph. Latent nodes zt (blue, top) and pose nodes xt ∈ SE(3) (orange, bottom) are linked by learned coupling factors 
+
+hθ (red dashed). Observation factors g, transition factors fθ , and loop closure (purple) jointly constrain both the metric trajectory and the predictive latent rollout. Alternating block coordinate descent optimizes the X-block and Z-block in turn. 
+
+factor, and the latent observation factor constrains the metric pose. This makes the map both metric (poses) and actionable (latent landmarks), and it allows loop closures correct both 
+
+the trajectory and the predictive latent rollout. We show graph smoothing improves long-horizon latent consistency and planning over open-loop latent rollout without dense geometic reconstruction. Our key findings and contributions are: 1) Joint formulation. The first coupled factor-graph ob-jective that jointly optimizes metric poses, latent world states, and latent landmarks, unifying SLAM-style global consistency with JEPA-style action-conditioned prediction. 2) Pose-conditioned latent encoder. A latent represen-tation Eθ (ot, x t) that is explicitly grounded in metric localization, bridging geometry and prediction. 3) Latent landmarks as an actionable map. The map is a set of learned latent embeddings {mk} living in the same space as zt, directly usable for planning rather than only for reconstruction. 4) Bidirectional loop closure. Loop closures update both the metric pose graph and the latent rollout, unlike SLAM (latent-agnostic) or JEPA (no loop closure). II. R ELATED WORK 
+
+The goal of SLAM is to estimate the pose of a mobile agent while constructing a map of surrounding environment. Despite 
+
+> arXiv:2606.28712v1 [cs.RO] 27 Jun 2026 2
+
+being useful for various vision and robotics applications, it has its limitation to reconstruct dense geometry [1]. Factor-graph smoothing was introduced [2], [3] to SLAM to improve its efficiency, and incremental nonlinear optimization, while they typically lack a formal mechanism to couple these em-beddings to metric localization for global consistency. This decoupling leaves a gap between abstract behavioral planning and precise spatial grounding. Lee et al. [4] optimize metric poses and geometric maps with expectation-maximization but produce no predictive, action-conditioned model. Notebably, predictive spatial mapping [5] was established that visual next-state prediction task objectives force neural latent spaces to implicitly organize into metric-accurate cognitive maps. It provides strong empirical validation that a system optimized for predicting sensory consequences implicitly resolves global environment geometry, embedding the map directly in the predictive coding. 
+
+Action-conditioned world models / JEPAs are effective ways of predicting the outcomes of actions through learning from the environment [6]. Recent work in JEPAs concentrates on the most relevant features used for future states and produces a compact, low-dimensional latent space and temporal model by predicting the latent representation of future observa-tions. For example, LeWorldModel [6] learns stable latent dynamics from pixels, and V-JEPA series [7], [8] extends joint-embedding prediction to video representation learning. Moreover, SkyJEPA [9] adopts JEPA backbones combined with kinematic probers to achieve accurate, long-horizon pre-dictions for real-time closed-loop quadrotor control, but they focus solely on high-frequency local flight dynamics. These methods yield actionable latents but lack global consistency and loop closure. In contrast, J-LAW adds a factor-graph inference layer to enforce consistency without retraining the predictor. III. J-LAW F ORMULATION 
+
+A. Coupled State 
+
+J-LAW maintains a coupled state over a trajectory of length 
+
+T :
+
+S = X1: T , Z 1: T , M 1: K , (1) where X1: T = {x1, . . . , x T } are metric poses, Z1: T =
+
+{z1, . . . , z T } are latent world states, and M1: K =
+
+{m1, . . . , m K } are latent landmark embeddings forming the actionable map. The key bridge is the pose-conditioned encoder: 
+
+zt = Eθ (ot, x t), (2) where ot is visual observation at time t, and xt ∈ SE(3) is a metric pose. The latent representation depends on both what 
+
+the agent sees and where it is. This is fundamentally different from standard JEPA, where the encoder ignores pose. 
+
+B. Joint MAP Objective 
+
+We estimate the coupled state by maximizing the posterior:              
+
+> {X⋆, Z ⋆, M ⋆}= arg min
+> X,Z,M
+> n
+> Φobs +λpΦpred +λgΦmot
+> +λcΦcouple +λlΦloop +λmΦlmk
+> o
+> ,(3)
+
+with the six factor terms: 
+
+a) Latent observation factor: Anchors each latent state to the pose-conditioned encoding, with a robust kernel: 
+
+Φobs =
+
+> T
+
+X
+
+> t=1
+
+ρ
+
+
+
+zt − Eθ (ot, x t) 2Σ−1
+
+> o
+
+
+
+. (4) 
+
+b) Action-conditioned latent prediction: Enforces JEPA-style predictive consistency between consecutive latents: 
+
+Φpred = 
+
+> T−1
+
+X
+
+> t=1
+
+zt+1 − Pθ (zt, a t) 2Σ−1
+
+> p
+
+. (5) 
+
+c) Metric motion model: Standard SLAM odometry fac-tor on poses (IMU preintegration or kinematic): 
+
+Φmot = 
+
+> T−1
+
+X
+
+> t=1
+
+xt+1 ⊟ g(xt, a t) 2Σ−1
+
+> g
+
+, (6) where g(xt, a t) is metric motion model (odometry) and ⊟ is the SE(3) between-operation. 
+
+d) Pose–latent coupling factor: The bidirectional bridge: a learned decoder predicts the expected latent state from the metric pose and the latent map: 
+
+Φcouple =
+
+> T
+
+X
+
+> t=1
+
+zt − hθ (xt, M ) 2Σ−1
+
+> c
+
+. (7) This is the factor that makes localization and world modeling 
+
+mutually constraining : a better pose yields a better latent estimate, and a consistent latent estimate feeds back to refine the pose. 
+
+e) Latent loop closure: When the agent revisits a loca-tion, latent states are pulled toward consistency, with a robust kernel to resist false loops: 
+
+Φloop = X
+
+> (i,j )∈L
+
+ρ
+
+
+
+zi − zj
+
+> 2Σ−1
+> l
+
+
+
+, (8) where L is the set of latent loop-closure edges. 
+
+f) Latent landmark observation: Associates latent states with map landmarks, making the map actionable: 
+
+Φlmk = X
+
+> (t,k )∈O
+
+zt − mk
+
+> 2Σ−1
+> m
+
+. (9) 
+
+C. What Makes J-LAW Novel 
+
+Dual representation. J-LAW jointly optimizes xt ∈ SE(3) 
+
+and zt ∈ Rd. SLAM optimizes only poses; JEPA optimizes only latents. Neither captures both. 
+
+Bidirectional coupling. The pose–latent factor Φcouple cre-ates a feedback loop absent from both SLAM and JEPA: localization improves prediction, and prediction improves lo-calization. 
+
+Actionable map. The map M = {mk} lives in latent space, so it is directly usable for planning, unlike a point cloud or occupancy grid. 
+
+Loop closure in both spaces. A revisit triggers both a metric pose-graph constraint ( Φmot ) and a latent consistency constraint ( Φloop ), correcting drift in geometry and prediction simultaneously. 3
+
+D. Alternating Block Coordinate Descent 
+
+Direct joint optimization of (3) over X, Z, and M simul-taneously is ill-conditioned: when both poses and latents are free, the coupling factor Φcouple admits a degenerate family of solutions where zt and hθ (xt) move toward each other without improving either estimate. Empirically, joint L-BFGS optimization yields latent RMSE worse than the latent-only baseline (Section IV). We therefore solve (3) by alternating block coordinate descent : partition the state into a pose block BX = {X} and a latent block BZ = {Z, M }, and minimize each block while holding the other fixed. 
+
+a) Pose block (fix Z, optimize X): With latents frozen, the coupling factor becomes a proper regularizer pulling each pose toward the location whose decoded latent matches the current zt:
+
+X(k+1) = arg min  
+
+> X
+
+λcΦcouple (X; Z(k)) + λg Φmot + λlΦX
+
+> loop
+
+,
+
+(10) where ΦX 
+
+> loop
+
+denotes metric pose-graph loop closure. 
+
+b) Latent block (fix X, optimize Z, M ): With poses frozen, the latent sub-problem recovers the standard FG-JEPA objective augmented by the coupling factor: 
+
+{Z(k+1) , M (k+1) } = arg min  
+
+> Z,M
+
+Φobs 
+
++ λpΦpred + λcΦcouple (Z; X(k+1) )+ λlΦloop + λmΦlmk . (11) Each block is solved with L-BFGS and strong Wolfe line search. We iterate for K=5 –8 outer rounds. This decom-position ensures that in each block the coupling factor acts as a one-directional regularizer, avoiding the degenerate joint solution while still transferring information bidirectionally across rounds. 
+
+E. Training and Inference 
+
+Phase 1 (Pretraining). Train Eθ and Pθ with standard JEPA loss, ignoring pose conditioning (set xt to a positional encoding or zero). 
+
+Phase 2 (Pose grounding). Train the coupling decoder hθ
+
+on a dataset with known poses (SLAM or motion capture) by minimizing ∥zt − hθ (xt)∥2.
+
+Phase 3 (Alternating inference). At test time, freeze 
+
+Eθ , P θ , h θ and solve the coupled factor graph by alternating block coordinate descent (Section 4.3). IV. E XPERIMENTS 
+
+We evaluate on real data: PushT (trained LeWM latents) [6], [10] and WildGS (dynamic SLAM sequences with motion-capture poses) [11]. The central questions are: (1) can the proposed factor graph reduce open-loop latent drift relative to JEPA rollout, especially when loop constraints are sparse or noisy; (2) which loop formulations best improve consistency without degrading pointwise latent accuracy; and (3) does alternating block coordinate descent outperform direct joint optimization for the coupled J-LAW objective? We also run 48 96 192 384 512        
+
+> Trajectory length H
+> 0.00
+> 0.05
+> 0.10
+> 0.15
+> 0.20
+> 0.25
+> 0.30
+> Latent RMSE
+> Latent RMSE
+> 48 96 192 384 512
+> Trajectory length H
+> 0.0
+> 0.5
+> 1.0
+> 1.5
+> 2.0
+> 2.5
+> Pose RMSE
+> Pose RMSE
+> Latent-only FG
+> Pose-only
+> J-LAW coupled (joint)
+> J-LAW alternating
+> J-LAW fi xed coupling
+> J-LAW adaptive (IRLS)
+
+Fig. 2. Latent RMSE (left) and pose RMSE (right) versus trajectory length H
+
+on 4 WildGS test scenes (mean ± std). Pose-only achieves the lowest latent RMSE but its pose error grows with H. J-LAW adaptive (IRLS) coupling substantially reduces pose RMSE relative to fixed coupling at all horizons, while J-LAW coupled (joint L-BFGS) is worst on both metrics, confirming the need for alternating block coordinate descent. 
+
+an expanded WildGS ablation that separates latent-only, pose-only, coupled J-LAW, and alternating J-LAW variants. For PushT, we use the real HDF5 dataset with a frozen trained LeWM checkpoint and adopt a latent factor graph over short windows sampled from real trajectories. Stage 1 measures teacher-forced latent prediction versus open-loop rollout, then solves a first-order factor graph with observa-tion, prior, frozen LeWM transition, and optional loop-closure factors on latent correction variables. Stage 2 reuses the Stage 1 protocol to sweep factor-graph weights and identify regimes where sparse correction improves pointwise RMSE without over-constraining the trajectory. Stage 3 extends this setting with robust Cauchy and uncertainty-weighted loop factors to mitigate false loops. Stage 4 tests methods that improve loop usefulness, including adaptive loop confidence, soft relative loop factors, and relinearized transition targets across outer iterations. Stage 5 then isolates the best relinearized relative formulation and evaluates when loop constraints become gen-uinely beneficial versus merely consistent. Across these stages, the PushT experiments quantify how graph correction reduces open-loop drift, how true loop closures trade off consistency against RMSE, and how robust weighting improves false-loop behavior.                                              
+
+> Stage Name RMSE Final err. Description
+> PushT (trained LeWM)
+> 1 open-loop 1.401 21.764 open-loop rollout without graph correction 1 FG no-loop 0.167 –factor-graph correction without loop closures 1 FG true-loop 0.282 2.593 factor-graph correction with true loop closures 2 best no-loop FG 0.086 –best sparse correction without loops 2 best true-loop FG 0.166 –fixed quadratic true-loop factor 3 uncertainty+Cauchy 0.129 –uncertainty-weighted robust loop factor 4 best no-loop FG 0.033 –relinearized sparse correction without loops 4 best true-loop FG 0.032 0.444 relinearized relative raw true-loop factor 4 best consistency true-loop 0.244 1.334 strongest loop-consistency reduction 5 best true-loop FG 0.031 0.443 relinearized relative raw true-loop factor 5 best consistency true-loop 0.032 0.438 strongest loop-consistency reduction 5 best false-loop FG 0.032 0.439 robust false-loop mitigation
+> WildGS (latent-only factor graph)
+> 6 open-loop 0.3050 2.5226 open-loop rollout without graph correction 6 factor graph 0.0873 0.9511 factor-graph corrected rollout
+
+TABLE I WILD GS LATENT -ONLY FACTOR -GRAPH RESULTS . C ORRECTION REDUCES LATENT RMSE AND ENDPOINT DRIFT VERSUS OPEN -LOOP ROLLOUT .4
+
+A. J-LAW Coupled Ablation on WildGS 
+
+We run a 3-way ablation on 8 WildGS scenes (4 train / 4 test) using a frozen LeWM encoder ( Eθ ) and a trained coupling decoder hθ (300 epochs, train RMSE < 0.01). Fig-ure 2 visualises latent and pose RMSE trends across trajectory lengths for all methods. Three modes are compared:  
+
+> •
+
+Latent-only FG : optimize Z only (no poses, no cou-pling).  
+
+> •
+
+Pose-only : optimize X only; latents are zt = hθ (xt). 
+
+> •
+
+J-LAW coupled : alternating block coordinate descent over X and Z.
+
+Method Latent RMSE Pose RMSE Latent-only FG 0.1595 –Pose-only 0.1202 0.4081 J-LAW joint L-BFGS 0.1664 0.5554 
+
+J-LAW alternating 0.1383 1.2910 J-LAW alt. ( wc=0 .5) 0.1536 0.4746             
+
+> TABLE II J-LAW COUPLED ABLATION ON WILD GS ( MEAN OVER 4TEST SCENES ). ALTERNATING BLOCK COORDINATE DESCENT OUTPERFORMS JOINT
+> L-BFGS AND BEATS THE ONLY BASELINE . P OSE -ONLY ACHIEVES LOWER LATENT RMSE BECAUSE IT SOLVES A SIMPLER SUB -PROBLEM (POSES ONLY ,LATENTS FULLY DETERMINED BY hθ), BUT CANNOT JOINTLY REFINE LATENTS .
+
+B. Long-Horizon Drift Stability 
+
+To test whether the joint estimation advantage compounds over longer trajectories, we sweep trajectory length H ∈{48 , 96 , 192 , 384 , 512 } on the same 4 WildGS test scenes. Table III reports endpoint drift (latent final error) for pose-only and J-LAW alternating. 
+
+H Pose-only J-LAW alt. Open-loop 48 2.25 2.11 2.43 96 2.35 2.61 2.85 192 2.47 2.31 2.51 384 2.66 2.51 2.32 512 3.11 2.33 2.33               
+
+> TABLE III ENDPOINT LATENT DRIFT VS .TRAJECTORY LENGTH (MEAN OVER 4WILD GS TEST SCENES ). P OSE -ONLY DRIFT GROWS 38% FROM H=48 TO
+> H=512 ; J-LAW ALTERNATING DRIFT GROWS ONLY 11%, AND CROSSES BELOW POSE -ONLY AT H=192 AND H=512 .
+
+Pose-only endpoint drift grows steadily from 2.25 ( H=48 )to 3.11 ( H=512 ), a 38% increase, because its latents are fully determined by hθ (xt) with no visual observation factor to correct accumulated pose error. J-LAW alternating drift grows only 11% over the same range and crosses below pose-only at H=512 (2.33 vs. 3.11). This confirms that the bidirectional coupling provides long-horizon drift stability that pose-only lacks: the latent observation factor Φobs anchors latents to visual evidence even when pose estimates degrade. 
+
+C. Adaptive Coupling Confidence 
+
+A fixed coupling weight λc applies uniformly across all timesteps, but the reliability of hθ (xt) varies. We introduce an IRLS-style adaptive confidence: after each outer iteration, compute per-timestep coupling residuals rt = ∥hθ (xt) − zt∥2
+
+and update confidence weights ct = 1 /(1 + ( rt/δ )2) with 
+
+δ = median( rt).The adaptive scheme significantly improves pose estimation: across all horizons, adaptive coupling reduces pose RMSE by 29–42% relative to fixed coupling (e.g., 0.72 vs. 0.95 at H=48 ,0.94 vs. 1.61 at H=384 ). The mean confidence converges to 
+
+≈ 0.52 , indicating that roughly half the timesteps are reliably coupled while the rest are downweighted. However, latent RMSE does not improve—the adaptive scheme trades latent accuracy for pose accuracy, confirming that the core limitation is the coupling decoder quality, not the coupling weight. 
+
+D. Findings 
+
+Drift reduction. Across both datasets, factor-graph correc-tion reduces latent RMSE by 71–94% relative to open-loop rollout. On WildGS, mean RMSE drops from 0.3050 to 0.0873 and final error from 2.5226 to 0.9511. 
+
+Loop consistency. True loop closures improve global tra-jectory consistency (loop error reduced by up to 98%) at a modest cost in pointwise RMSE, confirming the consistency– accuracy trade-off. 
+
+Robustness. Uncertainty-weighted and Cauchy loop factors reduce the damage from false loops (Stage 3 false-loop RMSE 0.1285 vs. 0.1863 unweighted), making latent loop closure safer in real data. 
+
+Alternating beats joint. Alternating block coordinate de-scent reduces latent RMSE by 16.9% relative to joint L-BFGS (0.1383 vs. 0.1664) and by 13.3% relative to the latent-only baseline (0.1383 vs. 0.1595). Joint L-BFGS is worse than the latent-only baseline, confirming that the degenerate coupling solution degrades performance. 
+
+Long-horizon stability. While pose-only achieves lower average latent RMSE on short trajectories, its endpoint drift grows 38% as H increases from 48 to 512. J-LAW alter-nating’s drift grows only 11% and crosses below pose-only at H=512 (2.33 vs. 3.11), demonstrating that bidirectional coupling provides drift stability absent from pose-only. 
+
+Adaptive coupling. IRLS-style adaptive confidence reduces pose RMSE by 29–42% over fixed coupling at all hori-zons, confirming that per-timestep reliability varies and fixed weighting is suboptimal for pose estimation. V. C ONCLUSION AND FUTURE WORK 
+
+J-LAW couples metric localization and actionable world modeling in a single factor-graph formulation. Across PushT and WildGS, graph-based correction consistently reduces la-tent drift, while loop closures improve global consistency at a modest accuracy cost. For the coupled WildGS problem, alternating block coordinate descent outperforms joint opti-mization, and adaptive coupling improves pose estimation un-der varying reliability. Future work will focus on tighter end-to-end training of the coupling module and more principled loop-confidence estimation. 5
+
+REFERENCES [1] S. Thrun, “Simultaneous localization and mapping,” Robotics and cog-nitive approaches to spatial mapping , pp. 13–41, 2008. [2] F. Dellaert and M. Kaess, “Factor graphs for robot perception,” Foun-dations and Trends® in Robotics , vol. 6, no. 1-2, pp. 1–139, 2017. [3] O. C ¸ atal, W. Jansen, T. Verbelen, B. Dhoedt, and J. Steckel, “Latentslam: unsupervised multi-sensor representation learning for localization and mapping,” in 2021 IEEE International Conference on Robotics and Automation (ICRA) . IEEE, 2021, pp. 6739–6745. [4] G. H. Lee, F. Fraundorfer, and M. Pollefeys, “Robust pose-graph loop-closures with expectation-maximization,” in 2013 IEEE/RSJ Interna-tional Conference on Intelligent Robots and Systems . IEEE, 2013, pp. 556–563. [5] J. Gornet and M. Thomson, “Automated construction of cognitive maps with visual predictive coding,” Nature Machine Intelligence , vol. 6, no. 7, pp. 820–833, 2024. [6] L. Maes, Q. Le Lidec, D. Scieur, Y. LeCun, and R. Balestriero, “LeWorldModel: Stable end-to-end joint-embedding predictive architec-ture from pixels,” 2026. [7] M. Assran, A. Bardes, D. Fan, Q. Garrido, R. Howes, M. Muckley, A. Rizvi, C. Roberts, K. Sinha, A. Zholus et al. , “V-JEPA 2: Self-supervised video models enable understanding, prediction and planning,” 
+
+arXiv preprint arXiv:2506.09985 , 2025. [8] L. Mur-Labadia, M. Muckley, A. Bar, M. Assran, K. Sinha, M. Rab-bat, Y. LeCun, N. Ballas, and A. Bardes, “V-JEPA 2.1: Unlock-ing dense features in video self-supervised learning,” arXiv preprint arXiv:2603.14482 , 2026. [9] P. Rao, W. Zhang, R. Balestriero, Y. LeCun, and G. Loianno, “SkyJEPA: Learning long-horizon world models for zero-shot sim-to-real control of quadrotors,” 2026. [Online]. Available: https://arxiv.org/abs/2606.23444 [10] C. Chi, Z. Xu, S. Feng, E. Cousineau, Y. Du, B. Burchfiel, R. Tedrake, and S. Song, “Diffusion policy: Visuomotor policy learning via action diffusion,” The International Journal of Robotics Research , vol. 44, no. 10-11, pp. 1684–1704, 2025. [11] J. Zheng, Z. Zhu, V. Bieri, M. Pollefeys, S. Peng, and I. Armeni, “Wildgs-slam: Monocular gaussian splatting slam in dynamic environ-ments,” in Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , 2025, pp. 11 461–11 471.

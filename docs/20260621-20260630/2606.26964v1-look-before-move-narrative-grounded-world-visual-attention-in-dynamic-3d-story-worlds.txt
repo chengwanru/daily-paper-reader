@@ -1,0 +1,921 @@
+Title: Look-Before-Move: Narrative-Grounded World Visual Attention in Dynamic 3D Story Worlds
+
+URL Source: https://arxiv.org/pdf/2606.26964v1
+
+Published Time: Fri, 26 Jun 2026 01:24:45 GMT
+
+Number of Pages: 25
+
+Markdown Content:
+# Look-Before-Move: Narrative-Grounded World Visual Attention in Dynamic 3D Story Worlds 
+
+Jiaming Bian *∗
+
+bianjiaming@csu.edu.cn 
+
+Bingliang Li 
+
+lbingl@outlook.com 
+
+Yuehao Wu 
+
+yuehao.wu@unsw.edu.au 
+
+Pichao Wang 
+
+pichaowang@gmail.com 
+
+Zhi Wang 
+
+zhiwang@nju.edu.cn 
+
+Hailan Ma 
+
+hailanma0413@gmail.com 
+
+Huadong Mo †
+
+huadong.mo@unsw.edu.au 
+
+Zhenhong Sun †‡ 
+
+zhenhongsun1992@outlook.com 
+
+Abstract 
+
+As embodied AI and world models increasingly operate in dynamic 3D environ-ments, visual perception must move beyond passively interpreting given observa-tions toward actively deciding what to observe. We study this problem through camera planning in dynamic 3D story worlds, where the camera must not only generate smooth motion, but also decide what visual evidence should be acquired before it moves. We formulate this capability as Narrative-Grounded World Visual Attention , where the camera acts as an embodied observer that deter-mines what to observe, how to compose the observation, and how to shift at-tention over time under narrative intent and physical 3D constraints. To realize this capability, we propose Look-Before-Move , a camera planning framework that separates observation specification from motion execution. It first builds a Semantic Observation Contract to convert directorial intent into executable vi-sual constraints, then performs Monte Carlo Viewpoint Search to find narrative-compliant and geometrically feasible viewpoints, and finally applies Semantic Trajectory Grounding to connect selected viewpoints into continuous, collision-aware, and temporally coherent camera motion. We further construct a dy-namic 3D Story World Benchmark based on StoryBlender , covering 50 stories, 457 scenes, and 1585 shots with animated characters, semantic scene configura-tions, and executable 3D environments. Experiments show that our framework improves subject perception, intent consistency, and trajectory quality over rep-resentative baselines, demonstrating the importance of organizing visual atten-tion before generating camera motion. Project page and code are available at: 
+
+https://engineeringai-lab.github.io/Look-Before-Move/ .
+
+1 Introduction 
+
+As embodied AI [1, 2] and world models [3, 4] increasingly operate inside executable 3D environ-ments, visual perception can no longer be treated as a passive input stream. Unlike conventional image or video understanding, where visual evidence is already given, an agent in a native 3D world must actively determine what to observe before planning how to move. This connects to autonomous camera control [5] and camera trajectory planning [6], but shifts the focus from smooth trajectory generation to observation-driven camera planning. This question is especially important in dynamic      
+
+> ∗*First author †Co-corresponding author ‡Project leader Preprint.
+> arXiv:2606.26964v1 [cs.AI] 25 Jun 2026
+
+3D story worlds, where recent systems have begun to construct editable narrative environments with controllable layouts, assets, character actions, and spatial-temporal dynamics [7, 8, 9]. A camera in such worlds is not simply a geometric sensor that maximizes visibility or avoids collisions. It acts as the eye of the world: selecting narrative subjects, emphasizing actions, revealing spatial relations, and shifting attention as the story unfolds. For example, when a story describes an assassin point-ing a pistol, the camera should not merely capture any person; it should identify the acting subject, preserve the action cue, and compose the scene according to its narrative meaning. We define this capability as Narrative-Grounded World Visual Attention : the camera organizes what to observe, how to observe it, and when to transition attention within a physically constrained 3D world. Realizing this capability requires solving three coupled problems. First, high-level directorial intent must be converted into visual requirements, such as target subjects, semantic relations, visibility conditions, composition preferences, and action cues. Second, the system must search for view-points that satisfy both narrative relevance and physical feasibility, since a semantically appropriate view may be invalid due to occlusion, collision, poor scale, or infeasible camera placement. Third, selected viewpoints must be grounded into camera motion that tracks dynamic actors, avoids obsta-cles, and preserves temporal coherence. These requirements go beyond camera-controllable video synthesis [10, 11, 12] and text-to-camera trajectory generation [13, 14, 15], where the objective is to follow a camera motion, synthesize a trajectory, or maintain visual consistency. Together, they advance camera planning toward the semantic-spatial-temporal organization of visual evidence. Existing camera planning methods provide foundations, but they often assume that the observation objective is already specified. Rule-based and geometry-driven methods encode cinematographic heuristics, visibility constraints, collision avoidance, and smooth path generation [6, 5]. Recent learning-based [16, 17] and generative methods [10, 11, 12, 18] model camera motion priors or synthesize camera-controllable videos by injecting trajectory representations into video generation models. Several works analyze camera motion and 3D camera control in videos [19, 20, 21], while recent 3D cinematography systems explore auto-regressive trajectory generation [13], diffusion-based camera and scene generation [14], text-to-camera trajectory generation [15], and multi-agent film automation [22]. These methods improve feasible trajectory generation, camera-controllable synthesis, or autonomous cinematography, but they do not address how an intent should be inferred from narrative intent and grounded in a physically executable 3D world. To address this gap, we propose Look-Before-Move , a narrative-grounded camera planning frame-work built on a simple principle: before a camera can move intelligently, it must first know what visual evidence it is supposed to acquire. Instead of directly generating a trajectory from a story instruction, our framework first constructs a Semantic Observation Contract that converts directorial intent into executable visual constraints. It then performs Monte Carlo Viewpoint Search to iden-tify viewpoints that are both narrative-compliant and geometrically feasible, followed by Semantic Trajectory Grounding to connect selected viewpoints into continuous camera motion. This decom-position turns narrative-grounded world visual attention into three executable steps: specifying the intended observation, selecting feasible viewpoints, and grounding them into motion. A systematic study of this problem also requires an executable evaluation environment. Although recent 3D story-world generation methods provide editable narrative environments, real-world film-ing is costly and difficult to control. Additionally, 2D video datasets or diffusion-generated videos cannot reliably determine whether a camera plan is physically feasible, whether a better viewpoint exists, or whether a failure results from semantic misunderstanding, geometric occlusion, or motion instability. We therefore construct a dynamic 3D Story World Benchmark based on StoryBlender [9]. The benchmark covers 50 stories, 457 scenes, and 1585 shots, and supports controlled evaluation along three dimensions: subject perception, intent consistency, and trajectory quality. Our experi-ments show that Look-Before-Move improves over representative camera trajectory planning base-lines across all three evaluation dimensions. The results support our central claim: in dynamic 3D story worlds, effective camera planning should begin with observation before motion generation. In summary, our main contributions are as follows: 
+
+• We formulate Narrative-Grounded World Visual Attention as a camera planning capability in dynamic 3D story worlds, reframing the problem from passively interpreting given observations to intent-driven visual evidence acquisition. 
+
+• We propose Look-Before-Move , a narrative-grounded camera planning framework that decom-poses camera planning into observation specification, viewpoint search, and trajectory grounding. 2• We construct a dynamic 3D Story World Benchmark on executable 3D scenes, supporting con-trolled evaluation of subject perception, intent consistency, and trajectory quality. 
+
+2 Related Work 
+
+Camera Trajectory Planning. Autonomous camera control has long studied generating feasible and visually pleasing viewpoints or trajectories in virtual environments. Early methods rely on cinematography rules, geometric constraints, visibility reasoning, collision avoidance, and smooth paths [6, 5]. Recent generative methods extend camera control to video generation by injecting trajectory representations, such as extrinsic matrices or Plucker coordinates, into diffusion mod-els [10, 11, 12], or by improving camera-controllable synthesis through multi-view and 3D-aware consistency [18, 17, 16]. However, many approaches [19, 20, 21] operate primarily in pixel space and lack access to executable 3D embodied worlds. Recent 3D cinematography methods explore auto-regressive trajectory generation [13], diffusion-based camera and scene generation [14], and multi-agent film automation [22]. Different from these works, our goal is not only to synthesize a trajectory, but to ground the intended observation from narrative intent before camera motion. 
+
+3D Story Worlds. The construction of 3D story worlds provides the foundation for controllable narrative visualization. Engine-based methods show that virtual environments can support dynamic storyboard generation and pre-visualization [7]. Recent LLM-based systems use code generation or structured reasoning to synthesize open-domain 3D scenes with editable layouts and assets [1, 2, 3, 4]. Other works introduce character action scripting and narrative behavior modeling, enabling 3D environments to express story events instead of static layouts [8]. StoryBlender further maintains cross-scene asset consistency and produces editable dynamic 3D storyboards with spatial-temporal dynamics [9]. These methods make it possible to construct narrative 3D worlds, but remain open how such worlds should be observed. Our work complements 3D story-world by introducing a camera planning framework that organizes visual attention inside executable story worlds. 
+
+LLM Reflection and Agentic Planning. Large language models have been used as agents that reason, reflect, and refine outputs through feedback. Frameworks such as Reflexion and Self-Refine show that language models can evaluate and revise their own generations [23, 24]. Works extend re-flection with dynamic instructions, visual-language reasoning, experience accumulation, tree search, and multi-agent collaboration [25, 26, 27, 28, 29]. These approaches are effective in text-centric or interactive environments, including narrative settings [30]. In dynamic 3D worlds, however, reflec-tion must be grounded in physical constraints: a proposed view may be occluded, the camera may collide with the scene, the subject may leave the frame, or the trajectory may become unstable. Em-bodied reasoning and visual reflection studies suggest that planning feedback should be tied to visual and geometric evidence [31, 32, 33]. In our framework, reflection is used as physical verification for viewpoint selection and trajectory grounding rather than as a verbal memory mechanism. 
+
+3 Method 
+
+Problem Statement. Let W = ( G, A, L, M) denote an executable dynamic 3D story world, where 
+
+G is the scene geometry, A contains characters, objects, and semantic attributes, L describes the spatial layout, and M records animations and object motions. Given a directorial intent I and a temporally ordered event sequence S = ( s1, . . . , s N ), scene-to-camera trajectory planning aims to produce a continuous camera trajectory for each event: 
+
+τi = π(W, I, S≤i), (1) where τi : [0 , 1] → SE(3) is an executable camera motion and π(·) is the planning policy. Here, 
+
+SE(3) represents the mathematical space of 3D positions and orientations. Executing τi in the 3D world produces an observation clip: 
+
+ci = R(W, τ i, s i), (2) and the final output is an ordered observation sequence E = ( c1, . . . , c N ).Unlike static viewpoint prediction or low-level trajectory generation, this task aims to organize world visual attention by deciding what should be observed, emphasized, and revealed over time. It re-quires solving two coupled problems: spatial viewpoint composition , which selects intent-compliant 3Story Scripts 3D Story Worlds      
+
+> Monte Carlo Viewpoint
+> Search
+> Semantic Trajectory
+> Grounding
+> Generated
+> Videos
+> 3D Story
+> Worlds
+> Semantic Trajectory Grounding
+> Temporal Semantic Editing
+> Multi-level
+> Viewpoint Search
+> Camera
+> Planning
+> AI Agent
+> Contract
+> Parsing
+> shot
+> reflection
+> Camera Pose
+> Refinement
+> Tournament-
+> based Reranking
+> Candidate A
+> Candidate B
+> Candidate C
+> Plan
+> Execute
+> Reflect
+> Refine
+> AI Editing Agent
+> Keep Full
+> Trim Best Range
+> Stitch Usable Range
+> Reject
+> Sampled
+> Review
+> Feedback
+> Chain
+> Observation
+> Contract
+> distance
+> movement
+> focus
+> preview
+> seed
+> ffmpeg / concat
+> Start
+> Camera Pose
+> End
+> Camera Pose
+> 𝐀 0
+> 𝐀 1
+> 𝐀 2
+> 𝐀 3
+> 𝐀 4
+> 𝐀𧀀𝐀𧰀𝐀
+> 𝐀𧀀𝐀𧰀𝐀
+> 𝐀𝐀𝐀𝐀𝐀
+> selected trajectory
+> alternative trajectories
+
+... 
+
+> Dataset Scale 3D Asset Composition
+
+(a) 3D Story-World Benchmark      
+
+> Once Upon a Time in America
+> Storyblender
+> Brave Heart The Godfather The Godfather II
+> Semantic Observation
+> Contract
+> Monte Carlo Viewpoint Search Semantic Observation Contract
+
+(b) Look-Before-Move Framework 
+
+... 
+
+> angle
+> direction
+> description
+> reaction
+> profile
+> WHO
+> WHEN
+> WHERE
+> HOW
+
+Figure 1: Overview of the benchmark construction and Look-Before-Move framework. (a) We build a dynamic 3D story-world benchmark using StoryBlender , covering narrative scripts, controllable scenes, character animations, camera annotations, and dataset statistics. (b) Look-Before-Move converts narrative intent into an observation contract, searches and refines feasible viewpoints in the executable 3D world, and grounds selected views into temporally coherent camera trajectories. and visible viewpoints under geometric constraints, and temporal motion coordination , which aligns these viewpoints with feasible camera motion relative to dynamic subjects and narratives. To address this task, we propose Look-Before-Move , a collaborative multi-agent camera planning framework consisting of three components. First, 3D Story World Benchmark provides executable dynamic scenes with geometry, semantic entities, animations, shot-level configurations, and render-ing feedback for controlled camera planning evaluation. Second, Look addresses spatial viewpoint composition by establishing an Observation Contract to search for safe, visible, and intent compli-ant viewpoints before any camera motion is committed. Third, Move addresses temporal motion coordination through grounding selected viewpoints into continuous camera trajectories that follow dynamic subjects, avoid collisions, and seamlessly align with narrative progression. 
+
+3.1 3D Story World Benchmark 
+
+To study narrative-grounded camera planning, we require a benchmark where story intent, dynamic events, character identities, and physical 3D geometry are jointly controllable and verifiable. 
+
+3D World Building. Existing 2D video datasets or diffusion-generated scenes often suffer from spatial hallucinations, identity drift, and a lack of physical grounding, severely limiting their utility for rigorous camera planning. To overcome these limitations, we construct our executable bench-mark using StoryBlender [9], an engine-verified 3D generation framework that guaranties strict 
+
+inter-shot consistency and explicit editability . Unlike 2D pixel-space representations, our virtual world relies on a persistent, physically grounded simulation. Formally, this world is represented as 
+
+W = ( G, A, L, M), corresponding to scene geometry, canonical character assets, spatial layout, and dynamic action sequences. By materializing entities in a unified 3D coordinate space, the environ-ment provides the camera with precise geometric boundaries and semantic perception capabilities. Building upon this foundation, we integrate these engine-verified scenes, animations, and temporal events to formalize our dataset as D = {(Wj , Ij , Sj , Yscene 
+
+j )}Mj=1 , where Ij denotes the directorial intent, Sj represents the event progression, and Yscene 
+
+j stores the comprehensive metadata neces-sary for programmatic evaluation. This establishes a reliable mapping between narrative intent and physical rendering, ensuring that camera decisions receive accurate visual and geometric feedback. 4Benchmark. Addressing the lack of dynamic evaluation, we propose an Executable 3D World Benchmark for world visual attention. Spanning 50 stories, the dataset comprises 457 dynamic scenes and 1585 shots. To support narrative environments, it includes 3197 3D assets (836 plot-related assets and 2361 supplementary assets for scene decoration), featuring an average of 9.76 characters per story and 1.44 character actions per shot. In the evaluation, given the 3D world W,intent I, and event process S = ( s1, . . . , s N ), the model must output a continuous camera trajectory 
+
+τi : [0 , 1] → SE(3) for each unit si. Because our dataset is built on 3D environments rather than static pose predictions, it allows models to make spatial-temporal decisions and undergo closed-loop engine verification. We conduct quantitative evaluations across three dimensions: (1) Subject Perception , assessing the ability to capture targets and avoid physical occlusions; (2) Intent Con-sistency , verifying whether viewpoints adhere to cinematic semantics; and (3) Trajectory Quality ,examining motion smoothness, spatial-temporal dynamics, and execution feasibility. 
+
+3.2 Look for Spatial Viewpoint Composition 
+
+Before the camera can move, it must first determine what the story requires it to see. The Look stage addresses this problem by converting high-level directorial intent into an adaptive observation con-tract that specifies the subjects, actions, spatial relations, visibility requirements, and composition preferences to be satisfied by candidate viewpoints. To this end, a group of specialized perception and planning agents collaborate over narrative instructions and rendered scene evidence, establishing a semantic-geometric perception interface between the story world and the camera. 
+
+Semantic Observation Contract. In complex 3D dynamic environments, the system first needs an accurate understanding of the current physical and visual state. To achieve this, we introduce the Perception Agent. By interacting with the 3D world, this agent samples and renders multi-view preview images around the target character to obtain intuitive environmental feedback. These multi-view previews not only capture the character’s pose and spatial position but also reveal potential environmental occlusions, thus extracting scene state representations rich in visual and geometric information from the observation unit si. This intelligent perception mechanism based on real ren-dering establishes a solid foundation for subsequent semantic intent parsing and planning. Faced with abstract high-level directorial intent, the camera struggles to execute it directly, neces-sitating a precise perception-based mapping mechanism. To this end, the Planning Agent, upon receiving the perception results, proposes an Observation Contract. Through semantic parsing Φ,this agent converts the abstract intent I and the scene state of the current observation unit si into a concrete observation contract Oi:
+
+Oi = {a∗, C spatial , T action } = Φ( I, s i) (3) where a∗ denotes the observable target subject, Cspatial represents spatial composition requirements, and Taction is the temporal action constraint. This structured contract not only specifies “what to look at” and “how to look at it” for the camera but also effectively narrows the state space for subsequent viewpoint search, successfully establishing a mapping between semantic intent and 3D geometry to provide prior guidance for precise camera control. 
+
+Monte Carlo Viewpoint Search. Merely establishing observation targets is insufficient to guaranty the usability of the framing; the camera must also identify the optimal visual landing point in the executable 3D world W. To achieve this, we design the Camera Reflection mechanism, a self-evaluation process based on multi-agent collaboration, viewpoint search, and fine-tuning. First, based on the observation contract Oi, the system drives multiple Camera Agents to perform Monte Carlo-based Multi-level Viewpoint Search, generating a large number of candidate shot boards in the large space. Subsequently, the Evaluation Agent executes Tournament-based Reranking on these candidate viewpoint sets V, progressively eliminating low-quality shots through competitive scoring to select the winning initial optimal viewpoint v∗
+
+> init
+
+:
+
+v∗ 
+
+> init
+
+= arg max  
+
+> v∈V
+
+(λ1Vis (v, a ∗) + λ2Comp (v, C spatial ) − λ3Occ (v, W)) (4) where Vis (·) evaluates subject visibility, Comp (·) measures composition rationality, and Occ (·) cal-culates physical occlusion caused by the environment. Following this competitive selection, the Reflection Agent refines the winning viewpoint through localized camera-pose adjustment. Starting from v∗
+
+> init
+
+, it applies small perturbations to the cam-era position, orientation, and focal parameters, and re-renders the scene to check whether the target 5subject remains visible, the action cue is preserved, and the composition contract is satisfied. Refine-ments that introduce collision, severe occlusion, excessive subject truncation, or unstable framing are rejected. Through this render-evaluate-adjust loop, the system corrects minor visual imperfec-tions, such as off-center subjects, poor scale, partial occlusion, or weak spatial relation expression, and obtains the final viewpoint v∗ 
+
+> i
+
+.In summary, the Look stage converts narrative intent into a physically executable spatial observation decision. It first builds a semantic observation contract from narrative intent and rendered scene evidence, then searches and refines candidate viewpoints through Monte Carlo sampling, tourna-ment reranking, and render-based reflection. The resulting viewpoint v∗ 
+
+> i
+
+grounds “what should be observed” in the executable 3D world and serves as the visual anchor for subsequent trajectory grounding in the Move stage. 
+
+3.3 Move for Temporal Motion Coordination 
+
+Once the observation contract and initial optimal viewpoint are determined, the system transitions from the “searching” for shots to the “executing” motion stage of camera trajectory planning. At this stage, the planning and editing agents work collaboratively to generate continuous, stable, and executable motion trajectories in the 3D scene, a process we term Semantic Trajectory Ground-ing . The whole process of Semantic Trajectory Grounding can be divided into Trajectory Planning, Trajectory Reflection, and Temporal Semantic Editing. 
+
+Trajectory Planning. After acquiring a sequence of high-quality discrete shots (keyframes) {v∗ 
+
+> t
+
+},generating smooth, continuous trajectories that adapt to dynamic subject movements is the core of achieving high-quality visual presentation. The Planning Agent uses the discrete shots as key nodes to solve for the optimal continuous trajectory τ ∗ 
+
+> i
+
+in the joint spatial-temporal space: 
+
+τ ∗ 
+
+> i
+
+= arg min 
+
+> τ
+
+X
+
+> t
+
+ ∥τ (t) − v∗ 
+
+> t
+
+∥2 + γCost smooth ( ˙ τ (t), ¨τ (t))  (5) This objective function aims to minimize the deviation between the continuous trajectory τ (t) and the discrete key shots v∗ 
+
+> t
+
+, while strictly constraining the camera’s kinematic properties (such as velocity ˙τ (t) and acceleration ¨τ (t)) through the penalty term Cost smooth . Through this relay strategy of first generating discrete shots by the Camera Agent, then generating continuous trajectories by the Planning Agent, the system can plan camera trajectories that both stably track the target and exhibit excellent smoothness. 
+
+Trajectory Reflection. Although the initially planned trajectories are theoretically feasible, they may still encounter unexpected physical obstacles or intent deviations in complex dynamic scenes, necessitating strict closed-loop verification. To address this, the Evaluation Agent intervenes again to trigger the Trajectory Reflection mechanism. It simulates execution and comprehensively scores 
+
+R(τi) the entire generated trajectory τi in a real 3D rendering environment: 
+
+R(τi) = αP subj (τi) + βI intent (τi, I) + δQ traj (τi) (6) The formula comprehensively evaluates the trajectory from three dimensions: subject perception 
+
+Psubj , intent consistency Iintent , and motion quality Qtraj . Only trajectory segments with scores ex-ceeding a threshold are retained. This agent-driven closed-loop verification mechanism actively identifies and corrects sub-optimal or unexecutable actions, greatly enhancing the robustness of camera movements and ensuring the absolute reliability of trajectories in complex environments. 
+
+Temporal Semantic Editing. When dealing with complex scenes containing multiple event streams, a single viewpoint is often insufficient to fully convey all information, making reasonable shot scheduling particularly important. At this stage, the Editing Agent takes over and schedules all observation clip sets {ci} in the temporal dimension. It screens and splices them to generate the final observation sequence E∗:
+
+E∗ = arg max 
+
+> E⊂{ ci}
+
+ X
+
+> ci∈E
+
+U (ci) − η
+
+> |E|− 1
+
+X
+
+> j=1
+
+Dtrans (cj , c j+1 )
+
+ (7) where U (ci) measures the information transmission utility and semantic concentration of a single clip, and Dtrans (·) calculates the visual incoherence penalty for adjacent viewpoint switches. By 6Table 1: Main quantitative comparison with segment-count weighting. Scores include subject per-ception, intent consistency, trajectory quality, user study, and overall; higher is better. Missing results are placeholders; first best and second best mark the strongest two entries.                                                                                                                                  
+
+> Set Methods Subject perception Intent consistency Trajectory quality User Study ↑Overall ↑
+> SP1 ↑SP2 ↑SP3 ↑Mean ↑IC1 ↑IC2 ↑IC3 ↑Mean ↑TQ1 ↑TQ2 ↑TQ3 ↑Mean ↑
+> Baseline  CCD 88.45 66.72 69.87 75.01 58.41 85.71 24.86 55.96 40.01 86.05 72.88 66.15 3.21 65.62 GenDoP+RGBD 82.74 57.80 67.27 69.27 74.30 76.52 22.08 57.30 32.64 80.99 73.29 62.00 2.92 62.75 GenDoP+noRGBD 83.75 59.14 67.00 69.96 72.53 78.17 24.17 57.91 36.13 81.25 73.94 63.41 3.01 63.63
+> Director  ET+Director A 59.69 36.82 59.72 52.08 85.92 63.17 10.80 52.92 40.81 56.96 67.64 55.00 2.28 53.28 ET+Director B 61.34 38.60 60.43 53.46 85.90 62.98 17.20 54.98 39.69 61.11 67.18 55.87 2.35 54.71 ET+Director C 57.40 43.54 51.22 50.72 79.20 69.80 19.63 55.00 38.86 57.51 67.59 54.55 2.25 53.26
+> Ours
+> Look-Before-Move 90.02 66.97 72.59 76.53 78.15 90.30 23.26 63.90 62.44 87.73 73.92 74.65 4.08 71.70
+
+balancing clip quality and switching smoothness, the Editing Agent condenses discrete observation clips into a high-quality visual sequence, thereby conveying high-level directorial intent as accu-rately and vividly as possible. In summary, the Move stage transforms selected viewpoints into temporally coordinated camera behavior. It first connects discrete observation anchors into smooth continuous trajectories, then verifies their physical feasibility and narrative consistency through closed-loop trajectory reflection. Finally, temporal semantic editing schedules verified clips into a coherent observation sequence. As a result, the system converts “how to observe” into executable camera motion that remains stable, feasible, and aligned with the evolving story. 
+
+4 Experiment 
+
+4.1 Implementation Details Benchmark Metrics. We evaluate camera planning from three complementary dimensions: Sub-ject Perception (SP) , Intent Consistency (IC) , and Trajectory Quality (TQ) . SP focuses on whether the generated camera behavior can correctly capture the intended subjects under dynamic scene conditions. It measures target visibility, framing completeness, and robustness to physical occlusions. IC evaluates whether the resulting views are semantically aligned with the given film-ing intent, including shot scale, narrative focus, action relevance, and consistency with the event description. TQ assesses the execution quality of the generated camera motion, including trajectory smoothness, motion stability, transition coherence, and temporal continuity. All metrics are normal-ized to a 0–100 scale, where higher scores indicate better performance. Detailed metric definitions and computation protocols are provided in the Appendix C .
+
+Setup and Evaluator Models. Our rendering and physics validation environment is built on Blender, which provides executable 3D scenes, camera control, collision checking, and frame-level rendering for evaluation. We use Gemini-3-Flash-Preview [34] for agent reasoning, reflection, and instruction generation. For subject perception evaluation, we use YOLO11x [35] together with ORB [36] to assess target detection, visibility, and frame-level consistency. For intent consistency, we use Qwen2.5-VL-7B-Instruct [37] to perform blind text-video alignment scoring between the rendered camera video and the corresponding filming instruction. To ensure a fair comparison, all methods are evaluated using the same story segments, prompts, renderer, evaluator models, and segment-count weighting protocol. All videos are rendered at 24 FPS on a workstation equipped with one NVIDIA RTX 5090 GPU. Details are provided in the Appendix C .
+
+Datasets. We evaluate all methods on the cinematic test set introduced in this work, which covers indoor and outdoor scenes, multi-character interactions, object-centric events, and temporally evolv-ing story segments. Each scene is paired with natural language filming instructions specifying the intended subject, narrative focus, action cue, and shot-level visual requirements, enabling zero-shot evaluation of text-to-3D camera scheduling. This setting tests whether a method can translate high-level directorial intent into executable camera behavior that decides both what to observe and how to organize motion over time; details are provided in Appendix C .7Ours 
+
+CCD 
+
+GenDoP 
+
+ET-C 
+
+(a) Subject 
+
+40 
+
+60 
+
+80 
+
+100  
+
+> Score  76.53 75.01
+> 69.27
+> 50.72
+
+SP1 
+
+SP2 
+
+SP3 
+
+Mean 
+
+Ours 
+
+CCD 
+
+GenDoP 
+
+ET-C 
+
+(b) Intent 
+
+20 
+
+40 
+
+60 
+
+80 
+
+100   
+
+> 63.90
+> 55.96 57.30 55.00
+
+IC1 
+
+IC2 
+
+IC3 
+
+Mean 
+
+Ours 
+
+CCD 
+
+GenDoP 
+
+ET-C 
+
+(c) Trajectory 
+
+40 
+
+60 
+
+80 
+
+100  
+
+> 74.65
+> 66.15 62.00
+> 54.55
+
+TQ1 
+
+TQ2 
+
+TQ3 
+
+Mean 
+
+Ours 
+
+CCD 
+
+GenDoP 
+
+ET-C 
+
+(d) Overall 
+
+50 
+
+60 
+
+70 
+
+80 
+
+90  
+
+> 71.70
+> 65.62 62.75
+> 53.26
+
+SP 
+
+IC 
+
+TQ 
+
+Overall Figure 2: Fine-grained quantitative comparison across subject perception, intent consistency, tra-jectory quality, and overall performance. Look-Before-Move improves the segment-weighted score while maintaining stronger motion-related metrics than the compared camera planning baselines. The panel exposes where each method succeeds or fails beyond the single aggregate score. Input Ours                                              
+
+> （LoBeM ）
+> ET
+> （Director C ）
+> GenDoP
+> （Pre-trained ）
+> CCD
+> （Pre-trained ）
+> Anassassinstands
+> outsidearevolvingdoor,
+> pointingapistol.
+> Adarkcarapproaches
+> thehospital,its
+> headlightsshiningonthe
+> twomen.
+> Thecamerapansacross
+> alavishbedroomtofind
+> Woltzasleepina
+> massivebed.
+> Twoassassinsemerge
+> fromthecrowdandrush
+> towardVitowithguns
+> drawn.
+> Thebodyguardcloses
+> theofficedoor,leaving
+> Kayaloneinthehallway.
+
+Figure 3: Qualitative comparison on representative story segments. Rows pair narrative instructions with outputs from our method and baselines, testing subject identity, action cues, spatial context, and story-relevant framing. Input Trajectory      
+
+> Frank steps aggressively toward Charlie , stopping
+> right in front of him.
+> Vito chases Anthony through the tomato plants
+> while holding a spray bottle.
+> Startled, Fredo steps backward in panic and falls
+> out of sight over the embankment.
+
+Figure 4: Qualitative visualization of world visual attention. Attention maps and trajectories show narrative intent grounded in evidence before execution. 
+
+4.2 Main Results 
+
+Based on the benchmark protocol above, we compare Look-Before-Move with representative cam-era planning and trajectory generation baselines, including Cinematographic Camera Diffusion [38], GenDoP [13], and Exceptional Trajectories [15]. We report results from two complementary per-spectives: namely quantitative comparison and qualitative visual analysis. 
+
+Quantitative Evaluation. Table 1 and Figures 2 and 5 show that Look-Before-Move achieves the best overall performance under the unified segment-weighted evaluation protocol. Our method ob-tains an Overall score of 71.70, outperforming the strongest complete baseline CCD by 6.08 points, with clear gains in both intent consistency and trajectory quality. These results show that dynamic 3D camera planning requires more than keeping subjects visible or generating smooth motion. Ex-isting baselines often address only one aspect of the problem, such as subject perception, shot-size matching, or trajectory generation, but struggle to jointly satisfy narrative intent, physical feasibil-ity, and temporal coherence. By first identifying narrative-compliant viewpoints and then grounding them into executable trajectories, Look-Before-Move provides a more complete solution to world visual attention. The results support our central argument: camera planning should be formulated as observation-driven visual evidence organization rather than direct trajectory generation. 
+
+Qualitative Evaluation. Figure 3 shows qualitative results across story segments. In the assassin case, Look-Before-Move identifies the intended character, renders the subject at close-up scale, and preserves the action cue. In the car and hospital scenes, it selects viewpoints that capture interac-tions while maintaining stable framing. In the bedroom wide shot, the generated view keeps both the bed and the sleeping character within the narrative focus, preparing the subsequent plot where the character awakens. These examples show that our method does not merely generate plausible frames, but selects views that are physically valid and narratively specific. Figure 4 further illustrates 840 45 50 55 60 65 70 75 80 
+
+> Failure threshold
+> 0
+> 20
+> 40
+> 60
+> 80
+> 100
+> Failure rate (%)
+> Ours
+> CCD
+> GenDoP+RGBD
+> GenDoP+noRGBD
+> ET-C
+
+Figure 5: Failure-case counts under uni-fied evaluation. Lower curves indicate fewer segments below each threshold. Table 2: Ablation results with segment-count weighting between different variants. Each row removes one com-ponent under the same evaluator, showing its impact on SP, IC, TQ, and overall score. 
+
+Variant SP ↑ IC ↑ TQ ↑ Overall ↑
+
+Ours 76.53 63.90 74.65 71.70 
+
+w/o MLS (Fast) 67.54 53.28 60.91 60.52 w/o VLM-R 75.30 60.82 71.86 69.11 w/o TG 69.05 53.24 60.19 60.74 w/o SHA 68.28 53.57 60.23 60.54 w/o PCSJ 64.24 55.00 59.90 59.45 X
+
+> Y
+> H
+> TQ1 smoothness: Ours 94.3 / CCD 0.0 / GenDoP 3.0
+> Overall: Ours 79.6 / CCD 64.1 / GenDoP 65.4
+
+Scene 007 Shot 002 
+
+Vito chases Anthony through the tomato plants 
+
+while holding a spray bottle. 
+
+Motion: truck; target: full body; shot: wide shot 
+
+> Ours (1.05)
+> CCD (0.08)
+> GenDoP (0.87)
+> X
+> Y
+> H
+> TQ1 smoothness: Ours 95.4 / CCD 3.3 / GenDoP 21.1
+> Overall: Ours 69.5 / CCD 62.4 / GenDoP 16.0
+
+Scene 004 Shot 002 
+
+A dark car approaches the hospital, its 
+
+headlights shining on the two men. 
+
+Motion: push in; target: full body; shot: wide shot 
+
+> Normalized per-method trajectories are start-centered and length-normalized; raw path lengths are shown in the legend.
+> Ours (0.85)
+> CCD (1.94)
+> GenDoP (0.94)
+
+Figure 6: Additional comparison of semantic trajectory quality. Look-Before-Move achieves stronger semantic alignment without sacrificing executable motion quality. how the framework maintains narrative-grounded visual attention over time. When the main subject moves across shots, the camera continues to track the protagonist, preserve action cues, and adapt its viewpoint to the evolving scene context. This behavior is enabled by converting the instruction into an observation contract and validating candidate views in the executable 3D world before trajectory grounding. As a result, Look-Before-Move reduces viewpoint drift and translates textual intent into stable visual evidence before camera motion is executed. 
+
+4.3 Additional Results Ablation Study. Table 2 evaluates five components under shared dataset, prompts, renderer, evalua-tor, and metrics. MLS, VLM-R, TG, SHA, and PCSJ denote Multi-level Monte Carlo Search, VLM Reflection, Trajectory Grounding, Semantic Height Adjust, and Pre-continuity Story Judge. The Fast variant is w/o MLS , where Monte Carlo search and reranking are disabled. The results show that viewpoint search and temporal grounding are the sources of improvement. Removing MLS causes the large drop, reducing the overall score from 71.70 to 60.52, confirming the importance of candidate expansion and reranking before motion planning. VLM-R improves intent consistency through visual-language feedback, while TG, SHA, and PCSJ are crucial for maintaining trajectory quality and temporal coherence. Overall, the ablation validates the core design of Look-Before-Move: narrative-compliant viewpoint selection must be coupled with executable motion grounding. 
+
+Trajectory Visualization. Figure 6 provides an additional quantitative view of the trade-off between semantic quality and trajectory quality. The comparison complements the main table by separating whether a method succeeds because it chooses story-relevant evidence, because it produces smooth executable motion, or because it balances both. Look-Before-Move is designed to improve this balance: the Look stage improves semantic evidence acquisition, while the Move stage prevents high-quality still viewpoints from becoming unstable motion plans. 95 Conclusion 
+
+We introduced narrative-grounded world visual attention as a novel paradigm for camera planning within dynamic 3D environments, moving beyond passive trajectory generation toward the active or-ganization of visual evidence. To realize this capability, we proposed Look-Before-Move as a collab-orative planning framework that effectively translates abstract directorial intent into executable cam-era behaviors by decoupling spatial viewpoint composition and temporal motion coordination. To facilitate systematic research, we constructed an executable 3D story-world benchmark that provides rigorous geometric and semantic feedback for closed-loop verification. Extensive experiments vali-date that our approach significantly outperforms existing methods across subject perception, intent consistency, and trajectory quality. Ultimately, this research bridges the critical gap between high-level cinematic intent and foundational physical execution, paving the way for fully autonomous and intelligent visual agents in complex virtual worlds, especially in long-horizon narrative generation and embodied world modeling. These results position camera control as active perception, requiring agents to reason jointly about narrative evidence, 3D observability, and executable motion. 10 References 
+
+[1] Z. Hu, A. Iscen, A. Jain, T. Kipf, Y. Yue, D. A. Ross, C. Schmid, and A. Fathi, “Scenecraft: An llm agent for synthesizing 3d scenes as blender code,” in Forty-first International Conference on Machine Learning , 2024. [2] Y. Yang, B. Jia, S. Zhang, and S. Huang, “Sceneweaver: All-in-one 3d scene synthesis with an extensible and self-reflective agent,” 2025. [3] X. Liu, C.-K. Tang, and Y.-W. Tai, “Worldcraft: Photo-realistic 3d world creation and cus-tomization via llm agents,” 2025. [4] G. Lin, K. Huang, M. Liu, R. Gao, H. Chen, L. Chen, B. Lu, T. Komura, Y. Liu, J.-Y. Zhu, and M. Li, “Pat3d: Physics-augmented text-to-3d scene generation,” 2025. [5] C. Lino and M. Christie, “Intuitive and efficient camera control with the toric space,” ACM Transactions on Graphics (TOG) , vol. 34, no. 4, pp. 1–12, 2015. [6] Z. Dehghanian, P. Ardekhani, A. Vahedi, H. Beigy, and H. R. Rabiee, “Camera trajectory gen-eration: A comprehensive survey of methods, metrics, and future directions,” arXiv preprint arXiv:2506.00974 , 2025. [7] A. Rao, X. Jiang, Y. Guo, L. Xu, L. Yang, L. Jin, D. Lin, and B. Dai, “Dynamic storyboard generation in an engine-based virtual environment for video production,” 2023. [8] Y. Huang, Y. Qin, S. Lu, X. Wang, R. Huang, Y. Shan, and R. Zhang, “Story3d-agent: Explor-ing 3d storytelling visualization with large language models,” 2024. [9] B. Li, Z. Sun, J. Bian, Y. Wu, Y. Wang, H. Li, Y. Bian, H. Mo, and D. Dong, “Storyblender: Inter-shot consistent and editable 3d storyboard with spatial-temporal dynamics,” 2026. [10] Z. Wang, Z. Yuan, X. Wang, Y. Li, T. Chen, M. Xia, P. Luo, and Y. Shan, “Motionctrl: A unified and flexible motion controller for video generation,” in ACM SIGGRAPH 2024 Conference Papers , pp. 1–11, 2024. [11] H. He, Y. Xu, Y. Guo, G. Wetzstein, B. Dai, H. Li, and C. Yang, “Cameractrl: Enabling camera control for text-to-video generation,” arXiv preprint arXiv:2404.02101 , 2024. [12] S. Yang, L. Hou, H. Huang, C. Ma, P. Wan, D. Zhang, X. Chen, and J. Liao, “Direct-a-video: Customized video generation with user-directed camera movement and object motion,” in ACM SIGGRAPH 2024 Conference Papers , pp. 1–12, 2024. [13] M. Zhang, T. Wu, J. Tan, Z. Liu, G. Wetzstein, and D. Lin, “Gendop: Auto-regressive camera trajectory generation as a director of photography,” in Proceedings of the IEEE/CVF Interna-tional Conference on Computer Vision , pp. 18229–18239, 2025. [14] X. Li, Z. Lai, L. Xu, Y. Qu, L. Cao, S. Zhang, B. Dai, and R. Ji, “Director3d: Real-world cam-era trajectory and 3d scene generation from text,” Advances in neural information processing systems , vol. 37, pp. 75125–75151, 2024. [15] R. Courant, N. Dufour, X. Wang, et al. , “E.T. the exceptional trajectories: Text-to-camera-trajectory generation with character awareness,” in European Conference on Computer Vision ,pp. 464–480, 2024. [16] S. Bahmani, I. Skorokhodov, A. Siarohin, W. Menapace, G. Qian, M. Vasilkovsky, H.-Y. Lee, C. Wang, J. Zou, A. Tagliasacchi, et al. , “Vd3d: Taming large video diffusion transformers for 3d camera control,” arXiv preprint arXiv:2407.12781 , 2024. [17] D. Xu, Y. Jiang, C. Huang, L. Song, T. Gernoth, L. Cao, Z. Wang, and H. Tang, “Cavia: Camera-controllable multi-view video diffusion with view-integrated attention,” arXiv preprint arXiv:2410.10774 , 2024. [18] D. Xu, W. Nie, C. Liu, S. Liu, J. Kautz, Z. Wang, and A. Vahdat, “Camco: Camera-controllable 3d-consistent image-to-video generation,” arXiv preprint arXiv:2406.02509 , 2024. [19] W. Zhao, S. Liu, H. Guo, W. Wang, and Y.-J. Liu, “Particlesfm: Exploiting dense point tra-jectories for localizing moving cameras in the wild,” in European Conference on Computer Vision , pp. 523–542, Springer, 2022. [20] S. Bahmani, I. Skorokhodov, G. Qian, A. Siarohin, W. Menapace, A. Tagliasacchi, D. B. Lin-dell, and S. Tulyakov, “Ac3d: Analyzing and improving 3d camera control in video diffusion transformers,” in Proceedings of the Computer Vision and Pattern Recognition Conference ,pp. 22875–22889, 2025. 11 [21] Z. Lin, S. Cen, D. Jiang, J. Karhade, H. Wang, C. Mitra, T. Ling, Y. Huang, S. Liu, M. Chen, et al. , “Towards understanding camera motions in any video,” arXiv preprint arXiv:2504.15376 , 2025. [22] Z. Xu, L. Wang, J. Wang, Z. Li, S. Shi, X. Yang, Y. Wang, B. Hu, J. Yu, and M. Zhang, “Filmagent: A multi-agent framework for end-to-end film automation in virtual 3d spaces,” 
+
+arXiv preprint arXiv:2501.12909 , 2025. [23] N. Shinn, F. e. Cassano, A. Gopinath, K. Narasimhan, and S. Yao, “Reflexion: Language agents with verbal reinforcement learning,” in Advances in Neural Information Processing Systems ,vol. 36, pp. 8634–8652, 2023. [24] A. Madaan, N. Tandon, P. Gupta, S. Hallinan, L. Gao, S. Wiegreffe, U. Alon, N. Dziri, S. Prab-humoye, Y. Yang, et al. , “Self-refine: Iterative refinement with self-feedback,” in Advances in Neural Information Processing Systems , vol. 36, pp. 46534–46594, 2023. [25] L. Liu, C. Zhang, L. Wu, et al. , “Instruct-of-reflection: Enhancing large language models iter-ative reflection capabilities via dynamic-meta instruction,” in Proceedings of the 2025 Confer-ence of the Nations of the Americas Chapter of the Association for Computational Linguistics: Human Language Technologies , pp. 9956–9978, 2025. [26] K. Cheng, L. YanTao, F. Xu, et al. , “Vision-language models can self-improve reasoning via reflection,” in Proceedings of the 2025 Conference of the Nations of the Americas Chapter of the Association for Computational Linguistics: Human Language Technologies , pp. 8876– 8892, 2025. [27] A. Zhao, D. Huang, Q. Xu, M. Lin, Y.-J. Liu, and G. Huang, “Expel: Llm agents are expe-riential learners,” in Proceedings of the AAAI Conference on Artificial Intelligence , vol. 38, pp. 19632–19642, 2024. [28] A. Zhou, K. Yan, M. Shlapentokh-Rothman, H. Liu, and C. Gan, “Language agent tree search unifies reasoning acting and planning in language models,” arXiv preprint arXiv:2310.04406 ,2023. [29] Z. Guo, B. Xu, X. Wang, et al. , “Mirror: multi-agent intra-and inter-reflection for optimized reasoning in tool learning,” in Proceedings of the Thirty-Fourth International Joint Conference on Artificial Intelligence , pp. 117–125, 2025. [30] H. Wu, W. Wu, T. Xu, et al. , “Towards enhanced immersion and agency for llm-based interac-tive drama,” in Proceedings of the 63rd Annual Meeting of the Association for Computational Linguistics , pp. 11166–11182, 2025. [31] B. Lin, Y. Nie, Z. Wei, et al. , “Navcot: Boosting llm-based vision-and-language navigation via learning disentangled reasoning,” IEEE Transactions on Pattern Analysis and Machine Intelligence , 2025. [32] P. Jian, J. Wu, W. Sun, et al. , “Look again, think slowly: Enhancing visual reflection in vision-language models,” in Proceedings of the 2025 Conference on Empirical Methods in Natural Language Processing , pp. 9262–9281, 2025. [33] Y. Wei, L. Zhao, K. Lin, et al. , “Perception in reflection,” in International Conference on Machine Learning , pp. 66378–66396, PMLR, 2025. [34] G. Team, P. Georgiev, V. I. Lei, et al. , “Gemini 1.5: Unlocking multimodal understanding across millions of tokens of context,” arXiv preprint arXiv:2403.05530 , 2024. [35] G. Jocher and J. Qiu, “Ultralytics YOLO11,” 2024. [36] E. Rublee, V. Rabaud, K. Konolige, and G. Bradski, “ORB: An efficient alternative to SIFT or SURF,” in Proceedings of the International Conference on Computer Vision , pp. 2564–2571, 2011. [37] P. Wang, S. Bai, S. Tan, et al. , “Qwen2-VL: Enhancing vision-language model’s perception of the world at any resolution,” arXiv preprint arXiv:2409.12191 , 2024. [38] H. Jiang, X. Wang, M. Christie, et al. , “Cinematographic camera diffusion model,” Computer Graphics Forum , vol. 43, no. 2, p. e15055, 2024. 12 Scent of a Woman 
+
+> Godfather
+> Godfather Part II
+> 10 3
+> 10 4
+> 10 5
+> Count (log)
+
+Search funnel 
+
+raw eligible retained 
+
+> Scent of a Woman
+> Godfather
+> Godfather Part II
+> 0.005
+> 0.010
+> 0.015
+> retained / raw
+
+Retained fraction 
+
+> Scent of a Woman
+> Godfather
+> Godfather Part II
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> score gap
+
+Retained vs. rejected      
+
+> 0.0 0.2 0.4 0.6 0.8 1.0
+
+normalized rank 
+
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> score
+
+Ranked score curves 
+
+> Godfather s2-2
+> Godfather s8-2
+> Godfather Part II s7-3
+> Godfather s5-5
+
+Figure 7: Monte Carlo viewpoint-search summary. The search funnel, retained-fraction distribution, retained-versus-rejected score gap, and candidate ranking curve show how large raw candidate pools are filtered into compact high-quality viewpoint sets. 
+
+A Implementation Details 
+
+Observation contract. For each shot, Look-Before-Move first parses the directorial intent into a semantic observation contract. The contract specifies the primary acting subject, the expected semantic target region, visibility and occlusion requirements, composition preferences, and temporal action cue. This contract is used to constrain the subsequent candidate search, so the system does not optimize camera motion before deciding what evidence the scene should provide. 
+
+Monte Carlo viewpoint search. The Look stage samples a large raw camera-pose pool around the current action context, rejects geometrically invalid or semantically weak views, and retains a com-pact candidate set for reranking. Figure 7 reports the search statistics over the available candidate-board records. Across 132 shots with visualized candidate boards, the search produces 160,693 raw candidates, keeps 107,478 eligible candidates after geometric and semantic filtering, and re-tains 2,587 high-quality candidates for final reranking. The small retained fraction indicates that the method is not selecting a viewpoint from a single heuristic anchor; it is searching a large feasible space and compressing it into a small set of narrative-compliant alternatives. 
+
+Trajectory grounding and editing. After viewpoint selection, the Move stage grounds discrete viewpoints into continuous camera trajectories in the executable 3D world. Trajectory ground-ing follows the selected subject, avoids infeasible camera placement, and smooths motion across keyframes. The temporal editing step then schedules observation clips by balancing local informa-tion utility against transition inconsistency, which is especially important when consecutive shots focus on different subjects or semantic targets. 13 (a) Traditional Methods (b) Look Before Move      
+
+> Observation Contract
+> (Intent →Constraints)
+> Conventional Trajectory
+> Blind from Obstacles
+> Wrong
+> Frame
+> Intent
+> Mismatch
+> Physical
+> Occlusion
+> Start
+> Look (Spatial) Move (Temporal)
+> Candidates Viewpoint Smooth Collision-Free Trajectory
+
+Figure 8: Motivation and task contrast for narrative-grounded world visual attention. The task requires the agent to convert high-level directorial intent into observable subjects, semantic regions, feasible viewpoints, and executable camera motion in a dynamic 3D story world. Vito chases   
+
+> Anthony through
+> the tomato plants
+> while holding a
+> spray bottle.
+> A dark car
+> approaches the
+> hospital, its
+> headlights shining
+> on the two men .
+
+（a）Statistics of the CineBoard benchmark （b）Camera trajectory visualization 
+
+Figure 9: Statistics of the 3D Story World benchmark and representative trajectory visualizations. The left pan-els summarize benchmark scale, asset composition, character density, and shot-level structure across executable story worlds. The right panels show how natural-language filming instructions are converted into concrete 3D camera paths for dynamic narrative events. 
+
+B Motivation and Problem Setup 
+
+Figure 8 summarizes the motivation behind narrative-grounded world visual attention. Traditional camera control often starts from a specified target, a coarse cinematic rule, or a desired trajectory pattern. In contrast, camera planning inside an executable story world must first determine which visual evidence is narratively relevant: the acting subject, the semantic region, the surrounding context, and the temporal relation to adjacent events. This difference makes the problem more than trajectory synthesis. The camera must first look for an observation that satisfies the story intent and the physical constraints of the 3D world, and only then move through a trajectory that preserves that observation over time. 14 C Benchmark Details 
+
+Table 3: Metric groups used in the benchmark. The same definitions are used throughout the main and appendix results.                            
+
+> Group Sub-metric Evaluation focus Subject Perception SP1 Target capture and sufficient on-screen visibility of the intended subject. Subject Perception SP2 Subject identity consistency in multi-character or visually ambiguous scenes. Subject Perception SP3 Occlusion robustness when the subject is blocked by geometry, props, or other actors. Intent Consistency IC1 Agreement with requested shot scale, camera angle, and composition pref-erence. Intent Consistency IC2 Accuracy of semantic target framing, such as face, hands, feet, or full body. Intent Consistency IC3 Consistency with the local event description and narrative action cue. Trajectory Quality TQ1 Motion smoothness and avoidance of abrupt camera displacement. Trajectory Quality TQ2 Executability, stability, and collision-aware spatial behavior in the 3D scene. Trajectory Quality TQ3 Temporal continuity between adjacent shot tails and heads.
+
+Data hierarchy. Our benchmark is organized as a hierarchy of stories, scenes, and shots. Each story contains temporally ordered narrative events; each scene provides an executable 3D environ-ment with persistent characters, objects, layout, and animations; each shot specifies the local acting subject, semantic target, action cue, and directorial requirement that the camera must satisfy. The benchmark contains 50 stories, 457 scenes, and 1585 shots, with 3197 explicit 3D assets including 836 plot-related assets and 2361 supplementary scene assets. This structure allows us to evaluate camera plans with closed-loop rendering feedback rather than treating viewpoint prediction as a static pose-regression task. 
+
+Evaluation dimensions. We evaluate all methods with the same rendered evidence, evaluator mod-els, and segment-weighted aggregation. The metrics are grouped into Subject Perception (SP), In-tent Consistency (IC), and Trajectory Quality (TQ), all normalized to a 0–100 scale. SP measures whether the intended subject remains visible, correctly identified, and robust to occlusion. IC mea-sures whether the rendered view follows the requested shot scale, semantic target, and event de-scription. TQ measures whether the final camera motion is smooth, stable, and temporally coherent across adjacent shots. 
+
+Metric computation. For each method, we render the planned trajectory into a sequence of frames. Let shot i contain Ti frames {Fi,t }Ti 
+
+> t=1
+
+and let the observation contract specify the target subject a∗ 
+
+> i
+
+,semantic target zi, shot-size request qi, and event description ei. The evaluator extracts a target box 
+
+bi,t with confidence ci,t , area ratio ri,t = |bi,t |/|Fi,t |, normalized center distance di,t , and a validity flag mi,t indicating whether the intended target is detected. We use clip( x) = min(1 , max(0 , x )) 
+
+and map every sub-score to 0–100. Invalid or inapplicable terms are removed from the denominator; in particular, TQ3 is not computed for the first shot of a story segment. 
+
+SP1 i = 100 
+
+P 
+
+> t
+
+mi,t + ϵ
+
+> Ti
+
+X
+
+> t=1
+
+mi,t ci,t clip 
+
+ ri,t 
+
+ρmin 
+
+
+
+(1 − di,t ), (8) 
+
+SP2 i = 100 
+
+P 
+
+> t
+
+mi,t + ϵ
+
+> Ti
+
+X
+
+> t=1
+
+mi,t clip 
+
+ M (bi,t , G (a∗ 
+
+> i
+
+)) − max a̸=a∗ 
+
+> i
+
+M (bi,t , G (a)) 
+
+γid 
+
+
+
+, (9) 
+
+SP3 i = 100 clip 1 − λmLmiss  
+
+> i
+
+− λeLedge  
+
+> i
+
+− λa
+
+1
+
+Ti − 1
+
+> Ti
+
+X
+
+> t=2
+
+log ri,t + ϵri,t −1 + ϵ
+
+!
+
+. (10) Here, SP1 measures effective subject coverage by combining detection confidence, visible area, and centering. SP2 measures identity consistency using ORB feature matching M (·, ·) between the detected subject crop and the reference gallery G(a) for each character; it rewards a positive margin over visually competing identities. SP3 penalizes target disappearance Lmiss  
+
+> i
+
+, edge truncation Ledge  
+
+> i
+
+,and abrupt visible-area changes, which are common symptoms of occlusion or unstable framing. 15 IC1 i = 100 
+
+P 
+
+> t
+
+mi,t + ϵ
+
+> Ti
+
+X
+
+> t=1
+
+mi,t clip 
+
+1 −
+
+log ri,t +ϵρ(qi)+ ϵ
+
+τsize 
+
+ , (11) 
+
+IC2 i = 100 
+
+P 
+
+> t
+
+mi,t + ϵ
+
+> Ti
+
+X
+
+> t=1
+
+mi,t Sregion (Fi,t , b i,t , z i), (12) 
+
+IC3 i = 100 Svlm (ei, {Fi,t }t∈K i ) . (13) IC1 compares the observed subject area ratio with the canonical ratio ρ(qi) for the requested shot size. IC2 evaluates whether the requested semantic region, such as face, hands, feet, or full body, is actually emphasized inside the target crop. IC3 is a blind visual-language judgment over keyframes 
+
+Ki, where the evaluator checks whether the rendered evidence conveys the event description and directorial intent. 
+
+TQ1 i = 100 clip  1 − αf ∆ϕi − αpMAD i
+
+ , (14) 
+
+TQ2 i = 100 clip 1 − βc
+
+1
+
+Ti − 1
+
+> Ti
+
+X
+
+> t=2
+
+∥pi,t − pi,t −1∥2 − βr
+
+1
+
+Ti − 1
+
+> Ti
+
+X
+
+> t=2
+
+log ri,t + ϵri,t −1 + ϵ − βoCi
+
+!
+
+,
+
+(15) 
+
+TQ3 i = 100 clip 
+
+
+
+ηs sim( Fi−1,T i−1 , F i, 1) + ηp
+
+
+
+1 − ∥pi−1,T i−1 − pi, 1∥2
+
+τcut 
+
+ 
+
+. (16) TQ1 measures visual smoothness using Farneback optical-flow acceleration ∆ϕi and mean absolute pixel difference MAD i. TQ2 measures tracking stability through target-center drift pi,t , target-area jumps, and an execution penalty Ci for collisions or invalid camera placements. TQ3 measures cut continuity between adjacent shots by combining image similarity and the jump of the target center from the previous tail frame to the current head frame. The final group scores are simple means over valid sub-metrics, 
+
+SP i = SP1 i + SP2 i + SP3 i
+
+3 , (17) 
+
+IC i = IC1 i + IC2 i + IC3 i
+
+3 , (18) 
+
+TQ i = TQ1 i + TQ2 i + νiTQ3 i
+
+2 + νi
+
+, νi = ⊮[i > 1] . (19) and the shot-level overall score is 
+
+Overall i = SP i + IC i + TQ i
+
+3 . (20) For a method m, we report segment-count weighted results over story segments S:
+
+Score( m) = 
+
+P 
+
+> s∈S
+
+ns
+
+ 1
+
+> ns
+
+P 
+
+> i∈s
+
+Score i(m)
+
+P 
+
+> s∈S
+
+ns
+
+, (21) where ns is the number of evaluated shots in segment s. The same aggregation is used for every sub-metric, group mean, and overall score in the main paper. 
+
+D Additional Ablation Analysis 
+
+Figure 10 expands the ablation table in the main paper with fine-grained sub-metric behavior and pairwise method similarity. Multi-level Monte Carlo Search (MLS) mainly enlarges the feasible viewpoint set and improves both subject perception and intent consistency. VLM Reflection (VLM-R) provides targeted semantic correction, especially for cases where the target region or narrative 16 Figure 10: Counterfactual ablation visualization. The metric panels show how each component affects SP, IC, and TQ sub-metrics under controlled component removals. 
+
+focus is visually subtle. Trajectory Grounding (TG) turns selected viewpoints into executable mo-tion, Semantic Height Adjust (SHA) improves the vertical alignment of semantic targets such as face or full body, and Pre-continuity Story Judge (PCSJ) reduces temporally inconsistent viewpoint switches before final editing. The counterfactual cases further show that the components fail in dif-ferent ways rather than contributing an interchangeable score boost. When the search component is weakened, the planner often keeps a plausible subject in view but loses the best semantic region or chooses a viewpoint with fragile visibility. When reflection is removed, errors are more likely to appear as fine-grained semantic mismatches, because the candidate view may be geometrically valid while still emphasizing the wrong body part, object, or interaction cue. When trajectory grounding is removed, the initial still view can remain reasonable, but the rendered clip becomes unstable once the subject or camera begins to move. This separation is useful because it indicates which part of the pipeline should be improved for each error type. 
+
+E Additional Qualitative Results 
+
+The qualitative comparisons in the main paper show representative final renderings, while the candi-date boards in Figures 13–18 expose the intermediate viewpoint alternatives considered before final selection. These boards are useful because many sampled views can satisfy a coarse visibility con-straint, but only a smaller subset simultaneously preserves subject identity, semantic target region, action cue, occlusion constraints, and composition. Each page corresponds to a group of shots and shows the retained candidate set after geometric validation, semantic filtering, deduplication, and reranking. The boards also make the role of the Look stage visually explicit. For close-up or region-specific re-quests, the retained views often concentrate around the requested semantic region while still keeping enough body or scene context for identity and action understanding. For wide or motion-oriented requests, the retained views spread over a larger feasible region so that the Move stage can later choose a trajectory that is both stable and narratively informative. This intermediate evidence helps distinguish Look-Before-Move from methods that directly commit to a single camera anchor or tra-jectory template. The additional boards also clarify how the same narrative instruction can admit several visually acceptable solutions. Some candidates prioritize a stable view of the acting subject, while others reveal more context or preserve a clearer action cue. Keeping these alternatives un-til reranking gives the planner room to trade off subject scale, semantic target visibility, occlusion risk, and trajectory continuity. This is particularly important for dynamic scenes, where a viewpoint that is optimal at one frame may become unreliable a few frames later. The board evidence there-fore complements the final renderings by showing not only what was selected, but what competing observations were rejected. 17 Figure 11: Representative failure cases. Severe occlusion, subject ambiguity, semantic target mismatch, and temporal discontinuity correspond to drops in SP3, SP2, IC2, and TQ3, respectively. 
+
+F Discussion 
+
+Failure Cases. Figure 11 summarizes representative failure cases according to the most affected metric dimension. Severe occlusion reduces SP when the acting subject is blocked by walls, fur-niture, props, or other characters. Subject ambiguity reduces SP when the camera locks onto the wrong person or fails to maintain identity in crowded scenes. Semantic target mismatch reduces IC when the requested visual region, such as the face, hands, feet, or full body, is framed imprecisely. Temporal discontinuity reduces TQ when the visual state at the end of one shot is poorly aligned with the beginning of the next shot. These failures are often coupled: an early identity error can lead to later target-region mismatch, while a correct still viewpoint may become invalid once the sub-ject moves behind geometry or another character enters the line of sight. This motivates reporting failures with affected sub-metrics rather than treating them as generic visual artifacts. 
+
+Future Work. The observed failures suggest several directions for improvement. First, future plan-ners should maintain stronger scene-level reasoning and uncertainty estimates over target identity, especially in multi-character scenes. Second, viewpoint search should anticipate future occlusions rather than only repairing them after rendering, enabling more reliable long-horizon camera motion. Third, semantic targets should be treated as temporally extended visual evidence rather than local keyframe regions. For example, a face, hand, or full-body request may be visible at one keyframe but become less legible during camera transition. A stronger planner should therefore evaluate whether the requested evidence remains interpretable across the whole clip. In addition, future systems could return structured failure explanations together with rendered clips, allowing the camera agent to re-vise the specific failed constraint instead of repeating the entire planning process. Longer story arcs also introduce higher-level constraints such as screen direction, repeated object viewpoints, delayed reveals, and story-level visual memory, which remain important extensions of narrative-grounded world visual attention. 
+
+Societal Impact. This work may have positive impact by enabling more controllable and inter-pretable camera planning for virtual production, animation, embodied AI, simulation, and educa-tional storytelling. By grounding camera behavior in explicit narrative intent and executable 3D verification, the proposed framework can reduce manual effort in scene visualization and make cin-ematic content creation more accessible to users without advanced technical skills. At the same time, more autonomous camera planning systems may be misused to generate misleading, manip-ulative, or low-quality synthetic visual narratives at scale. Therefore, future deployment should include human oversight, provenance tracking, and appropriate safeguards when the generated cam-era behavior is used in public-facing media or high-stakes simulation contexts. 
+
+G User Study 
+
+We conducted a subjective user study to assess the perceptual quality from a human perspective. A total of 95 participants rated camera motion clips generated by Look-Before-Move and other meth-ods (CCD, GenDoP, and Director) across four different stories, with three clips per story presented. 18 Figure 12: User study interface 
+
+To reduce prior bias, amera motion generation method names were hidden from participants during evaluation; within each story, clips from different methods were presented in randomized order as Clip 1–3. Participants rated each clip on three dimensions: subject perception, intent consistency, and trajectory quality, using an integer scale from 0 (extremely poor) to 5 (excellent). The final score per method was averaged across all participants and clips. 19 Figure 13: Monte Carlo viewpoint-search candidate boards. Each board reports retained candidate views after sampling, geometric and semantic validation, deduplication, and reranking. 
+
+20 Figure 14: Monte Carlo viewpoint-search candidate boards. Each board reports retained candidate views after sampling, geometric and semantic validation, deduplication, and reranking. 
+
+21 Figure 15: Monte Carlo viewpoint-search candidate boards. Each board reports retained candidate views after sampling, geometric and semantic validation, deduplication, and reranking. 
+
+22 Figure 16: Monte Carlo viewpoint-search candidate boards. Each board reports retained candidate views after sampling, geometric and semantic validation, deduplication, and reranking. 
+
+23 Figure 17: Monte Carlo viewpoint-search candidate boards. Each board reports retained candidate views after sampling, geometric and semantic validation, deduplication, and reranking. 
+
+24 Figure 18: Monte Carlo viewpoint-search candidate boards. Each board reports retained candidate views after sampling, geometric and semantic validation, deduplication, and reranking. 
+
+25

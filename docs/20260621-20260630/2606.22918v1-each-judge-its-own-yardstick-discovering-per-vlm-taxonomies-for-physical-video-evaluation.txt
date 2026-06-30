@@ -1,0 +1,490 @@
+Title: Each Judge Its Own Yardstick: Discovering Per-VLM Taxonomies for Physical Video Evaluation
+
+URL Source: https://arxiv.org/pdf/2606.22918v1
+
+Published Time: Tue, 23 Jun 2026 03:16:48 GMT
+
+Number of Pages: 12
+
+Markdown Content:
+# Each Judge Its Own Yardstick: Discovering Per-VLM Taxonomies for Physical Video Evaluation 
+
+Yu Cao 1, * , Ziquan Liu 1, Zhensong Zhang 2, Jiankang Deng 3, Shaogang Gong 1, Jifei Song 2
+
+> 1
+
+Queen Mary University of London 2Huawei Darwin Research Center 3Imperial College London 
+
+> *
+
+Corresponding author 
+
+{yu.cao, ziquan.liu, s.gong}@qmul.ac.uk {zhangzhensong, jifeisong}@huawei.com, j.deng@imperial.ac.uk 
+
+Abstract 
+
+Maintaining physical consistency in video gen-erators and world models increasingly relies on vision-language models (VLMs) as automated judges that provide reward signals, ranking de-cisions, and data-filtering criteria. Yet VLMs differ substantially in training data and architec-ture, encoding physical phenomena through dis-tinct internal representations. A single global evaluation schema therefore gives every VLM the same axes of competence, regardless of what each can actually perceive. We propose JUDGE FIT , an iterative refinement procedure that discovers a per-VLM evaluation taxonomy. An initial taxonomy is constructed by prompt-ing the target VLM to enumerate physics er-rors on a small set of videos and clustering the resulting descriptions. The taxonomy is then refined through a diagnostic step: we cal-ibrate the VLM’s per-dimension scores to hu-man physical-commonsense ratings, diagnose which dimensions it scores unreliably or re-dundantly, and prompt an LLM to repair them, iterating until convergence. We further instan-tiate this procedure as a benchmark and apply it to 16 VLMs spanning eight model families. The refined taxonomy outperforms the global-schema baseline on held-out videos for every VLM tested, with a mean relative improvement of approximately 32%. Beyond aggregate ac-curacy, the per-VLM profiles expose model-specific blind spots that overall rankings can-not anticipate, with reliability patterns differing markedly across model families. 
+
+1 Introduction 
+
+Recent video and world models (Brooks et al., 2024; Yang et al., 2025; Wan et al., 2025; Agarwal et al., 2025) increasingly rely on vision-language models (VLMs) as automated judges, extending the LLM-as-judge paradigm (Zheng et al., 2023; Gu et al., 2024) to the multimodal setting. These judges supply reward signals for reinforcement learning (Christiano et al., 2017; Ouyang et al., 
+
+Figure 1: Evaluation under two taxonomies. The fixed four-domain schema (left) concentrates VLM scores on the mechanics axis with the other three axes nearly inac-tive, offering little resolution on cross-model differences. Our per-VLM refined taxonomy (right) renders every dimension discriminative and reveals distinct strengths across models. 
+
+2022; Rocamonde et al., 2024), train large-scale visual reward models for text-to-image and text-to-video generation (Xu et al., 2023; Wu et al., 2025; Liu et al., 2026), and grade outputs on video-quality and physical-consistency benchmarks (He et al., 2024; Bansal et al., 2025a; Meng et al., 2024). The reliability of these judges directly bounds the qual-ity of any downstream generative system trained or filtered against them (Gao et al., 2023). On physical commonsense in particular, multi-modal judges have been shown to disagree substan-tially with human raters and to exhibit position bias and scoring instability (Chen et al., 2024; Wang et al., 2024). Existing physical-consistency bench-marks (e.g., Meng et al., 2024; Bansal et al., 2025b) respond by prescribing a fixed evaluation schema and applying it uniformly across all VLMs. This de-sign implicitly assumes that VLMs share the same axes of physical-evaluation competence and differ only in magnitude along each (Yin et al., 2024). As shown in Figure 1, under PhyGenBench’s four-domain schema (Meng et al., 2024), scores from six VLMs concentrate on the mechanics axis, leav-ing the remaining three nearly inactive, whereas 1
+
+> arXiv:2606.22918v1 [cs.CV] 22 Jun 2026
+
+our refined per-VLM taxonomy yields a distinct profile for each model in which overall standing does not predict competence on any particular rule. We argue that the evaluation schema should be treated as a property of the evaluator rather than of the benchmark, and that each VLM should be as-sessed along dimensions it can reliably score. Pur-suing this view requires a procedure that discovers a taxonomy per evaluator, and yields, as a direct by-product, a per-model map of which physical rules each VLM can and cannot ground in human judgment. We introduce J UDGE FIT , a two-stage seed-and-refine pipeline that discovers a per-VLM evalu-ation taxonomy. The seed stage has the target VLM enumerate, in free-form natural language, the physics errors it sees in a small set of videos stratified across the human quality spectrum. An LLM then clusters these descriptions into an initial taxonomy. The resulting taxonomy is grounded in the VLM’s own perceptual vocabulary: concepts the VLM never raises are concepts it cannot reli-ably detect, and are correspondingly absent from its starting taxonomy. In the refine stage, we cali-brate the VLM’s per-dimension scores against hu-man physical-commonsense ratings and use this to diagnose the taxonomy’s weaknesses: unreliable dimensions, redundant ones, and error classes no dimension captures. An LLM then proposes local edits, keeping only those whose dimensions im-prove agreement with human judgment beyond an overall sense of how flawed a video looks, iterating until convergence. Our refinement loop stabilizes within roughly two rounds, whereas scalar-reward search procedures (Yang et al., 2024; Yuksekgonul et al., 2025) require hundreds of iterations to re-cover per-dimension information from aggregate scores and become impractical when each call to a VLM is far more expensive than a text-only LLM query. We apply this procedure to 16 VLMs spanning eight model families, ranging from 7B open-weight models to frontier closed-source systems, using hu-man ratings from VideoPhy-2 (Bansal et al., 2025b) as the alignment target. The refined per-VLM tax-onomy outperforms the baseline on held-out videos for every VLM tested, with a mean relative im-provement of approximately 32%. The gain holds across the full capability spectrum, and the result-ing per-VLM profiles reveal that strong-on-average VLMs are not uniformly strong across physical rules, with the rules a given model judges reliably varying substantially across model families. Our contributions are as follows: • JUDGE FIT , a seed-and-refine pipeline that treats the judge’s evaluation schema itself as an optimizable object, using a calibrated di-agnosis of which dimensions a VLM can re-liably and distinctly score to drive sample-efficient edits. The procedure converges within roughly two refinement rounds in our experiments. • A per-VLM benchmark study on VideoPhy-2 covering 16 VLMs across eight model families, releasing the refined per-VLM tax-onomies and held-out evaluations. • A cross-VLM analysis of concept conver-gence and a bias-by-discrimination typology over physical rules, identifying which physics concepts are universally legible across VLMs and which remain model-specific blind spots. 
+
+2 Related Work 
+
+VLMs as automated judges. The LLM-as-judge paradigm (Zheng et al., 2023) has been extended to multimodal settings, where vision-language mod-els score generated images and videos against hu-man preferences (Chen et al., 2024; He et al., 2024). VLM-based judges supply reward signals for rein-forcement learning (Rocamonde et al., 2024), train large-scale visual reward models for text-to-image and text-to-video generation (Wu et al., 2025; Liu et al., 2026), and serve as automated graders in video-quality benchmarks (He et al., 2024). How-ever, multimodal judges show substantial disagree-ment with human raters and exhibit position bias, scoring instability, and hallucination (Chen et al., 2024; Wang et al., 2024; Shi et al., 2025). Judges also favor outputs from their own model family (Panickssery et al., 2024; Wataoka et al., 2024). The dominant response has been to calibrate or debias judges toward a shared rubric (Wang et al., 2024; Liu et al., 2024; Zheng et al., 2023), treat-ing evaluator disagreement as noise to be removed rather than signal about what each model can reli-ably score. 
+
+Physical-consistency benchmarks for video gen-eration. VideoPhy (Bansal et al., 2025a) evalu-ates semantic adherence and physical common-sense across 688 prompts, and VideoPhy-2 (Bansal et al., 2025b) extends this to 3,940 action-centric 2LLM                  
+
+> LLM
+> Clusterer
+> VLM
+> Judge
+> 𝑫 𝒂𝒏𝒏𝒐𝒕 Set
+> (Videos)
+> Free -form Physics
+> Error Descriptions Seed
+> Taxonomy (𝑻 𝟎 )“Object floated
+> Inappropriately”
+> “Reflection
+> Mismatch …”
+> “Collision too
+> Soft …”
+> 1. Optics
+> 2. Object coherence
+> 3. Material properties
+> 4. Dynamics &kinematics
+
+Stage 1: Seed Stage (Open Annotation & Clustering)  
+
+> LLM
+> LLM Editor
+
+Stage 2: Refine Stage (Diagnosis -Guided Editing)                                            
+
+> Per -dimension faults
+> (beta, 𝜋 ,rho)
+> Redundancies
+> VLM Judge
+> (Scoring)
+> Human
+> Ratings
+> (𝑦 )
+> 𝑟 !"
+> Per -dimension faults
+> (beta, 𝜋 ,rho)
+> Redundancies
+> Coverage faults
+> (residuals)
+> Diagnosis (𝑹 )
+> Ana lyze the diagnosis and proposes candidates:
+> DROP REDEFINE MERGE ADD SPLIT
+> (uninformative) (unstable) (redundant) (coverage) (broad)
+> Candidate
+> Taxonomy (𝑻 𝒋 )
+> Improve 𝑱 ?
+> Selection Objective
+> 𝑱 (𝝆 𝒑𝒄 +𝚫 𝐬𝐩𝐞𝐜 )
+> Ridge -Regression
+> Calibrator
+> Refined
+> Taxonomy (𝑻 ∗)
+> d1. Object coherence
+> d2. Material properties
+> d3. Optics
+> d4. Kinematics &Dynamics
+> d5. Object interaction
+> 𝐽 Stop Improving
+> Model -specific strength
+> Graph
+> Final Output
+> Predictive
+> Predictive
+> Predictive
+> Uninformative
+> Unstable
+
+Figure 2: Overview of J UDGE FIT . Stage 1 (Seed) : the VLM judge describes physics errors in free-form text over the annotation set Dannot , and an LLM clusters these descriptions into the initial seed taxonomy T0. Stage 2 (Refine) :the VLM scores each video along the current dimensions, a ridge-regression calibrator maps these scores to human ratings y, and the resulting diagnosis R drives an LLM editor that proposes local edits (drop, redefine, merge, add, split). A candidate is kept only if it improves the selection objective J, and the loop repeats until no edit helps, yielding the refined taxonomy T ⋆ in which each dimension tend to be predictive, stable, and non-redundant. 
+
+prompts with per-video physical-rule annotations. PhyGenBench (Meng et al., 2024) organizes 160 prompts under 27 physical laws spanning four fixed domains and applies a shared evaluation pipeline (PhyGenEval) across all judges. Adjacent bench-marks probe physical reasoning of VLMs them-selves (Chow et al., 2025; Xiang et al., 2026) or measure pixel-level physics fidelity in generated videos (Motamed et al., 2026). Across these bench-marks, evaluation criteria are fixed in advance and applied uniformly across all judges. 
+
+LLM-driven optimization and rubric induction. 
+
+Two adjacent lines of work inform our refine-ment procedure. The first uses LLMs as itera-tive optimizers over textual artifacts, including prompts (Yang et al., 2024; Pryzant et al., 2023) and compound-system components (Yuksekgonul et al., 2025; Khattab et al., 2023), with OPRO (Yang et al., 2024) notably finding that optimal prompts diverge across model families, an early signal that per-evaluator adaptation can outper-form shared artifacts. The second induces or re-fines evaluation criteria with LLM assistance: Eval-Gen (Shankar et al., 2024) and AutoCalibrate (Liu et al., 2024) construct rubrics from feedback, LLM-Rubric (Hashemi et al., 2024) fits a calibrator over a human-defined multidimensional rubric for per-sonalized score prediction, and GER-Eval (Siro et al., 2026) reports that LLM-generated rubrics fragment across model families. These works tar-get LLM text evaluation with human-defined or one-shot induced rubrics. Our setting differs along three axes: the evaluator is a VLM judging video physics rather than an LLM judging text (Meng et al., 2024; Bansal et al., 2025b); the taxonomy is iteratively discovered per evaluator rather than fixed or generated in one shot; and a linear cali-brator over human ratings is used as a diagnostic signal that steers refinement rather than as a fi-nal score predictor. These works also operate in regimes where evaluator calls are cheap text-only LLM queries; transferring iterative refinement to VLM video evaluation, where each call ingests sam-pled frames, places a tighter budget on the search procedure and motivates a sample-efficient design. 
+
+3 The JudgeFit Pipeline 
+
+3.1 Overview and Notation 
+
+JUDGE FIT discovers, for a given VLM judge 
+
+v, an evaluation taxonomy tailored to what 
+
+v can reliably perceive. A taxonomy T =
+
+{(d1, δ 1), . . . , (dk, δ k)} is a set of k named physical-error dimensions, each di paired with a natural-language definition δi. Given a video x,the judge scores every dimension for error sever-ity, producing a vector sv
+
+T (x) ∈ [0 , 5] k. We as-sess a taxonomy by how well these per-dimension scores explain human physical-commonsense rat-ings y(x) ∈ { 1, . . . , 5}.The procedure has two stages (Figure 2). A seed 
+
+stage (§3.2) elicits an initial taxonomy from the judge’s own error descriptions on an annotation set 
+
+Dannot , stratified across the full quality spectrum from physically faithful to severely implausible 3videos. A refine stage (§3.3) then tunes the tax-onomy’s per-dimension scores toward the human ratings on Dannot . A disjoint test set Dtest , never seen during refinement, is held out for evaluation. 
+
+3.2 Seed: Open Annotation and Clustering 
+
+For each video in Dannot , we prompt v to list, in free-form text, the physics errors it observes with-out predefined dimensions. An LLM then clusters the pooled descriptions into named, defined cate-gories, which form the seed taxonomy T0. Because 
+
+T0 is built only from errors the judge reports on its own, its dimensions are exactly those the judge already attends to, and an error class it never men-tions yields no dimension. The seed is thus specific to v before any refinement begins. 
+
+3.3 Refine: Diagnosis-Guided Editing 
+
+The seed captures the errors a VLM notices, but downstream uses such as supplying reward signals or ranking generations demand more than a list of noticed errors: they require per-dimension scores that track human judgment, which the seed does not yet provide. Refinement repairs the taxonomy through a loop in which an LLM editor revises the dimensions while the VLM re-scores the videos along them. The two models play deliberately asymmetric roles. The LLM editor can see how humans rated each video and which physical rules each one vi-olated, but can influence the VLM only by revis-ing the taxonomy. The VLM, in turn, scores each video using the current taxonomy, with no access to the human ratings. Because the editor reaches the VLM only through the taxonomy, every score re-mains the VLM’s own, and agreement with human ratings can improve only when a revision gives the VLM dimensions it is actually able to grade. Each round, the editor receives a D IAGNOSE (§4) of where the current taxonomy fails and proposes local, evidence-backed edits in response. The VLM re-scores the videos under each candidate, and a candidate is accepted only if it improves a selection objective J (Eq. 3) that rewards a taxonomy not just for ranking videos by human physical common-sense but for doing so through genuinely distinct dimensions. When no edit improves J, refinement stops. Empirically, most of the gain arrives within roughly two rounds (Figure 3). This efficiency mat-ters because each candidate sends the VLM back to re-score every video, far costlier than the text-only queries that scalar-reward optimizers iterate over 
+
+Algorithm 1 Taxonomy refinement procedure 
+
+Require: Seed taxonomy T0, annotation set Dannot 
+
+with ratings y and free-form annotations A,VLM v, LLM editor E, budget Tmax 
+
+Ensure: Refined taxonomy T ⋆, calibrator f ⋆ 
+
+> 1:
+
+S0 ← SCORE (v, T0, Dannot ) 
+
+> 2:
+
+(J⋆, f ⋆) ← SELECT (S0, y ) 
+
+> 3:
+
+T ⋆, S⋆ ← T 0, S0; t ← 0 
+
+> 4:
+
+improved ← true  
+
+> 5:
+
+while improved and t < T max do  
+
+> 6:
+
+improved ← false ; t ← t + 1  
+
+> 7:
+
+R ← DIAGNOSE (S⋆, y, A) 
+
+> 8:
+
+{T j }mj=1 ← E (T ⋆, R ) ▷ local edits  
+
+> 9:
+
+for each j: (Sj , J j , f j ) ← EVAL (Tj ) 
+
+> 10:
+
+j⋆ ← arg max j Jj 
+
+> 11:
+
+if Jj⋆ > J ⋆ then ▷ accept the edit  
+
+> 12:
+
+T ⋆, S⋆, J ⋆, f ⋆ ← T j⋆ , Sj⋆ , J j⋆ , f j⋆ 
+
+> 13:
+
+improved ← true  
+
+> 14:
+
+end if  
+
+> 15:
+
+end while  
+
+> 16:
+
+return T ⋆, f ⋆
+
+hundreds of times (Yang et al., 2024; Yuksekgonul et al., 2025). 
+
+4 Diagnostic Signals 
+
+To edit the taxonomy without leaking answers, the editor needs a precise account of how the VLM’s dimension scores relate to human ratings. We fit a cross-validated, ridge-regularized linear map fT
+
+from a video’s per-dimension scores s(x) to its human rating y(x), giving a calibrated prediction 
+
+ˆyfull = fT (s), and read the taxonomy’s faults off this map. Calibrating, rather than comparing scores directly, lets us judge a dimension by whether it car-ries information about human ratings, independent of how each VLM uses the scale. 
+
+4.1 What the diagnosis reveals Per-dimension faults. For each dimension i we read three signals from the calibrator: its standard-ized coefficient βi, the consistency πi ∈ [0 , 1] of that coefficient’s sign across folds, and its agree-ment with human ratings, 
+
+ρi = cov  rk( si), rk( y)
+
+σrk( si) σrk( y)
+
+, (1) the Spearman rank correlation between dimension 
+
+i’s scores and the human rating, where rk( ·) is the rank transform over videos. Applying the same cor-relation between two dimensions gives rij , which 4is large when the VLM scores them interchange-ably. The diagnosis flags faults of two kinds, each implying a repair drawn from five operations. The first kind concerns a single dimension: 
+
+
+
+|ρi| < τ ⇒ DROP (uninformative )
+
+πi < κ ⇒ REDEFINE (unstable )max   
+
+> j̸=i
+
+rij > γ ⇒ MERGE (redundant )
+
+(2) An uninformative dimension’s scores rank videos no better than chance against human judgment, marking a distinction the VLM cannot perceive. An unstable one contributes to the prediction with a sign that flips across folds, marking a distinction the VLM applies inconsistently. A redundant pair ranks videos almost identically, so the VLM does not truly separate them and the calibrator cannot credit either. 
+
+Coverage faults. A complementary fault hides in the videos fT predicts worst. When ˆyfull (x) ex-ceeds y(x), the VLM missed errors humans penal-ized; when it falls short, the VLM over-flagged errors humans tolerated. Aligning these residuals with the VLM’s own free-form annotations of the same videos reveals error classes that recur yet that no dimension captures, prompting the editor to ADD a dimension or SPLIT an overly broad one. 
+
+4.2 The Selection Objective 
+
+The two fault types tell the editor what to change, but not whether a change is worth keeping. That decision must guard against a taxonomy that improves agreement with humans by collapsing into a single impression of overall badness, rank-ing videos well while revealing nothing about 
+
+which physics failed. We therefore compare the full calibrator against a one-feature halo base-line (Thorndike, 1920) ˆyhalo fit on the mean di-mension score ¯s = 1
+
+> k
+
+P 
+
+> i
+
+si alone, and credit a taxonomy only for the ranking its dimensions buy beyond this baseline. Reusing the rank correlation 
+
+ρ(·) of Eq. (1) between a prediction and the human ratings, the refinement objective is: 
+
+J(T ) = ρ(ˆ yfull )
+
+| {z } 
+
+> ranking quality
+
++  ρ(ˆ yfull ) − ρ(ˆ yhalo ) | {z } 
+
+> ∆spec :specificity gain over halo
+
+.
+
+(3) An edit that improves ρ(ˆ yfull ) only by collapsing the taxonomy toward a single overall-quality score gains no specificity, and is rejected by J.
+
+5 Experiments 
+
+Data and Baseline. We align against VideoPhy-2 (Bansal et al., 2025b), using its per-video human ratings (1–5) and physical-rule annotations. We sample 300 videos balanced across the five rating levels, split into a 200-video annotation set Dannot 
+
+for seeding and refinement and a disjoint 100-video test set Dtest for evaluation. Our fixed-schema baseline (P HY GEN ) scores every judge along the four physical domains of PhyGenBench (Meng et al., 2024) under the same calibration protocol, so it differs from R EFINE only in its dimensions. 
+
+Models. We evaluate VLMs that natively accept video input, so each judge sees the full clip rather than a sampled subset of frames. This yields 16 VLMs across eight model families, covering both open-weight (Qwen, Gemma, GLM, Reka) and closed-source (Gemini, Seed, Nova, MiMo) sys-tems, with thinking and non-thinking variants in-cluded where available. The full list of VLMs with citations and the implementation details is given in Table 1 and Section A. The LLM editor and cluster-ing model are fixed to Gemini-2.5-Pro (Comanici et al., 2025) across all judges, chosen for its long context window, which the clustering step requires to pool free-form error descriptions over the full annotation set. 
+
+5.1 Refinement Improves Every VLM 
+
+Table 1 reports test-set agreement under three vari-ants. REFINE outperforms the P HY GEN base-line for all 16 VLMs, raising mean correlation from 0.239 to 0.315, a relative gain of 32%. The improvement holds across the full capabil-ity spectrum: the strongest judge (Gemini-3-Flash-Thinking, 0.346) and the weakest (GLM-4.6V, 0.116) both benefit, with the largest gains from MiMo-v2.5-Thinking ( +0 .159 ) and Gemini-3-Flash-Thinking ( +0 .138 ). The size of the gain varies by family rather than tracking baseline strength. The Gemini and GLM families improve consistently under refinement, with GLM-4.6V-Thinking and Gemini-3-Flash-Thinking gaining +0 .126 and +0 .138 
+
+over baseline, and Reka-Edge, the weakest seed, recovered to a competitive level once refined (+0 .081 ). The MiMo family gains the least overall, with three of its four variants improving by under 
+
++0 .06 , indicating that some judges expose little headroom for a refined taxonomy to exploit. 5Table 1: Per-VLM agreement with human ratings (test-set Spearman ρ) under the fixed P HY GEN baseline, S EED ,and R EFINE . Differences from P HY GEN shown at the lower-right of each S EED and R EFINE score. Thinking variants are marked with †.
+
+Model PhyGen Seed Refine 
+
+Gemini 
+
+Gemini-3-Flash-Thinking † (Gemini Team, Google DeepMind, 2025) +0.346 +0.372 +0.026 +0.484 +0.138 
+
+Gemini-3-Flash (Gemini Team, Google DeepMind, 2025) +0.293 +0.400 +0.107 +0.429 +0.136 
+
+Seed 
+
+Seed-2.0-Lite-Thinking † (Seed, 2026) +0.310 +0.400 +0.091 +0.422 +0.112 
+
+Seed-2.0-Lite (Seed, 2026) +0.261 +0.286 +0.025 +0.308 +0.047 
+
+MiMo 
+
+MiMo-v2.5-Thinking † (Xiao et al., 2026) +0.247 +0.356 +0.109 +0.406 +0.159 
+
+MiMo-v2.5 (Xiao et al., 2026) +0.317 +0.305 -0.012 +0.330 +0.012 
+
+MiMo-v2-Omni (Xiao et al., 2026) +0.294 +0.341 +0.046 +0.319 +0.025 
+
+MiMo-v2-Omni-Thinking † (Xiao et al., 2026) +0.234 +0.285 +0.051 +0.291 +0.057 
+
+Qwen 
+
+Qwen2.5-VL-7B (Qwen Team, 2025) +0.317 +0.276 -0.041 +0.383 +0.066 
+
+Qwen3-VL-8B-Instruct (Bai et al., 2025) +0.307 +0.328 +0.021 +0.375 +0.068 
+
+Gemma 
+
+Gemma-4-31B (Gemma Team, Google DeepMind, 2026) +0.285 +0.355 +0.070 +0.371 +0.086 
+
+Nova 
+
+Nova-2-Lite (Intelligence, 2025) +0.215 +0.174 -0.041 +0.262 +0.047 
+
+GLM 
+
+GLM-5V-Turbo (Hong et al., 2026) +0.181 +0.194 +0.013 +0.207 +0.026 
+
+GLM-4.6V-Thinking † (Hong et al., 2025) +0.037 +0.136 +0.100 +0.163 +0.126 
+
+GLM-4.6V (Hong et al., 2025) +0.116 +0.132 +0.016 +0.138 +0.022 
+
+Reka 
+
+Reka-Edge (Team et al., 2024) +0.070 +0.043 -0.028 +0.151 +0.081 
+
+Table 2: Effect of a thinking mode under S EED and REFINE . Green and red arrows indicate performance improvement and degradation respectively. 
+
+Seed Refine Model Base +Think Base +Think 
+
+Gemini-3-Flash 0.400 0.372 ↓ 0.429 0.484 ↑
+
+Seed-2.0-Lite 0.286 0.400 ↑ 0.308 0.422 ↑
+
+MiMo-v2.5 0.305 0.356 ↑ 0.330 0.406 ↑
+
+MiMo-v2-Omni 0.341 0.285 ↓ 0.319 0.291 ↓
+
+GLM-4.6V 0.132 0.136 ↑ 0.138 0.163 ↑
+
+Thinking variants. We also compare thinking and non-thinking variants under R EFINE (Table 2). Four of the five families improve with a thinking mode and one (MiMo-v2-Omni) declines, and the effect does not track base capability: three fami-lies with near-identical base scores (Seed-2.0-Lite 
+
+0.308 , MiMo-v2-Omni 0.319 , MiMo-v2.5 0.330 )respond in different directions and magnitudes (+0 .114 , −0.028 , +0 .076 ). Unlike the broadly consistent improvements a thinking mode tends to bring in text-only LLM reasoning, its benefit for physical video judging is model-specific rather than systematic. 
+
+5.2 Convergence and Generalization 
+
+Figure 3 traces the Spearman correlation ρ on 
+
+Dannot across refinement rounds, taken at each round’s cumulative-best taxonomy. The mean rises from 0.20 at seed to 0.27, 0.29, and 0.31 over the three rounds, with per-round gains of +0 .07 ,
+
++0 .02 , and +0 .02 . The marginal return shrinks quickly: most of the gain arrives in the first round, so a small fixed budget suffices, unlike scalar-reward optimizers that need hundreds of iterations. The judges differ sharply in how much their seed captures, since it reflects only the errors a VLM reports on its own. A judge that mentions few therefore ends up with a thin taxonomy. Refine-ment addresses this through the LLM editor, which reads the human ratings and residuals and revises the taxonomy to name the dimensions the VLM never raised on its own, prompting it to score what it had left unspoken. Reka-Edge surfaces the least at seed, yet a single round recovers it to a competi-tive level, the largest gain in the study. Finally, the gains transfer from the annotation set 6Figure 3: Refinement converges quickly and lifts weak seeds. Selection objective on Dannot across re-finement rounds, colored by developer (cumulative best per model). The mean trajectory (dashed, ± std) rises most steeply from seed to round 1 and flattens thereafter, with most models plateauing by round 2. Reka-Edge starts below zero at the seed and gains the most from a single round, while strong seeds (ByteDance) move little. 
+
+to held-out videos. Refinement selects taxonomies by the objective on Dannot , yet the resulting im-provements over P HY GEN hold on the disjoint test set (Table 1) for every model. Because the tax-onomy is a short, named set of dimensions rather than a high-capacity predictor, it has little room to overfit the 200 annotation videos, and the cali-brated agreement it yields generalizes rather than memorizing the alignment target. 
+
+6 Profiling VLM Judges 
+
+Having established that refinement improves agree-ment for every judge, we now use the refined per-VLM taxonomies as a lens on the judges them-selves, asking which physical concepts they share and how they differ in using the error scale. 
+
+6.1 Cross-VLM Concept Convergence 
+
+The refined taxonomies are discovered indepen-dently per VLM, raising the question of whether judges converge on a shared set of physical con-cepts or fragment into model-specific vocabularies. To examine this, we pool the dimensions of all 16 refined taxonomies (64 dimensions in total) and cluster them with Gemini-2.5-Pro into 24 atomic physical concepts grouped under 8 canonical types from classical mechanics. Each dimension is as-signed to every atomic concept its definition refer-ences, and a VLM is said to cover a concept if any of its refined dimensions maps to it. Figure 4 shows the resulting binary coverage matrix, with VLMs ordered by refinement performance and concepts grouped by type. Coverage is broadly shared rather than idiosyn-cratic: 21 of the 24 concepts (87.5%) appear in at least three VLMs, and no concept is unique to a single judge. A small core is near-universal, with momentum, trajectory, and rigidity each covered by 15 of 16 VLMs, followed by gravity (14), collision, and elasticity (13). These are the concepts every judge independently arrives at, and they cluster in dynamics, kinematics, and material mechanics, where motion and contact are directly visible. The long tail is where judges diverge. Buoyancy and surface tension are covered by only 2 of 16 VLMs each, and deformation and impenetrability by 5 each. Fluid mechanics is the weakest type overall, with three of its four concepts in this tail, indicating that physical phenomena requiring fine-grained perception of material and fluid behavior surface in few judges’ taxonomies. Breadth itself varies widely, from 18 concepts down to a me-dian of 12, and notably does not track refinement performance: GLM-4.6V-Thinking and Gemini-3-Flash-Thinking reference equally many concepts (18 each) yet sit at opposite ends of Table 1. A judge can name many physical phenomena without scoring any reliably against human ratings, the gap refinement closes. 
+
+6.2 Bias and Discrimination Across Judges 
+
+Concept coverage describes which physical phe-nomena a judge attends to, not how it uses its error scale once it does. We characterize each judge along two scoring traits measured on the test set. 
+
+Bias is the mean error severity it assigns across all videos and dimensions, with low values marking a strict judge and high values a lenient one. Dis-crimination is ∆ = ¯ spc =1 − ¯spc =5 (Embretson and Reise, 2025), the gap between the error severity it assigns to the worst and best videos, with positive 
+
+∆ meaning it rates implausible videos higher in error than faithful ones. Splitting bias at its median over the 16 judges gives a four-quadrant typology, shown in Figure 5. All 16 judges discriminate in the correct direc-tion ( ∆ > 0): none flatten or invert the human ordering, leaving the bottom two quadrants empty. 7Figure 4: Cross-VLM atomic-concept coverage. Binary coverage matrix over 16 VLMs (rows, ordered by refinement performance) and atomic physical concepts (columns), grouped into canonical types by vertical separators. A cell is filled when some dimension in a VLM’s refined taxonomy references that concept. Top marginal: number of VLMs covering each concept; right marginal: number of concepts each VLM covers. A shared core in dynamics, kinematics, and material mechanics is near-universal, while fluid mechanics forms a sparsely covered long tail.      
+
+> Figure 5: Bias-by-discrimination typology of the 16 VLMs. Each VLM is placed by its bias (x; left strict, right lenient) and discrimination ∆(y), colored by re-fined Spearman ρ. The dashed line marks the median bias, splitting strict from lenient.
+
+Judges split cleanly along the bias axis instead, 8 strict and 8 lenient, differing in scale placement, not discrimination. Bias and discrimination are coupled: more le-nient judges also draw wider gaps between good and bad videos, since a judge that freely assigns high error counts has room to separate worst from best. This is why the two lower quadrants stay empty, as a strict judge compresses its scores and cannot also score flat. But bias does not track agreement with human ratings: the strict and lenient halves reach almost the same mean re-fined correlation, and each spans nearly the full range, from Seed-2.0-Lite-Thinking (0.422) to GLM-4.6V-Thinking (0.163) among strict judges alone. How a judge places its scale is a stable trait of its style, separate from how well it aligns with human judgment. 
+
+7 Conclusion 
+
+We treated a judge’s evaluation schema as a prop-erty of the evaluator and introduced J UDGE FIT ,which discovers a per-VLM taxonomy by ground-ing it in each judge’s own error vocabulary and refining it under a calibrated diagnosis of what the judge can reliably score. Across 16 VLMs from eight families, it improves agreement with human ratings over a fixed schema for every judge, by 32% on average, within a small budget. Beyond aggregate accuracy, the per-VLM profiles reveal structure that overall rankings cannot capture, ex-posing where judges converge, where they diverge, and how their scoring styles vary independently of how well they align with human judgment. 8Limitations 
+
+Although J UDGE FIT yields consistent gains across all evaluated VLMs, two limitations remain. First, it requires human-annotated data carrying both ratings and per-video problem annotations, yet it needs far fewer such annotations than existing ap-proaches and thus keeps annotation cost low. Sec-ond, the seed and refine stages call an LLM, whose reproducibility is not guaranteed. This is inherent to LLM-based pipelines, but its randomness does not affect deployment: once a better taxonomy is found it can be applied directly, and the resulting scoring no longer involves the LLM. We leave vali-dation across a broader range of settings to future work. 
+
+References 
+
+Niket Agarwal, Arslan Ali, Maciej Bala, Yogesh Balaji, Erik Barker, Tiffany Cai, Prithvijit Chattopadhyay, Yongxin Chen, Yin Cui, Yifan Ding, and 1 others. 2025. Cosmos world foundation model platform for physical ai. arXiv preprint arXiv:2501.03575 .Shuai Bai and 1 others. 2025. Qwen3-VL technical report. arXiv preprint arXiv:2511.21631 .Hritik Bansal, Zongyu Lin, Tianyi Xie, Zeshun Zong, Michal Yarom, Yonatan Bitton, Chenfanfu Jiang, Yizhou Sun, Kai-Wei Chang, and Aditya Grover. 2025a. Videophy: Evaluating physical commonsense for video generation. In International Conference on Learning Representations , volume 2025, pages 102075–102121. Hritik Bansal, Clark Peng, Yonatan Bitton, Roman Gold-enberg, Aditya Grover, and Kai-Wei Chang. 2025b. Videophy-2: A challenging action-centric physical commonsense evaluation in video generation. arXiv preprint arXiv:2503.06800 .Tim Brooks, Bill Peebles, Connor Holmes, Will DePue, Yufei Guo, Leo Jing, David Schnurr, Joe Taylor, Troy Luhman, Eric Luhman, and 1 others. 2024. Video generation models as world simulators. OpenAI Blog ,1(8):1. Dongping Chen, Ruoxi Chen, Shilin Zhang, Yaochen Wang, Yinuo Liu, Huichi Zhou, Qihui Zhang, Yao Wan, Pan Zhou, and Lichao Sun. 2024. Mllm-as-a-judge: Assessing multimodal llm-as-a-judge with vision-language benchmark. In Forty-first Interna-tional Conference on Machine Learning .Wei Chow, Jiageng Mao, Boyi Li, Daniel Seita, Vi-tor Campagnolo Guizilini, and Yue Wang. 2025. Physbench: Benchmarking and enhancing vision-language models for physical world understanding. In International Conference on Learning Representa-tions , volume 2025, pages 97959–98108. Paul F Christiano, Jan Leike, Tom Brown, Miljan Mar-tic, Shane Legg, and Dario Amodei. 2017. Deep reinforcement learning from human preferences. Ad-vances in neural information processing systems , 30. Gheorghe Comanici, Eric Bieber, Mike Schaekermann, Ice Pasupat, Noveen Sachdeva, Inderjit Dhillon, Mar-cel Blistein, Ori Ram, Dan Zhang, Evan Rosen, and 1 others. 2025. Gemini 2.5: Pushing the frontier with advanced reasoning, multimodality, long context, and next generation agentic capabilities. arXiv preprint arXiv:2507.06261 .Susan E Embretson and Steven P Reise. 2025. Item response theory: Foundations for psychologists and social scientists . Routledge. Leo Gao, John Schulman, and Jacob Hilton. 2023. Scal-ing laws for reward model overoptimization. In In-ternational Conference on Machine Learning , pages 10835–10866. PMLR. Gemini Team, Google DeepMind. 2025. Gemini 3 Flash model card. Technical report, Google Deep-Mind. Gemma Team, Google DeepMind. 2026. Gemma 4 model card. https://ai.google.dev/gemma/ docs/core/model_card_4 .Jiawei Gu, Xuhui Jiang, Zhichao Shi, Hexiang Tan, Xuehao Zhai, Chengjin Xu, Wei Li, Yinghan Shen, Shengjie Ma, Honghao Liu, and 1 others. 2024. A survey on llm-as-a-judge. The Innovation .Helia Hashemi, Jason Eisner, Corby Rosset, Benjamin Van Durme, and Chris Kedzie. 2024. Llm-rubric: A multidimensional, calibrated approach to automated evaluation of natural language texts. In Proceedings of the 62nd Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers) ,pages 13806–13834. Xuan He, Dongfu Jiang, Ge Zhang, Max Ku, Achint Soni, Sherman Siu, Haonan Chen, Abhranil Chan-dra, Ziyan Jiang, Aaran Arulraj, and 1 others. 2024. Videoscore: Building automatic metrics to simulate fine-grained human feedback for video generation. In Proceedings of the 2024 Conference on Empiri-cal Methods in Natural Language Processing , pages 2105–2123. Wenyi Hong, Xiaotao Gu, Ziyang Pan, Zhen Yang, Yut-ing Wang, Yue Wang, Yuanchang Yue, Yu Wang, Yanling Wang, Yan Wang, and 1 others. 2026. Glm-5v-turbo: Toward a native foundation model for mul-timodal agents. arXiv preprint arXiv:2604.26752 .Wenyi Hong, Wenmeng Yu, Xiaotao Gu, Guo Wang, Guobing Gan, Haomiao Tang, Jiale Cheng, Ji Qi, Junhui Ji, Lihang Pan, and 1 others. 2025. Glm-4.5 v and glm-4.1 v-thinking: Towards versatile multi-modal reasoning with scalable reinforcement learn-ing. arXiv preprint arXiv:2507.01006 .
+
+9Amazon Artificial General Intelligence. 2025. Ama-zon nova 2: Multimodal reasoning and gen-eration models. Technical report, Techni-cal Report. Amazon. https://www. amazon. sci-ence/publications/amazon . . . . Omar Khattab, Arnav Singhvi, Paridhi Maheshwari, Zhiyuan Zhang, Keshav Santhanam, Sri Vard-hamanan, Saiful Haq, Ashutosh Sharma, Thomas T Joshi, Hanna Moazam, and 1 others. 2023. Dspy: Compiling declarative language model calls into self-improving pipelines. arXiv preprint arXiv:2310.03714 .Bo Li, Yuanhan Zhang, Dong Guo, Renrui Zhang, Feng Li, Hao Zhang, Kaichen Zhang, Peiyuan Zhang, Yanwei Li, Ziwei Liu, and 1 others. 2024. Llava-onevision: Easy visual task transfer. arXiv preprint arXiv:2408.03326 .Jie Liu, Gongye Liu, Jiajun Liang, Ziyang Yuan, Xi-aokun Liu, Mingwu Zheng, Xiele Wu, Qiulin Wang, Menghan Xia, Xintao Wang, and 1 others. 2026. Im-proving video generation with human feedback. Ad-vances in Neural Information Processing Systems ,38:82155–82192. Yuxuan Liu, Tianchi Yang, Shaohan Huang, Zihan Zhang, Haizhen Huang, Furu Wei, Weiwei Deng, Feng Sun, and Qi Zhang. 2024. Calibrating llm-based evaluator. In Proceedings of the 2024 joint international conference on computational linguis-tics, language resources and evaluation (lrec-coling 2024) , pages 2638–2656. Fanqing Meng, Jiaqi Liao, Xinyu Tan, Wenqi Shao, Quanfeng Lu, Kaipeng Zhang, Yu Cheng, Dianqi Li, Yu Qiao, and Ping Luo. 2024. Towards world simulator: Crafting physical commonsense-based benchmark for video generation. arXiv preprint arXiv:2410.05363 .Saman Motamed, Laura Culp, Kevin Swersky, Priyank Jaini, and Robert Geirhos. 2026. Do generative video models understand physical principles? In Proceed-ings of the IEEE/CVF Winter Conference on Applica-tions of Computer Vision , pages 948–958. Long Ouyang, Jeffrey Wu, Xu Jiang, Diogo Almeida, Carroll Wainwright, Pamela Mishkin, Chong Zhang, Sandhini Agarwal, Katarina Slama, Alex Ray, and 1 others. 2022. Training language models to follow in-structions with human feedback. Advances in neural information processing systems , 35:27730–27744. Arjun Panickssery, Samuel R Bowman, and Shi Feng. 2024. Llm evaluators recognize and favor their own generations. Advances in Neural Information Pro-cessing Systems , 37:68772–68802. Reid Pryzant, Dan Iter, Jerry Li, Yin Lee, Chenguang Zhu, and Michael Zeng. 2023. Automatic prompt op-timization with “gradient descent” and beam search. In Proceedings of the 2023 conference on empiri-cal methods in natural language processing , pages 7957–7968. Qwen Team. 2025. Qwen2.5-VL technical report. 
+
+arXiv preprint arXiv:2502.13923 .Juan Rocamonde, Victoriano Montesinos, Elvis Nava, Ethan Perez, and David Lindner. 2024. Vision-language models are zero-shot reward models for reinforcement learning. In International Conference on Learning Representations , volume 2024, pages 28446–28463. Bytedance Seed. 2026. Seed2. 0 model card: To-wards intelligence frontier for real-world complexity. Technical report, Technical report, Technical report, Bytedance, 2025. URL https://lf3-static . . . . Shreya Shankar, JD Zamfirescu-Pereira, Björn Hart-mann, Aditya Parameswaran, and Ian Arawjo. 2024. Who validates the validators? aligning llm-assisted evaluation of llm outputs with human preferences. In 
+
+Proceedings of the 37th Annual ACM Symposium on User Interface Software and Technology , pages 1–14. Lin Shi, Chiyu Ma, Wenhua Liang, Xingjian Diao, We-icheng Ma, and Soroush Vosoughi. 2025. Judging the judges: A systematic study of position bias in llm-as-a-judge. In Proceedings of the 14th International Joint Conference on Natural Language Processing and the 4th Conference of the Asia-Pacific Chapter of the Association for Computational Linguistics , pages 292–314. Clemencia Siro, Pourya Aliannejadi, and Mohammad Aliannejadi. 2026. Learning to judge: Llms design-ing and applying evaluation rubrics. In Findings of the Association for Computational Linguistics: EACL 2026 , pages 6371–6389. Reka Team, Aitor Ormazabal, Che Zheng, Cyprien de Masson d’Autume, Dani Yogatama, Deyu Fu, Donovan Ong, Eric Chen, Eugenie Lamprecht, Hai Pham, and 1 others. 2024. Reka core, flash, and edge: A series of powerful multimodal language models. 
+
+arXiv preprint arXiv:2404.12387 .Edward L Thorndike. 1920. A constant error in psy-chological ratings. Journal of applied psychology ,4(1):25. Team Wan, Ang Wang, Baole Ai, Bin Wen, Chaojie Mao, Chen-Wei Xie, Di Chen, Feiwu Yu, Haiming Zhao, Jianxiao Yang, and 1 others. 2025. Wan: Open and advanced large-scale video generative models. 
+
+arXiv preprint arXiv:2503.20314 .Peiyi Wang, Lei Li, Liang Chen, Zefan Cai, Dawei Zhu, Binghuai Lin, Yunbo Cao, Lingpeng Kong, Qi Liu, Tianyu Liu, and 1 others. 2024. Large language mod-els are not fair evaluators. In Proceedings of the 62nd Annual Meeting of the Association for Compu-tational Linguistics (Volume 1: Long Papers) , pages 9440–9450. Koki Wataoka, Tsubasa Takahashi, and Ryokan Ri. 2024. Self-preference bias in llm-as-a-judge. arXiv preprint arXiv:2410.21819 .
+
+10 Jie Wu, Yu Gao, Zilyu Ye, Ming Li, Liang Li, Hanzhong Guo, Jie Liu, Zeyue Xue, Xiaoxia Hou, Wei Liu, and 1 others. 2025. Rewarddance: Reward scaling in visual generation. arXiv preprint arXiv:2509.08826 .Kun Xiang, Heng Li, Terry Jingchen Zhang, Yinya Huang, Zirong Liu, Peixin Qu, Jixi He, Jiaqi Chen, Yu-Jie Yuan, Jianhua Han, and 1 others. 2026. Seep-hys: Does seeing help thinking?–benchmarking vision-based physics reasoning. Advances in Neural Information Processing Systems , 38. Bangjun Xiao, Bingquan Xia, Bo Yang, Bofei Gao, Bowen Shen, Chen Zhang, Chenhong He, Chiheng Lou, Fuli Luo, Gang Wang, and 1 others. 2026. Mimo-v2-flash technical report. arXiv preprint arXiv:2601.02780 .Jiazheng Xu, Xiao Liu, Yuchen Wu, Yuxuan Tong, Qinkai Li, Ming Ding, Jie Tang, and Yuxiao Dong. 2023. Imagereward: Learning and evaluating human preferences for text-to-image generation. Advances in Neural Information Processing Systems , 36:15903– 15935. Chengrun Yang, Xuezhi Wang, Yifeng Lu, Hanxiao Liu, Quoc V Le, Denny Zhou, and Xinyun Chen. 2024. Large language models as optimizers. In In-ternational Conference on Learning Representations ,volume 2024, pages 12028–12068. Zhuoyi Yang, Jiayan Teng, Wendi Zheng, Ming Ding, Shiyu Huang, Jiazheng Xu, Yuanming Yang, Wenyi Hong, Xiaohan Zhang, Guanyu Feng, and 1 others. 2025. Cogvideox: Text-to-video diffusion models with an expert transformer. In International Con-ference on Learning Representations , volume 2025, pages 83048–83077. Shukang Yin, Chaoyou Fu, Sirui Zhao, Ke Li, Xing Sun, Tong Xu, and Enhong Chen. 2024. A survey on multimodal large language models. National Science Review , 11(12):nwae403. Mert Yuksekgonul, Federico Bianchi, Joseph Boen, Sheng Liu, Pan Lu, Zhi Huang, Carlos Guestrin, and James Zou. 2025. Optimizing generative ai by backpropagating language model feedback. Nature ,639(8055):609–616. Lianmin Zheng, Wei-Lin Chiang, Ying Sheng, Siyuan Zhuang, Zhanghao Wu, Yonghao Zhuang, Zi Lin, Zhuohan Li, Dacheng Li, Eric Xing, and 1 others. 2023. Judging llm-as-a-judge with mt-bench and chatbot arena. Advances in neural information pro-cessing systems , 36:46595–46623. Jinguo Zhu, Weiyun Wang, Zhe Chen, Zhaoyang Liu, Shenglong Ye, Lixin Gu, Hao Tian, Yuchen Duan, Weijie Su, Jie Shao, and 1 others. 2025. Internvl3: Exploring advanced training and test-time recipes for open-source multimodal models. arXiv preprint arXiv:2504.10479 .
+
+A Implementation Details 
+
+A.1 Evaluated VLMs. 
+
+We assess 16 VLMs that natively accept video input, spanning eight families. From Google we include Gemini-3-Flash and its thinking variant Gemini-3-Flash-Thinking (Gemini Team, Google DeepMind, 2025), and the open-weight Gemma-4-31B (Gemma Team, Google DeepMind, 2026). From ByteDance we include Seed-2.0-Lite and Seed-2.0-Lite-Thinking (Seed, 2026). From Xiaomi we include MiMo-v2.5, MiMo-v2.5-Thinking, MiMo-v2-Omni, and MiMo-v2-Omni-Thinking (Xiao et al., 2026). From Alibaba we include Qwen2.5-VL-7B (Qwen Team, 2025) and Qwen3-VL-8B-Instruct (Bai et al., 2025). From Zhipu we include GLM-4.6V, GLM-4.6V-Thinking (Hong et al., 2025), and GLM-5V-Turbo (Hong et al., 2026). We further include Amazon Nova-2-Lite (Intelligence, 2025) and Reka-Edge (Team et al., 2024). The two Qwen judges are run locally; all others are accessed through OpenRouter. The LLM editor and clustering model are both Gemini-2.5-Pro (Comanici et al., 2025), chosen for its long context window, which the clustering step requires to pool free-form error descriptions over the full annotation set. Several VLMs were considered but not bench-marked. Some do not accept native video input and were excluded outright. Others accept video yet do not produce usable judgments under our protocol: LLaVA-OneVision-7B (Li et al., 2024) returns an all-zero error profile for every clip, InternVL3-8B (Zhu et al., 2025) reports no errors on any video, and Qwen3-VL-8B-Thinking emits unbounded rea-soning text that fails to complete the annotation set. We exclude all of these rather than report unreliable scores. 
+
+A.2 Hyper-parameters and Cost Hyper-parameters selection Each VLM judge in-gests the full video clip and scores every dimension on a [0 , 5] severity scale. To reduce sampling noise, each (video, dimension) pair is scored 3 times and averaged, with decoding temperature 0, and all judges receive an identical prompt template; only the taxonomy supplied to the judge differs across conditions. The diagnostic map fT is a ridge re-gression from standardized per-dimension scores to human ratings with regularization strength λ = 1 .0,and the coefficient βi, sign consistency πi, and rank correlations ρi, r ij are computed under 5-fold 11 LLM editor prompt (refine stage), abbreviated 
+
+You are refining a physics error taxonomy by proposing local edit operations. The taxonomy is scored by how well its per-dimension VLM scores predict human physical-commonsense ratings (pc, 1–5), via a 5-fold cross-validated ridge regression. Aim for high positive spearman(pc) together with a positive specificity gain over a one-feature halo baseline that uses only the mean dimension score. 
+
+## Current Taxonomy {N dimensions, each with a one-line definition} 
+
+## Diagnostic Report {global metrics; per-dimension (βi, β cv  
+
+> i
+
+, π i, ρ i, verdict ); pairwise correlation matrix with redundant pairs |rij | > γ ; top mispredicted videos with residual, prompt, VLM open-annotation errors, violated rules, and per-dim scores} 
+
+## Verdict definitions 
+
+• noise: |ρi| < τ — no rank signal against pc. 
+
+• unstable: πi < κ — coefficient sign flips across folds. 
+
+• predictive: |βi| large, low cross-fold variance, consistent sign. 
+
+• weak: some signal but βi too small or unstable to be predictive. 
+
+## Available Operations 
+
+• merge(dim_a, dim_b) → (new_name, new_definition) 
+
+• split(dim) → (sub_1, def_1), (sub_2, def_2) 
+
+• redefine(dim) → new_definition 
+
+• add(name, definition) 
+
+• drop(dim) 
+
+• no_op 
+
+## Rules (excerpt) 
+
+• drop only when verdict is noise; for unstable or weak dimensions prefer redefine. 
+
+• merge when a pairwise correlation exceeds γ; alternatively redefine one dimension to disambiguate. 
+
+• add or split when residual videos concentrate on a physical pattern no dimension covers. 
+
+• Keep 3–8 dimensions, each grounded in physics principles and describing an observable class of violations rather than abstract or subjective qualities. 
+
+• Maximize the selection objective J = ρpc + ∆ spec (Eq. 3); a candidate that raises ρpc by collapsing the taxonomy toward the halo baseline does not win. 
+
+• Propose exactly m = 2 independent candidates. 
+
+Return JSON :{"candidates": [ {"operation": "MERGE", "args": {"dim_a": "...", "dim_b": "...", "new_name": "...", "new_definition": "..."}, "reasoning": "cite verdict / beta / residual evidence"}, {"operation": "ADD", "args": {"name": "...", "definition": "..."}, "reasoning": "cite residual videos / unfollowed rules"} ]} 
+
+Figure 6: LLM editor prompt used in the refine stage. Fields in braces are filled per VLM and per round. 
+
+cross-validation, so no video used to fit the calibra-tor contributes to its own diagnosis. A dimension is flagged for DROP when |ρi| < τ (τ = 0 .10 ), for 
+
+REDEFINE when πi < κ (κ = 0 .6), and a pair for 
+
+MERGE when rij > γ (γ = 0 .6), with these thresh-olds fixed across all 16 judges. In the seed stage, each judge produces free-form error descriptions over the full 200 -video Dannot , which the clustering LLM groups into an initial taxonomy of roughly four dimensions (range 3–7); in refinement, the editor proposes m = 2 candidates per round, each accepted only if it improves the selection objective 
+
+J, up to a budget of Tmax = 3 rounds. The full editor prompt is shown in Figure 6. 
+
+Compute and cost. The two Qwen models are run locally on NVIDIA A100 GPUs (approximately 100 GPU-hours in total); all other judges, together with the LLM editor and clustering model, are ac-cessed through the OpenRouter API. The total API cost, including reruns and excluded models, is ap-proximately $1500. 12

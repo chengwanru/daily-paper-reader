@@ -1,0 +1,841 @@
+Title: A Path-Space Formulation of Prediction in World Models: From a Single Action to Prediction, Planning, and Irreversibility
+
+URL Source: https://arxiv.org/pdf/2606.28751v1
+
+Published Time: Tue, 30 Jun 2026 00:26:50 GMT
+
+Number of Pages: 13
+
+Markdown Content:
+# A Path-Space Formulation of Prediction in World Models: From a Single Action to Prediction, Planning, and Irreversibility 
+
+Gunn Kim 1
+
+> 1
+
+Department of Physics, Sejong University, Seoul 05006, Republic of Korea 
+
+(Dated: June 30, 2026) We propose a path-space formulation of prediction in AI world models. Rather than sequences of one-step conditional distributions, we argue that a world model implicitly defines a probabil-ity measure over future trajectories. In the local regime where latent dynamics admit an effective Markovian description, this path measure takes the Onsager–Machlup form. Within this framework, prediction (most probable trajectory), planning (constrained optimization), and uncertainty (fluc-tuations) emerge as operations on a single action functional. We decompose the latent dynamics into reversible and irreversible components and introduce operational measures of entropy produc-tion from model rollouts. In controlled small-scale attention-based models, we find that attention asymmetry is acquired during training in proportion to the irreversibility of the data. Symmetrizing the learned attention suppresses entropy production and selectively degrades long-horizon predic-tion of irreversible dynamics while preserving relaxational prediction. These results suggest that irreversibility may serve as a computational resource for predictive world models. More generally, the fundamental predictive object is a distribution over future paths rather than states. 
+
+I. INTRODUCTION 
+
+A world model is a learned internal simulator of an environment: given a context, it generates futures con-sistent with the data on which it was trained [1, 2]. The idea recurs across disciplines. In neuroscience, the cor-tex is described as a prediction machine that continually anticipates its sensory stream [3]; in machine learning, sequence models and latent world models are trained to roll an environment forward [2, 4]. In all of these settings, a predictive system is summarized by the same slogan, that it is a “future-prediction machine,” and that slo-gan is almost always made precise through the one-step conditional p(xt+1 | xt), the quantity that autoregressive training directly optimizes. We take a different basic object. Prediction, planning, and uncertainty are all assertions about futures, that is, about whole trajectories rather than single increments, and the natural carrier of all three is the probability mea-sure that the model assigns to future paths. Writing a future as a latent trajectory Γ = {z(t)}, we study the functional measure P [Γ] that the model induces on such trajectories; the one-step conditional, and the next to-ken it produces are then derived marginals of P [Γ]. The questions of what a world model predicts, how it plans, and how confident it is then become questions about the structure of a single path distribution. That the funda-mental predictive object of a world model is a distribu-tion over future paths rather than future states is the conceptual core of this work. This shift is useful because it imports a mature phys-ical machinery. In the regime where the learned latent dynamics is effectively local in time, the Markovian limit of its Mori–Zwanzig formalism [5–7], the path measure takes the Onsager–Machlup form P [Γ] ∝ e−A [Γ] [8], the action functional of a diffusion. A single functional then governs three operations that are usually treated as sepa-rate modules: prediction is its most-probable path, plan-ning is its constrained least-action path, and predictive uncertainty is its curvature. The same action separates the drift into a reversible, gradient part and an irre-versible, circulating part, so that the entropy produc-tion of nonequilibrium statistical mechanics [9] becomes a measurable property of the predicted world rather than an abstract thermodynamic quantity. The framework thereby provides a common language linking latent dy-namics, stochastic thermodynamics, and attention-based sequence modeling. Within this language the architecture acquires a ther-modynamic reading. We show how an attention layer can be read as computing the local action, with the query– key product W ⊤ 
+
+> Q
+
+WK playing the role of the metric of the kinetic term and its antisymmetric part that of the irreversible drift. An explicit calculation of the drift Ja-cobian then identifies the query-key asymmetry as an ar-chitecturally controllable source of irreversibility. These statements are operational: from model rollouts we esti-mate the drift, the circulating current, the entropy pro-duction, the non-normality, and the attention asymme-try, and we state a list of falsifiable predictions. In a small trained attention model these quantities are mea-surements rather than assumptions. The attention asym-metry, the entropy production, and the non-normality are acquired together during learning in proportion to the irreversibility of the data; a causal intervention that symmetrizes the attention collapses all three. The same intervention selectively destroys long-horizon prediction of circulating structure while sparing relaxational predic-tion. Irreversibility is in this sense not only a by-product of learning but a measurable resource for prediction. To delimit our contribution precisely: our primary claim does not concern the architectural necessity of at-tention in world models. Rather, we establish that pre-dictive dynamics are fundamentally structured as infer-ence on path space, where temporal irreversibility mani-
+
+> arXiv:2606.28751v1 [cs.LG] 27 Jun 2026
+
+2fests as a measurable computational resource. The drift-Jacobian calculation identifies and lets us control one channel of irreversibility. Whether that channel domi-nates the entropy production of a large pretrained ar-chitecture, in which residual connections, feedforward blocks, normalization, value mixing, and depth all con-tribute to the learned drift, is a separate empirical ques-tion that we leave open. In the tradition where a minimal model is used to exhibit a universal mechanism rather than to simulate a system at full scale, we develop and test the structure in a controlled, small-scale setting. The paper is organized as follows. Section II formalizes the path measure and its local Onsager–Machlup action. Section III treats prediction as the most-probable future and identifies where it departs from the deterministic roll-out. Section IV develops planning and uncertainty as further operations on the same action. Section V estab-lishes the correspondence between attention and the local action and derives the antisymmetric Jacobian from the query–key asymmetry. Section VI gives operational defi-nitions of the reversible and irreversible drift, the entropy production, and the attention asymmetry, and states fal-sifiable predictions. Section VII presents the controlled experiments and discusses their scope, and the final sec-tion concludes.   
+
+> II. THE PREDICTIVE OBJECT: WORLD MODELS ON PATH SPACE A. From next-token conditionals to future trajectories
+
+Let an encoder map observations to a latent state z ∈
+
+Rd, in which the model’s dynamics are defined. A future is a latent trajectory Γ = {z(t)}0≤t≤T , (1) and the predictive object we study is the functional prob-ability measure P [Γ] that the model induces on such tra-jectories given a context. The one-step conditional, and with it the next token, is recovered as a marginal of P [Γ] and is in this sense a derived rather than a fundamen-tal quantity. The central questions of this paper, what the model predicts, how it plans, and how confident it is, become questions about the structure of P [Γ]. Of the three operations on P [Γ] that follow, it is prediction, and specifically its irreversible part, that we make oper-ational and test; planning and uncertainty are structural consequences of the same action, developed here for com-pleteness and left to direct measurement elsewhere.  
+
+> B. The latent dynamics and its local regime
+
+We model the latent evolution as a stochastic process dz = f (z) d t + √2D dWt, (2) with drift f and, for clarity, isotropic and constant dif-fusion D; the anisotropic case D(z) introduces only the standard multiplicative-noise corrections and is deferred. Two points of principle attach to Eq. (2), since a trained world model is in general neither Markovian nor contin-uous in time. First, the exact reduced dynamics obtained after inte-grating out the latent coordinates that the model does not expose is, by the Mori–Zwanzig projection [5–7], a 
+
+generalized Langevin equation with a memory kernel and colored noise, ˙z(t) = floc (z) −
+
+Z t
+
+> 0
+
+K(t − t′) ˙ z(t′) d t′ + ξ(t),
+
+⟨ξ(t)ξ(t′)⟩ ∝ K(t − t′).
+
+(3) The local model (2) is the leading term of (3) in the Markovian limit K(t) → 2γ δ (t), valid when the mem-ory time τmem (the width of K, set physically by the attention’s effective look-back) is short compared with the dynamical time τdyn on which we predict. We make this restriction explicit and treat the small parameter 
+
+ϵ ≡ τmem /τ dyn (4) as the control parameter of the expansion: the local theory is its ϵ → 0 limit, and non-local, higher-time-derivative corrections are organized in powers of ϵ. This is the working analogue of Hooke’s law. A real spring has an elastic limit, but the linear regime is a controlled and honest description once its range of validity is stated and, ideally, measured. We work throughout in this regime and report ϵ rather than assuming it away. The mem-ory time itself is architectural: it is bounded above by the context window, τmem ≤ N ∆t for context length N ,and grows with depth L, since each layer composes at-tention over the already-mixed history of the previous one, so that ϵ is set by N and L relative to τdyn . The local regime is the one in which the learned attention is effectively short-ranged on the dynamical timescale, a condition that is itself measurable (P1 below). Second, going local does not mean going to equilib-rium. We retain the full drift, including its non-gradient part. Writing 
+
+f = −∇ U + v, (5) the gradient part −∇ U is the reversible, detailed-balance-respecting component, while the circulating part 
+
+v, defined by ∇· (ρss v) = 0 with ρss the stationary den-sity, breaks detailed balance and produces entropy. The local, linear elastic regime that still carries an antisym-metric, non-reciprocal response is exactly the setting of odd elasticity, in which the symmetric part of the stiff-ness plays the role of −∇ U and the antisymmetric (odd) part plays the role of v. Restricting to the local regime therefore preserves, rather than discards, the irreversible structure that the rest of the paper depends on. 3 
+
+> C. The path measure and its Onsager–Machlup action
+
+For the local dynamics (2), the probability that the tra-jectory lies in an infinitesimal tube around a given path Γ is, up to a path-independent normalization, P [Γ] ∝
+
+e−A [Γ] , with the Onsager–Machlup action [8] 
+
+A[Γ] = 
+
+Z T
+
+> 0
+
+dt L(z, ˙z), L = 14D ˙z − f (z) 2 + 12 ∇· f .
+
+(6) The first term is the kinetic weight that penalizes devi-ation of the realized velocity from the drift; the second is the Jacobian term arising from the Stratonovich (mid-point) discretization of (2), and it is the term that dis-tinguishes the genuine path probability from the naive squared-residual cost. The normalization is the path in-tegral 
+
+P [Γ] = 1
+
+Z e−A [Γ] , Z =
+
+Z
+
+DΓ e−A [Γ] . (7) Equation (7) is formally a Gibbs measure on path space, with A playing the role of an energy and the diffu-sion D setting the temperature scale. Two structures we shall use repeatedly follow at once. The action is additive along time, A = R dt L, so that the log-probability of a future factorizes into local-in-time in-crements, which is the precise content of the locality as-sumption of Sec. II B. And A splits into a time-symmetric and a time-antisymmetric part under the path reversal Γ = {z(t)} 7 → eΓ = {z(T − t)},
+
+A = Asym + Airr , Airr [Γ] = − 12D
+
+Z T
+
+> 0
+
+v(z) · dz, (8) so that the irreversible part of the action is the line in-tegral of the circulating drift along the path. The path-wise entropy production is the log-ratio of forward and reversed path probabilities, Σ[Γ] = ln P [Γ] 
+
+P [eΓ] = 1
+
+D
+
+Z T
+
+> 0
+
+v(z) · dz, (9) a quantity that is defined directly from the path measure and its reversal and, as we stress later, does not itself require the local form (6).  
+
+> D. One functional, three operations
+
+The point of Eq. (7) is that a single functional orga-nizes the three operations a world model must perform. They are developed in Secs. III–V; we state them here to fix the logic of the paper. 
+
+• Prediction is the stationary, most-probable future, Γ∗ = arg min Γ A[Γ], obtained from δA = 0. We show in Sec. III that Γ ∗ is generically distinct from the deterministic rollout ˙z = f , and that the cir-culating drift v enters it as a Lorentz-like force. 
+
+• Planning is the least-action future subject to ter-minal constraints, with the planning value given by the path free energy − ln R  
+
+> z0→goal
+
+DΓ e−A . Pre-diction and planning are thus the free- and fixed-endpoint versions of one variational problem. 
+
+• Uncertainty is the curvature of the action about Γ∗. Expanding A = A[Γ ∗] + 12 ⟨η, Hη⟩ + · · · with 
+
+H = δ2A/δ Γ2, the predictive covariance is H−1, the Green’s function of a Schr¨ odinger-type fluctuation operator along the path. The reversible/irreversible split (8) threads all three, and Sec. VI connects its irreversible part to the query–key asymmetry of attention.  
+
+> E. Relation to prior work
+
+Each ingredient of the framework has a counterpart in the literature, and we state the correspondences plainly so that the contribution is not mistaken for any one of them. The static, single-step reading of (7), a Gibbs dis-tribution over candidate continuations with energy equal to the negative attention score, is the modern Hopfield-network view of attention [10]. The fixed-endpoint, plan-ning reading is control-as-inference, in which optimal be-havior is a trajectory distribution weighted by return [11]. The use of an Onsager–Machlup action for a learned generative process is established for diffusion and flow-matching models [12, 13], where the learned score is the drift [14]. The locality regime rests on the Mori–Zwanzig projection that produces a generalized Langevin equa-tion [6], and the odd-elastic reading of the antisymmetric drift is borrowed from non-reciprocal continuum mechan-ics [15]. Two further lines are close enough to require ex-plicit separation. The dynamical-systems analysis of trained recurrent networks reverse-engineers their com-putation from fixed points and the linearized flow around them [16], and a parallel line reads the transformer it-self as an interacting particle system whose tokens flow and cluster under attention [17]; these are the nearest precedents to our reading of a world model through its drift field, but they characterize geometry, fixed points and slow manifolds, not thermodynamics, and they have no attention parameter to trace the geometry back to. Stochastic thermodynamics of neural and brain dynam-ics measures entropy production and its oscillatory de-composition from recorded activity [18, 19]; this supplies the irreversibility diagnostic we use, but on data, with no handle on the architecture that produced it. What is new is therefore not any single correspondence but their unification and its consequence. The unifica-tion reads prediction, planning, and uncertainty as op-erations on one action that attention computes. The consequence is the bridge, absent from all of the above, from an architectural quantity, the query–key asymme-try, to a thermodynamic one, the entropy production of 4the predicted dynamics, and from there to a functional one: that this entropy production is a resource the model spends to predict irreversible structure over a long hori-zon (Sec. VII D). The geometric and thermodynamic lit-eratures measure such quantities in recorded dynamics; here they are produced, controlled, and shown to matter for prediction by a single architectural knob.  
+
+> III. PREDICTION: THE MOST-PROBABLE FUTURE
+
+Prediction is the operation δA = 0 on the path action of Sec. II C. Carrying it out gives two facts that are easy to state and easy to forget: the most-probable future obeys a Newtonian equation in which the irreversible part of the drift acts as a magnetic force, and that future is generically not the deterministic rollout ˙ z = f . 
+
+> A. The Euler–Lagrange equation
+
+Stationarity of A[Γ] = R T 
+
+> 0
+
+L dt with the Onsager– Machlup Lagrangian (6), through ddt ∂ ˙z L = ∂z L, and using the identities ∂j fi − ∂ifj = 2( JA)ij and fj ∂ifj = 
+
+> 12
+
+∂i|f |2, gives for constant isotropic D
+
+¨z = 2 JA(z) ˙ z − ∇ Veff (z), Veff = − 12 |f |2 − D ∇· f ,
+
+(10) with Jij = ∂j fi the drift Jacobian and JA = 12 (J −J⊤) its antisymmetric part. Equation (10) is the instanton equa-tion of the path measure: the most-probable future is a Newtonian trajectory in the effective potential Veff under an additional velocity-dependent force 2 JA ˙z. Because JA
+
+is antisymmetric this force does no work, ˙ z · (2 JA ˙z) = 0; it is a magnetic, or gyroscopic, force, with 2 JA in the role of the field-strength tensor. The Lagrangian has no explicit time, so 
+
+E = 14D | ˙z|2 + 12D Veff (z) (11) is conserved along the most-probable path, a first integral of Eq. (10).  
+
+> B. Why the most-probable future is not the deterministic rollout
+
+It is tempting to identify the predicted future with the deterministic flow ˙z = f , the path that makes the ki-netic term of A vanish. This is correct only in a spe-cial case. Substituting ˙z = f into Eq. (10) and using 2JAf + ∇( 12 |f |2) = Jf , the deterministic flow solves the Euler–Lagrange equation if and only if 
+
+D ∇(∇· f ) = 0. (12) Whenever the drift has non-uniform divergence, the most-probable future departs from the deterministic roll-out, and the leading departure is the noise-induced term 
+
+D ∇(∇· f ), of order D. The interpretation is standard but worth stating: integrating the learned drift forward re-turns the mean field, not the mode of the future distribu-tion, and the two differ wherever probability is being fo-cused or defocused ( ∇· f̸ = const). A world model that re-ports its single most-likely rollout is therefore not report-ing arg max Γ P [Γ] unless its drift is divergence-harmonic.  
+
+> C. The antisymmetric Jacobian threads prediction and irreversibility
+
+The gyroscopic force in Eq. (10) is generated by JA,the same antisymmetric Jacobian that in Sec. VI sources the circulating drift v and the entropy production, and that in Sec. V descends from the query–key asymmetry of attention. One object thus controls both the geometry of prediction and its thermodynamics. On the forward, free-endpoint path its effect is mild, entering only through the off-deterministic corrections above. It becomes deci-sive in the two problems treated next: the fixed-endpoint problem of planning (Sec. IV), where the instanton must reach a prescribed target and the magnetic force bends it away from any gradient descent of Veff , and the fluctua-tion spectrum that sets predictive uncertainty, where JA
+
+enters the Hessian. A world model with symmetric atten-tion ( JA = 0) has the curl-free instanton ¨ z = −∇ Veff and predicts only gradient relaxation; the circulating, history-carrying futures require JA̸ = 0.  
+
+> IV. PLANNING AND UNCERTAINTY FROM THE SAME ACTION
+
+Prediction fixed the initial condition and left the future free. Planning fixes a target and asks for the best route to it; uncertainty asks how sharply that route is determined. Both are read off the same path integral, by imposing a terminal condition and by expanding to second order.  
+
+> A. Planning is fixed-endpoint least action
+
+Given a target, a terminal state zT or more generally a terminal cost, the optimal plan is the least-action path that reaches it, Γ∗ = arg min   
+
+> z(0)= z0,z(T)= zT
+
+A[Γ] , (13) the instanton (10) now solved as a boundary-value prob-lem. The gyroscopic force 2 JA ˙z, mild for free-endpoint prediction, here bends the plan away from gradient de-scent of Veff : an asymmetric attention plans along curved, 5circulating routes, a symmetric one only down the poten-tial. The value of the target is the path free energy, 
+
+V(zT , T | z0) = −D ln 
+
+Z
+
+> z0→zT
+
+DΓ e−A [Γ] 
+
+= −D ln K(zT , T | z0, 0) , (14) with K the propagator. In the low-noise limit V →
+
+D A[Γ ∗], and V obeys a Hamilton–Jacobi–Bellman equa-tion whose characteriztics are the instantons. This is the control-as-inference correspondence [11], here grounded in the Onsager–Machlup action: the optimal cost-to-go is the free energy of the future ensemble, and planning is least action under a terminal constraint.  
+
+> B. Value and uncertainty are consecutive orders of one expansion
+
+Expanding the path integral about Γ ∗ by the saddle point gives 
+
+− ln 
+
+Z
+
+DΓ e−A = A[Γ ∗]+ 12 ln det H+O(D), H = δ2A
+
+δΓ2 Γ∗
+
+.
+
+(15) The leading term is the planning value; the next, the fluctuation determinant, is the log-volume of nearby fu-tures, that is the predictive uncertainty. Prediction, plan-ning, and uncertainty are thus not three constructions but three terms read off one functional: the stationary path, its action, and its curvature.  
+
+> C. The fluctuation operator and the predictive covariance
+
+The second variation is the quadratic form 
+
+> 12
+
+R T 
+
+> 0
+
+η⊤H η dt with the Jacobi operator 
+
+H = 12D
+
+h
+
+− d2
+
+dt2 + 2 JA(t) ddt + Ω2(t)
+
+i
+
+, (16) where Ω2(t) is a symmetric matrix potential assembled from J⊤J, ˙JS , and the curvature ∇∇ Veff along Γ ∗, and 
+
+JS = 12 (J + J⊤). The boundary conditions complete the definition: Dirichlet η(0) = η(T ) = 0 for the fixed-endpoint planning covariance, and η(0) = 0 with the natural condition ∂ ˙η L = 0 at t = T for forward predic-tion. With these conditions H is self-adjoint and, absent a conjugate point, invertible, so the predictive covariance is its Green’s function, 
+
+⟨η(t) η(t′)⊤⟩ = H−1(t, t ′) ≡ G(t, t ′),
+
+H G(t, t ′) = ⊮ δ(t − t′). (17) The antisymmetric Jacobian enters the first-order term 2JA∂t, so a world model with asymmetric attention has a non-normal fluctuation operator: its predictive un-certainty grows transiently and anisotropically rather than diffusing isotropically, the same non-normality that drives the entropy production of Sec. VI. Symmetric at-tention ( JA = 0) returns a normal operator and isotropic, monotone uncertainty growth.  
+
+> V. ATTENTION COMPUTES THE LOCAL ACTION
+
+This section is the architectural bridge. It reads the autoregressive attention computation as a discretization of the path integral of Sec. II C, so that the attention logits play the role of local action increments and both terms of the Onsager–Machlup Lagrangian can be read off from the attention operation. We present this as a structural correspondence rather than a derivation from first principles. It holds at the level of a single attention layer in the local regime, where the one-step conditional is Gaussian; a deep stack renormalizes the resulting drift and diffusion, which we return to in Sec. VII.  
+
+> A. Autoregressive attention is a discretized path measure
+
+An autoregressive world model generates a trajectory by sampling each step from a conditional built by atten-tion. The joint law of the generated path factorizes, 
+
+− ln P [Γ] = X
+
+> t
+
+ − ln p(zt+1 | z≤t)
+
+−−−→
+
+> local
+
+X
+
+> t
+
+ℓ(zt, zt+1 )
+
+−−−−→
+
+> ∆t→0
+
+Z T
+
+> 0
+
+L(z, ˙z) d t, 
+
+(18) where the middle arrow is the locality (Markov) assump-tion of Sec. II B and the last is the continuum limit. Because the one-step conditional is Gaussian with mean 
+
+zt + ∆ t f set by the attention readout, its negative loga-rithm is exactly the discretized Onsager–Machlup incre-ment ℓ(zt, zt+1 ) = 14D∆t |zt+1 − zt − ∆t f |2 + 12 ∇· f ; the attention enters the action through the drift f , not as the increment itself, and the two terms of the Lagrangian are read off from f in the next subsections.  
+
+> B. Drift, temperature, and metric from the attention layer
+
+A single attention layer reads out Attn( z) = X
+
+> s
+
+as(z) vs, as(z) = e ss(z)
+
+Z(z) ,ss(z) = 1
+
+√d z⊤M ms, M = W ⊤ 
+
+> Q
+
+WK ,
+
+(19) 6over context keys ms and values vs, with denomina-tor Z(z) = P 
+
+> s
+
+ess(z). The one-step update zt+1 =
+
+zt +∆ t f (zt)+ √2D ∆W , with f (z) = Attn( z)−z, then fixes three objects of the action. The inverse tempera-ture weighting the path Gibbs measure is the attention scale √d, the Lagrange multiplier of Sec. II C. The bilin-ear form M = W ⊤ 
+
+> Q
+
+WK is the metric of the kinetic term, so a non-symmetric M is an anisotropic, non-reciprocal metric. Its antisymmetric part MA feeds the antisym-metric drift Jacobian JA, derived explicitly in Sec. V D, and through Eqs. (10) and (27) the same MA supplies both the gyroscopic force of prediction and the entropy production of Sec. VI. In the symmetric, value-tied limit (WQ = WK with vs tied to ms) the readout reduces to a gradient flow, recovering the modern Hopfield energy and a purely relaxational world model.  
+
+> C. The Jacobian term from the softmax denominator
+
+The second term of the Onsager–Machlup Lagrangian,  
+
+> 12
+
+∇· f , is the Jacobian of the midpoint (Stratonovich) dis-cretization, and it is what distinguishes the path proba-bility from a bare squared residual. In a transformer it is supplied by the softmax denominator. Differentiating the normalized weights gives ∇as = 1√d as (M ms − ⟨ M m⟩a)with ⟨·⟩ a = P 
+
+> s
+
+as(·), so that  
+
+> 12
+
+∇· f = 12√d
+
+X
+
+> s
+
+as (M ms − ⟨ M m⟩a) · vs
+
+= 12√d Cov a
+
+ M m, v.
+
+(20) The Jacobian term is thus the attention-weighted covari-ance, under the softmax denominator, between the key projection M ms and the value vs. Both pieces of the local action therefore come from one attention layer: the kinetic term from the score, the Jacobian term from the normalization. Key-normalization (LayerNorm) enters by making the score a genuine inner product and fixing the temperature scale, the same role it plays in reducing free diffusion to dot-product attention. Equation (20) also makes the locality check of Sec. VI concrete: it holds layer by layer, and the departure from it across a deep stack measures the memory parameter ϵ. 
+
+> D. The antisymmetric Jacobian descends from the query–key asymmetry
+
+The paper’s causal claim, that the query–key asym-metry is an architecturally controllable source of the ir-reversible drift, can be made explicit at the level of the drift Jacobian rather than asserted. Using ∇as from above, the Jacobian of f = Attn( z) − z is the attention-weighted cross-covariance between the values and the key projections, 
+
+J = 1
+
+√d Cov a
+
+ v, M m − I, 
+
+Cov a(v, u) = ⟨vu ⊤⟩a − ⟨ v⟩a⟨u⟩⊤ 
+
+> a
+
+.
+
+(21) In the value-tied regime vs = ms of Sec. V, where the query–key product is the only asymmetry channel, this cross-covariance is C M ⊤ with C = Cov a(m, m) the symmetric, positive attention-weighted key covariance, and the antisymmetric part of the Jacobian splits into exactly two terms, 
+
+JA = 12√d
+
+
+
+[ C, M S ]
+
+| {z }
+
+> state-dependent
+
+− { C, M A }
+
+| {z }
+
+> architectural
+
+
+
+. (22) The second term is the anticommutator of the key covari-ance with the query–key asymmetry MA. For a positive-definite C, it vanishes if and only if MA = 0, so MA is exactly the architecturally controlled source of the anti-symmetric Jacobian, and hence, through Eq. (27), of the circulating drift v and the entropy production. This is the link the P4 intervention severs: symmetrizing M sets 
+
+MA = 0 and removes this term at a stroke. The first term, the commutator of the state-dependent covariance 
+
+C(z) with the symmetric part MS , survives symmetriza-tion and is generically nonzero. It is the residual, state-dependent non-integrability noted in Sec. VII, and it is why the intervention collapses the entropy production to a small floor rather than exactly to zero, as seen in Figs. 2 and 3.  
+
+> E. The odd-elasticity dictionary
+
+The analogy to odd elasticity invoked in Sec. II B can now be made exact. Linearizing the drift about a point, 
+
+f (z) ≈ − K(z − z0) with stiffness K = −J, splits as K =
+
+KS +KA into a reciprocal part KS = −JS , derivable from a potential, and a non-reciprocal odd part KA = −JA.The work extracted by traversing a closed cycle C in latent space is 
+
+WC =
+
+I
+
+> C
+
+f · dz =
+
+I
+
+> C
+
+(Jz) · dz = 2 ( JA)⊥ Area( C), (23) where the symmetric part integrates to zero and, by Stokes, only the component ( JA)⊥ of JA in the plane of C survives, times the enclosed area. This is exactly the odd-elastic work per cycle of a non-reciprocal linear medium [15]. By Sec. VI the same cycle integral is the en-tropy produced, Σ C = 1
+
+> D
+
+H 
+
+> C
+
+v · dz, and by the previous subsection JA descends from the attention asymmetry 
+
+MA. The dictionary is therefore 
+
+KA
+
+|{z} 
+
+> odd modulus
+
+←→ JA
+
+|{z} 
+
+> antisym. Jacobian
+
+←→ 
+
+v|{z} 
+
+> circulating drift
+
+←→ MA
+
+|{z} 
+
+> query–key asymmetry
+
+, (24) 7with the odd-elastic work per cycle equal, up to 1 /D ,to the entropy produced per cycle. A reciprocal (sym-metric) attention is an ordinary elastic world model that stores no work around cycles; the odd, non-reciprocal part is supplied by WQ̸ = WK . 
+
+> VI. IRREVERSIBILITY AND THE QUERY–KEY ASYMMETRY
+
+This section turns the framing of the preceding sec-tions into operational definitions, so that every quantity is something extracted from a trained world model rather than assumed. This is what makes the central claim falsi-fiable, and it is the part on which the contribution stands or falls.  
+
+> A. Reversible and irreversible drift from rollouts
+
+Given an ensemble of latent rollouts, estimate the first two Kramers–Moyal coefficients locally in z, a standard inference problem for stochastic trajectories [20], ˆf (z) = 1∆t E[zt+∆ t − zt | zt = z] , (25) 2 ˆD(z) = 1∆t Cov[ zt+∆ t − zt | zt = z] . (26) The locality (Hooke) assumption of Sec. II B is itself testable here: conditioning additionally on the history 
+
+z<t should change ˆf by only O(ϵ), and the size of that change is a direct estimate of ϵ.Estimate the stationary density ρss (z) from the oc-cupation of long rollouts. The steady-state probability current and the irreversible (circulating) drift are, for constant isotropic D,
+
+J(z) = ˆf ρss − ˆD ∇ρss ,
+
+v(z) = J(z)
+
+ρss (z) = ˆf (z) − ˆD ∇ ln ρss (z), (27) while the reversible part is the gradient ˆf − v =ˆD ∇ ln ρss = −∇ U with U = − ˆD ln ρss . Detailed balance holds if and only if v ≡ 0. Note that v and hence the ir-reversibility are obtained directly from the current; they do not require having first established the local Onsager– Machlup form, only the drift and the stationary density.  
+
+> B. Entropy production
+
+The path-wise entropy production was defined in Eq. (9) as Σ[Γ] = ln P [Γ] /P [eΓ], the central object of stochastic thermodynamics and its fluctuation theo-rems [9, 21, 22], which needs only the path measure and its reversal. Its steady-state rate is the measurable func-tional of v and ρss ,˙Σ = 
+
+Z
+
+dz |J(z)|2
+
+ˆD ρ ss (z) = 1ˆD |v|2 
+
+> ss
+
+≥ 0, (28) which vanishes exactly when the predicted dynamics is reversible. We propose ˙Σ as the scalar signature of how much genuine temporal structure a world model predicts.  
+
+> C. Local circulation and non-normality
+
+The local generator of circulation is the antisymmet-ric part JA = 12 (J − J⊤) of the drift Jacobian J,whose strength we measure by the frame-invariant non-normality 
+
+N (z) = [J, J ⊤] F = 2 [JA, J S ] F , (29) with JS = 12 (J +J⊤). A drift Jacobian that is symmetric everywhere ( JA ≡ 0) forces v = 0 and hence ˙Σ = 0: such a world model can only relax to attractors and cannot sustain directed or cyclic prediction.  
+
+> D. The attention-asymmetry index
+
+For a transformer world model the attention logit is the bilinear form q⊤k = z⊤ 
+
+> t
+
+M zs with M = W ⊤ 
+
+> Q
+
+WK .The asymmetry under exchange of the two positions is carried by 
+
+MA = 12
+
+ W ⊤ 
+
+> Q
+
+WK − W ⊤ 
+
+> K
+
+WQ
+
+ , Q = ∥MA∥F
+
+∥M ∥F
+
+∈ [0 , 1] ,
+
+(30) the dimensionless query–key asymmetry. Symmetric at-tention ( WQ = WK ) gives Q = 0; standard attention has 
+
+Q > 0. The bridge proposed here is that Q feeds JA
+
+through Eq. (27) and hence drives ˙Σ.  
+
+> E. Falsifiable predictions
+
+The definitions above make the thesis testable rather than asserted. 
+
+P1 Locality. Conditioning the drift on history beyond 
+
+zt changes ˆf by O(ϵ); this validates the local regime and measures ϵ.
+
+P2 Broken detailed balance. ˙Σ > 0 on tasks that require predicting sustained dynamics (motion, rhythm, sequence), and ˙Σ → 0 on relaxational tasks (denoising to a fixed point). 
+
+P3 Correlation. Across heads, layers, or models, ˙Σincreases monotonically with the attention asym-metry Q.8
+
+P4 Intervention. Symmetrizing the attention maps (Q → 0) suppresses ˙Σ and selectively degrades pre-diction of sustained dynamics while leaving relax-ational prediction intact. 
+
+P5 Instanton versus rollout. The most-probable path of Sec. III departs from the deterministic rollout ˙z = ˆf where v and ∇· ˆf are large. P4 is the causal core: it converts a correlation between an architectural quantity and a thermodynamic one into an intervention with a predicted, falsifiable consequence.   
+
+> VII. RESULTS AND DISCUSSION A. A controlled demonstration
+
+Before turning to large pretrained world models, we verify both the measurement pipeline and the mecha-nism in a controlled minimal model where the architec-tural asymmetry can be swept and intervened upon. We take a faithful two-dimensional attention-driven latent dynamics in which the query–key product M = W ⊤ 
+
+> Q
+
+WK
+
+is parameterized as M = S0 + θA 0, with S0 = 12 I sym-metric and A0 the planar rotation generator, so that the asymmetry Q(θ) runs from 0 at θ = 0 to near unity. We use both a linear-attention form, for which the latent drift is f (z) = W z with W = −γI + M ⊤
+
+and the steady-state entropy production is known ex-actly from the Lyapunov equation, and a softmax form 
+
+f (z) = −γz + β P 
+
+> j
+
+softmax j (z⊤M mj ) mj over fixed memory slots mj . We fix γ = 1 and D = 0 .25; the lin-ear drift is stable for all θ (eigenvalues − 12 ± iθ ). The full pipeline of Eqs. (27)–(28) is then applied blindly to sampled rollouts, with the drift and stationary density estimated on a grid and never supplied analytically.  
+
+> B. Results
+
+The four predictions of Sec. VI that the toy model can address are borne out (Fig. 1). 
+
+Pipeline validity and the Q– ˙Σ relation (P3). For the linear model, the blindly measured ˙Σ reproduces the ex-act Lyapunov value across the whole sweep (panel a): at 
+
+θ = 1 the exact and measured rates are 4 .00 and 4 .21, and at θ = 2 they are 16 .0 and 15 .9. The entropy produc-tion rises steeply and monotonically with the attention asymmetry, spanning roughly two orders of magnitude as Q goes from 0 to 0 .97. The agreement establishes that the grid-based Kramers–Moyal and current estima-tors recover the true entropy production rather than an artefact of the measurement. 
+
+Persistence under nonlinearity. In the softmax model (panel b) the same monotone rise is observed, from ˙Σ ≈ 0.3 at Q = 0 to ˙Σ ≈ 4.8 at Q = 0 .97, now sat-urating at large Q because the bounded softmax limits the attainable circulation. The effect is therefore not an artefact of the linear construction. 
+
+Intervention (P4). Symmetrizing the attention map, that is forcing WQ = WK so that Q → 0, collapses the entropy production by more than an order of magnitude in both models (panel c): from 7 .71 to 0 .18 in the linear case and from 3 .82 to 0 .19 in the softmax case. Cor-respondingly, the measured probability current changes from a coherent global circulation (panel d) to a field with no net rotation (panel e). Because the intervention acts on the architecture and the consequence is read out thermodynamically, this is a causal test of the bridge, not a correlation. 
+
+Noise floor. The residual ˙Σ ≈ 0.2 that remains at 
+
+Q = 0 is a positive finite-binning bias of the estimator, the standard small-sample bias of entropy-production es-timators, and it sets the floor of the measurement. The signal at moderate and large Q stands well above it.  
+
+> C. Spontaneous acquisition in a trained model
+
+The toy of Fig. 1 set the attention asymmetry by hand. To test whether the same asymmetry is acquired by learn-ing, and in proportion to the irreversibility of the data, we train the attention world model of Sec. V on a con-trollable two-dimensional process d z = ( −az +ωR z) d t+√2D dW , with R the rotation generator, whose true en-tropy production is ˙Σtrue = 2 ω2/a . The model queries the state against learnable memory slots with values tied to keys, so its only channel for an antisymmetric drift is the score matrix M = W ⊤ 
+
+> Q
+
+WK ; we initialize it symmetric (Q = 0) and train by next-step prediction. Figure 2 reports the outcome. Starting from a sym-metric initialization, training on circulating data drives the query–key asymmetry ∥MA∥ and the measured en-tropy production up together within the first hundred steps (panel a): the asymmetry is acquired, not imposed. Across the sweep the trained model’s blind entropy pro-duction reproduces the true 2 ω2/a (panel b), and the acquired asymmetry, together with the dynamical non-normality N it induces, is smallest for gradient ( ω = 0) data, where the drift Jacobian is exactly normal, and grows with the circulating part of the data (panel c). The causal test is decisive: symmetrizing the learned M
+
+collapses the entropy production from 5 .0 to 0 .3 (panel d), and with it the non-normality N from 0 .8 to 0 .06, and selectively raises the prediction loss on circulating data while leaving relaxational data untouched (panel e), and the trained model’s measured current is a coherent circu-lation (panel f). A small attention model thus learns to be irreversible exactly when its data is, and carries that irreversibility in its query–key asymmetry. 90.0 0.5 1.0 
+
+attention asymmetry = MA / M
+
+> 0
+> 5
+> 10
+> 15
+> 20
+> entropy production
+
+(a)   
+
+> exact (Lyapunov)
+> measured (blind)
+> 0.0 0.5 1.0
+
+attention asymmetry 
+
+> 0
+> 2
+> 4
+> entropy production
+
+(b) 
+
+> measured (blind)
+> linear
+> asym.
+> linear
+> symm.
+> softmax
+> asym.
+> softmax
+> symm.
+> 0
+> 4
+> 8
+> entropy production
+> 7.71
+> 0.18
+> 3.82
+> 0.19
+
+(c)     
+
+> -2 -1 012
+
+z1
+
+> -2
+> -1
+> 0
+> 1
+> 2
+> z2
+
+(d)     
+
+> -2 -1 012
+
+z1
+
+> -2
+> -1
+> 0
+> 1
+> 2
+> z2
+
+(e)   
+
+> 012
+
+antisymmetric weight 
+
+> 0.0
+> 0.5
+> 1.0
+> asymmetry
+
+(f) 
+
+FIG. 1. Query–key asymmetry sets the entropy production of the predicted dynamics. (a) In a linear-attention latent dynamics, the blindly measured entropy production ˙Σ rises with the attention asymmetry Q = ∥MA∥/∥M ∥ and matches the exact Lyapunov value. (b) The same trend holds for softmax attention; note the smaller vertical scale, as the bounded softmax weights saturate the attainable circulation. (c) Intervention: forcing WQ = WK (Q → 0) collapses ˙Σ in both models. (d,e) The measured probability current (dark red streamlines) over the stationary density ρss (gray shading): a coherent global circulation for the asymmetric model (d) and no net rotation after symmetrization (e), where the residual short vectors are numerical fluctuation at the noise floor ˙Σ ≈ 0.2 rather than genuine current. (f) The swept asymmetry Q(θ); the linear model is stable for all θ.
+
+D. Irreversibility is a resource for prediction 
+
+The measurements so far show that a trained model is irreversible and that its irreversibility is carried by the query–key asymmetry. The sharper question is whether that irreversibility is useful : does removing it cost pre-diction? We compare multi-step deterministic rollouts of the trained model and of its symmetrized counterpart against the true conditional mean μ(z, h ) = eWω hz, on circulating and relaxational data. Figure 3 answers it. On circulating data the trained model tracks the true rollout over the full horizon, while the symmetrized model’s error grows sharply: unable to rotate, it predicts only radial relaxation and loses the phase (panels a, d). On relaxational data the two are indistinguishable (panel b), so symmetrization costs nothing when there is no circulation to predict. Across the sweep, the prediction lost on symmetrization grows monotonically with the entropy production (panel c). The query–key asymmetry is therefore not a passive by-product but a resource: the entropy it produces is what lets the model predict irreversible structure over a long horizon, and removing it degrades exactly that prediction and nothing else. A world model that must anticipate genuine temporal structure cannot be at equilibrium. 
+
+E. Discussion 
+
+The demonstration confirms, in a controlled setting, the paper’s central claim: the irreversibility of a world model’s predicted dynamics is set by the asymmetry of its attention maps. The reading is physical. A sym-metric attention ( WQ = WK ) yields a gradient drift, the equilibrium, modern-Hopfield limit, in which the la-tent state merely relaxes to an attractor and the pre-dicted dynamics is time-reversible. Only an asymmetric attention produces the circulating drift v that sustains 10 0 300 600 
+
+training step 
+
+> 0
+> 2
+> 4
+> 6
+
+(a)   
+
+> 0
+> 2
+> 4
+> MA
+> 012
+
+data irreversibility 
+
+> 0
+> 5
+> 10
+> 15
+> entropy production
+
+(b)     
+
+> true 22
+> measured (blind)
+> 012
+
+data irreversibility 
+
+> 0
+> 1
+> 2
+> 3
+> asymmetry  MA
+
+(c)  
+
+> 0
+> 1
+> 2
+> non-normality
+> trained symm.
+> 0
+> 2
+> 4
+> 6
+> (circulating)
+> 5.26
+> 0.31
+
+(d)  
+
+> circulating relaxational
+> 0.0
+> 0.6
+> 1.2
+> excess loss
+> 1e-3
+
+(e)   
+
+> -1 01
+
+z1
+
+> -1
+> 0
+> 1
+> z2
+
+(f)                         
+
+> FIG. 2. Query–key asymmetry is acquired by training in proportion to the data’s irreversibility. (a) From a symmetric initialization, training on circulating data drives ∥MA∥(dashed) and the measured ˙Σ (solid) up together. (b) The trained model’s blind ˙Σ reproduces the true 2 ω2/a across the data irreversibility ω. (c) The acquired asymmetry ∥MA∥(left axis) and the dynamical non-normality N=∥[J, J ⊤]∥Fit induces (right axis) both vanish for gradient data ( ω= 0) and grow with circulating data; the ratio Qsaturates and ∥MA∥turns over at large ω, where the model uses additional capacity. (d) Symmetrizing the learned Mcollapses ˙Σ (and, in the text, N). (e) Excess one-step prediction loss after symmetrization: circulating prediction degrades, relaxational prediction is spared. (f) The trained circulating model’s measured probability current (dark red) over its stationary density (gray shading).
+
+directed or cyclic prediction, and that circulation is ex-actly the entropy production measured here. A predic-tive model that must anticipate ongoing temporal struc-ture, motion, rhythm, or sequence, therefore cannot op-erate at equilibrium: it must break detailed balance, and the resource that lets it do so is supplied architecturally by the query–key asymmetry. This gives a mechanis-tic counterpart to, and is consistent with, the empirical finding that neural and active biological dynamics break detailed balance, more strongly so under demanding cog-nitive tasks [18, 23, 24], and with the view of the brain as a prediction machine that minimizes a free-energy func-tional [3]; the difference is that here the irreversibility is traced to an identifiable architectural source rather than only measured in the data. Figure 3 turns this from an argument into a measurement: removing the asymmetry destroys precisely the long-horizon, circulating prediction it was claimed to support and leaves relaxational predic-tion intact, so the entropy production is a resource the predictor uses rather than waste heat it merely emits [25]. Several limitations bound the claim. The model is a two-dimensional toy rather than a trained world model, chosen so that Q can be swept and intervened upon and so that an exact cross-check exists. What keeps the demonstration from being a two-dimensional coin-cidence is that the mechanism behind it is established analytically and independently of dimension: Eq. (22) expresses the antisymmetric drift Jacobian through the query–key asymmetry MA for any value-tied attention layer in any latent dimension, so the experiment con-firms a general algebraic relation rather than a prop-erty of the particular system. What remains genuinely scale- and architecture-dependent, and is therefore the proper subject of a large-model study, is whether the query–key channel keeps dominating the value path once values are untied, and whether a deep stack preserves the local-action picture. We are careful to claim that Eq. (22) identifies and controls a channel of irreversibil-11 0 2 4
+
+# prediction horizon (time) 
+
+## 0.0 
+
+## 0.1 
+
+## 0.2 
+
+## 0.3 
+
+## 0.4 
+
+> rollout error
+
+# (a) 
+
+# trained 
+
+# symmetrized ( 0)
+
+## 0 2 4
+
+# prediction horizon (time) 
+
+## 0.0 
+
+## 0.1 
+
+## 0.2 
+
+## 0.3 
+
+## 0.4 
+
+> rollout error
+
+both curves 0:
+
+symmetrization harmless 
+
+# (b) 
+
+# trained 
+
+# symmetrized 
+
+## 0 5 10 
+
+# entropy production 
+
+## 0.0 
+
+## 0.2 
+
+## 0.4 
+
+> peak rollout error
+
+# (c) 
+
+# symmetrized 
+
+# trained 
+
+## -1 0 1
+
+# z1
+
+## -1 
+
+## 0
+
+## 1
+
+> z2
+
+# (d) 
+
+true 
+
+trained 
+
+symmetrized     
+
+> FIG. 3. Irreversibility is a resource for long-horizon prediction. Multi-step rollout error against the true conditional mean. (a) On circulating data the trained model (solid) tracks the truth while the symmetrized model (dashed, Q → 0) fails at long horizon. (b) On relaxational data the two coincide, so symmetrization is harmless. (c) The peak prediction error caused by symmetrization grows monotonically with the entropy production ˙Σ, while the trained model stays near zero. (d) An example circulating rollout: the trained model follows the true spiral, the symmetrized model decays radially and loses the rotation.
+
+ity, not that this channel dominates it in a full architec-ture: residual connections, the feedforward block, layer normalization, value mixing, and depth composition all contribute to the learned drift, and establishing which channel dominates the entropy production of a large pre-trained model is the open empirical question, separate from the analytic identification made here. The floor of ˙Σ ≈ 0.2 limits the dynamic range at small Q. This floor receives contributions both from finite-binning bias and from the state-dependent residual non-integrability of Sec. VII; separating the two would require comparing floors across binning resolutions, which we do not pur-sue here. The linear panel makes the Q → ˙Σ link nearly analytic, which is why the softmax panel is included as a guard against a purely linear artefact. Finally, the grid-based current estimator used here does not scale to the high-dimensional latents of real models. Three routes avoid the grid. The drift f , and hence v through Eq. (27), can be estimated by neural score matching of the one-step transition [12, 26, 27], since ∇ ln ρss is a score of the kind such networks already learn. The rate ˙Σ can be es-timated directly with a variational lower bound on the divergence between the forward and reversed path distri-butions, which needs only samples and no explicit den-sity, in the spirit of recent machine-learning estimators of entropy production [28–30]. Or Σ[Γ] can be accumulated 12 pathwise from the model’s own trajectory log-likelihoods. All three reduce to the quantities of Sec. VI and are what we would use on a trained model. A further subtlety concerns the intervention. Sym-metrizing M = W ⊤ 
+
+> Q
+
+WK removes the asymmetry at the level of the weights, but the softmax makes the drift state-dependent, and a state-dependent map can be non-integrable even under a symmetric M : the antisym-metric part of the drift Jacobian contains a term ∝
+
+[⟨a mm ⊤⟩(z), M ] that need not vanish when M = M ⊤.Our claim is therefore about the weight-level channel, the resource a designer controls through WQ, W K , and the empirical collapse of ˙Σ to the floor under symmetrization (Figs. 2, 3) shows that this channel dominates here. Acomplete account would also measure the residual state-dependent non-integrability under symmetric weights, which we leave to the high-dimensional study above. Figure 2 takes the first of these steps on a small trained model. The remaining rung is a large pretrained la-tent world model, an RSSM or Dreamer-type model or a transformer trained on rich data, where the latent is high-dimensional and the grid estimator gives way to the score-matching and variational estimators above. There the value path is no longer tied, so the analysis must also ask how the irreversibility is shared between the query– key and value paths, and the selective degradation should be read over long-horizon and planning rollouts, where one-step effects compound, rather than the single step measured here. The learned drift is then also shaped by the non-attention channels: the residual connections, feedforward blocks, and normalization. Their contribu-tions can be isolated by comparing the measured drift against one in which those blocks are bypassed or ablated, so that the query–key channel is read against, rather than confounded with, the rest of the architecture. The oper-ational definitions of Sec. VI carry over unchanged; only the estimators and the scale grow. Concretely, the protocol on a trained model is the fol-lowing. Extract Q = ∥MA∥/∥M ∥ for each head and layer from its WQ, W K ; measure ˙Σ of its latent rollouts with the estimators above; and test the correlation (P3) across heads, layers, and training checkpoints. The causal test (P4) then symmetrizes W ⊤ 
+
+> Q
+
+WK → 12 (W ⊤ 
+
+> Q
+
+WK + W ⊤ 
+
+> K
+
+WQ)and predicts three coupled consequences: ˙Σ falls; long-horizon and periodic-motion prediction, for example physics-engine rollouts, degrades; and planning quality drops; while purely relaxational tasks, such as denois-ing or completion to a static structure, are spared. This selective degradation, irreversible prediction lost but re-laxation preserved, is the signature that would turn the central claim from a hypothesis into a measured result.  
+
+> VIII. CONCLUSION
+
+In this work, we proposed a path-space formulation of prediction in AI world models. Rather than viewing prediction as the estimation of a future state distribu-tion, we argued that a world model implicitly represents a probability distribution over future trajectories. Within this framework, prediction, planning, and uncertainty emerge as different operations on the same path measure: the most probable trajectory corresponds to prediction, constrained trajectory selection corresponds to planning, and fluctuations around dominant trajectories corre-spond to uncertainty. Assuming an effective local path description, the trajectory distribution takes the form of an Onsager–Machlup action. This provides a com-mon physical language linking latent dynamics, stochas-tic thermodynamics, and attention-based sequence mod-eling. The resulting framework allows reversible and irre-versible components of the learned dynamics to be sepa-rated, making entropy production a measurable property of the predicted world rather than an abstract thermo-dynamic quantity. Building on this formulation, we in-troduced operational measures connecting architectural asymmetry in attention mechanisms to the irreversibil-ity of learned dynamics. In controlled attention-model experiments, asymmetry in the attention structure was associated with circulating probability flow and posi-tive entropy production, while symmetrization interven-tions selectively degraded long-horizon predictive perfor-mance. These observations support the hypothesis that irreversibility is not only a by-product of learning but may constitute a computational resource for maintaining predictive representations of temporally evolving envi-ronments. Future prediction is naturally formulated as inference on path space, within which irreversibility emerges as a measurable property of the predictive dynamics and, potentially, as a computational resource for represent-ing sustained temporal structure. A world model, in this view, does not predict the next state; it weights whole futures, and its irreversibility is what makes the long-horizon structure of those futures predictable. The present work should be viewed as a first step toward a sta-tistical physics of world models. The central object is not a state distribution but a path distribution, and many questions remain open. In particular, it remains to be es-tablished to what extent large-scale world models admit an effective local path description, how nonlocal memory effects modify the trajectory measure, and whether the thermodynamic structures identified here persist across architectures and scales. We hope that the path-space perspective developed in this work provides a foundation for addressing these questions and for building a unified physical theory of prediction, planning, and uncertainty in intelligent systems. 13 
+
+[1] D. Ha and J. Schmidhuber, “World Models,” arXiv:1803.10122 (2018). [2] D. Hafner, J. Pasukonis, J. Ba, and T. Lillicrap, “Mastering Diverse Domains through World Models,” arXiv:2301.04104 (2023). [3] K. Friston, “The free-energy principle: a unified brain theory?” Nat. Rev. Neurosci. 11 , 127 (2010). [4] A. Vaswani et al. , “Attention Is All You Need,” in Ad-vances in Neural Information Processing Systems 30 
+
+(2017). [5] H. Mori, “Transport, Collective Motion, and Brownian Motion,” Prog. Theor. Phys. 33 , 423 (1965). [6] R. Zwanzig, Nonequilibrium Statistical Mechanics (Ox-ford Univ. Press, 2001). [7] A. J. Chorin, O. H. Hald, and R. Kupferman, “Optimal prediction and the Mori–Zwanzig representation of irre-versible processes,” Proc. Natl. Acad. Sci. USA 97 , 2968 (2000). [8] L. Onsager and S. Machlup, “Fluctuations and Irre-versible Processes,” Phys. Rev. 91 , 1505 (1953). [9] U. Seifert, “Stochastic thermodynamics, fluctuation the-orems and molecular machines,” Rep. Prog. Phys. 75 ,126001 (2012). [10] H. Ramsauer et al. , “Hopfield Networks is All You Need,” in Int. Conf. on Learning Representations (ICLR) 
+
+(2021). [11] S. Levine, “Reinforcement Learning and Control as Prob-abilistic Inference,” arXiv:1805.00909 (2018). [12] Y. Song et al. , “Score-Based Generative Modeling through Stochastic Differential Equations,” in Int. Conf. on Learning Representations (ICLR) (2021). [13] Y. Lipman, R. T. Q. Chen, H. Ben-Hamu, M. Nickel, and M. Le, “Flow Matching for Generative Modeling,” in Int. Conf. on Learning Representations (ICLR) (2023). [14] S. Raja et al. , “Action-Minimization Meets Generative Modeling: Efficient Transition Path Sampling with the Onsager–Machlup Functional,” in Proc. 42nd Int. Conf. on Machine Learning (ICML) , PMLR 267 , 50972 (2025). [15] C. Scheibner et al. , “Odd elasticity,” Nat. Phys. 16 , 475 (2020). [16] D. Sussillo and O. Barak, “Opening the Black Box: Low-Dimensional Dynamics in High-Dimensional Recurrent Neural Networks,” Neural Comput. 25 , 626 (2013). [17] B. Geshkovski, C. Letrouit, Y. Polyanskiy, and P. Rigol-let, “A mathematical perspective on Transformers,” arXiv:2312.10794 (2023). [18] C. W. Lynn et al. , “Broken detailed balance and entropy production in the human brain,” Proc. Natl. Acad. Sci. USA 118 , e2109889118 (2021). [19] D. Sekizawa, S. Ito, and M. Oizumi, “Decomposing ther-modynamic dissipation of linear Langevin systems via os-cillatory modes and its application to neural dynamics,” Phys. Rev. X 14 , 041003 (2024). [20] A. Frishman and P. Ronceray, “Learning Force Fields from Stochastic Trajectories,” Phys. Rev. X 10 , 021009 (2020). [21] C. Jarzynski, “Nonequilibrium Equality for Free Energy Differences,” Phys. Rev. Lett. 78 , 2690 (1997). [22] G. E. Crooks, “Entropy production fluctuation theorem and the nonequilibrium work relation for free energy dif-ferences,” Phys. Rev. E 60 , 2721 (1999). [23] C. Battle et al. , “Broken detailed balance at mesoscopic scales in active biological systems,” Science 352 , 604 (2016). [24] F. S. Gnesotto, F. Mura, J. Gladrow, and C. P. Broed-ersz, “Broken detailed balance and non-equilibrium dy-namics in living systems: a review,” Rep. Prog. Phys. 
+
+81 , 066601 (2018). [25] J. M. R. Parrondo, J. M. Horowitz, and T. Sagawa, “Thermodynamics of information,” Nat. Phys. 11 , 131 (2015). [26] A. Hyv¨ arinen, “Estimation of Non-Normalized Statistical Models by Score Matching,” J. Mach. Learn. Res. 6, 695 (2005). [27] J. Ho, A. Jain, and P. Abbeel, “Denoising Diffusion Probabilistic Models,” in Advances in Neural Informa-tion Processing Systems 33 (2020). [28] A. C. Barato and U. Seifert, “Thermodynamic Uncer-tainty Relation for Biomolecular Processes,” Phys. Rev. Lett. 114 , 158101 (2015). [29] S. Otsubo, S. Ito, A. Dechant, and T. Sagawa, “Estimat-ing entropy production by machine learning of short-time fluctuating currents,” Phys. Rev. E 101 , 062106 (2020). [30] D.-K. Kim, Y. Bae, S. Lee, and H. Jeong, “Learning Entropy Production via Neural Networks,” Phys. Rev. Lett. 125 , 140604 (2020).
