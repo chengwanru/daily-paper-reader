@@ -1,0 +1,1732 @@
+Title: A Generalization Theory for JEPA-Based World Models
+
+URL Source: https://arxiv.org/pdf/2606.27014v1
+
+Published Time: Fri, 26 Jun 2026 01:15:47 GMT
+
+Number of Pages: 16
+
+Markdown Content:
+Preprint 
+
+# A GENERALIZATION THEORY FOR JEPA-B ASED 
+
+# WORLD MODELS 
+
+Jingyi Cui 1∗ Qi Zhang 1∗ Hongwei Wen 2 Yisen Wang 1†
+
+> 1
+
+State Key Lab of General AI, School of Intelligence Science and Technology, Peking University 
+
+> 2
+
+University of Sydney 
+
+## ABSTRACT 
+
+Joint Embedding Predictive Architectures (JEPAs) have recently emerged as a promising paradigm for world modeling by learning predictive dynamics in a la-tent space rather than generating future observations at the input level. Despite their empirical success, the theoretical understanding of JEPA-based world mod-els remains limited. In this paper, we develop the first generalization theory for JEPA-based world models. We formulate JEPA pretraining as a conditional spec-tral graph learning problem and show that the JEPA objective is equivalent to a low-rank factorization of an action-conditioned co-occurrence matrix. Building on this characterization, we establish a connection between JEPA pretraining error and downstream planning regret, leading to a finite-sample generalization bound for JEPA-based world models. Our analysis reveals an inherent trade-off between approximation and sample errors with respect to the latent dimension, providing theoretical insights into the advantages and limitations of latent predictive models compared with input-level predictive approaches. 
+
+## 1 INTRODUCTION 
+
+Recent progress in self-supervised learning has increasingly shifted the focus of representation learning from discriminative objectives toward predictive world modeling. Among the emerging paradigms, Joint Embedding Predictive Architectures (JEPAs) (LeCun et al., 2022) excel by predict-ing latent-level information while avoiding the inefficiency of input-level generation. This perspec-tive has motivated a rapidly growing line of research on predictive latent world models, including V-JEPA (Assran et al., 2025), VL-JEPA (Chen et al., 2025), LeWM (Maes et al., 2026), etc. Despite the growing empirical success of JEPA world models, their theoretical understanding re-mains limited. Existing theoretical studies on JEPAs have primarily focused more on understanding JEPAs as a framework for latent space learning. Littwin et al. (2024) analyzed that JEPAs preferen-tially learn high-influence semantic features while suppressing noisy or weakly informative signals. Balestriero et al. (2025) reveals that JEPA anti-collapse regularization implicitly performs density estimation of the input observations. Very recently, Klindt et al. (2026) proved the identifiability of the Gaussian regularized JEPA world model. Nonetheless, these works either studied JEPA in the static representation learning setting or based the theoretical analysis on a parametric modeling. To the best of our knowledge, there is currently no theoretical framework explaining how JEPAs generalize as a world model framework in real-world action planning. As the action planning is conducted in the latent space whereas the planned actions are to be evaluated in the input-level downstream tasks, provable guarantees on downstream generalization is of vital importance. In this paper, we establish the first generalization theory for JEPA-based world models. Based on a conditioned spectral graph formulation, we established the equivalence between the JEPA pretrain-ing risk and matrix factorization of the co-occurrence matrix. Then by establishing the relationship between the downstream action planning regret and the pretrained JEPA risk, we derive the general-ization error bound for JEPA-based world models. The inherent trade-off between the approximation and sample error shown in this bound enables us to theoretically compare between the latent- and input-level predictive models. 
+
+> ∗
+
+Equal contribution 
+
+> †
+
+Corresponding author: Yisen Wang (yisen.wang@pku.edu.cn) 
+
+1
+
+> arXiv:2606.27014v1 [cs.LG] 25 Jun 2026
+
+Preprint Our contributions are as follows. • We for the first time establish a spectral graph based theoretical framework for JEPA-based world model, where we propose a conditioned co-occurrence matrix formulating the co-occurrence probability of the current and next state conditioned on the action. • We show that the JEPA risk is equivalent to a matrix factorization of the co-occurrence matrix conditioned on the actions, based on which we derive a generalization error bound for the JEPA-based world models. • Our theoretical results demonstrate an inherent trade-off between approximation and sam-ple error with respect to latent dimension, which can be used to demonstrate the advantages of latent- and input-level predictive models respectively. 
+
+## 2 RELATED WORKS 
+
+JEPA and JEPA-based world models. Joint-Embedding Predictive Architectures (JEPAs) provide a non-generative paradigm for self-supervised representation learning by predicting target represen-tations in latent space rather than reconstructing raw observations. I-JEPA (Assran et al., 2023) first applies this idea to images, while V-JEPA (Bardes et al., 2023) extends it to videos by predicting masked spatio-temporal features without pixel-level reconstruction. Recent works further use this paradigm for world modeling: V-JEPA 2 (Assran et al., 2025) trains an action-conditioned latent world model for robot planning, DINO-WM (Zhou et al., 2024) predicts future DINOv2 features for zero-shot planning, and LeWorldModel (Maes et al., 2026) learns an end-to-end JEPA-style world model directly from pixels. These methods show that latent feature prediction is an efficient alternative to pixel-level dynamics modeling. Despite the empirical success, theoretical guarantees of the JEPA-based world models are largely un-derexplored. The only existing research are conducted based on Gaussian-regularized JEPAs, where Balestriero et al. (2025) proved that the Gaussian regularization ensures input density estimation, and Klindt et al. (2026) provided identifiability results. Nonetheless, the generalization guarantees of JEPA-based world models are still lacking. 
+
+Spectral graph theory for representation learning. Spectral graph theory was introduced to self-supervised representation learning by HaoChen et al. (2021), who build generalization guarantees for self-supervised contrastive learning by formulating the similarity of the augmented data through the concept of augmentation graph. The theoretical framework was later extended to other repre-sentation learning paradigms, including unsupervised domain adaptation (Shen et al., 2022), multi-modal learning (Zhang et al., 2023), weakly supervised learning (Cui et al., 2023), autoregressive and masked self-supervised learning (SSL) (Zhang et al., 2024), and SSL with difficult examples (Zhang et al.). Recently, Balestriero & LeCun (2026) further brought forward a spectral graph theory of SSL that relies on harmonic analysis and spectral graph theory. Despite the theoretical research on representation learning, spectral graph theory has not yet been explored in JEPA-based world models which make predictions in the representation space. 
+
+## 3 MATHEMATICAL FORMULATIONS 
+
+3.1 PRETRAINING 
+
+JEPA pretraining objective. In the pretraining stage of JEPA, world models are learned by fore-casting future latent representations instead of reconstructing raw observations. Given a current observation x ∈ X := Rd and action a ∈ A , an encoder f : Rd → Rk maps the observation into a latent state z = f (x), while a predictor g : Rk × A → Rk estimates the latent representation of a future observation x+ ∈ X . The training objective minimizes the discrepancy between the predicted latent representation ˆz+ = g(f (x), a ) and the target latent embedding z+ = f (x+), i.e., 
+
+LJEPA (x, x +; f, g, a ) = ∥g(f (x), a ) − f (x+)∥2. (1) Note that the pretraining loss in equation 1 alone would leads to representation collapse. To prevent this, the JEPA-based models either use uniformity regularizations (Balestriero & LeCun, 2025; Maes 2Preprint 𝒂 𝟏 =“move forward”:                                              
+
+> 𝒂 𝟐 =“stay still”:
+> 𝑥 #𝑥 $
+> 𝑤 𝑥 #,𝑥 $,𝑎 #=1
+> 𝑤 𝑥 #,𝑥 #,𝑎 #=0𝑤 𝑥 #,𝑥 #,𝑎 #=1
+> 𝑤 𝑥 $,𝑥 #,𝑎 #=0
+> 𝑥 #𝑥 $
+> 𝑤 𝑥 #,𝑥 $,𝑎 $=0
+> 𝑤 𝑥 #,𝑥 #,𝑎 $=1𝑤 𝑥 #,𝑥 #,𝑎 $=1
+> 𝑤 𝑥 $,𝑥 #,𝑎 $=0𝑥 #𝑥 $
+
+Figure 1: An illustrative example of the graph relationship between world model inputs. (Left) Ob-servations of a car-moving example, where x1 and x2 represent two possible states of car locations. (Right) The transition probabilities from xi to xj , i, j ∈ { 1, 2} are conditioned on the actions a1
+
+and a2. The conditioned co-occurrence matrix M (a) is formed by assembling w(xi, x j , a ).et al., 2026) or techniques such as stop gradient and exponential moving average (Assran et al., 2025). In this paper, for the ease of theoretical analysis, we adopt a uniformity term inspired by spectral contrastive learning (HaoChen et al., 2021), and define the pretraining loss as 
+
+LJEPA = ∥g(f (x), a ) − f (x+)∥2 + g(f (x), a )⊤f (x′)2 . (2) For population risk, we assume the (x, x +) pairs are generated as follows: 1) sample x ∼ PX
+
+from Rd, and 2) given x and a ∈ A , sample x+ ∼ P( ·| x, a ). Then given action a, we define the pretraining risk as 
+
+RJEPA (f, g, a ) = Ex∼PX Ex+∼P( ·| x,a )∥g(f (x), a ) − f (x+)∥2 + E x∼PX
+
+> x′∼PX|a
+
+g(f (x), a )⊤f (x′)2 .
+
+(3) Then given action a ∈ A , we denote the optimal encoder and predictor under the population pre-training risk as 
+
+(f ∗, g ∗) = arg min  
+
+> f,g
+
+RJEPA (f, g, a ). (4) 
+
+Conditional co-occurrence matrix and matrix factorization. Inspired by previous works which introduced spectral graph theory to representation learning (HaoChen et al., 2021; Zhang et al., 2024), we here introduce a conditional co-occurrence matrix that formulates the co-occurrence re-lationship between (x, x +) pairs conditioned on the actions. Given action a ∈ A , for x, x + ∈ Rd, we denote w(x, x +, a ) := P( x, x +|a) ≥ 0 and denote the co-occurrence matrix 
+
+M (a) :=  w(x, x +, a ) 
+
+> x,x +∈Rd
+
+. (5) Note that different from the adjacency matrix formulated in HaoChen et al. (2021), our conditional co-occurrence matrix M (a) is asymmetric because typically we have w(x, x +, a )̸ = w(x+, x, a ).Also, compared with the co-occurrence matrix proposed in Zhang et al. (2024), our conditional co-occurrence matrix has an additional conditional relationship on the action variable a ∈ A . In Figure 1, we illustrate how a conditioned co-occurrence matrix M (a) is formulated by a two-state car-moving toy example. We denote the marginal probabilities as w(x) := P 
+
+> x+∈X
+
+w(x, x +, a ) and w(x+|a) := P 
+
+> x∈X
+
+w(x, x +, a ). Then according to the data generation process, we have w(x) = P X (x) and 
+
+w(x+|a) = P X|a(x+). Moreover, we denote the normalized co-occurance matrix as ¯M (a) := 
+
+D−1/2M (a)D−1/2+ (a), where D := diag( w(x)) x∈X and D+(a) := diag( w(x+|a)) x+∈X .In Theorem 3.1, we derive the equivalence between JEPA risk and the matrix factorization of ¯M (a).3Preprint 
+
+Theorem 3.1 (Equivalence between JEPA and matrix factorization) . Given a ∈ A , for normalized embedding functions f (x) and g(f (x), a ), we have 
+
+RJEPA (f, g, a ) = ∥ ¯M (a) − G(F, a )⊤F ∥2 + const ., (6) 
+
+where F := p w(x|a)f (x) 
+
+> x∈X
+
+and G(F, a ) := p w(x)g(f (x), a ) 
+
+> x∈X
+
+.
+
+In the following sections, for notational simplicity, we denote the matrix factorization risk as 
+
+RS-JEPA := ∥ ¯M (a) − G(F, a )⊤F ∥2.3.2 ACTION PLANNING 
+
+In the stage of action planning, we perform trajectory optimization in the latent space. For a T -step planning, given an initial observation x0, we randomly initialize a candidate action sequence 
+
+(a0, . . . , a T −1) and iteratively rollout predicted latent states up to a planning horizon. Action plan-ning is performed by optimizing the action sequence to minimize the difference between the pre-dicted latent and the latent of goal observation zg = f (xg ). Specifically, for t = 0 , . . . , T − 1, given predictor g, we denote 
+
+ˆzt+1 = g(ˆ zt, a t) (7) and 
+
+Lplan (a0, . . . , a T −1; f, g, x 0, x g ) = ∥ˆzT − zg ∥2 = ∥g (· · · g(f (x0), a 0) . . . , a T −1) − f (xg )∥2.
+
+(8) Then given the optimal encoder f ∗ and predictor g∗, for an initial observation x0, we denote the optimal action sequence as 
+
+(a∗
+
+> 0
+
+, . . . , a ∗ 
+
+> T−1
+
+) = arg min  
+
+> a0,...,a T−1
+
+Lplan (a0, . . . , a T −1; f ∗, g ∗, x 0, x g ). (9) 3.3 EVALUATION 
+
+Recall that in pretraining and action planning, the prediction is conducted in the latent space. By contrast, the planned actions are to be utilized in the input-space downstream tasks. Therefore, we evaluate the planned actions by measuring the predicted goal observation in the input space. Specifically, given initial observation x0, we obtain the T -step interatively rollout prediction ˆxT by 
+
+P(ˆ xt+1 |ˆxt, a ) for t = 1 , . . . , T − 1 and P(ˆ x1|x0, a ). By Bayes formula, we have P(ˆ xt+1 |ˆxt, a ) = 
+
+w(ˆ xt, ˆxt+1 , a )/w (ˆ xt). Then we have 
+
+V (a0, . . . , a T −1) = P(ˆ xT = xg |x0, a 0, . . . , a T −1)= X 
+
+> x1,...,x T−1
+
+P(ˆ xT = xg |xT −1, a T −1) · · · P(ˆ x1 = x1|x0, a 0)= X 
+
+> x1,...,x T−1
+
+w(xT −1, x g , a T −1)
+
+w(xT −1) · · · w(x0, x 1, a 0)
+
+w(x0) . (10) By denoting a∗∗ = arg max a V (a), we define the pointwise regret as 
+
+r(a0, . . . , a T −1) = V (a∗∗ ) − V (a). (11) Then we denote the expected planning regret as 
+
+E(a) = Ex0,x g r(a0, . . . , a T −1). (12) 3.4 FINITE -S AMPLE OPTIMA 
+
+To derive a finite-sample error bound for the JEPA framework, we first define the empirical JEPA risk in Definition 3.2. 
+
+Definition 3.2 (Empirical JEPA risk) . Consider a dataset ˆX = {x1, . . . , x n} containing n data points i.i.d. sampled from PX . Let ˆPX be the uniform distribution over ˆX . Let ˆPx,x ′ be the uniform 4Preprint distribution over data pairs (xi, x j ) where i̸ = j. We define the empirical spectral JEPA loss of a feature extractor f as 
+
+ˆRn(f, g, a ) := −2Ex∈ˆPX ,x +∼P( ·| x,a )
+
+g(f (x), a )⊤f (x′)
+
++ Ex,x −∈ˆPx,x − ,x ′∼P( ·| x−,a )
+
+g(f (x), a )⊤f (x′)2 . (13) Lemma 3.3 shows that ˆRn(f ) is an unbiased estimator of population spectral JEPA loss. 
+
+Lemma 3.3. ˆRn(f, g, a ) is an unbiased estimator of R(f, g, a ), i.e., 
+
+E ˆX
+
+h ˆRn(f, g, a )
+
+i
+
+= R(f, g, a ). (14) 
+
+Definition 3.4. Given dataset ˆX , we sample a subset of tuples as follows: first sample a permutation 
+
+π : [ n] → [n]. Then given a ∈ A , we sample tuple S = {(zi, z + 
+
+> i
+
+, z ′
+
+> i
+
+)}n/ 2 
+
+> i=1
+
+as follows: 
+
+zi = xπ2i−1 , z+ 
+
+> i
+
+∼ P( ·| zi, a ), z′ 
+
+> i
+
+∼ P( ·| xπ2i , a ). (15) We define the following loss on S:
+
+ˆRS (f, g, a ) = 1
+
+n/ 2
+
+> n/ 2
+
+X
+
+> i=1
+
+h g(f (zi), a )⊤f (z′
+
+> i
+
+)2 − 2g(f (zi), a )⊤f (z+ 
+
+> i
+
+)
+
+i
+
+. (16) In Lemma 3.5, we see that ˆRS (f, g, a ) is an unbiased estimator of ˆRn(f, g, a ).
+
+Lemma 3.5. Given ˆX , we have 
+
+ES ˆRS (f, g, a ) = ˆRn(f, g, a ). (17) Then given a ∈ A , we define the finite-sample optima of the encoder f and predictor g as 
+
+ˆf , ˆg = arg min 
+
+> f,g
+
+ˆRS (f, g, a ). (18) Then given the initial observation x0 and the goal observation xg , we define the finite-sample optimal action sequence as 
+
+(ˆ a0, . . . , ˆaT −1) = arg min  
+
+> a0,...,a T−1
+
+Lplan (a0, . . . , a T −1; ˆf , ˆg, x 0, x g ). (19) 
+
+## 4 GENERALIZATION ERROR BOUNDS 
+
+In this section, we derive the generalization error bounds for the downstream action planning error of JEPA-based world models. 4.1 EVALUATION ERROR FOR ACTION PLANNING 
+
+First, we study the evaluation error for single-step and multi-step action planning. We note that Theorems 4.1 and 4.2 are among the key theoretical results of this paper, revealing why an action series planned in the latent space generalizes well in the downstream evaluation on input-space samples. 
+
+Theorem 4.1 (Single-Step Planning) . When T = 1 , if we assume that Exg w(xg |a) = Exg w(xg |a′)
+
+for a, a ′ ∈ A . For arbitrary f and g, if we define 
+
+˜a = arg min  
+
+> a
+
+Lplan (a; f, g ), (20) 
+
+then we have 
+
+E(˜ a) ≤ 2c0 · max 
+
+> a
+
+pRS-JEPA (f, g, a ), (21) 
+
+where c0 := Ex0,x g
+
+pmax a w(xg |a)/w (x0).
+
+5Preprint Theorem 4.1 shows that for single-step planning, the expected planning regret is upper bounded by the pretraining risk of S-JEPA. That is, if an encoder f and predictor g makes the pretraining risk small enough, then the action ˜a optimized under f and g is good enough for the downstream action planning task. 
+
+Theorem 4.2 (Multi-Step Planning) . When T > 1, if we assume that Exg w(xg |a) = Exg w(xg |a′)
+
+for a, a ′ ∈ A , and M (a) is deterministic, i.e., given a ∈ A and x ∈ X , for x+ ∈ X there exists 
+
+w(x, x +, a ) = 1 and w(x, x ′, a ) = 0 for x′̸ = x+. Then for arbitrary f and g, by defining 
+
+˜a0, . . . , ˜aT −1 = arg min  
+
+> a0,...a T−1
+
+Lplan (a0, . . . , a T −1; f, g ), (22) 
+
+we have 
+
+E(˜ a0, . . . , ˜aT ) ≤ 2T c 3 · qmax  
+
+> a
+
+RS-JEPA (f, g, a ), (23) 
+
+where c3 := max a,x 0,x g
+
+pw(xg |a)/w (x0).
+
+In Theorem 4.2, we derive the evaluation error bound for multi-step action planning. Compared with Theorem 4.1, the T -step planning regret is approximately T times the single-step planning regret, explaining that longer planning horizon leads to higher planning error due to error accumulation. Also note that compared with Theorem 4.1, Theorem 4.2 requires a slightly stronger assumption that ¯M (a) is deterministic. This assumption adheres to real world dynamic systems, where given a prior observation xt and action at, the next observation xt+1 should be deterministically determined. 4.2 ERROR ANALYSIS FOR JEPA P RETRAINING RISK 
+
+In the following, we analyze the approximation error and sample error for the S-JEPA pretraining risk respectively. 
+
+Theorem 4.3 (Approximation Error for Spectral JEPA Risk) . Given a ∈ A , the optimal population risk equals 
+
+RS-JEPA (f ∗, g ∗, a ) = X
+
+> i>k
+
+σ2 
+
+> i
+
+(a), (24) 
+
+where σi(a) is the i-th largest singular value of ¯M (a).
+
+In Theorem 4.3, we show that as the approximation error of S-JEPA risk is determined by the singular values of the conditioned co-occurrence matrix. As the latent dimension k increases, the approximation error decreases. 
+
+Theorem 4.4 (Sample Error Bound for Spectral JEPA Risk) . Assume that ∥f ∥∞ < κ and ∥g∥∞ < κ 
+
+for all f ∈ F and g ∈ G . Fix a ∈ A . Then, with probability at least 1 − δ, we have 
+
+RS-JEPA ( ˆf , ˆg, a ) − R S-JEPA (f ∗, g ∗, a )
+
+≤ c1
+
+Rn/ 2(G ◦ F ) + Rn/ 2(F) + c2
+
+r log(2 /δ )
+
+n + δ
+
+!
+
+, (25) 
+
+where c1 := 32 k2κ3 + 32 kκ , c2 := 8 kκ 2 + 2 k2κ4, and 
+
+Rn(G ◦ F ) = max  
+
+> (zi,z ′
+> i,z +
+> i)ni=1
+
+Eσ
+
+"
+
+sup  
+
+> f∈F , g ∈G
+
+1
+
+m
+
+> m
+
+X
+
+> i=1
+
+σi
+
+ g(f (zi), a )⊤f (z′
+
+> i
+
+)2 − 2g(f (zi), a )⊤f (z+ 
+
+> i
+
+)
+
+#
+
+,
+
+Rn(F) = max  
+
+> k
+
+max 
+
+> {zi}ni=1
+
+Eσ
+
+"
+
+sup  
+
+> f∈F , g ∈G
+
+1
+
+m
+
+> m
+
+X
+
+> i=1
+
+σifk(zi)
+
+#
+
+.
+
+In Theorem 4.4, we show the sample error bound of S-JEPA risk, which depends on the Rademacher complexities Rn(G ◦ F ) and Rn(F). Note that as the latent dimension k increases, both the out-put dimensions of g ◦ f ∈ G ◦ F and f ∈ F increase, so typically we have larger Rademacher complexities and accordingly larger sample error. 6Preprint 4.3 FINITE -S AMPLE ERROR BOUNDS FOR ACTION PLANNING 
+
+Based on Theorems in the previous sections, we can now derive the finite-sample generalization error bound for action planning in Theorems 4.5 and 4.6. 
+
+Theorem 4.5 (Finite-Sample Error Bound for Single-Step Planning) . For some κ > 0, assume 
+
+∥g(f (x), a )∥∞ ≤ κ and ∥f (x)∥∞ ≤ κ for all f , g, and a. Assume that all Rn/ 2(G ◦ F ) are of the same order regardless of a. Then for T = 1 , with probability at least 1 − δ, we have 
+
+E(ˆ a) ≤ 2c0 ·
+
+vuuuuut
+
+max 
+
+> a
+
+X
+
+> i>k
+
+σ2 
+
+> i
+
+(a)
+
+| {z }
+
+> Approximaition Error
+
++ c1 [Rn(G ◦ F )Rn(F)] + c2 ·
+
+r log 2 /δ n + δ
+
+!| {z }
+
+> Sample Error
+
++c, (26) 
+
+where c3 := max a,x 0,x g
+
+pw(xg |a)/w (x0), c1 := 16 k2κ2 + 16 k2κ, c2 := 8 kκ 2 + 2 k2κ4, and 
+
+c := 2 − Ex0,x g max a w(x0,x g ,a )2  
+
+> w(x0)w(xg|a)
+
+.
+
+In Theorem 4.5, we show the finite-sample error bound for single-step planning. Given sample size 
+
+n, there is a trade-off between the approximation error term and sample error term with respect to the latent dimension k. That is, larger k leads to smaller max a
+
+P 
+
+> i>k
+
+σ2 
+
+> i
+
+(a) but larger c1, c2, and 
+
+Rn(G ◦ F ) + Rn(F). Moreover, as input-level predictive models can be viewed as special cases of the latent level ones, where k = n and f degenerates to an identity mapping. In this case, we have zero approximation error but the largest sample error. 
+
+Theorem 4.6 (Finite-Sample Error Bound for Multi-Step Planning) . For some κ > 0, assume 
+
+∥g(f (x), a )∥∞ ≤ κ and ∥f (x)∥∞ ≤ κ for all f , g, and a, and M (a) is deterministic. Assume that all Rn/ 2(G ◦ F ) are of the same order regardless of a. Then for T > 1, with probability at least 
+
+1 − δ, we have 
+
+E(ˆ a) ≤ 2c3T ·
+
+vuuuuut
+
+max 
+
+> a
+
+X
+
+> i>k
+
+σ2 
+
+> i
+
+(a)
+
+| {z }
+
+> Approximaition Error
+
++ c1 [Rn(G ◦ F ) + Rn(F)] + c2 ·
+
+r log 2 /δ n + δ
+
+!| {z }
+
+> Sample Error
+
++c, 
+
+(27) 
+
+where c0 := Ex0,x g
+
+pmax a w(xg |a)/w (x0), c1 := 16 k2κ2 + 16 k2κ, c2 := 8 kκ 2 + 2 k2κ4, and 
+
+c := 2 − Ex0,x g max a w(x0,x g ,a )2  
+
+> w(x0)w(xg|a)
+
+.
+
+In Theorem 4.6, we show the finite-sample error bound for multi-step action planning. The error trade-off w.r.t. the latent dimension k is similar to the single-step planning case. 4.4 APPROXIMATION AND SAMPLE ERROR TRADE -OFF 
+
+The above bounds reveal an intrinsic trade-off between the Approximation Error and the Sample Error , governed by the latent dimension k. On the one hand, a smaller latent dimension imposes a stronger information bottleneck, which reduces the complexity of the learned encoder and pre-dictor and therefore leads to a smaller Sample Error. However, such compression may discard action-relevant transition information, resulting in a larger Approximation Error. On the other hand, increasing k allows the latent model to preserve more singular components of the action-conditioned co-occurrence matrix, thereby reducing the Approximation Error. This benefit comes at the cost of a larger hypothesis space and higher sample complexity, which increases the Sample Error. There-fore, latent predictive models are most advantageous when a moderate-dimensional representation can retain the task-relevant dynamics while filtering out nuisance or unpredictable input-level vari-ations. In contrast, input-level predictive models can be viewed as an extreme case with minimal Approximation Error but potentially maximal Sample Error, since they are required to model all observation dimensions, including those irrelevant to downstream planning. 7Preprint 
+
+## 5 VALIDATION EXPERIMENTS 
+
+In this part, we conduct validation experiments to compare between latent- and input-level predictive models. 
+
+Settings. We consider a fully controlled synthetic continuous-control environment to compare two training paradigms for action-conditioned world models. The environment is a 2D point-mass system whose underlying state is st = [ px, p y , v x, v y ], with action at = [ ax, a y ]. The dy-namics are governed by vt+1 = damping · vt + action scale · at and pt+1 = pt + dt · vt+1 .The model does not have direct access to the true state. Instead, it observes a vector observa-tion xt = [ state features (st), nuisance features , random noise features ], where state features are generated from position and velocity and contain task-relevant information, nuisance features are additional observation dimensions obtained through nonlinear projections of the state, and ran-dom noise features are observation dimensions that are independent of both actions and task ob-jectives and are therefore inherently unpredictable. The upstream learning task is action-conditioned future prediction. Given the current observation 
+
+xt and an action sequence at+H−1, the model predicts the future representation at time t + H.Unless otherwise specified, we use a training horizon of H = 3 , corresponding to learning ei-ther xt, [at, a t+1 , a t+2 ] 7 → xt+3 for input-level reconstruction, or xt, [at, a t+1 , a t+2 ] 7 → zt+3 for latent-level prediction. Both paradigms share the same JEPA-style backbone consisting of an en-coder xt → zt, an action encoder, a GRU-based dynamics predictor, and a decoder z → x. In the latent-level paradigm, the predictor outputs a future latent representation and is trained using 
+
+MSE(ˆ zt+H , stopgrad(Enc( xt+H ))) , supplemented with a lightweight variance regularization term. In the input-level paradigm, the predicted latent representation is decoded back into observation space and optimized using MSE(ˆ xt+H , x t+H ). To explicitly study the impact of irrelevant observa-tion noise, we introduce a coefficient noise loss weight that increases the reconstruction weight of the unpredictable noise dimensions. The downstream task is goal-reaching planning. For each episode, a start state and a goal state are sampled. The agent performs receding-horizon planning using the Cross-Entropy Method (CEM): it repeatedly plans a short action sequence, executes only the first action, receives a new obser-vation, and replans until either the goal is reached or a step budget is exhausted. The parameter required planning steps characterizes the intrinsic difficulty of the task, i.e., approximately how many closed-loop decisions are required to reach the goal. Planning objectives are defined differ-ently for the two paradigms. In latent mode, the planning cost is |ˆz − zgoal |, whereas in input mode 0.0 0.2 0.4 0.6 0.8 1.0                           
+
+> observation noise std
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> success rate
+> required_steps=1
+> 0.0 0.2 0.4 0.6 0.8 1.0
+> observation noise std
+> required_steps=5
+> 0.0 0.2 0.4 0.6 0.8 1.0
+> observation noise std
+> required_steps=10
+> 0.0 0.2 0.4 0.6 0.8 1.0
+> observation noise std
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> required_steps=15
+> 0.0 0.2 0.4 0.6 0.8 1.0
+> observation noise std
+> required_steps=20
+> 0.0 0.2 0.4 0.6 0.8 1.0
+> observation noise std
+> required_steps=25
+> input latent
+
+Figure 2: Comparisons between latent- and input-level predictive models on synthetic data under various planning steps and noise levels. Both methods perform well on short-horizon tasks, while latent prediction shows advantages under higher noise and more required planning steps. 8Preprint it is |ˆx − xgoal |. However, all evaluations are conducted in the ground-truth state space using the Euclidean distance between positions, ensuring a fair comparison across methods. A rollout is con-sidered successful if |pcurrent − pgoal | ≤ 0.08 . We report the success rate to compare between input-and latent-level predictions. 
+
+Results. Figure 2 compares input-level reconstruction and latent-level prediction across different observation noise levels and required planning steps. For easy tasks, where the goal can be reached within only 1 or 5 steps, both methods achieve nearly perfect success rates, indicating that the difference between the two training objectives is not significant when the planning problem is short and simple. When the required number of steps increases to 10, input-level prediction still performs very well at low noise levels, while latent-level prediction is initially worse but gradually becomes comparable as the noise level increases. This suggests that input reconstruction can be sufficient when the task-relevant dynamics are easy to recover from observations. The advantage of latent-level prediction becomes clearer in harder long-horizon settings. For re-quired steps of 15 and 20, the two methods are close at low noise levels, but latent-level prediction tends to be more stable and better under larger observation noise. The difference is most evident when required steps reach 25: input-level prediction drops sharply as the task becomes difficult, whereas latent-level prediction maintains a noticeably higher success rate over most noise levels. These results suggest that latent prediction is not universally superior in all regimes, but it becomes more beneficial when planning requires long-horizon and robust decisions. By avoiding direct re-construction of the full observation space, latent-level prediction can focus more on action-relevant state information, which leads to better robustness in challenging long-horizon control tasks. These empirical observations also coincide with the theoretical results in Theorems 4.5 and 4.6. From a theoretical perspective, the approximation error of latent-level prediction is less affected by input noise, resulting in smaller evaluation error, and making latent-level predictions perform better under high noise levels. Besides, as the long-horizon planning is conducted in an iterative rollout manner, the t-th step estimation can be viewed as a noisy version of the true state, i.e., ˆxt = xt + ε.Therefore, latent-level predictions, which are less affected by noise, can give better success rates in long-horizon planning. 
+
+## 6 CONCLUSION 
+
+We established the first generalization theory for JEPA-based world models. Through a conditioned spectral graph framework, we showed that JEPA pretraining risk is equivalent to a matrix factor-ization of the conditioned co-occurrence matrix. This characterization enabled us to relate the pre-trained JEPA risk to downstream planning performance and derive a generalization bound for JEPA-based world models. Our results identify an inherent approximation-sample error trade-off with respect to latent dimensionality, providing theoretical insights into the advantages and limitations of latent-versus input-level predictive modeling. In the experiments, we showcase two situations of advantageous latent-level prediction, i.e., high noise and long-horizon planning, that validate the theoretical insights. Our theoretical framework has a potential to a broader classes of predictive world model architectures. 
+
+## REFERENCES 
+
+Mahmoud Assran, Quentin Duval, Ishan Misra, Piotr Bojanowski, Pascal Vincent, Michael Rabbat, Yann LeCun, and Nicolas Ballas. Self-supervised learning from images with a joint-embedding predictive architecture. In CVPR , 2023. Mido Assran, Adrien Bardes, David Fan, Quentin Garrido, Russell Howes, Matthew Muckley, Am-mar Rizvi, Claire Roberts, Koustuv Sinha, Artem Zholus, et al. V-jepa 2: Self-supervised video models enable understanding, prediction and planning. arXiv preprint arXiv:2506.09985 , 2025. Randall Balestriero and Yann LeCun. Lejepa: Provable and scalable self-supervised learning with-out the heuristics. arXiv preprint arXiv:2511.08544 , 2025. Randall Balestriero and Yann LeCun. Spectral graph theory: The mathematics of self-supervised learning [special issue on the mathematics of deep learning]. IEEE Signal Processing Magazine ,43(3):8–20, 2026. 9Preprint Randall Balestriero, Nicolas Ballas, Mike Rabbat, and Yann LeCun. Gaussian embeddings: How jepas secretly learn your data density. arXiv preprint arXiv:2510.05949 , 2025. Adrien Bardes, Quentin Garrido, Jean Ponce, Xinlei Chen, Michael Rabbat, Yann LeCun, Mido Assran, and Nicolas Ballas. V-jepa: Latent video prediction for visual representation learning. 2023. Delong Chen, Mustafa Shukor, Theo Moutakanni, Willy Chung, Jade Yu, Tejaswi Kasarla, Yejin Bang, Allen Bolourchi, Yann LeCun, and Pascale Fung. Vl-jepa: Joint embedding predictive architecture for vision-language. arXiv preprint arXiv:2512.10942 , 2025. Jingyi Cui, Weiran Huang, Yifei Wang, and Yisen Wang. Rethinking weak supervision in helping contrastive learning. In ICML , 2023. Jeff Z HaoChen, Colin Wei, Adrien Gaidon, and Tengyu Ma. Provable guarantees for self-supervised deep learning with spectral contrastive loss. NeurIPS , 2021. David Klindt, Yann LeCun, and Randall Balestriero. When does lejepa learn a world model? arXiv preprint arXiv:2605.26379 , 2026. Yann LeCun et al. A path towards autonomous machine intelligence version 0.9. 2, 2022-06-27. 
+
+Open Review , 62(1):1–62, 2022. Etai Littwin, Omid Saremi, Madhu Advani, Vimal Thilak, Preetum Nakkiran, Chen Huang, and Joshua Susskind. How jepa avoids noisy features: The implicit bias of deep linear self distillation networks. NeurIPS , 2024. Lucas Maes, Quentin Le Lidec, Damien Scieur, Yann LeCun, and Randall Balestriero. Leworld-model: Stable end-to-end joint-embedding predictive architecture from pixels. arXiv preprint arXiv:2603.19312 , 2026. Kendrick Shen, Robbie M Jones, Ananya Kumar, Sang Michael Xie, Jeff Z HaoChen, Tengyu Ma, and Percy Liang. Connect, not collapse: Explaining contrastive learning for unsupervised domain adaptation. In ICML , 2022. Qi Zhang, Yifei Wang, and Yisen Wang. On the generalization of multi-modal contrastive learning. In ICML , 2023. Qi Zhang, Tianqi Du, Haotian Huang, Yifei Wang, and Yisen Wang. Look ahead or look around? a theoretical comparison between autoregressive and masked pretraining. In ICML , 2024. Yi-Ge Zhang, Jingyi Cui, Qiran Li, and Yisen Wang. Difficult examples hurt unsupervised con-trastive learning: A theoretical perspective. In ICLR .Gaoyue Zhou, Hengkai Pan, Yann LeCun, and Lerrel Pinto. Dino-wm: World models on pre-trained visual features enable zero-shot planning. arXiv preprint arXiv:2411.04983 , 2024. 10 Preprint 
+
+## A APPENDIX 
+
+A.1 PROOFS 
+
+Proof of Theorem 3.1. By the definition of JEPA risk in equation 3, given a ∈ A , we have 
+
+RJEPA (f, g, a )= Ex∼PX Ex+∼P( ·| x,a )∥g(f (x), a ) − f (x+)∥2 + E x∼PX
+
+> x′∼PX|a
+
+g(f (x), a )⊤f (x′)2
+
+= X
+
+> x,x +
+
+w(x, x +, a )∥g(f (x), a ) − f (x+)∥2 + X
+
+> x,x ′
+
+w(x)w(x′|a) g(f (x), a )⊤f (x′)2
+
+= 2 − 2 X
+
+> x,x +
+
+w(x, x +, a )g(f (x), a )⊤f (x+) + X
+
+> x,x +
+
+w(x)w(x+|a) g(f (x), a )⊤f (x+)2
+
+= X
+
+> x,x +
+
+"
+
+w(x, x +, a )
+
+pw(x)w(x+|a) −
+
+hp w(x)g(f (x), a )
+
+i⊤ hp w(x+|a)f (x+)
+
+i#2
+
++ 2 − w(x, x +, a )2
+
+w(x)w(x+|a)
+
+(28) where the third equation holds because ∥g(f (x), a )∥2 = ∥f (x+)∥2 = 1 . Then by denoting F := p w(x|a)f (x) 
+
+> x∈X
+
+and G(F, a ) := p w(x)g(f (x), a ) 
+
+> x∈X
+
+, we have 
+
+RJEPA (f, g, a ) = ∥ ¯M (a) − G(F, a )⊤F ∥2 + const . (29) 
+
+Proof of Theorem 4.1. If T = 1 , by definition, we have 
+
+˜a = arg min  
+
+> a
+
+∥g(f (x0), a ) − f (xg )∥2 = arg max  
+
+> a
+
+g(f (x0), a )⊤f (xg ), (30) and 
+
+a∗∗ = arg max  
+
+> a
+
+V (a) = arg max  
+
+> a
+
+w(xg , x 0, a ). (31) Then for given x0 and xg , we have 
+
+r(˜ a; x0, x g )= w(x0, x g , a ∗∗ )
+
+w(x0) − w(x0, x g , ˜a)
+
+w(x0)= 1
+
+w(x0) [w(x0, x g , a ∗∗ ) − w(x0, x g , ˜a)] = 1
+
+w(x0)
+
+w(x0, x g , a ∗∗ ) − w(x0)w(xg |a∗∗ )g(f (x0), a ∗∗ )⊤f (xg )+ w(x0)w(xg |a∗∗ )g(f (x0), a ∗∗ )⊤f (xg ) − w(x0)w(xg |˜a)g(f (x0), ˜a)⊤f (xg )+ w(x0)w(xg |˜a)g(f (x0), ˜a)⊤f (xg ) − w(x0, x g , ˜a).
+
+=
+
+s
+
+w(xg |a∗∗ )
+
+w(x0)
+
+ w(x0, x g , a ∗∗ )
+
+pw(x0)w(xg |a∗∗ ) −
+
+q
+
+w(x0)w(xg |a∗∗ )g(f (x0), a ∗∗ )⊤f (xg )
+
+
+
+(32) 
+
++ w(xg |a∗∗ ) − w(xg |˜a)g(f (x0), a ∗∗ )⊤f (xg ) (33) 
+
++ w(xg |˜a)g(f (x0), a ∗∗ )⊤f (xg ) − g(f (x0), ˜a)⊤f (xg ) (34) 
+
+−
+
+s
+
+w(xg |˜a)
+
+w(x0)
+
+ w(x0, x g , ˜a)
+
+pw(x0)w(xg |˜a) −
+
+q
+
+w(x0)w(xg |˜a)g(f (x0), ˜a)⊤f (xg )
+
+
+
+. (35) Denote δ(x0, x g , a ) := w(x0,x g ,a )
+
+√w(x0)w(xg |a) − pw(x0)w(xg |a)g(f (x0), a )⊤f (xg ), then we have 
+
+(32) = 
+
+q
+
+w(xg |a∗∗ )/w (x0)δ(x0, x g , a ∗∗ ) (36) 11 Preprint and 
+
+(35) = −
+
+q
+
+w(xg |˜a)/w (x0)δ(x0, x g , ˜a). (37) Recall that RS-JEPA (f, g, a ) = P 
+
+> x0,x g
+
+δ(x0, x g , a )2. Then we have 
+
+r(˜ a; x0, x g ) ≤
+
+q
+
+w(xg |a∗∗ )/w (x0) · δ(x0, x g , a ∗∗ ) + 
+
+q
+
+w(xg |˜a)/w (x0) · δ(x0, x g , ˜a)+ [ w(xg |a∗∗ ) − w(xg |˜a)] g(f (x0), a ∗∗ )⊤f (xg )
+
+≤
+
+q
+
+w(xg |a∗∗ )/w (x0) · R S-JEPA (f, g, a ∗∗ ) + 
+
+q
+
+w(xg |˜a)/w (x0) · R S-JEPA (f, g, ˜a)+ w(xg |a∗∗ ) − w(xg |˜a)
+
+≤ 2qmax  
+
+> a
+
+w(xg |a)/w (x0) · R S-JEPA (f, g, a ) + w(xg |a∗∗ ) − w(xg |˜a)
+
+≤ 2qmax  
+
+> a
+
+w(xg |a)/w (x0) · qmax  
+
+> a
+
+RS-JEPA (f, g, a ) + w(xg |a∗∗ ) − w(xg |˜a). (38) Then if Exg w(xg |a) = Exg w(xg |a′) for a, a ′ ∈ A , we have 
+
+E(a∗) = Ex0,x g r(˜ a; x0, x g ) ≤ 2Ex0,x g
+
+qmax  
+
+> a
+
+w(xg |a)/w (x0) · max 
+
+> a
+
+pRS-JEPA (f, g, a ). (39) 
+
+Proof of Theorem 4.2. By definition, given x0 and xg , we have 
+
+r(˜ a0, . . . , ˜aT −1)= V (a∗∗ ) − V (˜ a)= P(ˆ xT = xg |x0, a ∗∗  
+
+> 0
+
+, . . . , a ∗∗  
+
+> T−1
+
+) − P(ˆ xT = xg |x0, ˜a0, . . . , ˜aT −1)= X 
+
+> x1,...,x T−1
+
+w(xT −1, x g , a ∗∗  
+
+> T−1
+
+)
+
+w(xT −1) · · · w(x0, x 1, a ∗∗  
+
+> 0
+
+)
+
+w(x0) − w(xT −1, x g , ˜aT −1)
+
+w(xT −1) · · · w(x0, x 1, ˜a0)
+
+w(x0)= X 
+
+> x1,...,x T−1
+
+w(xT −1, x g , a ∗∗  
+
+> T−1
+
+)
+
+w(xT −1) · · · w(x0, x 1, a ∗∗  
+
+> 0
+
+)
+
+w(x0) − w(xT −1, x g , a ∗∗  
+
+> T−1
+
+)
+
+w(xT −1) · · · w(x0, x 1, ˜a0)
+
+w(x0)+ · · · 
+
++ w(xT −1, x g , ˆa∗ 
+
+> T−1
+
+)
+
+w(xT −1) · · · w(x0, x 1, ˆa∗
+
+> 0
+
+)
+
+w(x0) − w(xT −1, x g , ˆaT −1)
+
+w(xT −1) · · · w(x0, x 1, ˆa0)
+
+w(x0)= X  
+
+> x1,...,x T−1
+> T−1
+
+Y
+
+> t=0
+
+w(xt, x t+1 , a ∗∗  
+
+> t
+
+)
+
+w(xt) − 
+
+> T−1
+
+Y
+
+> t=0
+
+w(xt, x t+1 , ˜at)
+
+w(xt)= X  
+
+> x1,...,x T−1
+> T−1
+
+X
+
+> ℓ=0
+> ℓ
+
+Y
+
+> t=0
+
+w(xt, x t+1 , a ∗∗  
+
+> t
+
+)
+
+w(xt) · 
+
+> T−1
+
+Y
+
+> t=ℓ+1
+
+w(xt, x t+1 , ˜at)
+
+w(xt) −
+
+> ℓ−1
+
+Y
+
+> t=0
+
+w(xt, x t+1 , a ∗∗  
+
+> t
+
+)
+
+w(xt) · 
+
+> T−1
+
+Y
+
+> t=ℓ
+
+w(xt, x t+1 , ˜at)
+
+w(xt)= X  
+
+> x1,...,x T−1
+> T−1
+
+X
+
+> ℓ=0
+> ℓ−1
+
+Y
+
+> t=0
+
+w(xt, x t+1 , a ∗∗  
+
+> t
+
+)
+
+w(xt) ·
+
+ w(xℓ, x ℓ+1 , a ∗∗  
+
+> ℓ
+
+)
+
+w(xℓ) − w(xℓ, x ℓ+1 , ˜aℓ)
+
+w(xℓ)
+
+
+
+· 
+
+> T−1
+
+Y
+
+> t=ℓ+1
+
+w(xt, x t+1 , ˜at)
+
+w(xt) .
+
+(40) By Theorem 4.1, we have for ℓ = 0 , . . . , T − 1
+
+w(xℓ, x ℓ+1 , a ∗∗  
+
+> ℓ
+
+)
+
+w(xℓ) − w(xℓ, x ℓ+1 , ˜aℓ)
+
+w(xℓ) ≤ 2qmax  
+
+> a
+
+w(xℓ+1 |a)/w (xℓ) · qmax  
+
+> a
+
+RS-JEPA (f, g, a ).
+
+(41) 12 Preprint Then if M (a) is deterministic, i.e., given a ∈ A and x ∈ X , for x+ ∈ X there exists w(x, x +, a ) = 1 and w(x, x ′, a ) = 0 for x′̸ = x+, we have 
+
+r(˜ a0, . . . , ˜aT −1)
+
+≤ X  
+
+> x1,...,x T−1
+> T−1
+
+X
+
+> ℓ=0
+> ℓ−1
+
+Y
+
+> t=0
+
+w(xt, x t+1 , a ∗∗  
+
+> t
+
+)
+
+w(xt) · 
+
+> T−1
+
+Y
+
+> t=ℓ+1
+
+w(xt, x t+1 , ˜at)
+
+w(xt)
+
+· 2qmax  
+
+> a
+
+w(xℓ+1 |a)/w (xℓ) · qmax  
+
+> a
+
+RS-JEPA (f, g, a )= 
+
+> T−1
+
+X
+
+> ℓ=0
+
+X 
+
+> x1,...,x T−1
+> ℓ−2
+
+Y
+
+> t=0
+
+w(xt, x t+1 , a ∗∗  
+
+> t
+
+)
+
+w(xt) · 
+
+> T−1
+
+Y
+
+> t=ℓ+1
+
+w(xt, x t+2 , ˜at)
+
+w(xt)
+
+· w(xℓ−1, x ℓ, a ∗∗ 
+
+> ℓ−1
+
+)
+
+w(xℓ−1) · w(xℓ+1 , x ℓ+2 , a ∗∗ 
+
+> ℓ+1
+
+)
+
+w(xℓ+1 ) · 2qmax  
+
+> a
+
+w(xℓ+1 |a)/w (xℓ) · qmax  
+
+> a
+
+RS-JEPA (f, g, a )
+
+≤ 
+
+> T−1
+
+X
+
+> ℓ=0
+
+X
+
+> xℓ
+
+P( xℓ|x0, a ∗∗  
+
+> 0
+
+, . . . , a ∗∗ 
+
+> ℓ−1
+
+)P( xg |xℓ, ˜aℓ, . . . , ˜aT −1)
+
+· 2 max 
+
+> ℓ
+
+qmax  
+
+> a
+
+w(xℓ+1 |a)/w (xℓ) · qmax  
+
+> a
+
+RS-JEPA (f, g, a )
+
+≤ 2T · max 
+
+> a,x,x ′
+
+q
+
+w(xg |a)/w (x) · qmax  
+
+> a
+
+RS-JEPA (f, g, a ). (42) 
+
+Proof of Theorem 4.3. By Theorem 3.1, given a ∈ A , we have 
+
+RJEPA (f, g, a ) = ∥ ¯M (a) − G(F, a )⊤F ∥2 
+
+> F
+
++ const . (43) Since B := G(F, a )⊤F has rank at most k minimizing the JEPA population risk is equivalent to solving 
+
+min  
+
+> rank( B)≤k
+
+∥ ¯M (a) − B∥2 
+
+> F
+
+. (44) Let 
+
+¯M (a) = U (a)Σ( a)V (a)⊤ (45) be the singular value decomposition of ¯M (a). By the Eckart–Young–Mirsky theorem, the unique best rank-k approximation of ¯M (a) under the Frobenius norm is 
+
+B∗ := G∗(F, a )⊤F ∗ = Uk(a)Σ k(a)Vk(a)⊤. (46) Then one valid factorization is obtained by distributing the singular values equally between the two factors, i.e., 
+
+F ∗ = Σ k(a)1/2Vk(a)⊤, (47) and 
+
+G∗(F, a ) = Σ k(a)1/2Uk(a)⊤. (48) In this case, we have 
+
+∥ ¯M (a) − G∗(F, a )⊤F ∗∥2 
+
+> F
+
+= X
+
+> i>k
+
+σ2 
+
+> i
+
+(a), (49) where σi(a) is the i-th largest singular value of ¯M (a) for i ∈ { 1, . . . , #|X |} . Hence we have 
+
+RS-JEPA (f ∗, g ∗, a ) = min  
+
+> f,g
+
+RS-JEPA (f, g, a ) = X
+
+> i>k
+
+σ2 
+
+> i
+
+(a). (50) 13 Preprint 
+
+Proof of Theorem 4.4. Fix a ∈ A . Define the composed hypothesis class 
+
+Ha := {hf,g,a := g ◦ f ◦ a : f ∈ F , g ∈ G} ,
+
+where g ◦ f ◦ a(z, z +, z ′) :=  g(f (zi), a )⊤f (z′
+
+> i
+
+)2 − 2g(f (zi), a )⊤f (z+ 
+
+> i
+
+). For simplicity, write 
+
+h(z) := g(f (z), a ). The population spectral JEPA risk can be written as 
+
+RS-JEPA (f, g, a ) = E(z,z +,z −)
+
+h h(z)⊤f (z′)2 − 2h(z)⊤f (z+)
+
+i
+
+,
+
+where (z, z +) is a positive pair and z′ is a negative sample. Its empirical counterpart based on 
+
+m = n/ 2 independent tuples is 
+
+ˆRm(f, g, a ) = 1
+
+m
+
+> m
+
+X
+
+> i=1
+
+h h(zi)⊤f (z′
+
+> i
+
+)2 − 2h(zi)⊤f (z+ 
+
+> i
+
+)
+
+i
+
+.
+
+Since ∥f ∥∞ ≤ κ and ∥g∥∞ ≤ κ, we have 
+
+∥h(z)∥∞ ≤ κ, ∥f (z)∥∞ ≤ κ. 
+
+Therefore, 
+
+h(z)⊤f (z′) ≤
+
+> k
+
+X
+
+> ℓ=1
+
+|hℓ(z)| | fℓ(z′)| ≤ kκ 2.
+
+Consequently, the tuple loss 
+
+ℓf,g,a (z, z +, z −) :=  h(z)⊤f (z−)2 − 2h(z)⊤f (z+)
+
+is uniformly bounded as 
+
+ℓf,g,a (z, z +, z −) ∈ −2kκ 2, k 2κ4 + 2 kκ 2 .
+
+We now control the Rademacher complexity of the tuple-loss class 
+
+La := {ℓf,g,a : f ∈ F , g ∈ G} .
+
+We now give the detailed Rademacher complexity bound for the tuple-loss class. Recall that 
+
+ℓf,g,a (z, z +, z −) :=  h(z)⊤f (z−)2 − 2h(z)⊤f (z+), h := g ◦ f ◦ a. 
+
+Let 
+
+Ha := {hf,g,a = g ◦ f ◦ a : f ∈ F , g ∈ G} .
+
+Since a is fixed, for any sample S = {(zi, z + 
+
+> i
+
+, z − 
+
+> i
+
+)}mi=1 , we have 
+
+ˆRS (Ha) = ˆRa(S)(G ◦ F ),
+
+where a(S) := {(a, z i)}mi=1 . If ˆRm(G ◦ F ) denotes the worst-case empirical Rademacher complex-ity over all samples of size m, then 
+
+ˆRS (Ha) ≤ ˆRm(G ◦ F ).
+
+Let S = {(zi, z + 
+
+> i
+
+, z − 
+
+> i
+
+)}mi=1 be a fixed sample of m tuples. We need to bound 
+
+ˆRS (La) := Eσ
+
+"
+
+sup  
+
+> f∈F , g ∈G
+
+1
+
+m
+
+> m
+
+X
+
+> i=1
+
+σiℓf,g,a (zi, z + 
+
+> i
+
+, z − 
+
+> i
+
+)
+
+#
+
+,
+
+where σ1, . . . , σ m are i.i.d. Rademacher random variables. By subadditivity of the supremum, 
+
+ˆRS (La) ≤ Eσ
+
+"
+
+sup 
+
+> f,g
+
+1
+
+m
+
+> m
+
+X
+
+> i=1
+
+σi
+
+ h(zi)⊤f (z− 
+
+> i
+
+)2
+
+#| {z }
+
+> T1
+
++2 Eσ
+
+"
+
+sup 
+
+> f,g
+
+1
+
+m
+
+> m
+
+X
+
+> i=1
+
+σih(zi)⊤f (z+ 
+
+> i
+
+)
+
+#| {z }
+
+> T2
+
+. (51) 14 Preprint We first control T1. Since 
+
+|h(zi)⊤f (z− 
+
+> i
+
+)| ≤ kκ 2,
+
+the map u 7 → u2 is 2kκ -Lipschitz on [−kκ 2, kκ 2]. Therefore, by Talagrand’s contraction lemma, 
+
+T1 ≤ 2kκ 2 Eσ
+
+"
+
+sup 
+
+> f,g
+
+1
+
+m
+
+> m
+
+X
+
+> i=1
+
+σih(zi)⊤f (z− 
+
+> i
+
+)
+
+#
+
+. (52) Expanding the inner product gives 
+
+T1 ≤ 2kκ 2
+
+> k
+
+X
+
+> ℓ=1
+
+Eσ
+
+"
+
+sup 
+
+> hℓ∈H a,ℓ , f ℓ∈F ℓ
+
+1
+
+m
+
+> m
+
+X
+
+> i=1
+
+σihℓ(zi)fℓ(z− 
+
+> i
+
+)
+
+#
+
+. (53) For two scalar function classes U and V uniformly bounded by κ, the following standard product-class bound holds: 
+
+Eσ
+
+"
+
+sup 
+
+> u∈U , v ∈V
+
+1
+
+m
+
+> m
+
+X
+
+> i=1
+
+σiu(xi)v(yi)
+
+#
+
+≤ 4κ
+
+h ˆRm(U) + ˆRm(V)
+
+i
+
+. (54) Indeed, using the identity 
+
+uv = 12
+
+(u + v)2 − u2 − v2 ,
+
+or equivalently the polarization identity, and then applying Talagrand’s contraction lemma to the square function on [−2κ, 2κ], one obtains equation 54. Applying this bound with 
+
+U = Ha,ℓ , V = Fℓ,
+
+we get 
+
+T1 ≤ 2kκ 2
+
+> k
+
+X
+
+> ℓ=1
+
+4κ
+
+h ˆRm(Ha,ℓ ) + ˆRm(Fℓ)
+
+i
+
+≤ 8k2κ3 h ˆRm(Ha) + ˆRm(F)
+
+i
+
+. (55) We next control T2. Expanding the inner product gives 
+
+T2 = Eσ
+
+"
+
+sup 
+
+> f,g
+
+1
+
+m
+
+> m
+
+X
+
+> i=1
+
+σikX
+
+> ℓ=1
+
+hℓ(zi)fℓ(z+ 
+
+> i
+
+)
+
+#
+
+≤
+
+> k
+
+X
+
+> ℓ=1
+
+Eσ
+
+"
+
+sup 
+
+> hℓ∈H a,ℓ , f ℓ∈F ℓ
+
+1
+
+m
+
+> m
+
+X
+
+> i=1
+
+σihℓ(zi)fℓ(z+ 
+
+> i
+
+)
+
+#
+
+. (56) Again applying the product-class bound equation 54, 
+
+T2 ≤
+
+> k
+
+X
+
+> ℓ=1
+
+4κ
+
+h ˆRm(Ha,ℓ ) + ˆRm(Fℓ)
+
+i
+
+≤ 4kκ 
+
+h ˆRm(Ha) + ˆRm(F)
+
+i
+
+. (57) Combining equation 55 and equation 57, we obtain 
+
+ˆRS (La) ≤ T1 + 2 T2
+
+≤  8k2κ3 + 8 kκ  h ˆRm(Ha) + ˆRm(F)
+
+i
+
+≤  8k2κ3 + 8 kκ  h ˆRm(G ◦ F ) + ˆRm(F)
+
+i
+
+. (58) Taking m = n/ 2 gives the desired Rademacher complexity control for the tuple-loss class. Here ˆRm(G ◦ F ) controls the online branch h = g ◦ f ◦ a, while ˆRm(F) controls the target branch 
+
+f . Since a is fixed, the composition with a does not introduce an additional trainable function class and is absorbed into G ◦ F .15 Preprint By the standard Rademacher uniform convergence bound, with probability at least 1 − δ, uniformly over f ∈ F and g ∈ G ,
+
+RS-JEPA (f, g, a ) − ˆRm(f, g, a )
+
+≤  16 k2κ3 + 16 kκ  h ˆRm(G ◦ F ) + ˆRm(F)
+
+i
+
++  4kκ 2 + k2κ4 r log(2 /δ )
+
+n + δ
+
+!
+
+. (59) Taking m = n/ 2, define 
+
+ϵn :=  16 k2κ3 + 16 kκ  h ˆRn/ 2(G ◦ F ) + ˆRn/ 2(F)
+
+i
+
++  4kκ 2 + k2κ4 r log(2 /δ )
+
+n + δ
+
+!
+
+.
+
+(60) Then, with probability at least 1 − δ, uniformly over f ∈ F and g ∈ G ,
+
+RS-JEPA (f, g, a ) − ˆRn/ 2(f, g, a ) ≤ ϵn.
+
+Using this uniform deviation bound and the empirical optimality of ( ˆf , ˆg), we have 
+
+RS-JEPA ( ˆf , ˆg, a ) − R S-JEPA (f ∗, g ∗, a )
+
+≤ ˆRn/ 2( ˆf , ˆg, a ) + ϵn − R S-JEPA (f ∗, g ∗, a )
+
+≤ ˆRn/ 2(f ∗, g ∗, a ) + ϵn − R S-JEPA (f ∗, g ∗, a )
+
+≤ 2ϵn. (61) Substituting the definition of ϵn gives 
+
+RS-JEPA ( ˆf , ˆg, a ) − R S-JEPA (f ∗, g ∗, a )
+
+≤  32 k2κ3 + 32 kκ  h ˆRn/ 2(G ◦ F ) + ˆRn/ 2(F)
+
+i
+
++  8kκ 2 + 2 k2κ4 r log(2 /δ )
+
+n + δ
+
+!
+
+. (62) This proves the desired sample error bound. 16

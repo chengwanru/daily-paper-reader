@@ -1,0 +1,495 @@
+Title: Not All Actions Are Equal: Rethinking Conditioning for Dexterous World Model
+
+URL Source: https://arxiv.org/pdf/2606.27325v1
+
+Published Time: Fri, 26 Jun 2026 01:21:58 GMT
+
+Number of Pages: 27
+
+Markdown Content:
+# Not All Actions Are Equal: Rethinking Conditioning for Dexterous World Model 
+
+## Zizhao Yuan 1 Zhengtu Liang 2 Taowen Wang 1 Qiwei Liang 1,2 Yichi Wang 3
+
+## Yunheng Wang 1 Yuetong Fang 1 Lusong Li 4 Zecui Zeng 4 Renjing Xu 1,† 
+
+> 1
+
+The Hong Kong University of Science and Technology (Guangzhou)  
+
+> 2
+
+Shenzhen University 3 Beijing University of Technology 4 JD Explore Academy  
+
+> †
+
+Corresponding author 
+
+## Abstract 
+
+Recent advances in action-conditioned world models show promising progress in modeling complex interactions and forecasting future states under diverse action sequences. While these models are often driven by stronger visual representations and model capacity, action conditioning itself remains underexplored. Most existing approaches compress the entire action sequence into a single represen-tation, which works well for low-DoF control but becomes less reliable in high-DoF scenarios. We observe that high-DoF dexterous actions are inherently heterogeneous, spanning multiple orders of magnitude, where large-scale motions coexist with subtle but important signals. When uniformly aggregated, optimization exhibits an imbalance across action components, which hinders the modeling of fine-grained effects and affects action fidelity. We therefore propose DexAC-WM , which treats action conditioning as a structured process rather than global compression. DexAC preserves dimension-level semantics via action tokenization and aligns action signals with visual dynamics through local refinement and global modulation. To address the limited high-level semantic grounding in existing world models, we further introduce a semantic branch that provides rich object-scene priors, which enables world model to capture dynamic visual details while supporting high-DoF action-conditioned video prediction. Experiments on EgoDex and EgoVerse show that combining the semantic branch with DexAC significantly improves FID, FVD, and PCK, demonstrating gains in visual-temporal realism and action-following consistency. We further verify that DexAC extends to other backbones, showing the scalability of our structured action-conditioning design. These results suggest that scaling world models to high-DoF control requires both structured action modeling and semantic grounding. 
+
+Project Page: https://zizhaoyuan.github.io/DexAC-WM 
+
+Keywords: Dexterous world model, egocentric human video, unified action condition 
+
+## 1 Introduction 
+
+Egocentric perspective provides strong physical priors and action intent, reflecting how humans naturally see, perceive, and interact with the world [ 1, 2 , 3 ]. To achieve human-level dexterity, it is crucial to fully leverage egocentric data so that the world model can intrinsically understand the action space from a first-person perspective. Recent progress has demonstrated strong performance in environments with relatively simple action spaces, such as navigation with discrete actions (e.g., forward, backward, and turning commands) and low-DoF robotic manipulation [ 4, 5 , 6 ]. In these settings, models are able to generate temporally coherent and physically consistent predictions that closely follow the given actions, suggesting that action-conditioned generative modeling is a promising paradigm for learning interactive world dynamics. However, low-DoF success does not generalize naturally to scenarios involving high-DoF dexterous control. Unlike low-DoF world models for manipulation [ 7 , 8, 5 , 9 ], where each action dimension contributes in a 1 
+
+> arXiv:2606.27325v1 [cs.CV] 25 Jun 2026 Ego Frames
+> Action MLP
+> CDiT
+> Flat Injection
+> Adaptive Injection
+> EgoDex
+
+Video Predictions 
+
+> FVD ↓
+> PCK@10 ↑
+
+Egocentric Datasets 
+
+Quantitative  Results 
+
+> 57D
+
+Action Representation 
+
+(a) Naïve AC -WM 
+
+> Heterogeneous Dex Action
+> 6D
+
+(b) Ours ( DexAC -WM)             
+
+> Action Tokenizer
+> CDiT
+> Local
+> Attn
+> Learnable Tokens Global
+> Attn
+> Semantic
+> Condition
+> Semantic Awareness
+> Poor Semantic
+> Head Camera 9D
+> Left Wrist 9D Right Wrist 9D
+> (3D Pos + 6D Rot) (3D Pos + 6D Rot)
+> Left Fingers 15D
+> (3D Pos x 5) (3D Pos x 5)
+> Right Fingers 15D
+> 57D
+> (3D Pos + 6D Rot)
+> EgoVerse
+> GT
+> …
+> …
+> …
+> Scoop Dump Ice
+> Ego Frames
+> Egodex EgoVerse
+> IRASim IRASim+DexAC
+> Cosmos Ours
+> Egodex EgoVerse %
+> IRASim IRASim+DexAC
+> Cosmos Ours
+
+Figure 1. Overview of our DexAC-WM. Two action-conditioning paradigms for generative world models. (a) A common design in existing approaches is to aggregate the action sequence into a compact global representation before injection. While effective in low-DoF settings, such aggregation becomes less expressive in high-DoF dexterous scenarios with heterogeneous action dimensions. (b) Our proposed DexAC-WM preserves dimension-level action semantics through tokenization and combines local refinement with global modulation to better align action signals with semantic dynamics. comparable magnitude across 6 DoF, dexterous human actions span multiple orders of magnitude (see Figure 2), Such variability arises from the intricate structure of the human hand and its specialized motor system, which together enable motions at substantially different scales [ 10 ]. In egocentric videos, global motion factors, such as wrist or camera movement, dominate in scale, yet fine-grained finger articulations remain extremely subtle yet semantically critical [ 11 ]. This imbalance introduces a gradient dominance effect, in which high-variance dimensions disproportionately influence optimization and effectively suppress low-magnitude signals. Previous research such as PEVA [ 12 ] has preliminarily explored the inherent variability of whole-body motion, yet such investigations remain severely underexplored for dexterous world models. Consequently, how to structurally represent the subtle hand actions is particularly challenging due to: 
+
+(1) Heterogeneity and subtlety in high-DoF dexterous actions. This raises a fundamental question: how should action conditioning be structurally represented to mitigate the heterogeneous semantic collapse of dexterous hands within these complex egocentric world models? (2) Limitations of global compression in action conditioning. Existing studies [13, 14, 15] have mainly explored three forms of representation of dexterous actions. One line of work uses joint-space representations, in which re-targeted high-DoF joint values are directly taken as action inputs [ 16 , 17 , 18 ]. Another line of research adopts geometry-aware keypoint or fingertip representations, which are generally easier to extract from human videos [ 19 , 20 , 21 ]. A third direction explores mesh-driven implicit conditioning, where rendered hand meshes or human poses are used to guide video generation [ 22 , 23 ]. These directions offer valuable insights: hand-aware supervision and keypoint-based actions are important for dexterous world modeling, while egocentric hand-motion sequences combined with scene rendering can drive plausible interaction generation, and joint-space and fingertip-space representations exhibit different trade-offs in human-to-robot transfer. However, the above conditioning strategies often compress the entire action vector into a single embedding, which inevitably collapses heterogeneous semantics, leading to poor action following and unstable physical predictions. We argue that this aggregation fundamentally breaks down in the high-DoF regime. (3) Limited semantic grounding. Beyond the action condition itself, recent 2D and 3D representation encoders and foundation models have shown strong potential for visual generation and spatial understanding. Recent works [ 24 , 25 , 26 ]2further explore using pretrained visual or geometric features as extra predictive states. However, most action-conditioned world foundation models still rely on a single VLM reasoner to provide limited semantic information [ 27 ]. These semantic and geometric priors remain underexplored in egocentric dexterous world models, where high-DoF hand motions require fine-grained action-spatial alignment. To address these limitations, we propose DexAC-WM , an egocentric action-conditioned world model that explicitly rethinks how actions are represented and injected under high-DoF dexterous control. Our key insight is that action dimensions should remain structured throughout the conditioning process, rather than being collapsed into a single representation. Based on this principle, we introduce a Structured Action Representation , which decomposes high-DoF actions into semantically independent tokens with magnitude alignment, enabling balanced learning across heterogeneous motion factors. Building on this structured representation, we further propose a Unified Local-Global Conditioning module that decouples action injection into two complementary pathways. The local refinement injects fine-grained action tokens via cross-attention to align subtle motions with local visual dynamics, while the global modulation summarizes action intent and injects it through adaptive modulation, ensuring temporally coherent motion. This design captures both fine-grained dexterous control and global dynamics. To further enhance semantic understanding, we introduce semantic condition to fuse DINOv3 [ 28 ] features with VLM text embeddings via cross-addition injection. We evaluate DexAC-WM on two large-scale egocentric datasets, where full model consistently improves both visual fidelity and action consistency over strong baselines. Our results suggest that structured action representation and semantic conditioning are essential for scaling world models to high-DoF control regimes , providing a new perspective on action modeling in embodied generative systems. We summarize the main contributions as follows: 
+
+• We identify a core limitation of existing action-conditioned world models in high-DoF dexterous settings: global action aggregation suffers from scale imbalance across heterogeneous action dimensions, suppressing subtle but semantically critical finger signals. 
+
+• We propose DexAC , a structured action-conditioning module tailored to high-DoF dexterous world models. DexAC preserves dimension-level action semantics through tokenization and re-couples heterogeneous actions with a unified local-global conditioning mechanism for fine-grained and globally coherent motion. 
+
+• We introduce a semantic conditioning branch with DINOv3, which provides strong semantic priors for visual-temporal prediction, while DexAC aligns these priors to further improve action-following consistency. 
+
+• Extensive experiments on EgoDex and EgoVerse show that DexAC with semantic condition substantially improves FID, FVD, and PCK over advanced baselines, including Wan, IRASim, and Cosmos. Further results on IRASim highlight the scalability of structured action conditioning. 
+
+## 2 Related Work 
+
+2.1 Action-Conditioned World Models 
+
+Recent advances in generative modeling have led to the emergence of action-conditioned world models, which simulate future observations under explicit control signals. Early works such as UniSim [ 8 ], Genie [ 4 ], and RoboDreamer [ 29 ] demonstrate that incorporating actions into diffusion-based video models enables interactive environment generation. Building on this idea, subsequent research explores data-driven world modeling for control, spanning both pixel-space video generation [ 30 , 31 , 32 ] and latent dynamics modeling [ 33 , 34 , 35 , 36 ]. In parallel, another line of work focuses on latent world models for long-horizon reasoning and planning, emphasizing efficiency and scalability [ 37 , 38 , 7 , 39 ]. Across these directions, a common design choice is to represent actions as compact vectors and integrate them into sequence models through simple conditioning mechanisms (e.g., AdaLN or MLP concatenation) [ 40 , 41 ]. This formulation has proven effective in low-DoF control settings and has driven much of the recent progress in generative world modeling. At the same time, recent works increasingly explore richer visual representations, moving beyond raw pixels toward semantically meaningful feature spaces(such as pre-trained visual foundation models) [ 42 , 43 , 44 ] to improve predictive modeling. As action spaces become more complex, designing more expressive and structured interfaces between action and perception is becoming an increasingly important direction. 3x y z roll pitch yaw   
+
+> 0.06
+> 0.04
+> 0.02
+> 0.00
+> 0.02
+> 0.04
+> 0.06
+> Action Magnitude Distribution
+> (a) Low-DoF Space (6-DoF)
+> Zero Baseline
+> Wrists (18 Dof) Hands (30 Dof) Camera (9 Dof)
+> 1.5
+> 1.0
+> 0.5
+> 0.0
+> 0.5
+> 1.0
+> 1.5
+> 2.0
+> (b) High-DoF Dexterous Space (57-DoF)
+> Zero Baseline
+
+Figure 2. Empirical comparison of action magnitude distributions. (a) Low-DoF action space (6-DoF). 
+
+The translation and rotation dimensions maintain bounded variances spanning the 10 −2 scale, effectively preventing gradient domination. (b) High-DoF dexterous action space (57-DoF). The severe 10 5 scale gap between macro-movements (wrist/camera) and micro-movements (fingers) creates critical optimization bottlenecks. Note that the finger articulations (30 DoF) appear almost flat due to their 10 −5 scale compared to the 10 0 macro-movements. 
+
+2.2 Egocentric Human Video 
+
+Egocentric human video has become an important data source for learning interaction dynamics, pro-viding direct observations of human intention and object manipulation from a first-person perspective. 0 2000 4000 6000 8000 10000 12000     
+
+> Training Steps
+> 0.02
+> 0.04
+> 0.06
+> Training Loss
+> Training Loss Curves Across Different Architectures
+> Ours (57-DoF)
+> Cosmos (6-DoF)
+> Base
+> Base + DexAC
+> Base + DINOv3 10000 10500 11000 11500 12000
+> 0.0450
+> 0.0475
+> 0.0500
+
+Figure 3. Training loss comparison. While the vanilla global conditioning struggles to converge in the high-DoF (57-DoF) space compared to the 6-DoF baseline, our proposed DexAC with seman-tic condition effectively stabilizes training and achieves a significantly lower loss. Large-scale datasets such as Ego4D [ 1 ], EPIC-KITCHENS [ 45 ], and HOI4D [ 46 ] have enabled significant progress in learn-ing action representations and manipulation priors from human demonstrations. Building on these resources, prior work has explored the extraction of policies and trans-ferable visual representations for downstream real-world robotic control [47, 3, 11]. A parallel line of effort has focused on constructing dedi-cated benchmarks for fine-grained dexterous manipulation at scale. HOT3D [ 48 ] introduces multi-view egocentric recordings with motion-capture-level 3D hand and object poses. EgoMimic [ 49 ] pairs egocentric video with 3D hand tracking to enable co-training from human and robot data. EgoDex [ 50 ] provides 829 hours of full-finger 3D hand tracking across 194 manipulation tasks collected via Apple Vision Pro. OpenEgo [ 51 ] consolidates six public datasets into 1,107 hours with unified MANO annotations and intention-aligned action primitives. At a larger scale, EgoVerse [ 52 ] spans 1,362 hours across 1,965 tasks and 240 scenes under a collaborative collection framework, while EgoScale [ 53 ] scales to over 20,000 hours, uncovering a log-linear scaling law between human data volume and downstream robot performance. Beyond policy learning, egocentric data have increasingly been applied to predictive modeling: from navigation world models [ 54 ] and whole-body motion modeling [ 12 ] to dexterous interaction modeling from human videos [ 11 , 55 ]. This progression reflects a broader shift from coarse, low-DoF behaviors toward increasingly fine-grained, high-DoF interaction modeling, calling for representations that can capture the multi-scale and structured nature of egocentric interactions within generative world models. 43 Case Study 
+
+Why Vanilla Action Injection Fails in High-DoF Dexterity? To understand the challenges of high-DoF dexterous action conditioning, we first compare the magnitude distributions of low-DoF (6-DoF) and high-DoF (57-DoF) action spaces. As shown in Figure 2, (a) 6-DoF gripper actions exhibit relatively balanced magnitudes, while (b) 57-DoF dexterous actions show strong scale heterogeneity. Large-scale motions, such as wrist and head movements, lie around the 10 0 scale, whereas subtle finger articulations can fall to the 10 −5 scale. This indicates that high-DoF dexterous actions are not merely higher-dimensional versions of low-DoF actions, but contain heterogeneous motion factors with substantially different numerical scales and semantic roles. Such scale heterogeneity directly affects the optimization dynamics of vanilla global action injection. In a standard MLP-based action encoder, all action dimensions are projected into a single shared embedding before interacting with visual features. During this process, large-magnitude wrist and head dimensions contribute more strongly to the shared action representation, while low-magnitude finger dimensions are easily weakened by dominant global motion factors. Consequently, the model shows limited sensitivity to heterogeneous action scales and subtle action-induced visual changes. Action scaling or per-dimension normalization can reduce the raw numerical imbalance, but it does not solve the representation collapse caused by global aggregation. Even after scaling, a vanilla MLP still compresses wrist pose, finger articulation, and ego motion into one shared embedding, mixing semantically different motion factors before visual-action alignment. Therefore, scale alignment is necessary but insufficient for high-DoF dexterous conditioning. Table. 4 and 3 further demonstrate this claim. Empirically, this optimization gap is reflected in the training loss curves in Figure 3. The same MLP-based action injection converges effectively in the 6-DoF setting, indicating that the network capacity is sufficient to represent low-DoF actions when the action dimensions are relatively balanced. However, when extended to 57-DoF dexterous actions, the flat action embedder converges more slowly and yields a higher training loss, showing that global action injection struggles to learn heterogeneous high-DoF actions. Compared with the base model, DexAC achieves a similar or slightly lower loss curve, suggesting that structured action representation alleviates the action-semantic collapse caused by scale heterogeneity to some extent. More importantly, when DexAC is combined with semantic conditioning, the model achieves lower and more stable convergence than using DexAC or semantic conditioning alone. This indicates that DexAC and semantic conditioning provide a more effective interface for aligning visual semantics with high-DoF dexterous actions. 
+
+## 4 Methodology 
+
+In this section, we introduce DexAC. Its core idea is to model action conditioning as a structured process jointly optimized with visual perception, rather than a single global aggregation. We begin with the preliminary in Sec. 4.1, followed by the framework overview in Sec. 4.2. We then present the Structured Action Representation, Unified Local-Global Conditioning, and Semantic Condition with Dual Cross Attention in Sec. 4.3, Sec. 4.4, and Sec. 4.5, respectively. 
+
+4.1 Preliminary Problem Formulation: Given an initial visual observation I0 and an action sequence, our goal is to predict the future visual sequence conditioned on both the initial visual context and the action sequence. Formally, the prediction process is defined as: 
+
+ˆV1: T = fθ (I0, A ), A ∈ RT ×Da , (1) where ˆV1: T = { ˆI1, ˆI2, . . . , ˆIT } denotes the predicted future visual frames, each frame ˆIt ∈ RH×W ×3, Da = 57 
+
+denotes the action dimension, and T is the action horizon. For step-wise modeling, we treat each frame It
+
+as the visual state St, and let At denote the action executed between St and St+1 . The overall sequence prediction can thus be viewed as a composition of action-conditioned state transitions: 
+
+ˆSt+1 = fθ (St, A t). (2) Compared with prior gripper-based settings that typically adopt 6-DoF actions, our setting involves 57-dimensional dexterous action signals. Such high-DoF and fine-grained action inputs substantially increase the complexity of visual dynamics modeling, thereby motivating a more structured conditioning mechanism. 5Semantic                  
+
+> Encoder
+> Pretrained
+> VLM Noise
+> Text
+> Semantic Condition
+> Projector Projector
+> LayerNorm
+> Scale+Shift
+> 𝜸 𝒂 ,𝜷 𝒂 ,𝐭
+> LayerNorm
+> Scale+Shift
+> Cross Attention
+> 𝜸 𝒂 ,𝜷 𝒂 ,𝐭
+> N x
+> Gate
+> Gate
+> Attention
+> 𝐭
+> 𝐭
+> DexAC
+> Vision Decoder
+> Norm
+> Dexterous Action
+> Condition ( DexAC )
+> (a) DexAC -WM (d) DiT Block (b) DexAC
+> DiT Block
+> DiT Block
+> 57D Actions
+> Local
+> Attn
+> Learnable
+> Tokens
+> Element -Wise
+> Multiplication
+> Element -Wise
+> Addition
+> LayerNorm
+> GELU
+> Linear
+> LayerNorm
+> GELU
+> Linear
+> Linear
+> GELU
+> Linear
+> Unsequeeze
+> Global
+> Attn
+> Proj
+> Vision Encoder
+> Trained
+> Frozen
+> . . .
+> (c) Semantic Condition
+> Norm
+> Actions
+
+Figure 4. Diagram of DexAC-WM architecture. DexAC is designed to explicitly capture both precise local dexterity and globally coherent motion in high-DoF action regimes, while the semantic condition provides rich scene- and object-based representations for semantic understanding. (b) presents the structure of DexAC to preserve dimension-wise structured actions with local and global attention refinement for adaptive action injection. (c) introduces two vanilla cross-attention to combine DINOv3 features with VLM language embed-dings for final addition. (d) presents DiT backbone architecture with 28 blocks in total, and structured action representations from DexAC are injected into each block through Adaptive Layer Normalization (AdaLN). 
+
+Training Objective. To train the action-conditioned world model, we adopt a velocity prediction objective following rectified flow formulation as follows: 
+
+L(θ) = Exτ ,v,c 
+
+∥u(xτ , τ, c ; θ) − v∥22
+
+ , (3) where xτ = (1 − τ )St+1 + τ ϵ denotes the interpolated noisy latent at timestep τ ∈ [0 , 1] , with ϵ ∼ N (0 , I ).The target velocity is defined as v = ϵ − St+1 . c = {cv (St), c a(At)} denotes the joint conditioning, where 
+
+cv (St) is the visual condition extracted from the current state St, and ca(At) is the structured action condition derived from At via dimension-wise tokenization and unified local-global conditioning. u(·; θ) is the velocity prediction network parameterized by θ.
+
+4.2 Overview 
+
+Our DexAC-WM is built upon the Cosmos-Predict2.5 [56 ] backbone. For text conditioning, we adopt Cosmos-Reason1 [57 ], which aggregates multi-layer Transformer features into a 2048-dimensional embedding. For visual conditioning, each RGB frame is encoded by a frozen Wan2.1 [ 58 ] visual encoder to extract spatial features. Our action representation module consists of three key components. 1) Structured Action Representation .Instead of flattening the action sequence into a single embedding for injection, we introduce a structured action tokenizer (SAT) to produce a sequence of per-dimension action tokens, preserving the temporal evolution and semantic independence of different motion factors. 2) Unified Local-Global Conditioning . We combine local refinement and global modulation in a unified pipeline. The local branch injects fine-grained action tokens to capture subtle motion changes, while the global branch summarizes action tokens via a learnable query to provide coherent sequence-level guidance. 3) Semantic Condition with Dual Cross-Attention .To enhance the semantic representation of the model, we introduce a semantic condition mechanism that jointly inject DINOv3 features and text embeddings into the latent space, where latent tokens act as queries and multi-modal features serve as keys and values. By aggregating them through cross-attention, the model jointly reasons over geometry and intent, improving spatio-temporal consistency in generation. 
+
+4.3 Structured Action Representation 
+
+To model high-DoF dexterous manipulation under egocentric observations, we design a structured action tokenizer that explicitly captures the relative motion of both wrists, finger articulations, and head ego-motion. Unlike prior works such as DexWM [ 11 ], which represent hand motion using camera-centric keypoint 6displacements and Euler-angle pose deltas, our method adopts a physically grounded rigid-body formulation that is more consistent with the underlying hand-object interaction dynamics. Action Representation. 
+
+Specifically, given hand poses Tt, T t+1 ∈ SE (3) at consecutive times, the relative transformation is T −1 
+
+> t
+
+Tt+1 ,yielding relative translation R⊤ 
+
+> t
+
+(pt+1 − pt) and relative rotation R⊤ 
+
+> t
+
+Rt+1 . To avoid Euler angle issues, we adopt the continuous 6D rotation representation. The final action vector comprises: (1) relative wrist motion (translation + rotation) for both hands, (2) finger joint displacements for fine articulation, and (3) head rotation changes for camera ego-motion. This unified high-DoF representation jointly models global hand movement, local finger motion, and viewpoint variation, ensuring geometric consistency and robustness under egocentric motion. Unlike camera-centric displacements, it decouples hand motion from viewpoint changes, enabling more stable learning and physically consistent action-conditioned prediction. 
+
+Structured Action Tokenizer (SAT). Due to the heterogeneous nature of dexterous actions, different components (e.g., fingers and wrists) exhibit distinct scales and statistical distributions. To facilitate stable learning and better distinguish action dynamics of varying magnitudes, we first normalize each action dimension independently. Given an action sequence a ∈ RT ×Da , we compute the mean μi and standard deviation σi for each action dimension i over the training dataset. The normalized action is then obtained: 
+
+˜at,i = at,i − μi
+
+σi + ϵ (4) where ϵ is a small constant for numerical stability. Our dimension-wise normalization preserves the statistical characteristics of each action component and provides a more unique representation for downstream con-ditioning. Given an action sequence of (B, T, D a), we first preserve its original temporal and dimensional structure rather than flattening it into a single vector. Each action entry is independently projected into a latent token space, producing per-timestep, per-dimension features: 
+
+ht,i = Linear (˜ at,i ), ht,i ∈ Rd (5) We then perform learnable temporal fusion along the horizon dimension to aggregate the dynamics of each action dimension into a single token. This results in a structured token set of shape (B, N, C ), where N presents each token corresponds to one action dimension and summarizes its temporal evolution. To aggregate temporal dynamics, we apply a learnable linear fusion along the temporal dimension followed by a GELU activation: 
+
+Atok = GELU (Linear ([ h1,i , h 2,i , . . . , h T,i ])  (6) This yields a set of dimension-wise action tokens Atok ∈ Rd, where each token Atok summarizes the temporal evolution of the i-th action dimension. Compared with conventional MLP-based action embedding, which compresses the entire action sequence into one global representation, this design preserves dimension-level semantics and provides a more suitable basis for fine-grained action conditioning. 
+
+4.4 Unified Local-Global Conditioning 
+
+To effectively inject high-DoF dexterous actions into the video generation backbone, we propose a Unified Local-Global Conditioning , which integrates both local action refinement and global action modulation into a unified conditioning pipeline. Unlike prior action injection strategies [ 56 ] that directly compress the entire action vector into a single embedding through a simple MLP, our design preserves the structural heterogeneity of different action dimensions and allows the model to selectively emphasize important motion components. Existing action-conditioned world models often aggregate all action dimensions into one global representation, implicitly averaging the contributions of heterogeneous motion factors. While this strategy is simple, it tends to weaken the representation of critical yet small-magnitude action dimensions, especially in dexterous manipulation, where subtle finger motions and ego-motion changes be easily overwhelmed by larger-scale wrist motion. To address this limitation, we design a two-stage conditioning mechanism: a local action refinement branch that directly adjusts latent noise according to fine-grained action tokens, and a global action modulation branch that summarizes the overall action intent and injects it into the DiT through adaptive feature modulation. 
+
+Local Action Refinement. Since the raw action values are numerically very small, we multiply each dimension by a constant scaling factor before tokenization to enhance conditioning strength and improve 7optimization stability. Each rescaled action dimension is then projected into the latent embedding space through a lightweight tokenizer. To enable direct interaction between action and latent visual dynamics, we introduce a linear projection layer that maps the action tokens into the latent feature space used by the diffusion backbone. Let the noise tokens Z ∈ RN ×d, where N is the number of latent tokens. After projection, we perform local action injection through local attention: 
+
+Zlocal = Z + Attn( Q = Z, K = Atok , V = Atok ) (7) where Atok denotes the projected action tokens. This module allows each latent token to actively query the structured action representation, so that fine-grained action information can directly refine the latent noise distribution. The residual connection preserves the original latent structure while enabling action-conditioned local modulation. 
+
+Global Action Modulation. While local attention provides fine-grained action priors for noise, it operates in a token-wise manner and lacks an explicit mechanism to capture the global structure of the action sequence. As a result, the model struggles to maintain coherent motion trends across frames, especially in high-DoF dexterous settings where actions exhibit strong temporal and structural dependencies. To preserve the model’s ability to perceive structured actions at a holistic level, we further introduce a global action modulation branch. Specifically, we define a learnable global query qg ∈ R1×d, which is used to summarize the action tokens: 
+
+Ag = Attn( Q = qg , K = Atok , V = Atok ) (8) where Ag ∈ R1×d is the global action context. This branch extracts a compact representation that captures the overall motion intent of the current action chunk. We then convert the global action context into scale and shift parameters: 
+
+(γa, β a) = fAdaLN (Ag ) (9) where γa, β a ∈ Rd. These parameters are used to modulate the locally refined latent features through Adaptive LayerNorm: 
+
+AdaLN( Zlocal ; γa, β a) = γa ⊙ LN( Zlocal ) + βa. (10) By doing so, the local action-conditioned latent features are further aligned with the global action context. This modulation improves the consistency of generated dynamics at the sequence level and provides a stronger global control signal to the DiT backbone. 
+
+Action Adaptive Injection. Finally, we combine the local and global branches into a adaptive layer normalization module for each DiT block. The local cross-attention branch ensures that latent noise tokens can directly perceive structured action information, enabling fine-grained action following. The global modulation branch summarizes the action tokens into a compact context vector and injects it through AdaLN, ensuring that the overall motion pattern remains coherent and physically consistent. Formally, the fused latent representation is written as: 
+
+Zfused = AdaLN( Zlocal ; γa, β a). (11) Compared with conventional single-embedding action injection, our design avoids averaging all action dimensions too early. Instead, it preserves dimension-level structure, emphasizes subtle but semantically important motion signals, and combines local refinement with global modulation in a complementary manner. As a result, the model better captures both fine-grained dexterous action details and long-range motion consistency during generation. 
+
+4.5 Semantic Condition with Dual Cross-Attention 
+
+To better capture the semantics of hand-object interaction, we introduce visual features with strong 2D structured geometric priors to complement the ViT encoder, which is semantically expressive but relatively weak in modeling fine-grained geometry. These two representations are complementary: the ViT encoder provides high-level semantic understanding, while DINO features offer dense spatial representations aligned with image content, thereby strengthening the model’s ability to localize hand-object regions and reason about 8scene geometry. Inspired by [ 25 , 59 , 60 ], we adopt a dual cross-attention to jointly inject DINOv3-L visual features and text embeddings into the latent space. Specifically, latent tokens serve as queries, while DINO tokens and text embeddings act as keys and values. DINO features provide dense, image-aligned spatial cues for fine-grained grounding of object geometry and scene structure, whereas text embeddings provide compact global semantics for high-level intent guidance. To balance the contributions of these two modalities, we concatenate DINO tokens and text tokens along the sequence dimension and aggregate the multi-modal context through cross-attention. This design enables the model to jointly reason over spatial details and semantic cues, thereby improving spatio-temporal consistency in both future appearance and motion generation. 
+
+## 5 Experiments 
+
+In this section, we first introduce implementation details in Sec. 5.1. We then present both quantitative and qualitative comparisons against a SOTA baseline in Sec. 5.2, highlighting improvements in visual quality, temporal coherence, and action consistency. Finally, we perform detailed ablation studies in Sec. 5.3 to analyze the contributions of structured action representation, unified local-global conditioning, and semantic condition with dual cross-attention and provide more details of the mechanism of our DexAC. 
+
+5.1 Experimental Setup 
+
+Datasets. We evaluate our DexAC-WM on two large-scale egocentric human manipulation datasets. EgoDex [50 ]comprises 829 hours of 1080p egocentric video at 30 Hz, containing 194 manipulation tasks involving 500 distinct objects, with rich multimodal annotations including 3D skeletal poses for the upper body and 25 key-points per hand, camera intrinsics and extrinsics, and confidence scores for all pose estimates. EgoVerse [ 52 ]is a collaborative egocentric dataset spanning 1,362 hours across 80k episodes, covering 1,965 tasks, 240 scenes, and 2,087 unique demonstrators, with standardized formats and manipulation-relevant annotations sourced from researchers and industry partners worldwide. For training and evaluation, we use the whole training set and test set data from EgoDex, and EgoVerse-A data from EgoVerse. 
+
+Evaluation metrics. We use PSNR [ 61 ] and SSIM [ 62 ] for pixel-level and structural quality, LPIPS [ 63 ] for perceptual similarity, and FID [ 64 ] and FVD [ 65 ] to evaluate spatial quality and spatio-temporal realism, respectively. Specifially, FID/FVD use the Cosmos-Cookbook protocol. We further report PCK@10 and PCK@20 [ 66 ] on predicted keypoints to evaluate fine-grained localization accuracy. PCK@10 reflects stricter precision, while PCK@20 captures overall motion correctness. 
+
+Baselines. To comprehensively evaluate the proposed DexAC-WM, we focus on Cosmos-Predict2.5 [ 56 ], Wan-Control [ 58 ] and IRASim [ 31 ] as baselines, as they represent strong and state-of-the-art action-conditioned world modeling frameworks under a comparable setting for fair comparison. 
+
+Implementation details. We train all models on the EgoDex dataset using 8 NVIDIA H200 GPUs with each batch size of 64. We adopt a sliding-window sampling strategy with 30-frame non-overlapping windows and 2 random starting positions per window to construct 13-frame training clips, consisting of 1 conditioning frame and a 12-step prediction horizon. We use 57-DoF action vectors as conditional inputs, including 15 dimensions per hand for finger articulation, 9 dimensions per wrist for 6D rotation representation, and 9 dimensions for relative camera pose. We employ a 2B action-conditioned backbone and finetune the model using an MSE loss using AdamW optimizer with learning rate of 4 × 10 −5 and a weight decay of 0.1. 
+
+5.2 Evaluation 
+
+We evaluate generated videos using a fixed temporal protocol, following the Cosmos-Predict2.5-DROID setting with a 12-frame prediction chunk. Specifically, all generated videos are trimmed to a uniform duration and temporally resampled to 30 frames per second, resulting in 26-frame sequences for evaluation. This setting is also comparable to Ctrl-World [ 9], which evaluates 6-frame predictions at 5 Hz within a 1 second horizon. All evaluations are conducted at a spatial resolution of 224 × 224 .
+
+Quantitative Results: Table 1 compare the performance of our method with that advanced action-conditioned world models on the EgoDex and EgoVerse datasets. Although generative-based baselines (such as Wan2.1 and Wan2.2) obtain moderate reconstruction quality but show weak temporal coherence, with FVD exceeding 1200 on both datasets. This indicates that large-scale video priors alone are not sufficient for action-conditioned dexterous prediction. Applying DexAC to IRASim further improve action consistency, with 9Insert Remove USB Clean Surface 
+
+Scoop Dump Ice Vertical Pick Place    
+
+> Motion Tracking Failure Excessive Range of Motion Object Disappearance Hand Distortion
+> GT Base  +DINOv3  +DexAC  Ours GT Base  +DINOv3  +DexAC  Ours
+
+Figure 5. Qualitative comparison of action-conditioned video prediction on Egodex [ 50 ]. From top to bottom, the rows show the frame sequences of the Ground Truth (GT), our proposed method (Ours), Cosmos w/ DexAC (+DexAC), Cosmos w/ DINOv3 (+DINOv3), and Base (Cosmos). PCK@10 gains of +6.18 on EgoDex and +3.0 on EgoVerse, and also reduces FVD on both datasets. These results show that DexAC provides complementary gains across different base architectures. For Cosmos-based variants, adding DINOv3 alone improves visual perception quality in FID on both EgoDex and Egoverse, but increases FVD from 352.19 to 977.68 in Egodex, suggesting weaker temporal stability. DexAC achieve the best PCK, and second-best in FVD in Egodex and second-best in PCK@20 in Egoverse, which demonstrates the gains in temporal coherence and action consistency. Our full model achieves the best FID and FVD on both benchmarks, reaching 106.6/284.40 on EgoDex, 139.60/830.03 on EgoVerse and best PCK and second-best results on Egoverse and Egodex. These results indicate that the joint effect of DINOv3 and DexAC better pre-10 Fold Clothes in Domain Cup on Saucer in Domain 
+
+Cup on Saucer Fold Clothes    
+
+> Motion Tracking Failure Excessive Range of Motion Object Disappearance Hand Distortion
+> GT Base  +DINOv3  +DexAC  Ours GT Base  +DINOv3  +DexAC  Ours
+
+Figure 6. Qualitative comparison of action-conditioned video prediction on EgoVerse [ 52 ]. From top to bottom, the rows show the frame sequences of the Ground Truth (GT), our proposed method (Ours), Cosmos w/ DexAC (+DexAC), Cosmos w/ DINOv3 (+DINOv3), and Base (Cosmos). serves semantic representations of structured actions, significantly improving action-temporal prediction. 
+
+Qualitative Results: Figure 5 and 6 show qualitative comparisons on EgoDex and EgoVerse. The base model can reconstruct the overall scene layout, but it often produces distorted hand poses and mismatched hand-object interactions. Under object occlusion, both the base and +DexAC show noticeable object disappearance. DINOv3 alleviates this situation by providing object- and scene-level semantic, but its predictions still exhibit motion drift, although the overall motion direction is partially preserved. DexAC better maintains the structural integrity of hand motions, but it is less consistent in modeling object interactions. For deformable object tasks (folding clothes) and multi-object scenarios, maintaining hand-object consistency becomes the main challenge. 11 Table 1. Quantitative comparison of advanced action-conditioned world models on EgoDex [ 50 ] and Ego-Verse [ 52 ]. Higher PSNR and SSIM indicate better reconstruction quality, while lower LPIPS, FID and FVD indicate better perceptual and temporal quality. Higher PCK represents better action consistency. The best and second-best AVG are highlighted in bold and underlined, respectively. Baselines PSNR ↑ SSIM ↑ LPIPS ↓ FID ↓ FVD ↓ PCK@10 ↑ PCK@20 ↑                                                                                                                                               
+
+> EgoDex [50] Wan2.1-Fun-1.3B-Control [58] 21.89 0.89 0.34 194.11 1532.49 20.35 36.89 Wan2.2-Fun-5B-Control [58] 22.97 0.73 0.31 167.98 1434.19 21.51 36.84 IRASim [31] 22.12 0.80 0.20 153.81 615.21 27.76 44.84 IRASim + DexAC 23.11 0.81 0.16 142.76 565.30 (↓8.11%) 33.94 (+22.26%) 51.37 (+14.56%)
+> Cosmos-Predict2.5-2B (Base) [56] 25.02 0.80 0.25 114.51 352.19 31.07 58.33 Base + DINOv3 25.74 0.81 0.23 110.25 977.68 33.86 60.78 Base + DexAC 25.14 (+0.47%) 0.80 0.25 114.26 (↓0.22%) 349.29 (↓0.82%) 34.15 (+9.91%) 61.41 (+5.28%)
+> Ours (Base + DINOv3 + DexAC) 25.13 (+0.44%) 0.80 (+0.57%) 0.24 (↓1.43%) 106.67 (↓6.84%) 284.40 (↓19.25%) 32.70 (+5.25%) 60.59 (+3.87%)
+> EgoVerse [52] Wan2.1-Fun-1.3B-Control [58] 22.43 0.74 0.37 176.99 1370.18 20.17 33.95 Wan2.2-Fun-5B-Control [58] 21.93 0.79 0.41 151.97 1203.89 25.74 41.32 IRASim [31] 22.59 0.71 0.35 229.74 989.21 41.68 57.90 IRASim+DexAC 23.66 (+4.74%) 0.75 (+5.63%) 0.39 224.77 (↓2.16%) 963.25 (↓2.62%) 44.68 (+7.20%) 58.12 (+0.38%)
+> Cosmos-Predict2.5-2B (Base) [56] 21.45 0.63 0.39 151.62 955.74 24.58 41.16 Base + DINOv3 21.09 0.62 0.41 162.13 857.82 26.45 41.73 Base + DexAC 21.37 0.63 0.40 152.10 919.56 (↓3.79%) 24.24 42.72 (+3.79%)
+> Ours (Base + DINOv3 + DexAC) 21.67 (+1.03%) 0.64 (+1.59%) 0.38 (↓2.56%) 139.60 (↓7.93%) 830.03 (↓13.15%) 40.62 (+65.26%) 60.51 (+47.01%)
+
+The base, +DINOv3, and +DexAC show different degrees of hand-object deformation. DexAC preserves more coherent motion trajectories and hand details, while the base and DINOv3 only exhibit more visible action drift. In comparison, the full model better preserves hand poses, motion trajectories, and hand-object interaction consistency, while reducing accumulated motion drift. These results indicate that structured action representation and action-aware semantic conditioning jointly help model both subtle dexterous motions and globally consistent interaction behavior. 
+
+5.3 Ablation Study 
+
+We conduct a series of ablations to examine why DexAC and a semantic condition branch improve high-DoF dexterous world modeling. Specifically, we investigate: 
+
+a. What are the roles of different components in DexAC? We conduct ablation studies to evaluate the contribution of each component in our structured action conditioning framework, as summarized in Table 2. Removing either local refinement or global modulation consistently degrades performance, confirming that both branches are important for high-DoF action conditioning. In particular, removing global modulation leads to the largest drop in overall performance, with clear degradation in reconstruction quality, perceptual fidelity, temporal coherence, and action consistency, indicating that global action intent is essential for stabilizing generation. Removing local refinement also degrades performance, especially in FVD and PCK, showing that fine-grained action injection is necessary for preserving dexterous motion details. Compared with the simple MLP-based conditioning baseline, our full condition achieves the best overall results, notably improving FID from 114.51 to 106.67 and FVD from 352.19 to 284.40, while also increasing PCK@10 from 31.07 to 32.70 and PCK@20 from 58.33 to 60.59 on EgoDex. These results demonstrate that the proposed unified local-global conditioning is more effective than conventional global action embedding for high-DoF dexterous actions. Computation analysis of DexAC can refer to Table 6 in Sec. C. 
+
+b. Are subtle action dimensions are effectively utilized? To verify whether subtle action dimensions are effectively utilized, we visualize the action heatmap in the AdaLN embedding space. Specifically, we extract the action-conditioned embedding before AdaLN modulation and compute channel-wise activation 12 Table 2. Ablation study on structured action conditioning components on EgoDex.                                              
+
+> Components PSNR ↑SSIM ↑LPIPS ↓FID ↓FVD ↓PCK@10 ↑PCK@20 ↑
+> MLP Action Embed 25.02 0.80 0.25 114.51 352.19 31.07 58.33 w/o Local Attn 25.12 0.80 0.25 114.51 377.03 30.48 58.50 w/o Global Attn 24.82 0.79 0.26 116.31 419.90 30.81 54.21 Full DexAC 25.13 0.80 0.24 106.67 284.40 32.70 60.59 w/o Local Attn w/o Global Att nDexAC Ours
+
+Figure 7. Action Heatmap in the AdaLN embedding space. magnitudes, forming a feature heatmap. As shown in Figure 7, the x-axis represents feature channels and the 
+
+y-axis denotes forward index, with color indicating activation strength. We compare four settings: (1) without Local Attention, (2) without Global Attention, (3) DexAC, and (4) Ours (DexAC+DINOv3). The baseline shows highly imbalanced activations dominated by a few channels, indicating that subtle action signals are suppressed. Removing global modulation leads to scattered and unstable patterns. In contrast, DexAC produces a more balanced and structured distribution, suggesting better preservation of dimension-wise action information. With DINO features, activations become more concentrated and semantically aligned, indicating stronger action-visual coupling. These results show that our structured action conditioning improves the utilization of subtle action dimensions , while semantic visual features further enhance this effect ,leading to more balanced and physically meaningful action injection. 
+
+Table 3. Three action-family PCK evaluation.                                       
+
+> Methods Wrist-Dom Finger-Dom Head-Dom PCK@10 PCK@20 PCK@10 PCK@20 PCK@10 PCK@20 MLP Action Embed 7.03 31.80 7.03 22.51 3.89 14.27 w/o Global Attn 88.83 93.76 0000w/o Local Attn 48.88 72.60 29.03 53.87 35.75 56.03 DexAC 33.04 58.42 33.04 58.42 40.00 60.99 Ours (DexAC + DINOv3) 54.65 76.09 29.68 54.44 41.21 65.51
+
+Table 4. Ablation study on action normalization and scaling on EgoDex.                             
+
+> Methods PSNR ↑SSIM ↑LPIPS ↓FID ↓FVD ↓PCK@10 ↑PCK@20 ↑
+> Ours (w/o Norm) 24.69 0.79 0.26 117.54 418.53 31.19 56.64
+> Ours (Scale 200) 24.79 0.80 0.25 118.22 371.18 31.42 56.40
+
+13 Fold Clothes  Fold Clothes in Domain  Cup on Saucer  Scoop Granular in Domain    
+
+> Insert Remove USB Clean Surface Scoop Dump Ice Vertical Pick Place
+
+(a) 
+
+(b) Figure 8. The PCA results of (a) EgoVerse and (b) EgoDex tasks. Fold Clothes  Fold Clothes in Domain  Cup on Saucer  Scoop Granular in Domain    
+
+> Insert Remove USB Clean Surface Scoop Dump Ice Vertical Pick Place
+
+(a) 
+
+(b) 
+
+Figure 9. The t-SNE results of (a) EgoVerse and (b) EgoDex tasks. 
+
+c. How do different action groups benefit? We provide action-family diagnostics across wrist-, finger-, and head-dominant groups to evaluate how different motions benefit from DexAC. Dimension-wise tokeniza-tion preserves subtle finger signals, while learnable global queries aggregate correlated wrist, finger, and camera motions. As shown in Table 3, MLP action embedding remains weak across all three action-dominant cases, showing that flat global action injection limits action-following ability under heterogeneous high-DoF actions. In contrast, local attention refinement is biased toward specific motion groups, while DexAC+DINOv3 achieves the best average PCK across the three groups, demonstrating family-balanced physical consistency from structured action conditioning and semantic grounding. Table 4 further verifies the importance of proper action normalization. Removing normalization degrades overall performance, while simply scaling all actions by 200 leads to a higher FVD than ours. This indicates that simple magnitude amplification can not effectively improve temporally consistent prediction for high-DoF dexterous actions. More importantly, per-dimension normalization is necessary but not sufficient. Although it alleviates raw numerical scale imbalance, it can-not prevent action semantics from collapsing under flat aggregation. Therefore, both scale alignment and 14 structured action tokenization are essential for reliable high-DoF action conditioning. We further visualize the PCA and t-SNE embeddings of the structured action tokenizer (SAT) features to examine how tokenizer represent high-DoF actions adaptively. The PCA results in Figure 8 reveal different distribution patterns across action groups. For example, finger-related samples exhibit both compact clusters and locally scattered points, suggesting that the tokenizer captures common finger-motion structures while remaining sensitive to task-dependent hand dynamics. The t-SNE visualization in Figure 9 further shows that action features from different tasks form distinct but partially clustered distributions, indicating that the proposed tokenizer can separate both local and global action patterns across different motion groups. These observations support the effectiveness of dimension-wise structured representation for modeling heterogeneous high-DoF actions. 
+
+d. Why does the semantic condition help? To analyze the effectiveness of semantic condition, we introduce two additional perceptual metrics and compare two variants in different weights of DINOv3 feature injection. Our results show that semantic conditioning improves perceptual fidelity, while changing the injection strength does not cause substantial performance fluctuations, although stronger semantic injection slightly degrades temporal consistency. This suggests that the performance variation in high-DoF dexterous prediction is more related to the lack of semantic grounding than to the exact injection strength. Meanwhile, combining DexAC further enhances DexAC-WM’s ability to perceive action semantics, improving visual perception quality while maintaining a lead in FVD and PCK. Results can refer to Table 7 and 8 in Sec. D. 
+
+e. Long horizon evaluation . Then, we study 65 frames ( >2s) for long-horizon evaluation. Table 5 shows that FVD and PCK degrade substantially under longer rollouts. 
+
+Table 5. Long horizon evaluation with 65 frames on EgoDex.                                           
+
+> Methods PSNR ↑SSIM ↑LPIPS ↓FID ↓FVD ↓PCK@10 ↑PCK@20 ↑
+> Cosmos-Predict2.5-2B (Base) 21.89 0.74 0.34 158.70 524.96 24.45 47.93 Base + DINOv3 22.75 0.76 0.31 134.12 499.44 26.45 41.73 Base + DexAC 22.48 0.75 0.32 134.28 484.34 27.22 50.70
+> Ours (Base + DINOv3 + DexAC) 22.69 0.76 0.31 133.02 465.31 27.42 50.67
+
+## 6 Conclusion 
+
+We propose DexAC-WM, a structured action-conditioning method that preserves dimension-level semantics and re-couples heterogeneous actions through local refinement and global modulation tailored to high-DoF dexterous world models. We further introduce additional semantic condition grounding and consistently improves DexAC-WM in visual-temporal quality and action consistency. Extensive experiments on both EgoDex and EgoVerse validate the effectiveness of combining structured action representation with semantic condition for high-DoF dexterous world modeling and the scalability of DexAC. 
+
+## References 
+
+[1] Kristen Grauman, Andrew Westbury, Eugene Byrne, Zachary Chavis, Antonino Furnari, Rohit Girdhar, Jackson Hamburger, Hao Jiang, Miao Liu, Xingyu Liu, et al. Ego4d: Around the world in 3,000 hours of egocentric video. In CVPR , 2022. [2] Kristen Grauman, Andrew Westbury, Lorenzo Torresani, Kris Kitani, Jitendra Malik, Triantafyllos Afouras, Kumar Ashutosh, Vijay Baiyya, Siddhant Bansal, Bikram Boote, et al. Ego-exo4d: Understanding skilled human activity from first-and third-person perspectives. In CVPR , 2024. [3] Wei Yu, Songheng Yin, Steve Easterbrook, and Animesh Garg. Egosim: Egocentric exploration in virtual worlds with multi-modal conditioning. In ICLR , 2025. [4] Jake Bruce, Michael D Dennis, Ashley Edwards, Jack Parker-Holder, Yuge Shi, Edward Hughes, Matthew Lai, Aditi Mavalankar, Richie Steigerwald, Chris Apps, et al. Genie: Generative interactive environments. In ICML , 2024. 15 [5] Philipp Wu, Alejandro Escontrela, Danijar Hafner, Pieter Abbeel, and Ken Goldberg. Daydreamer: World models for physical robot learning. In CoRL , 2023. [6] Anthony Hu, Lloyd Russell, Hudson Yeo, Zak Murez, George Fedoseev, Alex Kendall, Jamie Shotton, and Gianluca Corrado. Gaia-1: A generative world model for autonomous driving. arXiv preprint arXiv:2309.17080 , 2023. [7] Nicklas Hansen, Hao Su, and Xiaolong Wang. Td-mpc2: Scalable, robust world models for continuous control. arXiv preprint arXiv:2310.16828 , 2023. [8] Mengjiao Yang, Yilun Du, Kamyar Ghasemipour, Jonathan Tompson, Dale Schuurmans, and Pieter Abbeel. Learning interactive real-world simulators. arXiv preprint arXiv:2310.06114 , 2023. [9] Yanjiang Guo, Lucy Xiaoyang Shi, Jianyu Chen, and Chelsea Finn. Ctrl-world: A controllable generative world model for robot manipulation. arXiv preprint arXiv:2510.10125 , 2025. [10] Anton R Sobinov and Sliman J Bensmaia. The neural mechanisms of manual dexterity. Nature Reviews Neuroscience , 2021. [11] Raktim Gautam Goswami, Amir Bar, David Fan, Tsung-Yen Yang, Gaoyue Zhou, Prashanth Krishnamurthy, Michael Rabbat, Farshad Khorrami, and Yann LeCun. World models for learning dexterous hand-object interactions from human videos, 2026. [12] Yutong Bai, Danny Tran, Amir Bar, Yann LeCun, Trevor Darrell, and Jitendra Malik. Whole-body conditioned egocentric video prediction. arXiv preprint arXiv:2506.21552 , 2025. [13] Ying Zheng, Lei Yao, Yuejiao Su, Yi Zhang, Yi Wang, Sicheng Zhao, Yiyi Zhang, and Lap-Pui Chau. A survey of embodied learning for object-centric robotic manipulation. Machine Intelligence Research , 2025. [14] Shan An, Ziyu Meng, Chao Tang, Yuning Zhou, Tengyu Liu, Fangqiang Ding, Shufang Zhang, Yao Mu, Ran Song, Wei Zhang, et al. Dexterous manipulation through imitation learning: A survey. arXiv preprint arXiv:2504.03515 , 2025. [15] Yinlin Li, Peng Wang, Rui Li, Mo Tao, Zhiyong Liu, and Hong Qiao. A survey of multifingered robotic manipulation: Biological results, structural evolvements, and learning methods. Frontiers in Neurorobotics ,2022. [16] Chen Wang, Haochen Shi, Weizhuo Wang, Ruohan Zhang, Li Fei-Fei, and C Karen Liu. Dexcap: Scalable and portable mocap data collection system for dexterous manipulation. arXiv preprint arXiv:2403.07788 ,2024. [17] Yuzhe Qin, Yueh-Hua Wu, Shaowei Liu, Hanwen Jiang, Ruihan Yang, Yang Fu, and Xiaolong Wang. Dexmv: Imitation learning for dexterous manipulation from human videos. In ECCV , 2022. [18] Yuzhe Qin, Wei Yang, Binghao Huang, Karl Van Wyk, Hao Su, Xiaolong Wang, Yu-Wei Chao, and Dieter Fox. Anyteleop: A general vision-based dexterous robot arm-hand teleoperation system. arXiv preprint arXiv:2307.04577 , 2023. [19] Yuzhe Qin, Binghao Huang, Zhao-Heng Yin, Hao Su, and Xiaolong Wang. Dexpoint: Generalizable point cloud reinforcement learning for sim-to-real dexterous manipulation. In CoRL , 2023. [20] Ankur Handa, Arthur Allshire, Viktor Makoviychuk, Aleksei Petrenko, Ritvik Singh, Jingzhou Liu, Denys Makoviichuk, Karl Van Wyk, Alexander Zhurkevich, Balakumar Sundaralingam, et al. Dextreme: Transfer of agile in-hand manipulation from simulation to reality. In ICRA , 2023. [21] Chuan Wen, Xingyu Lin, John So, Kai Chen, Qi Dou, Yang Gao, and Pieter Abbeel. Any-point trajectory modeling for policy learning. arXiv preprint arXiv:2401.00025 , 2023. [22] Yufei Ye, Xueting Li, Abhinav Gupta, Shalini De Mello, Stan Birchfield, Jiaming Song, Shubham Tulsiani, and Sifei Liu. Affordance diffusion: Synthesizing hand-object interactions. In CVPR , 2023. 16 [23] Yue Ma, Yingqing He, Xiaodong Cun, Xintao Wang, Siran Chen, Xiu Li, and Qifeng Chen. Follow your pose: Pose-guided text-to-video generation using pose-free videos. AAAI , 2024. [24] Xiangyu Sun, Shijie Wang, Fengyi Zhang, Lin Liu, Caiyan Jia, Ziying Song, Zi Huang, and Yadan Luo. Vggt-world: Transforming vggt into an autoregressive geometry world model. arXiv preprint arXiv:2603.12655 ,2026. [25] Gaoyue Zhou, Hengkai Pan, Yann LeCun, and Lerrel Pinto. Dino-wm: World models on pre-trained visual features enable zero-shot planning. arXiv preprint arXiv:2411.04983 , 2024. [26] Yang Zhou, Yifan Wang, Jianjun Zhou, Wenzheng Chang, Haoyu Guo, Zizun Li, Kaijing Ma, Xinyue Li, Yating Wang, Haoyi Zhu, et al. Omniworld: A multi-domain and multi-modal dataset for 4d world modeling. arXiv preprint arXiv:2509.12201 , 2025. [27] Niket Agarwal, Arslan Ali, Maciej Bala, Yogesh Balaji, Erik Barker, Tiffany Cai, Prithvijit Chattopadhyay, Yongxin Chen, Yin Cui, Yifan Ding, et al. Cosmos world foundation model platform for physical ai. arXiv preprint arXiv:2501.03575 , 2025. [28] Oriane Siméoni, Huy V Vo, Maximilian Seitzer, Federico Baldassarre, Maxime Oquab, Cijo Jose, Vasil Khali-dov, Marc Szafraniec, Seungeun Yi, Michaël Ramamonjisoa, et al. Dinov3. arXiv preprint arXiv:2508.10104 ,2025. [29] Siyuan Zhou, Yilun Du, Jiaben Chen, Yandong Li, Dit-Yan Yeung, and Chuang Gan. Robodreamer: Learning compositional world models for robot imagination. arXiv preprint arXiv:2404.12377 , 2024. [30] Chuning Zhu, Raymond Yu, Siyuan Feng, Benjamin Burchfiel, Paarth Shah, and Abhishek Gupta. Unified world models: Coupling video and action diffusion for pretraining on large robotic datasets. arXiv preprint arXiv:2504.02792 , 2025. [31] Fangqi Zhu, Hongtao Wu, Song Guo, Yuxiao Liu, Chilam Cheang, and Tao Kong. Irasim: A fine-grained world model for robot manipulation. In ICCV , 2025. [32] Ruixiang Wang, Qingming Liu, Yueci Deng, Guiliang Liu, Zhen Liu, and Kui Jia. Eva: Aligning video world models with executable robot actions via inverse dynamics rewards. arXiv preprint arXiv:2603.17808 ,2026. [33] Ruijie Zheng, Jing Wang, Scott Reed, Johan Bjorck, Yu Fang, Fengyuan Hu, Joel Jang, Kaushil Kundalia, Zongyu Lin, Loic Magne, et al. Flare: Robot learning with implicit world modeling. arXiv preprint arXiv:2505.15659 , 2025. [34] Iman Nematollahi, Branton DeMoss, Akshay L Chandra, Nick Hawes, Wolfram Burgard, and Ingmar Posner. Lumos: Language-conditioned imitation learning with world models. In ICRA , 2025. [35] Adrià López Escoriza, Nicklas Hansen, Stone Tao, Tongzhou Mu, and Hao Su. Multi-stage manipulation with demonstration-augmented reward, policy, and world model learning. arXiv preprint arXiv:2503.01837 ,2025. [36] Chuanruo Ning, Kuan Fang, and Wei-Chiu Ma. Prompting with the future: Open-world model predictive control with interactive digital twins. arXiv preprint arXiv:2506.13761 , 2025. [37] Mido Assran, Adrien Bardes, David Fan, Quentin Garrido, Russell Howes, Matthew Muckley, Ammar Rizvi, Claire Roberts, Koustuv Sinha, Artem Zholus, et al. V-jepa 2: Self-supervised video models enable understanding, prediction and planning. arXiv preprint arXiv:2506.09985 , 2025. [38] Danijar Hafner, Jurgis Pasukonis, Jimmy Ba, and Timothy Lillicrap. Mastering diverse domains through world models. arXiv preprint arXiv:2301.04104 , 2023. [39] Julian Schrittwieser, Ioannis Antonoglou, Thomas Hubert, Karen Simonyan, Laurent Sifre, Simon Schmitt, Arthur Guez, Edward Lockhart, Demis Hassabis, Thore Graepel, et al. Mastering atari, go, chess and shogi by planning with a learned model. Nature , 2020. 17 [40] William Peebles and Saining Xie. Scalable diffusion models with transformers. In ICCV , 2023. [41] Lili Chen, Kevin Lu, Aravind Rajeswaran, Kimin Lee, Aditya Grover, Misha Laskin, Pieter Abbeel, Aravind Srinivas, and Igor Mordatch. Decision transformer: Reinforcement learning via sequence modeling. 
+
+NeurIPS , 2021. [42] Tete Xiao, Ilija Radosavovic, Trevor Darrell, and Jitendra Malik. Masked visual pre-training for motor control. arXiv preprint arXiv:2203.06173 , 2022. [43] Suraj Nair, Aravind Rajeswaran, Vikash Kumar, Chelsea Finn, and Abhinav Gupta. R3m: A universal visual representation for robot manipulation. arXiv preprint arXiv:2203.12601 , 2022. [44] Yecheng Jason Ma, Shagun Sodhani, Dinesh Jayaraman, Osbert Bastani, Vikash Kumar, and Amy Zhang. Vip: Towards universal visual reward and representation via value-implicit pre-training. arXiv preprint arXiv:2210.00030 , 2022. [45] Dima Damen, Hazel Doughty, Giovanni Maria Farinella, Sanja Fidler, Antonino Furnari, Evangelos Kazakos, Davide Moltisanti, Jonathan Munro, Toby Perrett, Will Price, et al. Scaling egocentric vision: The epic-kitchens dataset. In ECCV , 2018. [46] Yunze Liu, Yun Liu, Che Jiang, Kangbo Lyu, Weikang Wan, Hao Shen, Boqiang Liang, Zhoujie Fu, He Wang, and Li Yi. Hoi4d: A 4d egocentric dataset for category-level human-object interaction. In 
+
+CVPR , 2022. [47] Kenneth Shaw, Shikhar Bahl, and Deepak Pathak. Videodex: Learning dexterity from internet videos. In 
+
+CoRL , 2023. [48] Prithviraj Banerjee, Sindi Shkodrani, Pierre Moulon, Shreyas Hampali, Shangchen Han, Fan Zhang, Linguang Zhang, Jade Fountain, Edward Miller, Selen Basol, et al. Hot3d: Hand and object tracking in 3d from egocentric multi-view videos. In CVPR , 2025. [49] Simar Kareer, Dhruv Patel, Ryan Punamiya, Pranay Mathur, Shuo Cheng, Chen Wang, Judy Hoffman, and Danfei Xu. Egomimic: Scaling imitation learning via egocentric video. In ICRA , 2025. [50] Ryan Hoque, Peide Huang, David J Yoon, Mouli Sivapurapu, and Jian Zhang. Egodex: Learning dexterous manipulation from large-scale egocentric video. arXiv preprint arXiv:2505.11709 , 2025. [51] Ahad Jawaid and Yu Xiang. Openego: A large-scale multimodal egocentric dataset for dexterous manipulation. arXiv preprint arXiv:2509.05513 , 2025. [52] Ryan Punamiya, Simar Kareer, Zeyi Liu, Josh Citron, Ri-Zhao Qiu, Xiongyi Cai, Alexey Gavryushin, Jiaqi Chen, Davide Liconti, Lawrence Y Zhu, et al. Egoverse: An egocentric human dataset for robot learning from around the world. arXiv preprint arXiv:2604.07607 , 2026. [53] Ruijie Zheng, Dantong Niu, Yuqi Xie, Jing Wang, Mengda Xu, Yunfan Jiang, Fernando Castañeda, Fengyuan Hu, You Liang Tan, Letian Fu, et al. Egoscale: Scaling dexterous manipulation with diverse egocentric human data. arXiv preprint arXiv:2602.16710 , 2026. [54] Amir Bar, Gaoyue Zhou, Danny Tran, Trevor Darrell, and Yann LeCun. Navigation world models. In 
+
+CVPR , 2025. [55] Byungjun Kim, Taeksoo Kim, Junyoung Lee, and Hanbyul Joo. Dexterous world models. arXiv preprint arXiv:2512.17907 , 2025. [56] Arslan Ali, Junjie Bai, Maciej Bala, Yogesh Balaji, Aaron Blakeman, Tiffany Cai, Jiaxin Cao, Tianshi Cao, Elizabeth Cha, Yu-Wei Chao, et al. World simulation with video foundation models for physical ai. arXiv preprint arXiv:2511.00062 , 2025. [57] Alisson Azzolini, Junjie Bai, Hannah Brandon, Jiaxin Cao, Prithvijit Chattopadhyay, Huayu Chen, Jinju Chu, Yin Cui, Jenna Diamond, Yifan Ding, et al. Cosmos-reason1: From physical common sense to embodied reasoning. arXiv preprint arXiv:2503.15558 , 2025. 18 [58] Team Wan, Ang Wang, Baole Ai, Bin Wen, Chaojie Mao, Chen-Wei Xie, Di Chen, Feiwu Yu, Haiming Zhao, Jianxiao Yang, et al. Wan: Open and advanced large-scale video generative models. arXiv preprint arXiv:2503.20314 , 2025. [59] Y Zhu et al. Vima: General robot manipulation with multimodal prompts. In ICLR , 2023. [60] Xinyi Chen, Yilun Chen, Yanwei Fu, Ning Gao, Jiaya Jia, Weiyang Jin, Hao Li, Yao Mu, Jiangmiao Pang, Yu Qiao, et al. Internvla-m1: A spatially guided vision-language-action framework for generalist robot policy. arXiv preprint arXiv:2510.13778 , 2025. [61] Alain Hore and Djemel Ziou. Image quality metrics: Psnr vs. ssim. In ICPR , 2010. [62] Zhou Wang, Alan C Bovik, Hamid R Sheikh, and Eero P Simoncelli. Image quality assessment: from error visibility to structural similarity. IEEE TIP , 2004. [63] Richard Zhang, Phillip Isola, Alexei A Efros, Eli Shechtman, and Oliver Wang. The unreasonable effectiveness of deep features as a perceptual metric. In CVPR , 2018. [64] Martin Heusel, Hubert Ramsauer, Thomas Unterthiner, Bernhard Nessler, and Sepp Hochreiter. Gans trained by a two time-scale update rule converge to a local nash equilibrium. NeurIPS , 2017. [65] Thomas Unterthiner, Sjoerd Van Steenkiste, Karol Kurach, Raphael Marinier, Marcin Michalski, and Sylvain Gelly. Towards accurate generative models of video: A new metric & challenges. arXiv preprint arXiv:1812.01717 , 2018. [66] Yi Yang and Deva Ramanan. Articulated human detection with flexible mixtures of parts. IEEE TPAMI ,2012. [67] Stephanie Fu, Netanel Tamir, Shobhita Sundaram, Lucy Chai, Richard Zhang, Tali Dekel, and Phillip Isola. Dreamsim: Learning new dimensions of human visual similarity using synthetic data. arXiv preprint arXiv:2306.09344 , 2023. [68] Robin Rombach, Andreas Blattmann, Dominik Lorenz, Patrick Esser, and Björn Ommer. High-resolution image synthesis with latent diffusion models. In CVPR , 2022. [69] Jianyuan Wang, Minghao Chen, Nikita Karaev, Andrea Vedaldi, Christian Rupprecht, and David Novotny. Vggt: Visual geometry grounded transformer. In CVPR , 2025. 19 A Overview of the Appendix 
+
+This appendix contains additional analysis, experimental details, and discussions, organized as follows: 
+
+• Sec. B outlines the additional implementation details in experiments. 
+
+• Sec. C presents model performance and effects of DexAC. 
+
+• Sec. D investigates the effectiveness of the semantic condition branch. 
+
+• Sec. E visualizes more qualitative results for further comparison and analysis. 
+
+• Sec. F discusses the limitations of the current study and highlights possible directions for future work. 
+
+## B Additional Implementation Details 
+
+All models are trained under the Fully Sharded Data Parallel (FSDP) setting for 2 epochs (about 20 hours per epoch in Egodex). We report results using the final checkpoint for all methods. The remaining configuration is identical to that described in the main paper. 
+
+## C Model Performance and Effects of DexAC 
+
+we provide more details of the structured action tokenizer (SAT) of DexAC in Figure 10. We set the action embedding space of 256, with 12 action chunk-size T. We evaluate different variants of action of the parameters and tokenization and computation cost in Table 6. The results show that our proposed full DexAC achieve lower parameters than MLP-embedding baseline. And full DexAC requires 3.55G FLOPs mainly from local refinement, but it is more parameter efficient than the MLP baseline and yields clear gains, making the extra computation a reasonable cost. Furthermore, without global Attention or local attention shows significant drop of DreamSim [ 67 ] and Latent L2 [ 68 ] which indicates the effectiveness of two components for action refinement and perceptual gains. This suggests that the gains of DexAC are not simply due to increased parameter count, but instead arise from a more effective structured action-conditioning design. MLP  Action  
+
+> Vector
+
+SAT  Action      
+
+> Vector
+> C=57*12 4*C C=2048
+> Drop
+> GELU
+> Linear
+> Drop
+> Linear
+> D=57, T=12 C=256
+> Linear
+> unsequeeze
+> (B, T, D) (B, C)
+> Linear
+> GELU
+> (B, T, D) (B, T*D, C)
+> C=256
+
+Figure 10. Details comparison of the vanilla MLP action embedding method and our proposed structured action tokenizer (SAT) for action dimension-level feature preservation. 
+
+Table 6. Model complexity comparison: Parameters and FLOPs. Components Params FLOPs MLP Action Embed 22.39M 24.64M w/ SAT 0.512K 245.76K w/ Local Attn 13.65M 3.42G w/ Global Attn 2.37M 126.45M Full DexAC 16.02M 3.55G 
+
+20 Table 7. Additional Quantitative Results of DreamSim and Latent L2. Lower is better for both metrics. Baselines DreamSim ↓ Latent L2 ↓
+
+Cosmos-Predict2.5-2B (Base) 0.1245 9.3637 Base + DINOv3 0.1233 9.2491 Base + DexAC 0.1235 9.2518 Base + DexAC + DINOv3 (Ours) 0.1229 9.2304 
+
+w/o Local Attn 0.1275 9.4113 w/o Global Attn 0.1271 9.3537 
+
+## D Effects of Semantic Condition 
+
+We vary the DINOv3 injection strengths to compare a moderate conditioning strength against a substantially stronger setting to examine whether increasing semantic guidance consistently benefits perception quality. Table 8 shows that increasing the weight of the semantic branch from 0.2 to 0.6 has little effect on the first four metrics, while FVD shows a slight increase. To further evaluate the performance gain of the semantic condition in perception quality, we evaluate DreamSim [ 67 ] and Latent L2 [ 68 ] in Table 7. These findings indicate that DINOv3 provides useful action-semantic knowledge. When combined with DexAC, these priors are further aligned with structured, high-DoF action features, enabling DexAC-WM to learn a semantic-aware action representation that better preserves visual changes during fine-grained dexterous motions. 
+
+Table 8. Ablation results of the weight of our semantic condition. Weights PSNR ↑ SSIM ↑ LPIPS ↓ FID ↓ FVD ↓
+
+0.2 (Ours) 25.13 0.80 0.24 106.67 284.40 
+
+0.6 25.14 0.80 0.25 106 288.17 
+
+## E Additional Qualitative Results 
+
+We present additional success cases for 26-frame prediction in Figures 12, 13, 14, 15, 16, 17, and 18, and for 65-frame prediction in Figures 19, 20, and 21. To comprehensively visualize the temporal progression and long-horizon consistency of the generated interactions, we uniformly sample 8 frames at equal intervals from both the Ground Truth and predicted videos from Egodex. The Base and DINOv3 only models consistently struggle with visual-motion alignment. Although DexAC is better at capturing local hand structure representations, it exhibits macro-motion drift over long time periods. In contrast, our full method demonstrates superior spatio-temporal consistency. We observe two primary failure modes in extremely challenging scenarios shown in Figures 11. First, accumulated conditioning errors in prolonged interactions cause long-horizon prediction deviation . Second, self-occlusion or intricate manipulation occasionally yields distorted finger details due to unobserved geometry. Resolving these occlusion ambiguities and mitigating long-horizon drifts remain future directions. 
+
+## F Limitations 
+
+The current framework mainly focuses on egocentric observations. While egocentric views provide strong embodiment signals, they restrict the model’s ability to leverage multi-view spatial information, which is important for transferring learned representations to humanoid robots and other embodied agents operating in more complex environments. Furthermore, the present study is constrained by available computational resources and thus is limited to a fixed model scale and relatively short video prediction horizons. Although this setup enables a controlled evaluation of structured action conditioning, we do not yet investigate the behavior of the proposed design under larger model capacities, longer-horizon generation, and other modal priors like VGGT [ 69 ]. Exploring these scaling dimensions constitutes an important direction for future 21 GT Base  +DINOv3  +DexAC  Ours Figure 11. Throwing a Tennis Ball. research. Finally, our method still depends on supervised finetuning, which is computationally expensive. Future work will focus on improving training efficiency through more lightweight adaptation, with the goal of building more scalable and spatially aware world models at lower cost. 22 GT Base  +DINOv3  +DexAC  Ours Figure 12. Assemble Disassemble Furniture Bench Chair. GT Base  +DINOv3  +DexAC  Ours 
+
+Figure 13. Assemble Disassemble Tiles. 23 GT Base  +DINO v3  +DexAC  Ours Figure 14. Basic Pick Place. GT Base  +DINOv3  +DexAC  Ours 
+
+Figure 15. Dry Hands. 24 GT Base  +DINOv3  +DexAC  Ours Figure 16. Screw Unscrew Fingers Fixture. GT Base  +DINO v3  +DexAC  Ours 
+
+Figure 17. Slot Batteries. 25 GT Base  +DINOv3  +DexAC  Ours Figure 18. Stack. GT Base  +DINOv3  +DexAC  Ours 
+
+Figure 19. Basic Pick Place. 26 GT Base  +DINOv3  +DexAC  Ours Figure 20. Open Close Insert Remove Case. GT Base  +DINOv3  +DexAC  Ours 
+
+Figure 21. Play Reset Connect Four. 27

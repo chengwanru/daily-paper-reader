@@ -1,0 +1,830 @@
+Title: TempAct: Advancing Temporal Plausibility in Autoregressive Video Generation via Planner-Executor RL
+
+URL Source: https://arxiv.org/pdf/2606.28016v1
+
+Published Time: Mon, 29 Jun 2026 00:54:14 GMT
+
+Number of Pages: 26
+
+Markdown Content:
+# TempAct: Advancing Temporal Plausibility in Autoregressive Video Generation via Planner-Executor RL 
+
+Jing Wang 1,2,∗ Xiangxin Zhou 2,∗ Jiajun Liang 3,¶ Kaiqi Liu 4
+
+Wanyun Pang 5 Zhenyu Xie 1 Tianyu Pang 2,‡ Xiaodan Liang 1,‡
+
+> 1
+
+Shenzhen Campus of Sun Yat-Sen University, 2Tencent Hunyuan, 
+
+> 3
+
+Tsinghua University, 4Peking University, 5USTB 
+
+> ∗
+
+Equal contribution ¶Project Lead ‡Corresponding author 
+
+Abstract. Autoregressive (AR) video diffusion models enable low-latency streaming gener-ation by synthesizing videos chunk by chunk with cached visual context, but this chunk-wise formulation makes temporal instruction following ambiguous. A single global prompt does not specify which sub-event should be realized in each chunk, while naively switching to step-wise prompts often leads to delayed reactions, blended step semantics, and error propagation across prompt transitions. These failures are difficult to address with supervised fine-tuning or dis-tillation alone: SFT suffers from exposure bias, while rollout-based distillation still optimizes low-level denoising or teacher-distribution matching rather than directly enforcing action ordering and prompt-transition correctness. We propose TempAct , a planner–executor reinforcement learning framework that jointly optimizes temporal decomposition and step-conditioned execution for temporally plausible AR video generation. TempAct uses an LLM planner to explore span-aware step prompts that are executable by the video model, and trains an AR diffusion executor to follow these prompts under its own generated histo-ries. Its key mechanism is hierarchical group exploration: candidate plans form planning groups, and each plan induces an execution group of multiple continuations from a shared visual context, enabling plan-level credit assignment for long-horizon temporal outcomes and executor-level credit assignment for prompt-switch behavior. We further design hierarchical rewards that combine plan-quality and full-video temporal feedback for the planner with local transition-level step-following rewards, aesthetic regularization, and KL constraints for the executor. Experiments on Self-Forcing and LongLive show that TempAct improves temporal consistency while preserving overall visual quality. 
+
+Date: June 26, 2026 
+
+Code: https://github.com/jingw193/TempAct 
+
+Project Page: https://jingw193.github.io/TempAct/ 
+
+1 Introduction 
+
+Video diffusion models (Kuaishou, 2024; Wan et al., 2025; Chen et al., 2025; Jin et al., 2025; Wang et al., 2025; ByteDance, 2026; Wang et al., 2026c) have advanced rapidly in visual fidelity and 1       
+
+> arXiv:2606.28016v1 [cs.CV] 26 Jun 2026 A golden retriever sits on a grassy lawn with a rubber ball lying on the grass a short distance in front of it. First, it fixes its gaze on the ball
+> and crouches low, hindquarters raised. Next, it pounces forward , covering the short gap in two quick bounds, and snatches the ball firmly in
+> its mouth . Finally, it trots back and drops the ball precisely at its owner's feet .
+> Chunk 1
+> Prompt
+> AR Video Diffusion
+
+... 
+
+... 
+
+...     
+
+> Chunk 2 Chunk 3
+> AR Video Diffusion
+> Baseline: A single prompt across different moments.
+> Chunk 1
+> Step Prompt 1
+> AR Video Diffusion
+
+... 
+
+... 
+
+...      
+
+> Chunk 2 Chunk 3
+> AR Video Diffusion
+> Step Prompt: Step-specific prompts across time.
+> Step Prompt 2
+> Chunk 1 Step Prompt 1
+
+... ...     
+
+> Chunk 2
+> Chunk 3
+> AR Video Diffusion
+> Step Prompt 2
+> Prompt
+> LLM Planner
+> Step
+> Following
+> Reward
+> AR Video Diffusion
+> Step Prompt 3
+> Aesthetic
+> Reward
+> Temporal
+> Following
+> Reward
+> Plan Quality
+> Reward
+> TempAct: Planner-Executor Reinforcement Learning
+> Training Reward Curve
+> Self-Forcing
+> + Step Prompt
+> + TempAct
+
+Figure 1: Overview and Motivation of TempAct. Framework. Single-prompt AR generation conditions every chunk on the same global instruction, while step-prompt generation provides explicit stage-wise conditions but still relies on a fixed executor. TempAct introduces a planner–executor RL framework that jointly optimizes temporal decomposition and prompt-transition execution. 
+
+Qualitative comparison . Compared with single-prompt and step-prompt baselines, TempAct produces more faithful event progression under temporally complex instructions. Training dynamics .The increasing reward curve shows that hierarchical planner–executor optimization provides effective learning signals for temporal plausibility. motion realism, but deploying them in interactive applications requires more than high-quality offline generation: the model must generate streams with low latency while maintaining temporal coherence over long horizons. A common response to this demand is to distill pretrained video diffusion models into few-step autoregressive (AR) video generators (Huang et al., 2026; Cui et al., 2025; Yang et al., 2025b; Zhu et al., 2026), often using distribution-matching distillation (DMD) (Yin et al., 2024a) to preserve generation quality while reducing sampling cost. In this formulation, the model no longer synthesizes an entire video at once; instead, it generates one chunk after another, using previously generated frames as causal visual context. This context is stored through mechanisms such as attention states, KV caches, or visual caches, allowing subsequent chunks to be produced efficiently while preserving continuity with the past. This chunk-wise formulation improves efficiency, but it can also make temporal instruction following ambiguous. In most AR generators, each chunk is typically conditioned on the same global prompt. As a result, the model knows the full instruction but not which part of the instruction should be realized in the current chunk. For example, in the dog example in Figure 1, the instruction requires the dog to first sit and then pick up the ball and run. However, the single-prompt Self-Forcing baseline prematurely depicts the dog holding the ball while sitting at the beginning, causing an event from a later stage to appear too early. We refer to this failure as temporal confusion : the video may look reasonable at each frame, but the event order is collapsed or blurred across chunks . A straightforward fix is to replace the global prompt with step-wise prompts that specify the active subgoal for each stage. However, this shifts the difficulty to handling prompt transitions. 2As illustrated in Figures 1, 3, and 4, when the prompt changes, the AR executor may keep following the previous action, blend adjacent step semantics, or carry errors from earlier chunks into later ones. These failures are difficult to eliminate with supervised fine-tuning (SFT) or distillation alone. SFT suffers from exposure bias because it trains on clean teacher-forced histories but must infer from imperfect rollouts at test time (Schmidt, 2019; Ning et al., 2024). Rollout-based distillation methods such as DMD can reduce this mismatch, but both SFT and distillation still optimize low-level denoising or teacher-distribution matching (Lipman et al., 2022), rather than explicitly enforcing action ordering or prompt-transition correctness. This motivates reinforcement learning (Shao et al., 2024; Liu et al., 2025): by exploring generated plans and videos and scoring them with LLM/VLM feedback (Guo et al., 2025; Jaech et al., 2024; Bai et al., 2025), RL can directly reward executable temporal plans , successful prompt-switch execution , and long-horizon consistency .Motivated by this, we propose TempAct , a planner–executor reinforcement learning framework for temporally plausible AR video generation. Our key observation is that temporally complex generation requires solving two coupled problems: first determining what should happen at each stage, and then deciding how to realize that stage under autoregressive visual history. Executor-only training mainly improves the second problem, i.e., how well the video model follows a given condition, but it cannot revise an ambiguous or poorly timed temporal decomposition. A planner–executor framework therefore provides a more general solution: the planner can organize event order, step granularity, and state changes, while the executor learns to realize prompt transitions without drifting from the generated visual context. TempAct instantiates this idea by using an LLM planner to explore span-aware decompositions of a global instruction and an autoregressive video diffusion executor to roll out chunks conditioned on the active step and accumulated visual history. Crucially, the LLM is not used as a fixed preprocessing module ; instead, TempAct optimizes both the planner and executor from generated trajectories, allowing the planner to learn which temporal plans are executable by the video model and the executor to learn how to realize prompt switches under its own imperfect histories. To make this joint optimization effective, TempAct introduces a hierarchical group exploration strategy in which execution groups are nested under planning groups. For each global prompt, the planner samples a group of candidate temporal plans, covering different action orders, temporal granularities, and state descriptions. Conditioned on each candidate plan, the executor constructs a plan-specific execution group: it first generates a shared context from an earlier step, and then samples multiple continuations after the step transition under that same context. This nested structure provides aligned credit assignment at two levels: comparisons across planning groups reward decompositions that lead to better full-video temporal outcomes, while comparisons within each execution group isolate prompt-switch execution from variations in preceding visual history. Rewards follow the same hierarchy, combining plan-quality and full-video temporal-following feedback for the planner with local transition-level rewards and aesthetic regularization for the executor. Empirically, we evaluate temporal plausibility using a Temporal-Following Score that measures whether generated videos follow the intended event sequence. TempAct improves this score across Self-Forcing and LongLive backbones on temporally complex video generation tasks, with consistent gains under both in-domain and out-of-domain VLM evaluation, as well as human evaluation. 
+
+2 Related Works 
+
+32.1 Autoregressive Video Generation 
+
+Autoregressive (AR) video generation enables streaming synthesis by producing frames or chunks sequentially, but teacher-forced AR diffusion models suffer from train-test mismatch and error accumulation when conditioned on their own histories (Hu et al., 2024; Gao et al., 2024). Recent work improves AR generation through causal distillation, rollout-based training, and memory management: CausVid converts bidirectional diffusion transformers into causal generators with video DMD and KV caching (Yin et al., 2024b,a); Self-Forcing trains with autoregressive rollouts and video-level feedback to mitigate exposure bias (Huang et al., 2026; Cui et al., 2025); subsequent methods manage contextual memory for more consistent long rollouts (Ji et al., 2025, 2026; Yi et al., 2025; Yang et al., 2026); LongLive further introduces KV-recache, streaming long tuning, and frame-sink attention for interactive long-video generation (Yang et al., 2025b); and Causal Forcing bridges the architectural gap between bidirectional teachers and causal students by using an AR teacher for ODE initialization before DMD post-training (Zhu et al., 2026; Zhao et al., 2026). These methods improve streaming efficiency and rollout stability under a given text condition, whereas TempAct focuses on instruction-guided temporal plausibility by jointly optimizing temporal planning and prompt-transition execution with hierarchical reinforcement learning. 
+
+2.2 Reinforcement Learning for Generative Models 
+
+The success of group-relative policy optimization in language models has inspired growing interest in reinforcement learning for generative models. For diffusion and flow-matching models, Flow-GRPO and DanceGRPO introduce stochastic sampling paths that make GRPO-style policy updates applicable to visual generation (Liu et al., 2025; Xue et al., 2025). Subsequent studies improve the efficiency and stability of online diffusion RL through better sampling schemes, credit assignment, clipping strategies, and regularization (Li et al., 2025a; Wang and Yu, 2025; Li et al., 2025b, 2026; Wang et al., 2026b; He et al., 2025; Wang et al., 2026a). Beyond these optimizer and sampler designs, video feedback learning shows that preference and semantic rewards can improve video generation quality and alignment (Liu et al., 2026). Recent work further applies RL to autoregressive video generation. AR-CoPO (He et al., 2026) uses chunk-level forking and localized contrastive updates. Astrolabe (Zhang et al., 2026b) aligns distilled AR models with forward-process negative-aware fine-tuning and streaming local-window updates. KVPO (Zhang et al., 2026a) introduces ODE-native GRPO with KV-cache semantic exploration and velocity-space contrastive objectives. Together, these methods advance executor-level preference alignment for streaming AR generators, but they do not explicitly model how complex instructions should be temporally organized, leaving event ordering and long-horizon semantic dependencies under-specified. In contrast, TempAct performs planner–executor RL over temporally complex instructions, using an LLM planner to explore executable temporal decompositions and an AR executor to learn prompt-switch execution under hierarchical credit assignment, offering a new perspective on long-horizon temporal plausibility. 
+
+3 Preliminaries 
+
+Autoregressive Video Diffusion Models. Autoregressive (AR) video diffusion models provide the basic streaming formulation used by recent long-video generation methods such as Self-Forcing (Huang et al., 2026) and LongLive (Yang et al., 2025b). Given a text condition c, an AR video model 4represents a video sequence x1: K = {x1, . . . , xK } through the causal factorization 
+
+pθ(x1: K | c) = 
+
+> K
+
+Y
+
+> i=1
+
+pθ(xi | x<i , c), (1) where xi denotes the i-th generated frame or video chunk, and x<i = {x1, . . . , xi−1} denotes the previously generated frames or chunks used as causal visual context. Generation then proceeds sequentially, sampling each xi conditioned on x<i and c.Each conditional distribution pθ(xi | x<i , c) is modeled by flow matching (Lipman et al., 2022; Liu et al., 2022). To train the model, for the i-th frame or chunk xi, a noise endpoint ϵi ∼ N (0, I) and a timestep t ∼ U (0 , 1) are sampled, and the intermediate state is defined as xti = (1 − t)xi + tϵi.The model predicts the velocity field vθ(xti, t | x<i , c) from the noisy state, timestep, text condition, and causal visual context. The final training loss is the conditional flow-matching (CFM) objective, defined as 
+
+LCFM (θ) = Ei,t, xi,ϵi
+
+h
+
+vθ(xti, t | x<i , c) − (ϵi − xi) 22
+
+i
+
+. (2) The main difference among AR training schemes lies in how the historical context is constructed. Teacher forcing (TF) (Williams and Zipser, 1989; Rasul et al., 2021) conditions each prediction on clean ground-truth history x<i . Diffusion forcing (DF) (Chen et al., 2024) improves robustness by corrupting the historical frames with independently sampled noise levels, so the model learns to denoise under noisy contexts {xtj 
+
+> j
+
+}j<i . However, both TF and DF still build the history from data rather than from the model’s own generated frames, causing exposure bias when the model must condition on its own outputs at inference time. Self-Forcing (Huang et al., 2026) addresses this mismatch by training on rollouts from the current model, xθ 
+
+> 1: K
+
+∼ QKi=1 pθ(xi | x<i , c), and distilling teacher velocity predictions along these self-generated trajectories. 
+
+GRPO and Flow-GRPO. Group Relative Policy Optimization (GRPO) is a critic-free policy optimization algorithm for improving LLM reasoning ability (Shao et al., 2024). For a prompt q,the current policy πθ samples a group of G responses {oi}Gi=1 , each scored by a reward function 
+
+ri = r(q, o i). GRPO estimates the advantage of each response by normalizing rewards within the same group: 
+
+Ai = ri − mean( {rj }Gj=1 )std( {rj }Gj=1 ) + ϵ . (3) The policy is then updated with a PPO-style clipped objective and a reference-policy regularizer: 
+
+LGRPO (θ) = −Eq, {oi}
+
+"
+
+1
+
+G
+
+> G
+
+X
+
+> i=1
+
+min ( ρiAi, clip( ρi, 1 − ϵc, 1 + ϵc)Ai) − βD KL (πθ∥πref )
+
+#
+
+, (4) where ρi = πθ(oi | q)/π θold (oi | q) and πref is a fixed reference policy. The key property of GRPO is that relative comparison among samples from the same prompt provides a low-cost baseline, avoiding the extra critic model required by PPO (Schulman et al., 2017). Group Sequence Policy Optimization (GSPO) extends this group-relative principle to sequence-level policy updates by normalizing the importance ratio over the generated sequence, providing a stable update rule for long-form LLM generations (Zheng et al., 2025). Flow-GRPO extends group-relative policy optimization to diffusion and flow-matching generators (Liu et al., 2025). Since standard flow-matching samplers follow deterministic ODE trajectories, Flow-GRPO uses an ODE-to-SDE conversion to recast generation as a stochastic policy, making it 5compatible with GRPO-style optimization. In flow-matching RL, however, the importance-ratio distribution can be biased across denoising timesteps, which weakens the intended clipping constraint and may lead to over-optimization. GRPO-Guard (Wang et al., 2026b) addresses this issue with regulated clipping, including ratio normalization ˆρ = RatioNorm (ρ) that recenters and stabilizes the timestep-wise ratio distribution before applying the clipped surrogate. 
+
+4 Method 
+
+To address temporal confusion and weak step following in autoregressive video generation, we propose TempAct, a planner–executor reinforcement learning framework for instruction-guided temporal plausibility. As shown in Figure 2, TempAct uses an LLM planner πϕ to decompose a global prompt into span-aware step prompts and an autoregressive diffusion executor pθ to realize these steps under generated visual context. Section 4.1 introduces the hierarchical planner–executor pipeline, Section 4.2 presents the joint RL objective, and Section 4.3 describes the multi-level reward design. 
+
+4.1 Hierarchical Planner-Executor Pipeline 
+
+AR video diffusion models suffer from temporal confusion when conditioned on a global prompt, while simply switching to step-wise prompts still leaves the executor with limited step-following ability. Moreover, supervised fine-tuning is insufficient to address these failures, as it suffers from exposure bias and optimizes flow-matching objectives that are only indirectly aligned with temporal semantic correctness. We therefore jointly optimize the planner and executor via reinforcement learning: the planner is updated with GSPO from plan-level and video-level advantages, and the executor is updated with Flow-GRPO from local step-following and aesthetic advantages. 
+
+LLM-based Step Planning and Prompt Enhancement. Given a global instruction c and a target latent video length K, we assign each step prompt a temporal span of L latent frames. The planner πϕ therefore produces a temporally ordered plan s = {s1, . . . , s J } with J = ⌈K/L ⌉, where each step prompt sj describes the action to be executed and the expected visual state during its assigned L-frame span. For example, generating 30 latent frames with L = 6 requires the LLM to decompose the prompt into J = 5 step prompts. Rather than using a deterministic decomposition, we sample a group of candidate plans from the LLM policy, 
+
+sm ∼ πϕ(s | c), m = 1 , . . . , M, (5) where M is the planning-level group size. Each sampled plan contains both a step decomposition and prompt enhancement: the original temporal instruction is split into span-aware subgoals, and each subgoal is rewritten with explicit objects, actions, and state constraints for its assigned latent-frame interval. This stochastic planning stage allows the LLM to explore alternative temporal decompositions and receive reward feedback on which plans are more executable for the video generator. We further apply step-prompt smoothing for execution: instead of conditioning the diffusion model only on the current step, each span is represented by a smoothed prompt ˜sj = Smooth (sj , s j+1 ) that exposes the executor to both the current subgoal and the upcoming subgoal. This transition-aware prompt reduces abrupt semantic changes between adjacent spans and empirically prevents large performance drops caused by hard prompt switching. 
+
+Hierarchical Autoregressive Video Sampling. For each sampled plan sm, the executor pθ
+
+generates K latent video frames autoregressively under the smoothed step prompt assigned to each temporal span, where K is the target latent length defined above. To train the executor at a step 6Prompt 
+
+> LLM Planner
+> Diffusion  Executor
+> �e
+> 1
+> Subject
+> Scene
+> Action
+> Reasonability
+
+Executor 
+
+Reward 
+
+Step-Following 
+
+Aesthetic 
+
+> �e
+> 2
+> �e
+> n
+> �e
+> 1
+> �e
+> 2
+> �e
+> n
+> Advantage Computiation
+
+Planner 
+
+Reward 
+
+Temporal-
+
+Following 
+
+Plan Quality       
+
+> Faithfulness
+> Coverage
+> Temporal
+> Coherence
+> Hallucination
+> Temporal Order
+> Physical
+> Plausibility
+> Visual
+> Consistency
+> Prompt
+> Alignment
+> A chef in a white apron stands at a wooden
+> cutting board on a kitchen counter. The
+> tomato is placed on the board with a steady
+> hand, the apron's texture and the tomato's
+> ripeness are visible.
+> The chef picks up a sharp chef's knife , its
+> blade's texture is visible. The chef slices the
+> tomato into neat , even rounds. The slices'
+> texture and the tomato's shape are clear.The
+> lighting is consistent.
+> The chef arranges the slices in a careful row
+> on a clean white plate . The plate's texture and
+> the slices' arrangement are visible. The lighting
+> is natural, and the kitchen's environment is
+> consistent.
+
+Step 2 Step 3 Step 1 
+
+Shared Context 
+
+> ...
+> ...
+> ...
+> ...
+> ...
+
+Cache 
+
+Step 2 Step 3 Step 1 
+
+... ... ... 
+
+> �video
+> 2,1
+> �video
+> 2,2
+> �video
+> 2,n
+> ...
+> �Jud��
+> 2
+> �plan
+> 2
+> Advantage Computiation
+> �plan
+> m
+> �plan
+> 1
+
+Step 2 Step 3 Step 1 
+
+... ... ... ... 
+
+... 
+
+Update Executor 
+
+Update Plannr Figure 2: Overview of TempAct. An LLM planner samples span-aware temporal decompositions of a global instruction, while an autoregressive video executor rolls out shared contexts and multiple continuations under the corresponding step prompts. The nested planning–execution groups support hierarchical credit assignment, with plan-level rewards guiding executable decompositions and local transition-level rewards improving prompt-switch execution. transition from smj to smj+1 , we first generate a shared context xm
+
+1: k up to the end of the current span, where k = min (jL, K ). Each frame i is conditioned on the smoothed prompt of its own span 
+
+σ(i) = ⌈i/L ⌉, where ˜smσ(i) = Smooth( smσ(i), s mσ(i)+1 ),
+
+xm
+
+1: k ∼
+
+kY
+
+i=1 
+
+pθ(xi | x<i , ˜smσ(i)), (6) then sample N possible continuations {ym,n k+1: K }Nn=1 that complete the remaining video from span j + 1 
+
+to the end. For each future latent frame, the executor conditions on the shared context, previously generated continuation frames, and the smoothed prompt assigned to that frame’s temporal span, 
+
+ym,n k+1: K ∼
+
+KY
+
+i=k+1 
+
+pθ(ym,n i | xm
+
+1: k, ym,n k+1: i−1, ˜smσ(i)), n = 1 , . . . , N. (7) This yields a hierarchical group {sm, xm
+
+1: k, {ym,n k+1: K }Nn=1 }Mm=1 : the outer group compares different span-aware LLM plans, while the inner group compares different full-video continuations starting from the same context. The full continuations are used for reward evaluation, but the executor update is applied only to the first chunk after the prompt switch, so the credit assignment focuses on prompt-switch execution rather than all future spans. 74.2 Joint RL of Planner and Executor 
+
+The sampled trajectories are scored by rewards defined in the next subsection. Let Rm 
+
+> plan
+
+denote the planner-level reward for plan sm, computed from plan executability and video-level temporal instruction following. Let Rm,n  
+
+> exec
+
+denote the executor-level reward computed only on the first chunk after the prompt switch, measuring local step following and visual quality at the prompt-switch moment. We compute group-relative advantages separately at the two levels, 
+
+Am 
+
+> plan
+
+= Rm 
+
+> plan
+
+− μplan 
+
+σplan + ϵ , Am,n  
+
+> exec
+
+= Rm,n  
+
+> exec
+
+− μm
+
+> exec
+
+σm 
+
+> exec
+
++ ϵ , (8) where μplan and σplan are computed over the M sampled plans, while μm 
+
+> exec
+
+and σm 
+
+> exec
+
+are computed over the N transition segments sharing the same plan and context. The LLM planner is updated with Group Sequence Policy Optimization (GSPO) (Zheng et al., 2025). Following GSPO, we define the sequence importance ratio for a sampled plan as 
+
+ρmϕ =
+
+ πϕ(sm | c)
+
+πϕold (sm | c)
+
+1/|sm|
+
+, (9) where |sm| denotes the number of generated planner tokens. The planner objective is 
+
+Lplanner (ϕ) = −E
+
+"
+
+1
+
+M
+
+> M
+
+X
+
+> m=1
+
+min  ρmϕ Am
+
+> plan
+
+, clip( ρmϕ , 1 − ϵp, 1 + ϵp)Am
+
+> plan
+
+#
+
+, (10) We regularize the planner with βpDKL (πϕ∥πref ). Unlike token-level PPO ratios, this sequence-level ratio assigns one relative update weight to the entire LLM plan, matching the fact that rewards are obtained after executing the complete temporal decomposition. The diffusion executor is optimized with a clipped Flow-GRPO objective on the first chunk after the transition to span j + 1 , ym,n k+1: k+t, where t is the chunk size, rather than on the entire remaining continuation. This choice is important because group-relative policy gradients compare samples under the same conditioning state: within this transition chunk, all candidates share the same preceding context and newly activated step prompt, whereas later chunks are generated from sample-specific histories and therefore correspond to different policy inputs. It also improves credit assignment by applying the RL update exactly at the prompt-switch moment, where the action for the new subgoal is decided and any execution error can propagate autoregressively to subsequent chunks. The executor objective is: 
+
+Lexec (θ) = −Em, {ym,n k+1: k+t}Nn=1 
+
+"
+
+1
+
+N
+
+> N
+
+X
+
+> n=1
+
+min  ˆρm,n θ Am,n 
+
+> exec
+
+, clip(ˆ ρm,n θ , 1 − ϵe, 1 + ϵe)Am,n 
+
+> exec
+
+#
+
+. (11) Here ρm,n θ is the likelihood ratio of the denoising trajectory for ym,n k+1: k+t, and ˆρm,n θ = RatioNorm (ρm,n θ )
+
+is the normalized ratio defined above. In practice, we also add the KL regularizer βeDKL (pθ(yk+1: k+t |
+
+x1: k, ˜sj+1 )∥pref (yk+1: k+t | x1: k, ˜sj+1 )) to constrain the transition-span policy from drifting too far from the reference diffusion policy. Together, these updates encourage the planner to discover step prompts that are temporally coherent and executable, and the executor to realize the active subgoal at the prompt-switch moment under imperfect autoregressive context. 84.3 Multi-level Reward Design Planner Rewards. The planner is rewarded from two complementary perspectives: whether the generated decomposition is a high-quality temporal plan before execution, and whether executing this plan leads to videos that follow the original temporal instruction. 
+
+• Plan Quality Score. We use Qwen3-8B (Yang et al., 2025a) as an LLM-based plan judge to evaluate each sampled plan sm against the original prompt c. The judge focuses on faithfulness to the original instruction, coverage of all requested events, temporal coherence across steps, and hallucination avoidance. This produces a plan-quality reward Rm 
+
+> judge
+
+that encourages the planner to preserve the original event structure, distribute actions across meaningful visual stages, and avoid unsupported additions. 
+
+• Temporal-Following Score. Conventional semantic alignment metrics, such as CLIP score, ImageReward, and VideoAlign (Liu et al., 2026), are often insensitive to event ordering and long-range temporal dependencies. We therefore use a VLM-based evaluator to score each executed video. Given sampled video frames and the original prompt, the evaluator not only predicts a temporal-order score, but also assesses physical consistency, visual consistency, and text-video consistency at both frame-level and video-level granularity. These auxiliary criteria prevent the policy from optimizing temporal order alone while ignoring visual plausibility or prompt faithfulness. For each sampled plan sm, we average the video-level scores over its N
+
+execution continuations to obtain Rm 
+
+> video
+
+= 1
+
+> N
+
+PNn=1 Rm,n 
+
+> video
+
+. Due to the high cost of large-scale training-time evaluation with stronger proprietary VLMs (like Gemini), we use Qwen3-VL-8B as the training-time video evaluator. The final planner-level reward combines the textual plan-quality signal and the realized video-level temporal-following signal as Rm
+
+> plan
+
+, balancing decomposition quality with executable temporal consistency. Detailed instructions, scoring rules, aggregation weights, and scoring examples are provided in Appendix B. 
+
+Executor Rewards. The executor is rewarded from two complementary perspectives: whether it correctly realizes the newly activated step prompt after a prompt switch, and whether this semantic optimization preserves visual quality. Both signals are computed only on the first transition span 
+
+ym,n k+1: k+L so that the reward remains aligned with the transition-span Flow-GRPO update. 
+
+• Local Step-Following Score. Similar to the temporal-following score, we use a VLM-based evaluator to assess step-following performance. For each first transition span ym,n k+1: k+L, we use Qwen3-VL-8B to compute a local step-following reward Rm,n  
+
+> step
+
+from its sampled frames and the localized step prompt smj+1 . The evaluator relies only on visible evidence and checks whether the required subjects, scene, objects, motion, and visual dynamics are present and temporally plausible. This reward provides direct feedback on prompt-switch execution, rather than assigning credit from the full remaining continuation. 
+
+• Aesthetic Quality Score. To prevent semantic optimization from degrading visual quality, we include an aesthetic reward Rm,n  
+
+> aes
+
+computed by PickScore (Kirstain et al., 2023) on the same transition chunk. The final executor-level reward Rm,n  
+
+> exec
+
+combines the local step-following signal and the aesthetic-quality signal, encouraging the executor to realize the active subgoal while maintaining visually pleasing generations. Detailed instructions and formulas are provided in Appendix B. 95 Experiments 
+
+5.1 Experimental Setup Implementation Details. We evaluate TempAct on two autoregressive video diffusion backbones, Self-Forcing and LongLive, using a training set of 5,000 temporally structured instructions generated by GPT-5.2. In each training batch, TempAct first samples M = 4 candidate plans from the planner and then samples N = 8 executor rollouts for each plan, producing 32 videos for hierarchical credit assignment. Each sampled video contains 117 frames, which correspond to 30 latent frames. To match the training rollout length, each semantic step spans L = 6 latent frames during training, while evaluation uses a longer span of L = 12 latent frames per step. The planner is initialized from Qwen3-1.7B and optimized with LoRA using rank 32 and alpha 64. The diffusion executor is optimized separately with LoRA using rank 256 and alpha 256. All experiments are conducted on 32 NVIDIA H20 GPUs with a batch size of 16. Each training step takes approximately 800 seconds, and the models are trained for 300–400 steps. Detailed training hyperparameters are provided in Appendix A. 
+
+Temporal Order Benchmark. To evaluate temporal instruction following beyond generic video quality, we construct a Temporal Order benchmark that emphasizes whether generated videos preserve the requested event order and state transitions. The benchmark contains two subsets with different levels of temporal complexity: the Simple Set includes 100 prompts with one to two ordered steps, and the Hard Set includes 100 prompts with three to four ordered steps and more complex dependencies. For each generated video, we uniformly sample frames from the full video and ask VLM evaluators to judge whether the video follows the intended temporal order and realizes the described actions or state changes. During evaluation, we fix the planner output length to 3 steps for the Simple Set and 5 steps for the Hard Set. Each step covers 12 latent frames, i.e., L = 12 .
+
+Evaluation Metrics. We report both general video-generation metrics and temporal instruction-following metrics. For general quality and semantic alignment, we evaluate VBench on 141-frame generated videos. We also report PickScore as an aesthetic preference metric and throughput as an efficiency metric, with PickScore computed on videos generated for the Temporal Order benchmark. For temporal instruction following, we report Temporal-Following Scores on both the Simple and Hard Sets of the Temporal Order benchmark. We use two VLM judges for this evaluation: Qwen3-VL-8B, which belongs to the same model family as the training-time video reward model and serves as an in-domain evaluator, and Gemini-3-Flash, which is never used during training and serves as an out-of-domain evaluator for testing reward-model generalization. Both evaluators follow the same scoring protocol as Rm
+
+> video
+
+.
+
+5.2 Quantitative and Qualitative Results Quantitative analysis. Table 1 shows that TempAct consistently improves temporal plausibility under complex instructions across different AR video backbones and evaluators. On Self-Forcing, TempAct raises the average Temporal-Following Score from 0.400 to 0.462, corresponding to a 15.5% relative improvement. The gains are observed across all four judge–subset combinations: 20.8% and 10.9% on the Simple Set under Qwen3-VL and Gemini-3-Flash, respectively, and 24.9% and 9.7% on the Hard Set. This indicates that the learned planner produces more executable step decompositions and that the executor better follows prompt transitions, especially under harder long-horizon dependencies. The same trend holds for LongLive, where the average Temporal-Following Score improves from 0.432 to 0.488, yielding a 13.0% relative gain. Notably, the improvements are 10 Table 1: Comparison of different methods on the Temporal Order benchmark using Temporal-Following Score as the primary metric. Scores are in [0 , 1] and are evaluated on full-video frame samples; Avg. averages the four Temporal-Following Scores across the Simple and Hard sets and the two judges.                                                                       
+
+> Method
+> Temporal-Following Score VBench PickScore Simple Set (1-2 Steps) Hard Set (3-4 Steps) Avg. Total Quality Semantic Qwen Gemini Qwen Gemini
+> Single-prompt video generation
+> Self-Forcing 0.410 0.456 0.240 0.419 0.381 81.20 83.80 70.50 20.7 Casual Forcing 0.381 0.447 0.304 0.452 0.396 80.85 84.02 68.18 20.8 LongLive 0.428 0.505 0.302 0.463 0.424 80.36 82.72 70.91 21.1
+> Step-prompt video generation
+> Self-Forcing 0.414 0.485 0.269 0.431 0.400 80.07 82.89 68.82 20.6 + TempAct 0.500 +20 .8% 0.538 +10 .9% 0.336 +24 .9% 0.473 +9 .7% 0.462 +15 .5% 79.99 82.71 69.14 20.6 LongLive 0.411 0.521 0.314 0.481 0.432 79.55 82.10 69.35 20.8 + TempAct 0.508 +23 .6% 0.579 +11 .1% 0.352 +12 .1% 0.512 +6 .4% 0.488 +13 .0% 79.97 82.61 69.40 20.8
+
+consistent for both the in-domain Qwen3-VL judge and the out-of-domain Gemini-3-Flash judge, suggesting that the gains are not merely overfitting to the training-time reward model. Importantly, these temporal-following gains do not come at the cost of overall visual quality. For Self-Forcing, VBench Total remains nearly unchanged (80.07 vs. 79.99), while Semantic slightly improves from 68.82 to 69.14 and PickScore remains 20.6. For LongLive, TempAct improves VBench Total from 79.55 to 79.97, Quality from 82.10 to 82.61, and Semantic from 69.35 to 69.40, while maintaining the same PickScore of 20.8. These results support the central motivation of TempAct: explicitly separating high-level temporal planning from low-level visual execution improves temporal plausibility while preserving the generation quality of the underlying autoregressive video model. 
+
+Qualitative analysis. Figures 3 and 4 compare single-prompt generation, step-prompt generation, and TempAct on the Self-Forcing and LongLive backbones. Single-prompt generation often exhibits temporal semantic confusion: actions intended for different stages are blended together, and some requested events are only partially realized. Step prompts make the current stage more explicit and therefore reduce such semantic averaging, but the autoregressive executor can still struggle to faithfully execute prompt transitions. For example, in the third example of Figure 3, the squirrel fails to bury the acorn in the soil and instead leaves it on the ground, showing that the generated video does not correctly realize the state transition specified by the prompt. In contrast, TempAct substantially reduces these failures by jointly optimizing temporal planning and step-conditioned execution, producing videos that better preserve the intended event order and more accurately realize complex temporal actions. 
+
+5.3 Ablation Study 
+
+Unless otherwise specified, all ablation studies are conducted on the Self-Forcing backbone and evaluated on the Temporal Order benchmark using Temporal-Following Scores produced by the in-domain Qwen3-VL judge. We study the contributions of the planner–executor components, executor reward design, KL regularization, and planner reward design. 11 A chef in a white apron stands at a wooden cutting board on a kitchen counter. First, she places a ripe tomato on the board and steadies it with one hand . Next, she picks up a sharp                   
+
+> chef's knife and slices the tomato into neat, even rounds . Finally, she arranges the slices in a careful row on a clean white plate and steps back .
+> In a pottery studio, a lump of grey clay sits on a spinning wheel. First, both hands are placed on the clay as the wheel begins to spin, centering the clay into a smooth column . Next, thumbs
+> press into the top of the column, opening a hollow and drawing the walls upward . Finally, the wheel slows and the rough shape of a small bowl is visible, still glistening with water .
+> A brown squirrel sits on a patch of bare ground near a tree root. First, it picks up an acorn with its front paws and examines it closely, turning it over . Next, it sets the acorn down and
+> begins digging a small hole in the soft soil with rapid scratching motions. Finally, i tdrops the acorn into the hole and pushes loose dirt back over it , patting the surface flat with its paws.
+> Self-Forcing +Step Prompt +Ours Self-Forcing +Step Prompt +Ours Self-Forcing +Step Prompt +Ours
+
+Figure 3: Qualitative comparison on temporally ordered prompts using the Self-Forcing backbone. 
+
+Core Component Ablation. Table 2 shows the effect of progressively adding each component. In the single-prompt setting, applying RL only to prompt enhancement brings almost no improvement, with the average score changing from 0.325 to 0.326. This suggests that improving a global prompt alone is insufficient for temporally ordered generation, since the video model still lacks explicit step-level control. Directly using step prompts without smoothing also performs poorly, dropping the average score to 0.248, which reflects the difficulty of abrupt prompt switching in autoregressive generation. Prompt smoothing recovers the score to 0.342, showing that stable step-conditioned generation requires smoother transitions. On top of this multi-prompt setup, planner RL improves the average score to 0.362, while executor RL gives a larger gain to 0.390. Jointly optimizing both components performs best, reaching 0.418 on average and 0.500 on the Simple Set. These results indicate that better temporal plans and stronger step-conditioned execution are complementary. 12 A woman sits down at a vanity table in a softly lit bedroom. First, she opens a wooden jewelry box and takes out a delicate pearl necklace . Next, she holds the necklace up to the light for                
+
+> a moment . Finally, she carefully fastens the necklace around her neck and closes the jewelry box .
+> A woman stands at a kitchen counter preparing a salad. First, she tears large lettuce leaves and places them in a wooden bowl .Next, she slices a cucumber into thin rounds and scatters
+> them over the lettuce . Finally, she drizzles olive oil over the salad and uses two large spoons to gently toss everything together .
+> A young man is at a clean wooden desk in a modern office. First, he carefully places his closed silver laptop on the right side of the desk . Next, he picks up a small black notebook that is
+> already on the desk . Finally, he opens the notebook to a blank page and holds it as if ready to write .
+> LongLive +Step Prompt +Ours LongLive +Step Prompt +Ours Longlive +Step Prompt +Ours
+
+Figure 4: Qualitative comparison on temporally ordered prompts using the LongLive backbone. 
+
+KL Regularization. Table 3 shows that a moderate executor KL weight gives the best trade-off. Removing KL regularization reduces the average score to 0.375 and also lowers PickScore, suggesting that unconstrained executor RL can hurt visual quality. A small KL weight improves aesthetics but does not improve the Temporal-Following Score. The best setting is βe = 5 × 10 −4, which reaches the highest average Temporal-Following Score of 0.390 and the best PickScore of 20.6. A larger weight slightly lowers the Temporal-Following Score, indicating that too much regularization limits useful policy updates. 
+
+Reward Ablation for Planner. Table 4 evaluates reward choices for planner optimization, where TA denotes the text-alignment metric from Liu et al. (2026). Using the video-level reward Rm
+
+video 
+
+improves performance on both the Simple and Hard sets over the baseline, showing that execution feedback can guide the planner toward more useful decompositions. Adding the textual judge 13 Table 2: Component ablation. Left: Temporal-Following Scores when progressively adding step-wise prompting, prompt smoothing, planner RL, and executor RL. Right: Training reward trajectories in the planner–executor RL ablation study. 
+
+Setting Simple Set ↑ Hard Set ↑ Avg. ↑
+
+Single Prompt 0.410 0.240 0.325 Single Prompt + PE RL 0.409 0.243 0.326 Step Prompt 0.287 0.208 0.248 Step Prompt + Smoothing 0.414 0.269 0.342 + Planner RL 0.420 0.304 0.362 + Executor RL 0.458 0.321 0.390 + Joint Planner–Executor RL 0.500 0.336 0.418 
+
+Table 3: Ablation of executor KL regularization.                           
+
+> βeSimple Set ↑Hard Set ↑Avg. ↑PickScore ↑
+> 00.452 0.297 0.375 20.2
+> 1×10 −40.439 0.309 0.374 20.4
+> 5×10 −40.458 0.321 0.390 20.6
+> 1×10 −30.452 0.313 0.383 20.5
+
+Table 4: Ablation of planner reward design. 
+
+Planner Reward Simple Set ↑ Hard Set ↑ TA ↑
+
+Baseline 0.414 0.269 -0.03 
+
+Rm 
+
+> video
+
+0.428 0.313 -0.06 
+
+Rm 
+
+> video
+
++ Rm 
+
+> judge
+
+0.420 0.304 -0.04 
+
+reward Rm 
+
+> judge
+
+slightly lowers the Temporal-Following Scores but improves TA from −0.06 to −0.04 ,indicating that the judge helps regularize plan quality while the video reward remains the main driver of temporal-following performance. Table 5: Ablation of executor reward design.                             
+
+> Executor Reward Simple Set ↑Hard Set ↑Avg. ↑PickScore ↑
+> No Executor RL 0.414 0.269 0.340 20.6
+> Rm,n
+> step 0.465 0.314 0.390 20.4
+> Rm,n
+> step +Rm,n
+> aes 0.458 0.321 0.390 20.6
+> Rm,n
+> step +Rm,n
+> video 0.421 0.304 0.363 20.6
+> Rm,n
+> video 0.381 0.244 0.313 20.7
+
+Reward Ablation for Executor. Ta-ble 5 shows that local step-following re-ward is the key signal for executor train-ing. Using Rm,n  
+
+> step
+
+improves the average score from 0.340 to 0.390, while adding PickScore preserves the same Temporal-Following Score and recovers aesthetic quality to 20.6. In contrast, using only the full-video reward Rm 
+
+> video
+
+performs worse than no executor RL, and combining it with the local reward also reduces performance. This suggests that executor learning benefits most from rewards aligned with the prompt-switch transition segment, whereas full-video rewards are too coarse for low-level execution updates. 
+
+5.4 User Study Human preference evaluation. To further validate whether the Temporal-Following gains reflect human judgments, we conduct a pairwise user study on the Temporal Order benchmark. For each prompt, annotators compare videos generated by TempAct and the corresponding baseline, and choose which video better preserves the intended temporal order and action progression, with ties allowed when the two videos are comparable. We collect preference statistics over 100 evaluated samples for each backbone and report the win/tie/loss ratios for Self-Forcing and LongLive. As shown in Figure 5, TempAct is preferred substantially more often than the baseline on both backbones, 14 indicating that planner–executor RL improves temporal consistency in a way that is perceptible to human evaluators. 
+
+Agreement between Temporal-Following Scores and human preference. We also examine Wins 
+
+> 0.462
+> Tie
+> 0.297
+> Loses
+> 0.241
+> Self-Forcing
+> Wins
+> 0.448
+> Tie
+> 0.314
+> Loses
+> 0.238
+> LongLive
+
+Figure 5: Human preference. whether the proposed VLM-based Temporal-Following Score is aligned with human preference. For each TempAct– baseline pair in the human study, we compare the video preferred by annotators with the video assigned the higher Temporal-Following Score by the VLM judge. To account for ambiguous cases, we treat VLM score differences within 
+
+±0.03 as ties. Under this protocol, Gemini-3-Flash agrees with human preference on 81% of the evaluated pairs, while Qwen3-VL-8B reaches 76% agreement. This high consistency suggests that Temporal-Following Score is a reliable proxy for human-perceived temporal plausibility, and that the improvements reported in Table 1 correspond to meaningful gains in user preference. 
+
+6 Conclusion 
+
+We presented TempAct, a planner–executor reinforcement learning framework for improving temporal plausibility in streaming autoregressive video generation. TempAct addresses temporal confusion and prompt-switch failures by jointly optimizing an LLM planner, which explores executable temporal decompositions, and an AR video executor, which learns to follow step-conditioned prompts under its own generated histories. Its hierarchical group exploration design nests execution groups under planning groups, enabling plan-level comparison across candidate decompositions and localized executor credit assignment at prompt-switch moments. Across Self-Forcing and LongLive backbones, TempAct improves Temporal-Following Scores under both in-domain and out-of-domain VLM evaluation, as well as human evaluation, while preserving visual quality. Ablations further show that planner and executor optimization are complementary, and that local transition-level rewards provide a more effective executor signal than coarse full-video feedback. These results suggest that explicitly coupling temporal planning with autoregressive execution is a promising direction for long-horizon, instruction-following video generation. 
+
+Limitations and Future Work. Although TempAct effectively improves temporal plausibility, it is still constrained by the capability of the underlying autoregressive video generator. As a result, some failure cases may remain, including visual distortions, physically implausible motions, or accumulated artifacts in long rollouts. In addition, the current planner assigns step prompts to fixed temporal spans, which may be suboptimal for actions with different durations or varying execution difficulty. A promising direction is to make the planner duration-aware, allowing it to allocate generation time adaptively according to the semantic complexity of each action. Another future direction is to extend the LLM planner into a VLM-based planner that can observe previously generated content and dynamically adjust subsequent instructions based on the actual visual state. Such closed-loop planning could further improve long-horizon consistency and make autoregressive video generation more robust under complex temporal instructions. 15 References 
+
+Shuai Bai, Yuxuan Cai, Ruizhe Chen, Keqin Chen, Xionghui Chen, Zesen Cheng, Lianghao Deng, Wei Ding, Chang Gao, Chunjiang Ge, Wenbin Ge, Zhifang Guo, Qidong Huang, Jie Huang, Fei Huang, Binyuan Hui, Shutong Jiang, Zhaohai Li, Mingsheng Li, Mei Li, Kaixin Li, Zicheng Lin, Junyang Lin, Xuejing Liu, Jiawei Liu, Chenglong Liu, Yang Liu, Dayiheng Liu, Shixuan Liu, Dunjie Lu, Ruilin Luo, Chenxu Lv, Rui Men, Lingchen Meng, Xuancheng Ren, Xingzhang Ren, Sibo Song, Yuchong Sun, Jun Tang, Jianhong Tu, Jianqiang Wan, Peng Wang, Pengfei Wang, Qiuyue Wang, Yuxuan Wang, Tianbao Xie, Yiheng Xu, Haiyang Xu, Jin Xu, Zhibo Yang, Mingkun Yang, Jianxin Yang, An Yang, Bowen Yu, Fei Zhang, Hang Zhang, Xi Zhang, Bo Zheng, Humen Zhong, Jingren Zhou, Fan Zhou, Jing Zhou, Yuanzhi Zhu, and Ke Zhu. Qwen3-vl technical report. arXiv preprint arXiv:2511.21631 , 2025. ByteDance. Seedance. https://seed.bytedance.com/zh/seedance2_0 , 2026. Boyuan Chen, Diego Martí Monsó, Yilun Du, Max Simchowitz, Russ Tedrake, and Vincent Sitz-mann. Diffusion forcing: Next-token prediction meets full-sequence diffusion. Advances in Neural Information Processing Systems , 37:24081–24125, 2024. Guibin Chen, Dixuan Lin, Jiangping Yang, Chunze Lin, Junchen Zhu, Mingyuan Fan, Hao Zhang, Sheng Chen, Zheng Chen, Chengcheng Ma, et al. Skyreels-v2: Infinite-length film generative model. 
+
+arXiv preprint arXiv:2504.13074 , 2025. Justin Cui, Jie Wu, Ming Li, Tao Yang, Xiaojie Li, Rui Wang, Andrew Bai, Yuanhao Ban, and Cho-Jui Hsieh. Self-forcing++: Towards minute-scale high-quality video generation. arXiv preprint arXiv:2510.02283 , 2025. Kaifeng Gao, Jiaxin Shi, Hanwang Zhang, Chunping Wang, Jun Xiao, and Long Chen. Ca2-vdm: Efficient autoregressive video diffusion model with causal generation and cache sharing. arXiv preprint arXiv:2411.16375 , 2024. Daya Guo, Dejian Yang, Haowei Zhang, Junxiao Song, Ruoyu Zhang, Runxin Xu, Qihao Zhu, Shirong Ma, Peiyi Wang, Xiao Bi, et al. Deepseek-r1: Incentivizing reasoning capability in llms via reinforcement learning. arXiv preprint arXiv:2501.12948 , 2025. Dailan He, Guanlin Feng, Xingtong Ge, Yi Zhang, Bingqi Ma, Guanglu Song, Yu Liu, and Hongsheng Li. Ar-copo: Align autoregressive video generation with contrastive policy optimization. arXiv preprint arXiv:2603.17461 , 2026. Haoran He, Yuxiao Ye, Jie Liu, Jiajun Liang, Zhiyong Wang, Ziyang Yuan, Xintao Wang, Hangyu Mao, Pengfei Wan, and Ling Pan. Gardo: Reinforcing diffusion models without reward hacking. 
+
+arXiv preprint arXiv:2512.24138 , 2025. Jinyi Hu, Shengding Hu, Yuxuan Song, Yufei Huang, Mingxuan Wang, Hao Zhou, Zhiyuan Liu, Wei-Ying Ma, and Maosong Sun. Acdit: Interpolating autoregressive conditional modeling and diffusion transformer. arXiv preprint arXiv:2412.07720 , 2024. Xun Huang, Zhengqi Li, Guande He, Mingyuan Zhou, and Eli Shechtman. Self forcing: Bridging the train-test gap in autoregressive video diffusion. Advances in Neural Information Processing Systems , 38:167283–167308, 2026. 16 Aaron Jaech, Adam Kalai, Adam Lerer, Adam Richardson, Ahmed El-Kishky, Aiden Low, Alec Helyar, Aleksander Madry, Alex Beutel, Alex Carney, et al. Openai o1 system card. arXiv preprint arXiv:2412.16720 , 2024. Sihui Ji, Xi Chen, Shuai Yang, Xin Tao, Pengfei Wan, and Hengshuang Zhao. Memflow: Flowing adaptive memory for consistent and efficient long video narratives. arXiv preprint arXiv:2512.14699 ,2025. Yicheng Ji, Zhizhou Zhong, Jun Zhang, Qin Yang, XiTai Jin, Ying Qin, Wenhan Luo, Shuiyang Mao, Wei Liu, and Huan Li. Forcing-kv: Hybrid kv cache compression for efficient autoregressive video diffusion models. arXiv preprint arXiv:2605.09681 , 2026. Yang Jin, Zhicheng Sun, Ningyuan Li, Kun Xu, Hao Jiang, Nan Zhuang, Quzhe Huang, Yang Song, Yadong Mu, and Zhouchen Lin. Pyramidal flow matching for efficient video generative modeling. In International Conference on Learning Representations , volume 2025, pages 23378–23402, 2025. Yuval Kirstain, Adam Polyak, Uriel Singer, Shahbuland Matiana, Joe Penna, and Omer Levy. Pick-a-pic: An open dataset of user preferences for text-to-image generation. Advances in neural information processing systems , 36:36652–36663, 2023. Kuaishou. Kling. https://klingai.kuaishou.com/ , 2024. Junzhe Li, Yutao Cui, Tao Huang, Yinping Ma, Chun Fan, Yiming Cheng, Miles Yang, Zhao Zhong, and Liefeng Bo. Mixgrpo: Unlocking flow-based grpo efficiency with mixed ode-sde. arXiv preprint arXiv:2507.21802 , 2025a. Yuming Li, Yikai Wang, Yuying Zhu, Zhongyu Zhao, Ming Lu, Qi She, and Shanghang Zhang. Branchgrpo: Stable and efficient grpo with structured branching in diffusion models. arXiv preprint arXiv:2509.06040 , 2025b. Yuming Li, Qingyu Li, Chengyu Bai, Xiangyang Luo, Zeyue Xue, Wenyu Qin, Meng Wang, Yikai Wang, and Shanghang Zhang. Aegpo: Adaptive entropy-guided policy optimization for diffusion models. arXiv preprint arXiv:2602.06825 , 2026. Yaron Lipman, Ricky TQ Chen, Heli Ben-Hamu, Maximilian Nickel, and Matt Le. Flow matching for generative modeling. arXiv preprint arXiv:2210.02747 , 2022. Jie Liu, Gongye Liu, Jiajun Liang, Yangguang Li, Jiaheng Liu, Xintao Wang, Pengfei Wan, Di Zhang, and Wanli Ouyang. Flow-grpo: Training flow matching models via online rl. arXiv preprint arXiv:2505.05470 , 2025. Jie Liu, Gongye Liu, Jiajun Liang, Ziyang Yuan, Xiaokun Liu, Mingwu Zheng, Xiele Wu, Qiulin Wang, Menghan Xia, Xintao Wang, et al. Improving video generation with human feedback. 
+
+Advances in Neural Information Processing Systems , 38:82155–82192, 2026. Xingchao Liu, Chengyue Gong, and Qiang Liu. Flow straight and fast: Learning to generate and transfer data with rectified flow. arXiv preprint arXiv:2209.03003 , 2022. Mang Ning, Mingxiao Li, Jianlin Su, Albert Ali Salah, and Itir Onal Ertugrul. Elucidating the exposure bias in diffusion models. In International Conference on Learning Representations , volume 2024, pages 15167–15189, 2024. 17 Kashif Rasul, Calvin Seward, Ingmar Schuster, and Roland Vollgraf. Autoregressive denoising diffusion models for multivariate probabilistic time series forecasting. In International conference on machine learning , pages 8857–8868. PMLR, 2021. Florian Schmidt. Generalization in generation: A closer look at exposure bias. In Proceedings of the 3rd Workshop on Neural Generation and Translation , pages 157–167, 2019. John Schulman, Filip Wolski, Prafulla Dhariwal, Alec Radford, and Oleg Klimov. Proximal policy optimization algorithms. arXiv preprint arXiv:1707.06347 , 2017. Zhihong Shao, Peiyi Wang, Qihao Zhu, Runxin Xu, Junxiao Song, Xiao Bi, Haowei Zhang, Mingchuan Zhang, Y. K. Li, Y. Wu, and Daya Guo. Deepseekmath: Pushing the limits of mathematical reasoning in open language models. arXiv preprint arXiv:2402.03300 , 2024. Team Wan, Ang Wang, Baole Ai, Bin Wen, Chaojie Mao, Chen-Wei Xie, Di Chen, Feiwu Yu, Haiming Zhao, Jianxiao Yang, Jianyuan Zeng, Jiayu Wang, Jingfeng Zhang, Jingren Zhou, Jinkai Wang, Jixuan Chen, Kai Zhu, Kang Zhao, Keyu Yan, Lianghua Huang, Mengyang Feng, Ningyi Zhang, Pandeng Li, Pingyu Wu, Ruihang Chu, Ruili Feng, Shiwei Zhang, Siyang Sun, Tao Fang, Tianxing Wang, Tianyi Gui, Tingyu Weng, Tong Shen, Wei Lin, Wei Wang, Wei Wang, Wenmeng Zhou, Wente Wang, Wenting Shen, Wenyuan Yu, Xianzhong Shi, Xiaoming Huang, Xin Xu, Yan Kou, Yangyu Lv, Yifei Li, Yijing Liu, Yiming Wang, Yingya Zhang, Yitong Huang, Yong Li, You Wu, Yu Liu, Yulin Pan, Yun Zheng, Yuntao Hong, Yupeng Shi, Yutong Feng, Zeyinzi Jiang, Zhen Han, Zhi-Fan Wu, and Ziyu Liu. Wan: Open and advanced large-scale video generative models. arXiv preprint arXiv:2503.20314 , 2025. Feng Wang and Zihao Yu. Coefficients-preserving sampling for reinforcement learning with flow matching. arXiv preprint arXiv:2509.05952 , 2025. Jin Wang, Jianxiang Lu, Guangzheng Xu, Comi Chen, Haoyu Yang, Linqing Wang, Peng Chen, Mingtao Chen, Zhichao Hu, Longhuang Wu, et al. Tagrpo: Boosting grpo on image-to-video generation with direct trajectory alignment. arXiv preprint arXiv:2601.05729 , 2026a. Jing Wang, Ao Ma, Jiasong Feng, Dawei Leng, Yuhui Yin, and Xiaodan Liang. Pt-t2i/v: An efficient proxy-tokenized diffusion transformer for text-to-image/video-task. In The Thirteenth International Conference on Learning Representations , 2025. Jing Wang, Jiajun Liang, Jie Liu, Henglin Liu, Gongye Liu, Jun Zheng, Wanyuan Pang, Ao Ma, Zhenyu Xie, Xintao Wang, et al. Grpo-guard: Mitigating implicit over-optimization in flow matching via regulated clipping. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 5988–5998, 2026b. Jing Wang, Ao Ma, Ke Cao, Jun Zheng, Jiasong Feng, Zhanjie Zhang, Wanyuan Pang, and Xiaodan Liang. Wisa: World simulator assistant for physics-aware text-to-video generation. Advances in Neural Information Processing Systems , 38:5388–5416, 2026c. Ronald J Williams and David Zipser. A learning algorithm for continually running fully recurrent neural networks. Neural computation , 1(2):270–280, 1989. Zeyue Xue, Jie Wu, Yu Gao, Fangyuan Kong, Lingting Zhu, Mengzhao Chen, Zhiheng Liu, Wei Liu, Qiushan Guo, Weilin Huang, et al. Dancegrpo: Unleashing grpo on visual generation. arXiv preprint arXiv:2505.07818 , 2025. 18 An Yang, Anfeng Li, Baosong Yang, Beichen Zhang, Binyuan Hui, Bo Zheng, Bowen Yu, Chang Gao, Chengen Huang, Chenxu Lv, Chujie Zheng, Dayiheng Liu, Fan Zhou, Fei Huang, Feng Hu, Hao Ge, Haoran Wei, Huan Lin, Jialong Tang, Jian Yang, Jianhong Tu, Jianwei Zhang, Jianxin Yang, Jiaxi Yang, Jing Zhou, Jingren Zhou, Junyang Lin, Kai Dang, Keqin Bao, Kexin Yang, Le Yu, Lianghao Deng, Mei Li, Mingfeng Xue, Mingze Li, Pei Zhang, Peng Wang, Qin Zhu, Rui Men, Ruize Gao, Shixuan Liu, Shuang Luo, Tianhao Li, Tianyi Tang, Wenbiao Yin, Xingzhang Ren, Xinyu Wang, Xinyu Zhang, Xuancheng Ren, Yang Fan, Yang Su, Yichang Zhang, Yinger Zhang, Yu Wan, Yuqiong Liu, Zekun Wang, Zeyu Cui, Zhenru Zhang, Zhipeng Zhou, and Zihan Qiu. Qwen3 technical report. arXiv preprint arXiv:2505.09388 , 2025a. Shuai Yang, Wei Huang, Ruihang Chu, Yicheng Xiao, Yuyang Zhao, Xianbang Wang, Muyang Li, Enze Xie, Yingcong Chen, Yao Lu, et al. Longlive: Real-time interactive long video generation. 
+
+arXiv preprint arXiv:2509.22622 , 2025b. Yang Yang, Tianyi Zhang, Wei Huang, Jinwei Chen, Boxi Wu, Xiaofei He, Deng Cai, Bo Li, and Peng-Tao Jiang. Anchor forcing: Anchor memory and tri-region rope for interactive streaming video diffusion. arXiv preprint arXiv:2603.13405 , 2026. Jung Yi, Wooseok Jang, Paul Hyunbin Cho, Jisu Nam, Heeji Yoon, and Seungryong Kim. Deep forcing: Training-free long video generation with deep sink and participative compression. arXiv preprint arXiv:2512.05081 , 2025. Tianwei Yin, Michaël Gharbi, Richard Zhang, Eli Shechtman, Fredo Durand, William T Freeman, and Taesung Park. One-step diffusion with distribution matching distillation. In Proceedings of the IEEE/CVF conference on computer vision and pattern recognition , pages 6613–6623, 2024a. Tianwei Yin, Qiang Zhang, Richard Zhang, William T Freeman, Fredo Durand, Eli Shechtman, and Xun Huang. From slow bidirectional to fast causal video generators. arXiv e-prints , pages arXiv–2412, 2024b. Ruicheng Zhang, Kaixi Cong, Jun Zhou, Zhizhou Zhong, Zunnan Xu, Shuiyang Mao, Wei Liu, and Xiu Li. Kvpo: Ode-native grpo for autoregressive video alignment via kv semantic exploration. 
+
+arXiv preprint arXiv:2605.14278 , 2026a. Songchun Zhang, Zeyue Xue, Siming Fu, Jie Huang, Xianghao Kong, Y. Ma, Haoyang Huang, Nan Duan, and Anyi Rao. Astrolabe: Steering forward-process reinforcement learning for distilled autoregressive video models. arXiv preprint arXiv:2603.17051 , 2026b. Min Zhao, Hongzhou Zhu, Kaiwen Zheng, Zihan Zhou, Bokai Yan, Xinyuan Li, Xiao Yang, Chongxuan Li, and Jun Zhu. Causal forcing++: Scalable few-step autoregressive diffusion distillation for real-time interactive video generation. arXiv preprint arXiv:2605.15141 , 2026. Chujie Zheng, Shixuan Liu, Mingze Li, Xiong-Hui Chen, Bowen Yu, Chang Gao, Kai Dang, Yuqiong Liu, Rui Men, An Yang, et al. Group sequence policy optimization. arXiv preprint arXiv:2507.18071 ,2025. Hongzhou Zhu, Min Zhao, Guande He, Hang Su, Chongxuan Li, and Jun Zhu. Causal forcing: Autoregressive diffusion distillation done right for high-quality real-time interactive video generation. 
+
+arXiv preprint arXiv:2602.02214 , 2026. 19 Appendix of TempAct: Advancing Temporal Plausibility in Autoregressive Video Generation via Planner-Executor Reinforcement Learning 
+
+Appendix A. Training Hyperparameters 
+
+Table 6 summarizes the main hyperparameters used for TempAct training. We separate the con-figurations into the shared autoregressive video setup, planner optimization, executor optimization, hierarchical reinforcement learning, and streaming rollout settings. 
+
+Appendix B. Reward Details 
+
+B.1 Planner reward. Plan Quality Score. The LLM-based plan judge returns faithfulness F m, coverage Cm, temporal coherence T m, and hallucination Hm scores in a structured JSON format: 
+
+{"faithfulness_score": 0.0, "coverage_score": 0.0, "temporal_score": 0.0, "hallucination_score": 0.0 }
+
+The hallucination score measures unsupported content introduced by the plan: 0.0–0.2 indicates minor harmless visual enrichment, 0.2–0.5 indicates noticeable unsupported descriptive additions, and 0.5–1.0 indicates significant invented details, events, or scene changes. Larger hallucination therefore indicates more unsupported content. We aggregate these scores into 
+
+Rm 
+
+> judge
+
+= 0 .4F m + 0 .25 Cm + 0 .25 T m − 0.3Hm. (12) 
+
+Temporal-Following Score. The video-level evaluator returns a structured JSON response that contains three parts: (i) a reasoning field with frame-level evidence, detected errors, and aggregation logic; (ii) frame-level scores for the sampled frames; and (iii) global scores for temporal order, physical plausibility, visual consistency, prompt alignment, and overall quality. A typical response follows the schema 
+
+{"think": { "frame_evidence": ["frame 1: ...", "frame 2: ..."], 
+
+20 "detected_errors": ["..."], "aggregation_logic": "..." }, "frame_scores": [0, 0, 0, 0, 0, 0], "temporal_order_score": 0, "physical_plausibility_score": 0, "visual_consistency_score": 0, "prompt_alignment_score": 0, "final_score": 0 }
+
+where all scalar scores are returned on a 0–10 scale. We normalize each score to [0 , 1] and aggregate them as Rm,n  
+
+> video
+
+= 0 .2 ¯Sm,n  
+
+> frame
+
++ 0 .3 Sm,n  
+
+> final
+
++ 0 .2 Sm,n 
+
+> temp
+
++ 0 .1 Sm,n  
+
+> phys
+
++ 0 .1 Sm,n  
+
+> vis
+
++ 0 .1 Sm,n 
+
+> align
+
+, (13) where ¯Sm,n  
+
+> frame
+
+is the average normalized frame-level score, and Sm,n 
+
+> final
+
+, Sm,n 
+
+> temp
+
+, Sm,n 
+
+> phys
+
+, Sm,n  
+
+> vis
+
+, and Sm,n 
+
+> align
+
+denote the normalized final, temporal-order, physical-plausibility, visual-consistency, and prompt-alignment scores, respectively. This aggregation follows the same weighting scheme as our VLM reward implementation and prevents the planner from optimizing only temporal order while ignoring physical realism, visual stability, or text-video alignment. The planner-level reward is 
+
+Rm 
+
+> plan
+
+= 0 .15 Rm 
+
+> judge
+
++ 0 .85 Rm
+
+> video
+
+. (14) 
+
+B.2 Executor reward. Local Step-Following Score. The local step-following evaluator returns a structured JSON response with reasoning fields and scalar scores for the transition segment: 
+
+{"think": { "detected_errors": ["..."], "temporal_reasoning": ["..."], "motion_smooth_and_blur_reasoning": ["..."] }, "subject_score": 0, "scene_score": 0, "action_score": 0, "object_appearance_reasonability_score": 0, "final_score": 0 }
+
+The scalar scores measure subject correctness, scene consistency, action execution, object-appearance reasonability, and overall step-following quality, denoted by Sm,n  
+
+> sub
+
+, Sm,n 
+
+> scene
+
+, Sm,n  
+
+> act
+
+, Sm,n  
+
+> obj
+
+, and Sm,n 
+
+> final
+
+. We aggregate them into 
+
+Rm,n  
+
+> step
+
+= 0 .15 Sm,n  
+
+> sub
+
++ 0 .15 Sm,n  
+
+> scene
+
++ 0 .2Sm,n  
+
+> act
+
++ 0 .2Sm,n  
+
+> obj
+
++ 0 .3Sm,n 
+
+> final
+
+. (15) 21 Figure 6: Prompt instruction for evaluating the Plan Quality Score. Given the PickScore aesthetic reward Rm,n  
+
+> aes
+
+on the same transition segment, the executor-level reward is 
+
+Rm,n  
+
+> exec
+
+= 0 .6Rm,n  
+
+> step
+
++ 0 .4Rm,n  
+
+> aes
+
+. (16) 
+
+B.3 Prompt Instruction. 
+
+We provide detailed LLM and VLM input instructions for evaluating the Plan Quality Score, Temporal-Following Score, and Local Step-Following Score, as shown in Figures 6, 7, and 8. We also provide examples of scoring results in Figure 9. 22 Figure 7: Prompt instruction for evaluating the Temporal-Following Score. 23 Table 6: Comprehensive hyperparameters for TempAct planner–executor reinforcement learning. We summarize the configurations used for the shared autoregressive video setup, planner RL, executor RL, hierarchical sampling, and streaming rollout. 
+
+Category Setting Value Model & Video Specs Backbone Self-Forcing / LongLive Denoising Timesteps ( T ) 4 from [1000 , 750 , 500 , 250] 
+
+Local Attention Size 9 / 12 Sink Size 1 / 3 Local Size 8 / 9 Frames per chunk 3Planner RL Planner Policy LLM planner πϕ
+
+LoRA Fine-Tuning Rank ( r) 32 Scaling Factor ( α) 64 Dropout Rate 0.0 Gradient Checkpointing True Optimization Objective GSPO Planning Group Size ( M ) 4Step Span ( L) 6 latent frames Prompt Segments 5Reward Signals plan judge + video-level reward Gradient Accumulation Steps 2Judge / Video Reward Weights 0.15 / 0.85 KL Reference Policy frozen initialization policy EMA Decay Rate None KL Penalty Weight 5 × 10 −4
+
+Learning Rate 2 × 10 −5
+
+Advantage Clip Max 1Clip Range ( ϵlow , ϵ high ) (5 × 10 −4, 5 × 10 −4)
+
+Executor RL LoRA Fine-Tuning Rank ( r) 256 Scaling Factor ( α) 256 Executor Policy AR diffusion executor pθ
+
+Optimization Objective Flow-GRPO Continuation Group Size ( N ) 8Reward Signals local step-following + PickScore Step / Aesthetic Reward Weights 0.6 / 0.4 Updated Region first chunk after prompt switch Optimizer AdamW Learning Rate ( η) 1 × 10 −5
+
+LR Scheduler constant_with_warmup Gradient Accumulation Steps 2Max Gradient Norm 1.0 EMA Decay Rate 0.9 / 0.99 KL Penalty Weight 5 × 10 −4
+
+Advantage Clip Max 2Clip Range ( ϵlow , ϵ high ) (1 × 10 −5, 1 × 10 −5)
+
+Hierarchical RL Training Transition Latent Frames ( k) random from [6 , 12] 
+
+Max Train Steps 400 Training Hardware 32 NVIDIA H200 GPUs Streaming Rollout Target Latent Video Length ( K) 30 latent frames Chunk Size 3 frames Prompt Switching transition-aware prompt smoothing VAE Temporal Stride 4
+
+24 Figure 8: Prompt instruction for evaluating the Local Step-Following Score. 25 Figure 9: Examples of Temporal-Following scoring results produced by the VLM evaluators. 26

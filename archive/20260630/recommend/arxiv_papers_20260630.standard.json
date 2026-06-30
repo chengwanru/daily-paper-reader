@@ -1,0 +1,796 @@
+{
+  "mode": "standard",
+  "generated_at": "2026-06-30T20:56:46.604775+00:00",
+  "stats": {
+    "mode": "standard",
+    "tag_count": 1,
+    "deep_divecandidates": 11,
+    "deep_cap": 6,
+    "deep_selected": 6,
+    "quick_candidates": 13,
+    "quick_skim_target": 11,
+    "quick_selected": 11
+  },
+  "deep_dive": [
+    {
+      "id": "2606.26025v2",
+      "source": "arxiv",
+      "title": "In-Context World Modeling for Robotic Control",
+      "abstract": "Modern Vision-Language-Action (VLA) models often fail to generalize to novel setups, such as altered camera viewpoints or robot morphologies, because they are typically conditioned only on current observations and language instructions. By ignoring the underlying system configuration as a variable, these models implicitly assume a fixed execution context encountered during training, necessitating data-intensive fine-tuning for any new environment. In this work, we introduce In-Context World Modeling (ICWM), a framework that treats system identification as an in-context adaptation problem. ICWM enables robot policies to autonomously infer essential system variables from a short history of self-generated, task-agnostic interactions. Unlike traditional In-Context Learning that uses demonstrations to specify what task to perform, ICWM leverages the context window to understand how the system operates. By processing these interactions before task execution, the model implicitly captures the world dynamics of the current system, enabling adaptation to novel configurations without parameter updates. Extensive experiments in simulation and on real-world robot platforms demonstrate that ICWM significantly outperforms standard VLA baselines on novel camera viewpoints.",
+      "authors": [
+        "Siyin Wang",
+        "Junhao Shi",
+        "Senyu Fei",
+        "Zhaoyang Fu",
+        "Li Ji",
+        "Jingjing Gong",
+        "Xipeng Qiu"
+      ],
+      "primary_category": "cs.RO",
+      "categories": [
+        "cs.RO",
+        "cs.CV"
+      ],
+      "published": "2026-06-24T16:53:36+00:00",
+      "link": "https://arxiv.org/pdf/2606.26025v2",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 9.0,
+      "llm_evidence_en": "Introduces ICWM for robot policies to infer system variables via in-context world modeling",
+      "llm_evidence_cn": "提出ICWM框架，通过上下文世界建模让机器人策略推断系统变量",
+      "llm_evidence": "提出ICWM框架，通过上下文世界建模让机器人策略推断系统变量",
+      "canonical_evidence": "提出ICWM框架，通过上下文世界建模让机器人策略推断系统变量",
+      "llm_tldr_en": "ICWM enables robot policies to adapt to new setups by in-context world modeling from short task-agnostic interactions, without fine-tuning.",
+      "llm_tldr_cn": "现有VLA模型对相机视角和机器人形态变化缺乏泛化能力，需大量微调。ICWM将系统辨识视为上下文适应问题，仅通过短期的任务无关交互历史推断系统变量。在多种变化场景下，ICWM实现零样本泛化，无需更新模型参数。该方法为世界模型在机器人控制中的实际应用提供了新范式。",
+      "llm_tldr": "现有VLA模型对相机视角和机器人形态变化缺乏泛化能力，需大量微调。ICWM将系统辨识视为上下文适应问题，仅通过短期的任务无关交互历史推断系统变量。在多种变化场景下，ICWM实现零样本泛化，无需更新模型参数。该方法为世界模型在机器人控制中的实际应用提供了新范式。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "world model",
+      "matched_requirement_id": "req-2",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2606.27325v1",
+      "source": "arxiv",
+      "title": "Not All Actions Are Equal: Rethinking Conditioning for Dexterous World Model",
+      "abstract": "Recent advances in action-conditioned world models show promising progress in modeling complex interactions and forecasting future states under diverse action sequences. While these models are often driven by stronger visual representations and model capacity, action conditioning itself remains underexplored. Most existing approaches compress the entire action sequence into a single representation, which works well for low-DoF control but becomes less reliable in high-DoF scenarios. We observe that high-DoF dexterous actions are inherently heterogeneous, spanning multiple orders of magnitude, where large-scale motions coexist with subtle but important signals. When uniformly aggregated, optimization exhibits an imbalance across action components, which hinders the modeling of fine-grained effects and affects action fidelity. We therefore propose DexAC-WM, which treats action conditioning as a structured process rather than global compression. DexAC preserves dimension-level semantics via action tokenization and aligns action signals with visual dynamics through local refinement and global modulation. To address the limited high-level semantic grounding in existing world models, we further introduce a semantic branch that provides rich object-scene priors, which enables world model to capture dynamic visual details while supporting high-DoF action-conditioned video prediction. Experiments on EgoDex and EgoVerse show that combining the semantic branch with DexAC significantly improves FID, FVD, and PCK, demonstrating gains in visual-temporal realism and action-following consistency. We further verify that DexAC extends to other backbones, showing the scalability of our structured action-conditioning design. These results suggest that scaling world models to high-DoF control requires both structured action modeling and semantic grounding.",
+      "authors": [
+        "Zizhao Yuan",
+        "Zhengtu Liang",
+        "Taowen Wang",
+        "Qiwei Liang",
+        "Yichi Wang",
+        "Yunheng Wang",
+        "Yuetong Fang",
+        "Lusong Li",
+        "Zecui Zeng",
+        "Renjing Xu"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV"
+      ],
+      "published": "2026-06-25T17:36:35+00:00",
+      "link": "https://arxiv.org/pdf/2606.27325v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 9.0,
+      "llm_evidence_en": "reevaluates action conditioning for dexterous world models, directly addressing world action model design",
+      "llm_evidence_cn": "重新评估灵巧世界模型的动作条件化，直接处理世界动作模型设计",
+      "llm_evidence": "重新评估灵巧世界模型的动作条件化，直接处理世界动作模型设计",
+      "canonical_evidence": "重新评估灵巧世界模型的动作条件化，直接处理世界动作模型设计",
+      "llm_tldr_en": "Reveals that uniform action aggregation fails for high-DoF dexterous world models and proposes a novel conditioning approach that treats action components heterogeneously.",
+      "llm_tldr_cn": "针对高自由度灵巧世界模型中动作条件化不均匀导致优化失衡的问题，提出非均匀动作聚合方法，将细粒度操作信号与大幅度运动分开处理，显著提升了灵巧世界模型在复杂操控任务中的预测准确性和动作质量。",
+      "llm_tldr": "针对高自由度灵巧世界模型中动作条件化不均匀导致优化失衡的问题，提出非均匀动作聚合方法，将细粒度操作信号与大幅度运动分开处理，显著提升了灵巧世界模型在复杂操控任务中的预测准确性和动作质量。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "world action model",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2606.28128v1",
+      "source": "arxiv",
+      "title": "PhysisForcing: Physics Reinforced World Simulator for Robotic Manipulation",
+      "abstract": "Video generation models have emerged as a promising paradigm for embodied world simulation. However, both general-domain video generators and robot-specific data fine-tuned models can still produce physically implausible manipulations, including discontinuous motion trajectories and inconsistent robot-object interactions, which limits their reliability as world simulators. Through extensive experiments, we find that such physical instability mainly arises from two factors: deformation of moving objects and implausible spatio-temporal correlations among interacting entities, particularly during contact. Building on this observation, we propose PhysisForcing, a scalable training framework that strengthens physical consistency by focusing supervision on physics-informative regions through joint optimization of pixel-level and semantic-level features. The framework consists of a pixel-level trajectory alignment loss, which supervises DiT features using reference point trajectories, and a semantic-level relational alignment loss, which aligns DiT features with inter-region relations extracted from a frozen video understanding encoder. Extensive experiments on R-Bench, PAI-Bench, and EZS-Bench show that PhysisForcing consistently improves embodied video generation over strong baselines, improving the Wan2.2-I2V-A14B and Cosmos3-Nano base models on R-Bench by 22.3\\% and 9.2\\% (7.1\\% and 3.7\\% over vanilla finetuning), with the Cosmos3-Nano variant attaining the best overall score. Beyond generation, as a world model under the WorldArena action-planner protocol it raises the closed-loop success rate from 16.0\\% to 24.0\\% and further improves downstream policy success, indicating that physically aligned video models yield stronger representations for robotic manipulation.",
+      "authors": [
+        "Peiwen Zhang",
+        "Yufan Deng",
+        "Shangkun Sun",
+        "Juncheng Ma",
+        "Duomin Wang",
+        "Jonas Du",
+        "Zilin Pan",
+        "Ye Huang",
+        "Hao Liang",
+        "Songyan Huang",
+        "Ruihua Zhang",
+        "Enze Xie",
+        "Ming-Yu Liu",
+        "Daquan Zhou"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV",
+        "cs.AI",
+        "cs.RO"
+      ],
+      "published": "2026-06-26T14:30:18+00:00",
+      "link": "https://arxiv.org/pdf/2606.28128v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 9.0,
+      "llm_evidence_en": "physics reinforced world simulator using video generation for robotic manipulation",
+      "llm_evidence_cn": "使用视频生成模型强化物理一致性的世界模拟器，用于机器人操作",
+      "llm_evidence": "使用视频生成模型强化物理一致性的世界模拟器，用于机器人操作",
+      "canonical_evidence": "使用视频生成模型强化物理一致性的世界模拟器，用于机器人操作",
+      "llm_tldr_en": "PhysisForcing improves physical consistency in video-generation-based world simulators for robotic manipulation by focusing supervision on contact and motion continuity.",
+      "llm_tldr_cn": "视频生成模型作为具身世界模拟器时存在物理不合理性。PhysisForcing通过识别运动物体变形和接触时空关联问题，提出强化物理一致性的训练框架，在机器人操作模拟中显著提升了运动和交互的物理逼真度。",
+      "llm_tldr": "视频生成模型作为具身世界模拟器时存在物理不合理性。PhysisForcing通过识别运动物体变形和接触时空关联问题，提出强化物理一致性的训练框架，在机器人操作模拟中显著提升了运动和交互的物理逼真度。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "World Action Model using video generation models",
+      "matched_requirement_id": "req-6",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2606.30534v1",
+      "source": "arxiv",
+      "title": "Orca: The World is in Your Mind",
+      "abstract": "We introduce Orca, an initial instantiation of a general world foundation model. Orca learns a unified world latent space from multimodal world signals and exposes it through multimodal readout interfaces. Rather than optimizing isolated next-token, next-frame, or next-action prediction, we are centered on Next-State-Prediction modeling, offering a unified state-transition modeling route toward understanding, predicting, and acting upon the world. Orca learns through two complementary paradigms: unconscious learning captures dense natural state transitions from continuous videos, and conscious learning models sparse meaningful state transitions by language-described events and VQA supervision. For pre-training, we construct a large-scale world-learning inventory data, including 125K hours of video data and 160M event annotations. After pre-training, Orca learns a unified world latent space. To examine whether the learned latent supports downstream, we evaluate it by three representative downstream readouts: text generation, image prediction, and embodied action generation. Orca's backbone is frozen, and only the lightweight modality-specific decoders are trainable. Experiments show the scalability of the proposed paradigm and verify that stronger world latent enables stronger downstream readouts. Orca outperforms similar-sized specialized baselines. These results show that Orca, as a general world foundation model, presents a promising approach to understanding, predicting, and acting upon the world. Finally, we discuss the current limitations, aiming to provide useful insights and inspiration for the community.",
+      "authors": [
+        "Yihao Wang",
+        "Yuheng Ji",
+        "Mingyu Cao",
+        "Yanqing Shen",
+        "Runze Xiao",
+        "Huaihai Lyu",
+        "Senwei Xie",
+        "Euan Liu",
+        "Klara Tian",
+        "Tianfeng Long",
+        "Yichi Zhang",
+        "Zhengliang Cai",
+        "Ruike Chen",
+        "Jifan Zhao",
+        "Ruochuan Shi",
+        "Zihan Tang",
+        "Jing Lyu",
+        "Wenxing Tan",
+        "Ningbo Zhang",
+        "Yangtao Hu",
+        "Yuming Gao",
+        "Xiansheng Chen",
+        "Junkai Zhao",
+        "Congsheng Xu",
+        "Boan Zhu",
+        "Ziqi Wang",
+        "Yupu Feng",
+        "Qiongqiong Zhang",
+        "Yingli Zhao",
+        "Yulong Ao",
+        "Shaoxuan Xie",
+        "You Liu",
+        "Guocai Yao",
+        "Leiduo Zhang",
+        "Xiaodan Liu",
+        "Yunyan Zhang",
+        "Yance Jiao",
+        "Xinyan Yang",
+        "Jiaxing Wei",
+        "Xu Liu",
+        "Tengfei Pan",
+        "Shaokai Nie",
+        "Chunlei Men",
+        "Sen Cui",
+        "Xiaojie Jin",
+        "Hongyang Li",
+        "Jianlan Luo",
+        "Yao Mu",
+        "Yunchao Wei",
+        "Jun Yan",
+        "Hang Zhao",
+        "Xiaolong Zheng",
+        "Jiaming Li",
+        "Yonghua Lin",
+        "Tiejun Huang",
+        "Zhongyuan Wang",
+        "Pengwei Wang"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV"
+      ],
+      "published": "2026-06-29T16:36:10+00:00",
+      "link": "https://arxiv.org/pdf/2606.30534v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 9.0,
+      "llm_evidence_en": "Proposes a general world foundation model with Next-State-Prediction from videos",
+      "llm_evidence_cn": "提出通用世界基础模型，通过Next-State-Prediction从视频学习",
+      "llm_evidence": "提出通用世界基础模型，通过Next-State-Prediction从视频学习",
+      "canonical_evidence": "提出通用世界基础模型，通过Next-State-Prediction从视频学习",
+      "llm_tldr_en": "Orca learns a unified world latent space from multimodal signals using Next-State-Prediction, enabling understanding, prediction, and action in the world from video and language data.",
+      "llm_tldr_cn": "现有模型分别建模文本、视频和动作，缺乏统一的世界状态转换建模。Orca提出Next-State-Prediction范式，通过无意识学习从连续视频捕获稠密状态转换，通过有意识学习从语言事件建模稀疏转换。在大规模世界学习数据（125K小时视频）上预训练后，Orca在多项理解和预测任务上表现优异。该工作为构建可行动的世界模型提供了统一框架。",
+      "llm_tldr": "现有模型分别建模文本、视频和动作，缺乏统一的世界状态转换建模。Orca提出Next-State-Prediction范式，通过无意识学习从连续视频捕获稠密状态转换，通过有意识学习从语言事件建模稀疏转换。在大规模世界学习数据（125K小时视频）上预训练后，Orca在多项理解和预测任务上表现优异。该工作为构建可行动的世界模型提供了统一框架。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "world model",
+      "matched_requirement_id": "req-2",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2606.27537v1",
+      "source": "arxiv",
+      "title": "MemoBench: Benchmarking World Modeling in Dynamically Changing Environments",
+      "abstract": "Video generation models aspire to simulate dynamic environments, and several benchmarks now evaluate memory consistency across frames. However, most assess consistency only while the target remains in view, and the few that force objects out of view evaluate static scenes where nothing changes during occlusion. To bridge this gap, we introduce MemoBench, a diagnostic benchmark built around the disappear-and-reappear paradigm in dynamically changing environments: a target object undergoes a physical process, disappears from view, and must be correctly recovered in its updated state upon reappearance. We curate 360 ground-truth clips spanning synthetic and real-world scenes, and design an evaluation suite combining automated metrics with VQA-based assessment across four diagnostic pillars. Evaluation of eight state-of-the-art models reveals key insights and open challenges regarding memory consistency under the disappear-and-reappear paradigm.",
+      "authors": [
+        "Haoyu Chen",
+        "Kaichen Zhou",
+        "Hang Hua",
+        "Kaile Zhang",
+        "Jingwen Qian",
+        "Wufei Ma",
+        "Haonan Chen",
+        "Chunjiang Liu",
+        "Yizhou Zhao",
+        "Xiaoyuan Wang",
+        "Weiyue Li",
+        "Alan Yuille",
+        "Paul Pu Liang",
+        "Yilun Du"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV"
+      ],
+      "published": "2026-06-25T20:37:39+00:00",
+      "link": "https://arxiv.org/pdf/2606.27537v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 8.0,
+      "llm_evidence_en": "benchmark for world modeling memory consistency in video generation",
+      "llm_evidence_cn": "用于视频生成世界模型记忆一致性的基准",
+      "llm_evidence": "用于视频生成世界模型记忆一致性的基准",
+      "canonical_evidence": "用于视频生成世界模型记忆一致性的基准",
+      "llm_tldr_en": "MemoBench introduces a diagnostic benchmark to evaluate video generation models' ability to remember and update object states after occlusion in dynamic environments.",
+      "llm_tldr_cn": "现有视频世界模型基准仅评估目标在视野内的记忆一致性，忽略遮挡后状态更新。MemoBench围绕消失-重现范式设计，包含360个合成和真实场景片段，结合自动指标和VQA评估，揭示了当前模型在动态环境中的记忆缺陷。",
+      "llm_tldr": "现有视频世界模型基准仅评估目标在视野内的记忆一致性，忽略遮挡后状态更新。MemoBench围绕消失-重现范式设计，包含360个合成和真实场景片段，结合自动指标和VQA评估，揭示了当前模型在动态环境中的记忆缺陷。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "research on video generation for world models",
+      "matched_requirement_id": "req-8",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2606.27326v1",
+      "source": "arxiv",
+      "title": "Hallucination in World Models is Predictable and Preventable",
+      "abstract": "Modern generative world models render increasingly realistic action-controllable futures, yet they frequently hallucinate: rollouts remain visually fluent while drifting from the ground-truth dynamics. We hypothesize that hallucination concentrates in low-coverage regions of the state-action space, where lightweight data-centric signals can both detect it and guide mitigation. To test this, we introduce MMBench2, a 427-hour, 210-task dataset for visual world modeling with ground-truth actions, rewards, and live simulators, and train a 350M-parameter world model on it. We identify three distinct hallucination modes: perceptual, action-marginalized, and scene-diverging -- each anchored to a different stage of the pipeline, and develop three signals that accurately predict where the model will fail. To close coverage gaps at training time, we develop a coverage-aware sampling technique; to close them online, our hallucination predictors serve as curiosity rewards for targeted data collection, yielding a data-efficient finetuning recipe that adapts the pretrained world model to entirely unseen environments with as few as 50 real environment trajectories. Overall, our findings reveal that hallucination in world models is inherently a data coverage issue, and that the same signals used to detect it can also be used for mitigation.   An interactive web version of our paper is available at https://www.nicklashansen.com/mmbench2",
+      "authors": [
+        "Nicklas Hansen",
+        "Xiaolong Wang"
+      ],
+      "primary_category": "cs.LG",
+      "categories": [
+        "cs.LG",
+        "cs.CV",
+        "cs.RO"
+      ],
+      "published": "2026-06-25T17:38:45+00:00",
+      "link": "https://arxiv.org/pdf/2606.27326v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 8.0,
+      "llm_evidence_en": "Generative world model hallucination detection and prevention",
+      "llm_evidence_cn": "生成世界模型幻觉检测与预防",
+      "llm_evidence": "生成世界模型幻觉检测与预防",
+      "canonical_evidence": "生成世界模型幻觉检测与预防",
+      "llm_tldr_en": "Identifies hallucination modes in generative world models and proposes data-centric signals to detect and mitigate them using MMBench2 dataset.",
+      "llm_tldr_cn": "针对生成世界模型在长程推演中易出现幻觉的问题，提出幻觉可预测和可预防的假设。通过构建包含427小时、210个任务的数据集MMBench2并训练350M参数世界模型，识别出三种幻觉模式（感知性、动作边缘化、场景发散），开发了三种数据驱动信号来准确检测和减轻这些幻觉，提升了世界模型的可靠性。",
+      "llm_tldr": "针对生成世界模型在长程推演中易出现幻觉的问题，提出幻觉可预测和可预防的假设。通过构建包含427小时、210个任务的数据集MMBench2并训练350M参数世界模型，识别出三种幻觉模式（感知性、动作边缘化、场景发散），开发了三种数据驱动信号来准确检测和减轻这些幻觉，提升了世界模型的可靠性。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "generative world model",
+      "matched_requirement_id": "req-3",
+      "selection_source": "carryover_cache",
+      "paper_id": "2606.27326v1"
+    }
+  ],
+  "quick_skim": [
+    {
+      "id": "2606.27964v1",
+      "source": "arxiv",
+      "title": "Directing the World: Fast Autoregressive Video Generation with Compositional Human-Camera Control",
+      "abstract": "Building interactive world models requires generating realistic videos while maintaining controllable dynamics over long horizons. Autoregressive video generation offers a scalable foundation, but suffers from error accumulation and temporal degradation during extended rollouts. This issue is further amplified under heterogeneous controls such as human motion and camera trajectories, which may interfere and destabilize a pretrained video prior, while existing methods often trade off controllability and visual quality. We propose \"Directing the World\", a fast autoregressive framework for controllable world-model video generation with compositional human-motion and camera-trajectory control. Our key idea is to decouple control learning while preserving a unified autoregressive video prior. We introduce a Fast-Slow Memory training strategy to stabilize long-horizon rollout learning and improve convergence. For human motion control, we design a t-guided Dynamic Projection mechanism and a refined Motion-CFG strategy, enabling temporally smooth and accurate motion alignment without degrading visual fidelity, and supporting multi-person control.After learning a robust motion prior, we introduce a second-stage camera-trajectory control module to compose human dynamics with viewpoint changes for coherent world exploration. We further construct a large-scale dataset with synchronized video, text, human-motion, and camera-trajectory annotations, organized into motion-centric and camera-centric subsets for decoupled training. Extensive experiments show stable long-horizon generation with precise controllability and high visual quality. See more at https://whydahuzi.github.io/Directing-the-World.github.io/.",
+      "authors": [
+        "Haoyuan Wang",
+        "Yabo Chen",
+        "Haibin Huang",
+        "Chi Zhang",
+        "Xuelong Li"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV"
+      ],
+      "published": "2026-06-26T11:08:09+00:00",
+      "link": "https://arxiv.org/pdf/2606.27964v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 8.0,
+      "llm_evidence_en": "video generation for world models",
+      "llm_evidence_cn": "面向世界模型的视频生成",
+      "llm_evidence": "面向世界模型的视频生成",
+      "canonical_evidence": "面向世界模型的视频生成",
+      "llm_tldr_en": "Proposes Directing the World, a fast autoregressive framework for controllable world-model video generation with compositional human-camera control.",
+      "llm_tldr_cn": "现有交互式世界模型在长程视频生成中面临误差累积和可控性下降的问题。本文提出Directing the World，一种快速自回归框架，通过解耦人体运动和相机轨迹控制实现可组合的世界模型视频生成。该方法在保持视觉质量的同时实现了精确的长时间控制，为构建交互式世界模型提供了高效方案。",
+      "llm_tldr": "现有交互式世界模型在长程视频生成中面临误差累积和可控性下降的问题。本文提出Directing the World，一种快速自回归框架，通过解耦人体运动和相机轨迹控制实现可组合的世界模型视频生成。该方法在保持视觉质量的同时实现了精确的长时间控制，为构建交互式世界模型提供了高效方案。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "research on video generation for world models",
+      "matched_requirement_id": "req-8",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "8plus"
+    },
+    {
+      "id": "2606.26694v2",
+      "source": "arxiv",
+      "title": "PhysEditWorld: A Large-Scale Dataset Toward Physics-Editable World Models",
+      "abstract": "Recent game world models can synthesize visually plausible, action-conditioned rollouts. However, their interaction behaviors often remain limited to exploratory or wandering trajectories, and physical dynamics are typically learned as implicit correlations from data rather than as controllable variables. This limitation hinders their applicability to authored game environments, where physical rules are deliberately designed and require explicit manipulation. We introduce PhysEditWorld, a multimodal dataset with physical parameters, with a primary focus on gravity in this initial version. At its core, PhysEditWorld is built upon a replay paradigm implemented with a UE5 replay-and-rendering pipeline. Each scenario records a normalized action trace and replays the same initial state, character controller, action sequence, and camera policy under multiple gravity configurations, enabling controlled and attributable physical variation. PhysEditWorld contains 12 cinematic UE5 scenes, over 100 hours of gameplay interactions, and more than 60 million rendered rollout frames. Each sample provides synchronized multimodal signals, including RGB, depth, normals, audio, action traces, camera trajectory, engine states, semantic annotations, and explicit gravity labels. We further conduct initial utility studies on both generative video models and world understanding models, demonstrating that PhysEditWorld enables improved gravity-faithful dynamics modeling, enhances consistency under physical edits, and provides a scalable foundation for controllable world modeling research.",
+      "authors": [
+        "Bin Hu",
+        "Yanwen Ma",
+        "Jiehui Huang",
+        "Ziliang Zhang",
+        "Haoning Wu",
+        "Ruicheng Zhang",
+        "Yaokun Li",
+        "Zijun Wang",
+        "Yuechen Zhang",
+        "Chun-Mei Tseng",
+        "Hanhui Li",
+        "Shengju Qian",
+        "Jun Zhou",
+        "Kaipeng Zhang",
+        "Xiaodan Liang",
+        "Jiaya Jia",
+        "Xiu Li"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV"
+      ],
+      "published": "2026-06-25T07:27:09+00:00",
+      "link": "https://arxiv.org/pdf/2606.26694v2",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 7.0,
+      "llm_evidence_en": "dataset for physics-editable world models",
+      "llm_evidence_cn": "面向物理可编辑世界模型的数据集",
+      "llm_evidence": "面向物理可编辑世界模型的数据集",
+      "canonical_evidence": "面向物理可编辑世界模型的数据集",
+      "llm_tldr_en": "PhysEditWorld provides a multimodal dataset with physical parameters (gravity) for game world models, enabling explicit control over physics in action-conditioned rollouts.",
+      "llm_tldr_cn": "当前游戏世界模型的动作条件展开行为局限于探索性轨迹，且物理动力学作为隐式相关而非可控变量。本文提出PhysEditWorld数据集，基于UE5重放-渲染管线构建，包含重力等物理参数的真实动作轨迹。该数据集支持物理可编辑世界模型的训练与评估，使世界模型能够显式操控物理规则。",
+      "llm_tldr": "当前游戏世界模型的动作条件展开行为局限于探索性轨迹，且物理动力学作为隐式相关而非可控变量。本文提出PhysEditWorld数据集，基于UE5重放-渲染管线构建，包含重力等物理参数的真实动作轨迹。该数据集支持物理可编辑世界模型的训练与评估，使世界模型能够显式操控物理规则。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "research on video generation for world models",
+      "matched_requirement_id": "req-8",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "7"
+    },
+    {
+      "id": "2606.24742v1",
+      "source": "arxiv",
+      "title": "World Value Models for Robotic Manipulation",
+      "abstract": "Generalist value models play a pivotal role in scaling robotic policy learning from large-scale, mixed-quality data. Mathematically, accurate value estimation demands deep temporal understanding, requiring models to both ground the current belief using historical context and plan over future outcomes. However, most existing robotic value models are built on Vision-Language Model (VLM) backbones that are pretrained primarily on static or temporally sparse visual observations, lacking the requisite temporal modeling capabilities for value estimation. Unlike VLMs, world models naturally excel at temporal modeling and future planning, making them ideal foundations for learning generalizable value functions. Driven by this insight, we marry world models with value estimation to construct a new generalist robotic value model, World Value Model (WVM), that offers accurate task progressions to assess data quality. On standard benchmarks, WVM delivers state-of-the-art (SOTA) Value-Order Correlation (VOC) results. Complementing standard evaluation suites that contains only expert data, we further introduce Suboptimal-Value-Bench, a multi-embodiment benchmark consisting of 800 suboptimal trajectories with high-fidelity, human-labeled frame annotations. Our evaluations show that WVM maintains its SOTA performance on Suboptimal-Value-Bench, establishing its robustness in handling both expert and suboptimal data. When deployed for policy learning, WVM improves manipulation performance across various policy extraction approaches in both simulated and real-world deployment, providing robust guidance for learning from mixed-quality data.",
+      "authors": [
+        "Zhihao Wang",
+        "Jianxiong Li",
+        "Yu Cui",
+        "Yuan Gao",
+        "Xianyuan Zhan",
+        "Junzhi Yu",
+        "Xiao Ma"
+      ],
+      "primary_category": "cs.RO",
+      "categories": [
+        "cs.RO"
+      ],
+      "published": "2026-06-23T16:07:48+00:00",
+      "link": "https://arxiv.org/pdf/2606.24742v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "world model combined with value estimation for robotic manipulation",
+      "llm_evidence_cn": "世界模型与价值估计结合用于机器人操作",
+      "llm_evidence": "世界模型与价值估计结合用于机器人操作",
+      "canonical_evidence": "世界模型与价值估计结合用于机器人操作",
+      "llm_tldr_en": "World Value Models marry world models with value estimation to leverage temporal modeling for generalizable robotic value functions.",
+      "llm_tldr_cn": "现有机器人价值模型基于静态视觉骨干缺乏时间建模能力。World Value Models将世界模型的时间推理优势引入价值估计，构建能够从历史上下文中理解当前信念并规划未来结果的价值函数，提升了从大规模混合质量数据中学习策略的性能。",
+      "llm_tldr": "现有机器人价值模型基于静态视觉骨干缺乏时间建模能力。World Value Models将世界模型的时间推理优势引入价值估计，构建能够从历史上下文中理解当前信念并规划未来结果的价值函数，提升了从大规模混合质量数据中学习策略的性能。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "world model",
+      "matched_requirement_id": "req-2",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    },
+    {
+      "id": "2606.28758v1",
+      "source": "arxiv",
+      "title": "X-Mind: Efficient Visual Chain-of-Thought via Predictive World Model for End-to-End Driving",
+      "abstract": "Predicting future states is essential for autonomous agents, yet current Vision-Language-Action (VLA) models fundamentally lack this capability, relying instead on reactive perception-action mapping. While integrating Predictive World Models (PWMs) addresses this gap, existing approaches either incur prohibitive cascaded latency or act as shallow terminal tasks that fail to deeply embed forward-looking reasoning. To endow VLA models with this reasoning capability, we propose X-Mind. Rather than treating PWMs as an external auxiliary module, this framework internalizes them as the Visual Chain-of-Thought (Visual CoT). By enforcing a world rollout prior to action, the model is constrained to imagine future evolution first, yielding a driving policy that is robustly grounded in environmental dynamics and aware of the future consequences its actions will unfold. The challenge here is efficiency, and we tackle it on two fronts. First, we introduce a compact representation of visual thinking: an abstract sketch that fuses a Bird's-Eye-View (BEV) layout with abstract driving priors (e.g., navigation intents and traffic rules). Rather than rolling out dense future frames, the model reasons over this sketch as a mental canvas; aided by a Deep Compression Autoencoder (DC-AE), a 12-frame future rollout is reduced to merely 96 tokens, alleviating the long-context computational bottleneck. Second, to accelerate generation further, we propose a recurrent block diffusion scheme that unrolls the denoising steps across the layers of the large drive model, folding iterative refinement into the backbone's one forward pass. Trained and validated on large-scale real-world data, X-Mind achieves competitive end-to-end driving performance, which makes it a highly practical, low-latency solution that successfully deploys large-scale cognitive reasoning directly onto resource-constrained vehicle platforms.",
+      "authors": [
+        "Bohao Zhao",
+        "Chengrui Wei",
+        "Guangfeng Jiang",
+        "Ruixin Liu",
+        "Xuejie Lv",
+        "Liu Liang",
+        "Sutao Deng",
+        "Xiuyang Fan",
+        "Pengkun Zheng",
+        "Jinyun Zhou",
+        "Rui Guo",
+        "Hanpeng Liu",
+        "Yutong Zheng",
+        "Yi Guo",
+        "Xinlong Zheng",
+        "Qingyu Luo",
+        "Zhuangzhuang Ding",
+        "Yu Zhang",
+        "Hang Zhang",
+        "Xianming Liu"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV",
+        "cs.AI"
+      ],
+      "published": "2026-06-27T06:17:50+00:00",
+      "link": "https://arxiv.org/pdf/2606.28758v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 8.0,
+      "llm_evidence_en": "uses predictive world model as visual chain-of-thought for end-to-end driving",
+      "llm_evidence_cn": "将预测世界模型作为视觉思维链用于端到端驾驶",
+      "llm_evidence": "将预测世界模型作为视觉思维链用于端到端驾驶",
+      "canonical_evidence": "将预测世界模型作为视觉思维链用于端到端驾驶",
+      "llm_tldr_en": "X-Mind internalizes predictive world models as visual chain-of-thought for VLA models, enforcing future prediction before action for end-to-end driving.",
+      "llm_tldr_cn": "当前视觉-语言-动作模型缺乏预测能力，仅进行反应式感知到动作映射。本文提出X-Mind，将预测世界模型内化为视觉思维链，迫使模型在行动前先想象未来演化，从而在端到端驾驶任务中实现前瞻性推理，降低了级联延迟并提升了安全性。",
+      "llm_tldr": "当前视觉-语言-动作模型缺乏预测能力，仅进行反应式感知到动作映射。本文提出X-Mind，将预测世界模型内化为视觉思维链，迫使模型在行动前先想象未来演化，从而在端到端驾驶任务中实现前瞻性推理，降低了级联延迟并提升了安全性。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "world model",
+      "matched_requirement_id": "req-2",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "8plus"
+    },
+    {
+      "id": "2606.27014v1",
+      "source": "arxiv",
+      "title": "A Generalization Theory for JEPA-Based World Models",
+      "abstract": "Joint Embedding Predictive Architectures (JEPAs) have recently emerged as a promising paradigm for world modeling by learning predictive dynamics in a latent space rather than generating future observations at the input level. Despite their empirical success, the theoretical understanding of JEPA-based world models remains limited. In this paper, we develop the first generalization theory for JEPA-based world models. We formulate JEPA pretraining as a conditional spectral graph learning problem and show that the JEPA objective is equivalent to a low-rank factorization of an action-conditioned co-occurrence matrix. Building on this characterization, we establish a connection between JEPA pretraining error and downstream planning regret, leading to a finite-sample generalization bound for JEPA-based world models. Our analysis reveals an inherent trade-off between approximation and sample errors with respect to the latent dimension, providing theoretical insights into the advantages and limitations of latent predictive models compared with input-level predictive approaches.",
+      "authors": [
+        "Jingyi Cui",
+        "Qi Zhang",
+        "Hongwei Wen",
+        "Yisen Wang"
+      ],
+      "primary_category": "cs.LG",
+      "categories": [
+        "cs.LG"
+      ],
+      "published": "2026-06-25T13:29:20+00:00",
+      "link": "https://arxiv.org/pdf/2606.27014v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 7.0,
+      "llm_evidence_en": "develops generalization theory for JEPA-based world models",
+      "llm_evidence_cn": "为基于JEPA的世界模型建立泛化理论",
+      "llm_evidence": "为基于JEPA的世界模型建立泛化理论",
+      "canonical_evidence": "为基于JEPA的世界模型建立泛化理论",
+      "llm_tldr_en": "First generalization theory for JEPA-based world models, connecting JEPA pretraining error to downstream planning regret.",
+      "llm_tldr_cn": "基于JEPA的世界模型在经验上成功，但缺乏理论理解。本文首次为JEPA世界模型建立泛化理论，将预训练误差与下游规划遗憾联系起来，证明了低秩分解特性，为世界模型设计提供了理论指导。",
+      "llm_tldr": "基于JEPA的世界模型在经验上成功，但缺乏理论理解。本文首次为JEPA世界模型建立泛化理论，将预训练误差与下游规划遗憾联系起来，证明了低秩分解特性，为世界模型设计提供了理论指导。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "world model",
+      "matched_requirement_id": "req-2",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "7"
+    },
+    {
+      "id": "2606.25215v1",
+      "source": "arxiv",
+      "title": "Reflective VLA: In-Context Action Consequences Make VLAs Generalize",
+      "abstract": "Most vision-language-action (VLA) models are reactive: they predict the next action from the current instruction and observation, implicitly assuming that the current observation fully specifies the action-relevant state. In embodied control, however, embodiment-specific factors such as camera-to-robot geometry, robot calibration, or systematic actuation bias are often hard to identify from a single observation. As a result, reactive policies cannot reliably disambiguate these factors in general, overfitting to training environments and generalizing poorly at deployment. We propose Reflective VLA, which conditions each decision on a context of observation-action-consequence triplets. Each triplet records not only what the robot observed and executed, but also how the scene changed afterward, exposing the deployment-specific mapping from actions to observed effects. Architecturally, Reflective VLA routes all observation modalities through the VLM under shared attention, so the action expert reasons directly over past triplets and the current observation. A block-causal mask enables parallel multi-frame training without leakage and supports KV-cached real-time inference. On standard LIBERO and SimplerEnv-Bridge, Reflective VLA preserves strong in-distribution performance. Under distribution shift on LIBERO-Plus and the harder LIBERO-Plus-Hard, it improves average success rate by 5.4 and 4.2 percentage points over a matched reactive baseline. Ablations with a matched history-only baseline further show that action consequences -- rather than additional context length alone -- are the key to cross-environment generalization. Project page: https://lianqing11.github.io/reflective-vla-page/",
+      "authors": [
+        "Qing Lian",
+        "Kent Yu",
+        "Lei Zhang"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV",
+        "cs.RO"
+      ],
+      "published": "2026-06-23T22:23:35+00:00",
+      "link": "https://arxiv.org/pdf/2606.25215v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "proposes Reflective VLA using observation-action-consequence triplets, linking to world action model",
+      "llm_evidence_cn": "提出Reflective VLA，利用观测-动作-结果三元组，与世界动作模型关联",
+      "llm_evidence": "提出Reflective VLA，利用观测-动作-结果三元组，与世界动作模型关联",
+      "canonical_evidence": "提出Reflective VLA，利用观测-动作-结果三元组，与世界动作模型关联",
+      "llm_tldr_en": "Proposes Reflective VLA that conditions decisions on observation-action-consequence triplets to generalize across embodiment variations, improving world action model robustness.",
+      "llm_tldr_cn": "针对反应式VLA模型在具身控制中泛化性差的问题，提出Reflective VLA，通过观测-动作-结果三元组对决策进行条件化，使模型能推断具身因素并适应部署环境，为世界动作模型提供了更好的推理范式。",
+      "llm_tldr": "针对反应式VLA模型在具身控制中泛化性差的问题，提出Reflective VLA，通过观测-动作-结果三元组对决策进行条件化，使模型能推断具身因素并适应部署环境，为世界动作模型提供了更好的推理范式。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "world action model",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    },
+    {
+      "id": "2606.28804v1",
+      "source": "arxiv",
+      "title": "ViPSim: Collaborating Visual and Parameter Spaces for Consistent Long-Horizon Embodied World Models",
+      "abstract": "Embodied World Models (EWMs) have emerged as a scalable and risk-free paradigm for advancing embodied intelligence, enabling the safety-critical evaluation of Vision-Language-Action systems. However, their reliability as evaluation benchmarks and foundational simulators is often hindered by the representation gap between low-dimensional actions and high-dimensional video synthesis. This gap results in a lack of geometric correspondence, manifesting as accumulated trajectory drift and inconsistent robot-object interactions during long-horizon rollouts. To bridge this gap, we propose ViPSim, a framework that achieves consistent long-horizon generation through the synergistic collaboration of Visual and Parameter Spaces. We define the Visual Space as a domain of explicit spatial priors, integrating pixel-aligned projections of end-effector pose, camera perspectives, depth-informed scene geometry, and robotic morphological masks to provide dense structural grounding. Concurrently, the Parameter Space serves as a domain of numerical drivers, injecting raw action sequences and camera matrices to provide precise motion guidance. By unifying these two spaces, ViPSim ensures that the generated states are simultaneously anchored by geometric boundaries and steered by numerical commands. Extensive experiments demonstrate that ViPSim is backbone-agnostic and significantly enhances trajectory consistency. Notably, our approach exhibits emergent capabilities in generating complex interactions with deformable objects (e.g., cloth folding) and maintains robust performance in out-of-distribution and cross-embodiment scenarios, providing a high-fidelity foundation for the automated evaluation and predictive control of embodied agents.",
+      "authors": [
+        "Longyu Chen",
+        "Heng Li",
+        "Wei Yang",
+        "Manqi Zhao",
+        "Dongsheng Jiang"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV",
+        "cs.RO"
+      ],
+      "published": "2026-06-27T08:18:09+00:00",
+      "link": "https://arxiv.org/pdf/2606.28804v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 8.0,
+      "llm_evidence_en": "consistent long-horizon embodied world model generation",
+      "llm_evidence_cn": "一致的长时程具身世界模型生成",
+      "llm_evidence": "一致的长时程具身世界模型生成",
+      "canonical_evidence": "一致的长时程具身世界模型生成",
+      "llm_tldr_en": "ViPSim bridges the representation gap between actions and video synthesis via collaborative visual and parameter spaces for consistent long-horizon embodied world models.",
+      "llm_tldr_cn": "具身世界模型（EWM）在长时程展开时因动作与视频合成之间的表征鸿沟导致轨迹漂移和不一致。本文提出ViPSim，通过视觉空间和参数空间的协同协作弥补这一鸿沟，在视觉层面保持几何对应关系。实验表明ViPSim生成了更一致的长时程交互，可用于安全评估Vision-Language-Action系统。",
+      "llm_tldr": "具身世界模型（EWM）在长时程展开时因动作与视频合成之间的表征鸿沟导致轨迹漂移和不一致。本文提出ViPSim，通过视觉空间和参数空间的协同协作弥补这一鸿沟，在视觉层面保持几何对应关系。实验表明ViPSim生成了更一致的长时程交互，可用于安全评估Vision-Language-Action系统。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "video world model",
+      "matched_requirement_id": "req-5",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "8plus"
+    },
+    {
+      "id": "2606.27644v1",
+      "source": "arxiv",
+      "title": "CascadeOcc: Rethinking 3D Occupancy World Models with Cascaded VQ Representations",
+      "abstract": "This letter proposes CascadeOcc, a novel occupancy world model that prioritizes intrinsic structural hierarchy over extrinsic auxiliary modalities for autonomous driving. Occupancy world models -- forecasting the future driving environment and planning the driving trajectory -- effectively bridge perception and planning, but current approaches often heavily rely on external modalities or large language models, failing to fully exploit the inherent structural potential of occupancy representations themselves. To enhance representational capacity for complex 3D scenes, we integrate a cascaded Vector Quantized (VQ) mechanism into an autoregressive framework. Following a coarse-to-fine principle, CascadeOcc progressively refines fine-grained details from global structures through a multi-scale architecture. Additionally, we incorporate a TimeMixer to capture multi-scale temporal dependencies, establishing a dual-hierarchy mechanism in both space and time. Experimental results on 4D occupancy forecasting and motion planning benchmarks demonstrate that CascadeOcc achieves superior performance among vision-centric approaches, validating that optimizing inherent representations is a powerful alternative to relying on external foundation models.",
+      "authors": [
+        "Kyumin Hwang",
+        "Wonhyeok Choi",
+        "Jaeyeul Kim",
+        "Jihun Park",
+        "Daehee Park",
+        "Sunghoon Im"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV"
+      ],
+      "published": "2026-06-26T01:43:37+00:00",
+      "link": "https://arxiv.org/pdf/2606.27644v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 7.0,
+      "llm_evidence_en": "occupancy world model with cascaded VQ for autonomous driving",
+      "llm_evidence_cn": "用于自动驾驶的占用世界模型，采用级联向量量化",
+      "llm_evidence": "用于自动驾驶的占用世界模型，采用级联向量量化",
+      "canonical_evidence": "用于自动驾驶的占用世界模型，采用级联向量量化",
+      "llm_tldr_en": "CascadeOcc proposes an occupancy world model using cascaded vector quantization in an autoregressive framework to forecast 3D driving scenes.",
+      "llm_tldr_cn": "现有占用世界模型依赖外部模态或大语言模型，未充分利用自身结构。CascadeOcc引入级联向量量化机制，按照从粗到细原则逐步细化细粒度检测，在自动驾驶场景预测和规划中取得更好效果。",
+      "llm_tldr": "现有占用世界模型依赖外部模态或大语言模型，未充分利用自身结构。CascadeOcc引入级联向量量化机制，按照从粗到细原则逐步细化细粒度检测，在自动驾驶场景预测和规划中取得更好效果。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "world model",
+      "matched_requirement_id": "req-2",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "7"
+    },
+    {
+      "id": "2606.26964v1",
+      "source": "arxiv",
+      "title": "Look-Before-Move: Narrative-Grounded World Visual Attention in Dynamic 3D Story Worlds",
+      "abstract": "As embodied AI and world models increasingly operate in dynamic 3D environments, visual perception must move beyond passively interpreting given observations toward actively deciding what to observe. We study this problem through camera planning in dynamic 3D story worlds, where the camera must not only generate smooth motion, but also decide what visual evidence should be acquired before it moves. We formulate this capability as Narrative-Grounded World Visual Attention, where the camera acts as an embodied observer that determines what to observe, how to compose the observation, and how to shift attention over time under narrative intent and physical 3D constraints. To realize this capability, we propose Look-Before-Move, a camera planning framework that separates observation specification from motion execution. It first builds a Semantic Observation Contract to convert directorial intent into executable visual constraints, then performs Monte Carlo Viewpoint Search to find narrative-compliant and geometrically feasible viewpoints, and finally applies Semantic Trajectory Grounding to connect selected viewpoints into continuous, collision-aware, and temporally coherent camera motion. We further construct a dynamic 3D Story World Benchmark based on StoryBlender, covering 50 stories, 457 scenes, and 1585 shots with animated characters, semantic scene configurations, and executable 3D environments. Experiments show that our framework improves subject perception, intent consistency, and trajectory quality over representative baselines, demonstrating the importance of organizing visual attention before generating camera motion.",
+      "authors": [
+        "Jiaming Bian",
+        "Bingliang Li",
+        "Yuehao Wu",
+        "Pichao Wang",
+        "Zhi Wang",
+        "Hailan Ma",
+        "Huadong Mo",
+        "Zhenhong Sun"
+      ],
+      "primary_category": "cs.AI",
+      "categories": [
+        "cs.AI",
+        "cs.CV"
+      ],
+      "published": "2026-06-25T12:38:39+00:00",
+      "link": "https://arxiv.org/pdf/2606.26964v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "addresses world visual attention in dynamic 3D worlds, relevant to world model concept",
+      "llm_evidence_cn": "在动态3D世界中处理世界视觉注意，与世界模型概念相关",
+      "llm_evidence": "在动态3D世界中处理世界视觉注意，与世界模型概念相关",
+      "canonical_evidence": "在动态3D世界中处理世界视觉注意，与世界模型概念相关",
+      "llm_tldr_en": "Proposes Look-Before-Move for narrative-grounded world visual attention in dynamic 3D story worlds, enabling cameras to decide what to observe before moving, advancing embodied world models.",
+      "llm_tldr_cn": "针对动态3D故事世界中的世界视觉注意问题，提出Look-Before-Move方法，使相机能根据叙事意图和物理约束决定观察内容，为具身世界模型提供了主动视觉感知的新范式，提升了世界模型在动态环境中的适应性。",
+      "llm_tldr": "针对动态3D故事世界中的世界视觉注意问题，提出Look-Before-Move方法，使相机能根据叙事意图和物理约束决定观察内容，为具身世界模型提供了主动视觉感知的新范式，提升了世界模型在动态环境中的适应性。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "world model",
+      "matched_requirement_id": "req-2",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    },
+    {
+      "id": "2606.30045v1",
+      "source": "arxiv",
+      "title": "Walking in the Implicit: Interactive World Exploration via Neural Scene Representation",
+      "abstract": "Interactive video generation systems for camera-controlled world exploration roll out growing sequences of latent video frames, entangling state transition with high-frequency observation synthesis. We propose Walking in the Implicit, a scene-centric paradigm that changes the rollout variable from frame latents to a fixed-length, renderable implicit state, termed Neural Implicit Scene (NIS). This factorizes interactive generation into stochastic transition of a compact scene state and deterministic pose-conditioned rendering given the sampled state. We instantiate this paradigm as NeuWorld: a transformer VAE learns locally anchored NIS from sparse posed frames, and a diffusion transformer evolves NIS conditioned on future camera trajectories and geometry-aware retrieved history. By reusing the VAE encoder as a unified conditioner, NeuWorld maps camera, reference-image, and history cues into the same NIS modality, avoiding external heterogeneous encoders. Trained from scratch on public posed-view data without pretrained video backbones or auxiliary 3D reconstructors, NeuWorld achieves strong long-horizon consistency with favorable inference efficiency.",
+      "authors": [
+        "Zhiqi Li",
+        "Chengrui Dong",
+        "Zhenhua Du",
+        "Hangning Zhou",
+        "Cong Qiu",
+        "Hailong Qin",
+        "Mu Yang",
+        "Dongxu Wei",
+        "Peidong Liu"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV"
+      ],
+      "published": "2026-06-29T09:37:33+00:00",
+      "link": "https://arxiv.org/pdf/2606.30045v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 8.0,
+      "llm_evidence_en": "interactive world exploration video generation",
+      "llm_evidence_cn": "交互式世界探索视频生成",
+      "llm_evidence": "交互式世界探索视频生成",
+      "canonical_evidence": "交互式世界探索视频生成",
+      "llm_tldr_en": "Proposes NeuWorld, a scene-centric paradigm for interactive video generation that uses a neural implicit scene state instead of frame latents for rollout.",
+      "llm_tldr_cn": "交互式视频生成系统在相机控制的世界探索中常将状态转换与高频观测合成纠缠，导致效率低下。本文提出Walking in the Implicit场景中心范式，将展开变量从帧隐变量改为固定长度的可渲染隐式场景状态（NIS）。NeuWorld实例化该范式：Transformer VAE从稀疏带位姿帧学习局部锚定NIS，扩散Transformer根据未来相机轨迹演化NIS。该方法实现了高效且可控的世界探索视频生成。",
+      "llm_tldr": "交互式视频生成系统在相机控制的世界探索中常将状态转换与高频观测合成纠缠，导致效率低下。本文提出Walking in the Implicit场景中心范式，将展开变量从帧隐变量改为固定长度的可渲染隐式场景状态（NIS）。NeuWorld实例化该范式：Transformer VAE从稀疏带位姿帧学习局部锚定NIS，扩散Transformer根据未来相机轨迹演化NIS。该方法实现了高效且可控的世界探索视频生成。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "video world model",
+      "matched_requirement_id": "req-5",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "8plus"
+    },
+    {
+      "id": "2606.28016v1",
+      "source": "arxiv",
+      "title": "TempAct: Advancing Temporal Plausibility in Autoregressive Video Generation via Planner-Executor RL",
+      "abstract": "Autoregressive (AR) video diffusion models enable low-latency streaming generation by synthesizing videos chunk by chunk with cached visual context, but this chunk-wise formulation makes temporal instruction following ambiguous. A single global prompt does not specify which sub-event should be realized in each chunk, while naively switching to step-wise prompts often leads to delayed reactions, blended step semantics, and error propagation across prompt transitions. These failures are difficult to address with supervised fine-tuning or distillation alone: SFT suffers from exposure bias, while rollout-based distillation still optimizes low-level denoising or teacher-distribution matching rather than directly enforcing action ordering and prompt-transition correctness. We address these challenges with TempAct, a planner--executor reinforcement learning framework that jointly optimizes temporal decomposition and step-conditioned execution for temporally plausible AR video generation. TempAct uses an LLM planner to explore span-aware step prompts that are executable by the video model, and trains an AR diffusion executor to follow these prompts under its own generated histories. Its key mechanism is hierarchical group exploration: candidate plans form planning groups, and each plan induces an execution group of multiple continuations from a shared visual context, enabling plan-level credit assignment for long-horizon temporal outcomes and executor-level credit assignment for prompt-switch behavior. We further design hierarchical rewards that combine plan-quality and full-video temporal feedback for the planner with local transition-level step-following rewards, aesthetic regularization, and KL constraints for the executor. Experiments on Self-Forcing and LongLive show that TempAct improves temporal consistency while preserving overall visual quality.",
+      "authors": [
+        "Jing Wang",
+        "Xiangxin Zhou",
+        "Jiajun Liang",
+        "Kaiqi Liu",
+        "Wanyun Pang",
+        "Zhenyu Xie",
+        "Tianyu Pang",
+        "Xiaodan Liang"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV"
+      ],
+      "published": "2026-06-26T12:19:28+00:00",
+      "link": "https://arxiv.org/pdf/2606.28016v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 7.0,
+      "llm_evidence_en": "autoregressive video generation with planner-executor RL for temporal action plausibility",
+      "llm_evidence_cn": "自回归视频生成结合规划器-执行器强化学习，提升时间动作合理性",
+      "llm_evidence": "自回归视频生成结合规划器-执行器强化学习，提升时间动作合理性",
+      "canonical_evidence": "自回归视频生成结合规划器-执行器强化学习，提升时间动作合理性",
+      "llm_tldr_en": "TempAct applies planner-executor reinforcement learning to autoregressive video diffusion models to enforce temporally plausible action sequences chunk by chunk.",
+      "llm_tldr_cn": "自回归视频扩散模型在逐块生成时存在时间指令模糊问题。TempAct引入规划器-执行器强化学习框架，直接优化动作时序合理性，缓解了曝光偏差和错误传播。实验验证了该方法在提高视频生成连贯性上的有效性。",
+      "llm_tldr": "自回归视频扩散模型在逐块生成时存在时间指令模糊问题。TempAct引入规划器-执行器强化学习框架，直接优化动作时序合理性，缓解了曝光偏差和错误传播。实验验证了该方法在提高视频生成连贯性上的有效性。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "video action model",
+      "matched_requirement_id": "req-4",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "7"
+    }
+  ]
+}

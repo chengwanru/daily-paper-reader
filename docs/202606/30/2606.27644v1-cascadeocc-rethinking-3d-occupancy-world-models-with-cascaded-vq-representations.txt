@@ -1,0 +1,252 @@
+Title: CascadeOcc: Rethinking 3D Occupancy World Models with Cascaded VQ Representations
+
+URL Source: https://arxiv.org/pdf/2606.27644v1
+
+Published Time: Mon, 29 Jun 2026 00:20:43 GMT
+
+Number of Pages: 5
+
+Markdown Content:
+> JOURNAL OF L ATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2015 1
+
+# CascadeOcc: Rethinking 3D Occupancy World Models with Cascaded VQ Representations 
+
+Kyumin Hwang ∗, Wonhyeok Choi ∗, Jaeyeul Kim, Jihun Park, Daehee Park †, and Sunghoon Im †, Member, IEEE 
+
+Abstract —This letter proposes CascadeOcc, a novel occupancy world model that prioritizes intrinsic structural hierarchy over extrinsic auxiliary modalities for autonomous driving. Occupancy world models—forecasting the future driving environment and planning the driving trajectory—effectively bridge perception and planning, but current approaches often heavily rely on external modalities or large language models, failing to fully exploit the inherent structural potential of occupancy representations themselves. To enhance representational capacity for complex 3D scenes, we integrate a cascaded Vector Quantized (VQ) mechanism into an autoregressive framework. Following a coarse-to-fine principle, CascadeOcc progressively refines fine-grained details from global structures through a multi-scale architecture. Additionally, we incorporate a TimeMixer to capture multi-scale temporal dependencies, establishing a dual-hierarchy mechanism in both space and time. Experimental results on 4D occupancy forecasting and motion planning benchmarks demonstrate that CascadeOcc achieves superior performance among vision-centric approaches, validating that optimizing inherent representations is a powerful alternative to relying on external foundation models. 
+
+Index Terms —Occupancy, Forecasting, Planning, World Model, Autonomous Driving 
+
+I. I NTRODUCTION 
+
+# THE paradigm of 3D scene understanding in autonomous driving is being reshaped around representations centered on bird’s-eye view (BEV) [1], [2] and occupancy [3], [4], marking a departure from traditional dense depth estimation approaches [5]–[9]. A major catalyst for this shift has been the emergence of BEV representation based methodologies such as BEVFormer [10] and LSS [11], which infer 3D structure from multi-camera images without relying on dense depth maps, along with occupancy prediction methods extended from these representations. In particular, the introduction of dense occupancy label datasets, as proposed in SurroundOcc [12], Occ3D [13], and OpenOccupancy [14], along with the tri-plane representation introduced in TPVFormer [15] that effectively integrates the strengths of voxel and BEV representations, has 
+
+Manuscript received: January 6, 2026; Revised: March 17, 2026; Accepted: March 30, 2026. This work was supported by Korea Research Institute for defense Technology planning and advancement through Defense Innovation Vanguard Enterprise Project, funded by Defense Acquisition Program Admin-istration (R230206), the Technology Innovation Program (RS-2024-00445759, Development of Navigation Technology Utilizing Visual Information Based on Vision-Language Models for Understanding Dynamic Environments in Non-Learned Spaces) funded by the Ministry of Trade, Industry & Energy (MOTIE, Korea) and LG AI STAR Talent Development Program for Leading Large-Scale Generative AI Models in the Physical AI Domain (RS-2025-25442149). K. Hwang, W. Choi, J. Kim, J. Park, D. Park, S. Im with the Daegu Gyeongbuk Institute of Science and Technology (DGIST), Daegu 42988, South Korea. E-mail: {kyumin, smu06117, jykim94, pjh2857, dhpark, sunghoonim }@dgist.ac.kr *: Equal Contribution, †: D. Park and S. Im are the Corresponding authors. 
+
+played a significant role in accelerating the progress of vision-based occupancy prediction to a level that is comparable to LiDAR-based perception. Building on this success, recent research has begun to move beyond static 3D scene understanding toward forecasting future driving environments and vehicle trajectories, giving rise to the concept of the occupancy world. OccWorld [16], an early work in the occupancy world framework, transforms 3D scenes into discrete tokens using a Vector Quantized Variational AutoEncoder (VQVAE) [17], and forecasts future scene occupancy and ego-vehicle trajectory through a spatial-temporal transformer. More recently, there has been a growing body of research exploring the integration of world models with large language models (LLM), leverage their rich contextual representations to enable broader scene understanding [18], [19]. Alongside this line of work, other approaches have emerged that enhance future prediction by employing distinct encoding mechanisms based on scene semantics, effectively disentangling movable elements from static free-space regions within driving scenes [19], [20]. Furthermore, methods like FSF-Net [21] have sought to improve fine-grained 4D occupancy forecasting by explicitly capturing spatial-temporal dynamics through the fusion of coarse BEV scene flow and vector-quantized networks. However, recent research in the world model has faced key limitations, including the complexity arising from a heavy reliance on auxiliary modalities or external knowledge priors, and structural disjoints caused by artificially partitioning the scene into separate latent spaces, which potentially complicates the holistic modeling of interactions between dynamic agents and their surroundings. Consequently, prior approaches have not thoroughly investigated the potential of refining structural representations to bridge the occupancy world model and the autoregressive model, nor demonstrated how fully exploiting these inherent capabilities can achieve superior performance without necessitating external knowledge. We propose a streamlined approach to address these chal-lenges through a novel architecture, CascadeOcc. Specifically, we design CascadeOcc to seamlessly incorporate the cascade paradigm, or coarse-to-fine strategy, which has penetrated advances in the multi-view stereo and the autoregressive model, into the occupancy world model. Inspired by the planning-driven philosophy of UniAD [22], we adopt a progressively cascading design as the core principle of our framework. Specifically, we leverage a hierarchical multi-scale VQVAE-v2 [23] to maximize both the spatial expressiveness and reconstruction fidelity of 3D voxel representations. At each scale, the output of the previous scale can serve as conditional  
+
+> arXiv:2606.27644v1 [cs.CV] 26 Jun 2026 JOURNAL OF L ATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2015 2
+
+guidance for the following scale, ensuring robust structural consistency while preserving the high-fidelity reconstruction capabilities of the autoregressive model. This structure enables a progressive refinement process, wherein a coarse reconstruction of the global scene is followed by an increasingly detailed focus on dynamic and fine-grained elements. Furthermore, we propose TimeMixer to establish a dual-hierarchy mechanism across both spatial and temporal dimensions. By extending the coarse-to-fine design to the temporal domain, TimeMixer effectively fuses long-range and short-range dependencies for precise planning scenario prediction. To demonstrate the effectiveness of CascadeOcc, we evaluate its performance on 4D occupancy forecasting and ego-motion planning using the Occ3D [13] and nuScenes [24] datasets. In 3D occupancy reconstruction, CascadeOcc achieves notable improvements over OccWorld, with an increase of 2.24% in IoU and 4.6% in mIoU. These results indicate that the proposed method effectively preserves rich representations within 3D occupancy voxels. Furthermore, in 4D occupancy forecasting, CascadeOcc achieves 3.65% and 3.2% improvements in IoU and mIoU, respectively, over OccWorld. Moreover, our model demonstrates enhanced safety by achieving a lower collision rate, highlighting the reliable planning capability of the pro-posed occupancy world model. Our contributions are threefold as follows:  
+
+> •
+
+To the best of our knowledge, we are the first to introduce a novel Occupancy World Model, CascadeOcc, which seamlessly integrates a cascaded VQ representation into an autoregressive framework.  
+
+> •
+
+We propose TimeMixer, which extends the coarse-to-fine paradigm to the temporal domain to establish a dual-hierarchy mechanism, effectively fusing long- and short-range dependencies for accurate forecasting and planning.  
+
+> •
+
+Extensive experiments demonstrate that CascadeOcc achieves superior performance in both forecasting and planning without reliance on auxiliary knowledge, validat-ing that optimized inherent representations are sufficient to ensure enhanced user safety. II. M ETHOD 
+
+The overall pipeline of the proposed CascadeOcc is illus-trated in Figure 1. The primary objective of the proposed method is to design an occupancy world model that maximizes the expressive capacity of the autoregressive model for 4D occupancy forecasting and motion planning, without relying on additional information or modalities. Consistent with the OccWorld framework, we adopt a two-stage training paradigm, including occupancy reconstruction and forecasting phases, and our discussion primarily concentrates on the distinctive structural innovations. Furthermore, while our framework jointly estimates both occupancy tokens and ego-pose, we omit the explicit mathematical formulation for pose estimation for the sake of brevity, as these operations remain identical to the baseline implementation. 
+
+A. Multi-scale Scene Tokenizer Formulation 
+
+To enhance the representational capacity for complex driving scenes, we incorporate a hierarchical multi-scale VQVAE-v2 [23] into our scene tokenizer. Given a 3D occupancy voxel 
+
+x ∈ RH×W ×D , we first transform it into a feature embedding 
+
+xemb ∈ RH×W ×(D·C) via learnable C class embeddings. The encoder operates progressively from the highest resolution (k = 1 ) to the lowest ( k = 3 ). Encoder features ek at each level are computed as: 
+
+ek = Ek(ek−1), where e0 = xemb . (1) At each scale k, the spatial resolution is downsampled by a factor of 2k−1 to aggregate global semantics. Conversely, the subsequent quantization proceeds from coarser to finer scales to preserve structural details. For the top scale, the discrete token z3 is derived directly from e3. For finer scales tokens {z2, z 1} are obtained by conditioning {e3, e 2}
+
+on the upsampled reconstruction ˆhk+1 from the coarser scale: 
+
+zk =
+
+(
+
+Qk(ek) if k = 3 
+
+Qk(Concat (ek, ˆhk+1 )) else , ˆhk = Dk(zk),
+
+(2) where Qk and Dk denote the quantizer and decoder blocks at scale k. Inspired by the Feature Pyramid Network (FPN) [25], we fuse all multi-scale quantized tokens {z1, z 2, z 3} into the bottom decoder to reconstruct the 3D occupancy scene as illustrated in Figure 1-(a). This hierarchical formulation is meticulously designed to capture both global context and fine-grained details, ensuring robust modeling of dynamic autonomous driving environments. 
+
+B. Cascade Occupancy World Model 
+
+Following the OccWorld, our model jointly performs 4D occupancy forecasting and ego-vehicle planning. However, instead of using a subsequent 2D U-Net for multi-resolution features, we integrate a cascading strategy directly into the forecasting transformers, inspired by coarse-to-fine generation paradigms [23]. Let Zk = {ztk}Tt=1 and Pk = {ptk}Tt=1 denote the observed sequence of discrete occupancy tokens and ego-poses at scale 
+
+k ∈ { 1, 2, 3} of length T . The forecasting proceeds sequentially from the coarsest scale ( k = 3 ) to finest ( k = 1 ). To predict the future state at T +1 , we employ a scale-specific transformer Tk equipped with a guidance-aware attention mechanism. Query Qk is derived from the current scale’s temporal context Zk, while key Kk and value Vk are projected from an augmented context sequence Ck to incorporate hierarchical guidance: 
+
+Qk = ZkW Qk , Kk, V k = CkW K,V k , (3) 
+
+(ˆ zT +1  
+
+> k
+
+, ˆpT +1  
+
+> k
+
+) = Tk (Attn (Qk, K k, V k)) , (4) where W Qk and W K,V k are learnable projection matrices for scale k, and the augmented context sequence Ck = {ctk}Tt=1 
+
+is constructed by concatenating the temporal context of the current scale with the upsampled prediction from the coarser scale: 
+
+ctk =
+
+(
+
+ztk if k = 3 
+
+Concat (ztk, U(ˆ zT +1  
+
+> k+1
+
+)) else , (5) where ˆzT +1  
+
+> k+1
+
+is the latent token previously forecasted by the coarser scale transformer Tk+1 , and U denotes the upsampling JOURNAL OF L ATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2015 3(c) TimeMixer (a) Multi -scale VQVAE              
+
+> Input :
+> Occupancy Voxel 𝑥
+> VQVAE
+> Bottom Encoder
+> 𝑘 =3(Coarse) :
+> 12 ×12 tokens
+> 𝑘 =2:
+> 25 ×25 tokens
+> 𝑘 =1(Fine) :
+> 50 ×50 tokens
+
+𝐾 , 𝑉 Generation      
+
+> 𝑧 !𝑧 !𝑧 !
+> If k == 3 : else :
+> 𝑧 !𝑧 ̂!"#𝑧 !𝑧 ̂!"#𝑉 !
+> // Eq. 5
+
+Transformer ( 𝒯 !)  
+
+> TimeMixer
+> (Short -Long Fusion)
+> Feed Forward
+> Network
+> Self -Attention 𝑧 ̂!
+> UP( )
+
+(b) Cascade Occupancy World         
+
+> VQVAE
+> Middle Encoder
+> 𝑍 $%&'
+> (Original, length 𝑇 )
+> Causal 1D Conv (ℋ)
+> 𝑍 ()*+,'
+> (Aggregated, length 𝑇 /4)
+> 𝛾 !
+> Fine -Attention
+> Coarse -
+> Attention
+> Self -Attention 𝑧 !
+> ×
+> ×
+> 𝛾 "
+> 𝑧 ̃!
+> ∆𝐴𝑡𝑡𝑛 (𝑧 ,𝑍 "#$% )
+> ∆𝐴𝑡𝑡𝑛 (𝑧 ,𝑍 !&'()% )
+> Gated Multi -scale Attention
+> // Eq. 6 // Eq. 7
+> Concat
+> Concat
+> Output :
+> Occupancy Voxel 𝑥 "
+> // Eq. 2
+> VQ
+> VQ
+> VQVAE
+> Top Decoder
+> VQVAE
+> Top Encoder
+> VQ
+> VQVAE
+> Middle Decoder
+> 𝑧 *
+> 𝑧 +
+> 𝑧 ,
+> Query
+> Key, Value
+> Concatenate
+> Quantized Vector 𝑧 !
+> VQVAE
+> Bottom Decoder
+
+Fig. 1. Structure of CascadeOcc. Given a sequence of 3D occupancy inputs, the Multi-scale VQVAE (a) first encodes the scene into hierarchical discrete tokens. The Cascade Occupancy World (b) then progressively forecasts future states from coarse to fine levels. To capture complex temporal dynamics, the 
+
+TimeMixer (c) adaptively aligns short- and long-term contexts using gated attention, guiding the model to generate high-fidelity future occupancy predictions. 
+
+operation. Instead of forecasting the entire scene at once, our approach first establishes the global context (e.g., background) and progressively modifies fine-grained details, resulting in more robust forecasting and reliable driving plans. 
+
+C. TimeMixer: Temporal-Hierarchy from Long- to Short-Range 
+
+While this cascading strategy establishes a spatial hierar-chy, we propose TimeMixer to extend this paradigm to the temporal domain. Inspired by the coarse-to-fine hypothesis in CasMVSNet [26], TimeMixer introduces a temporal pyramid within the scale-specific transformer to balance long- and short-range dynamics. We encode the input token and pose sequences Z = {zt}Tt=1 and P = {pt}Tt=1 using a causal 1D convolutional block Hcausal [27], consisting of two stacked convolutions (kernel size 2, stride 2). This operation extracts a coarse representation by reducing the temporal resolution by a factor of four: 
+
+Zcoarse = H(Z), P coarse = H(P ). (6) The coarse features enable effective long-range encoding by filtering high-frequency noise, while the original sequences (Zf ine ≡ Z, P f ine ≡ P ) retain fine-grained resolution for short-range interactions. To effectively integrate these dual-scale features, we design a gated attention module. The final temporal context ˜z is computed by fusing the self-attention output with cross-scale residual gains: 
+
+˜z = Attn self (z) + γc∆Attn (z, Z coarse ) + γf ∆Attn (z, Z f ine ), (7) 
+
+where z is the query at the current time step, ∆Attn (Q, K ) = 
+
+Attn (Q, K ) − Attn self (Q) represents the residual information gain from cross-scale attention, and γc, γ f are learnable gating parameters. This formulation allows CascadeOcc to dynami-cally weigh global temporal context against local motion details, GT OccWorld Ours         
+
+> 𝑡 =1𝑠 𝑡 =2𝑠 𝑡 =3𝑠
+
+Fig. 2. Qualitative results of the forecasting and planning with CascadeOcc. Best viewed ZOOMED-IN .
+
+ensuring accurate trajectory planning and robust forecasting in complex environments. III. E XPERIMENTS 
+
+A. Implementation Details 
+
+We evaluate 3D reconstruction and 4D forecasting on the Occ3D-nuScenes dataset [13] using mIoU and IoU, while trajectory planning is assessed on the nuScenes dataset [24] via L2 error and collision rate. For a fair comparison with previous works, all training loss functions and evaluation protocols strictly follow the implementation details specified in OccWorld. To mitigate the issue of error accumulation across scales - commonly referred to as the exposure bias problem [29], [30], we adopt a soft-labeling [29] during training. The Spatial Temporal Transformer uses two attention layers per pathway. TimeMixer employs ReLU activations, and gating parameters use the Sigmoid function. Experiments were conducted on four NVIDIA A6000 GPUs. JOURNAL OF L ATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2015 4                                                                                                                                                                                                                
+
+> TABLE I 3D OCCUPANCY RECONSTRUCTION PERFORMANCE ON THE OCC 3D-NU SCENES VALIDATION DATASET .
+> Methods IoU ↑mIoU ↑
+> Others
+> barrier
+> bicycle
+> bus
+> car
+> cons. veh
+> motorcycle
+> pedestrian
+> traffic cone
+> trailer
+> truck
+> dri. sur
+> other flat
+> sidewalk
+> terrain
+> manmade
+> vegetation
+> OccWorld [16] 61.88 64.74 46.34 71.84 69.96 67.59 69.01 45.14 73.50 74.77 68.57 54.65 65.27 82.74 78.18 69.81 66.53 52.95 43.77
+> CascadeOcc (Ours) 64.12 69.34 54.82 77.90 76.41 72.27 72.96 51.07 79.21 79.27 75.34 61.25 68.48 84.16 82.00 72.37 69.64 55.35 46.32
+> TABLE II 4D OCCUPANCY FORECASTING (MIOU & I OU) AND MOTION -PLANNING (L2 & COLLISION RATE )PERFORMANCE ON THE OCC 3D-NU SCENES DATASET .METHODS UTILIZING LARGE LANGUAGE MODELS (LLM S)ARE MARKED IN GRAY TEXT . ( O: O CCUPANCY ,M: M AP ,B: 3D BB OX )Method Input mIoU (%) ↑IoU (%) ↑L2 ( m)↓Collision Rate (%) ↓
+> 1s 2s 3s Avg. 1s 2s 3s Avg. 1s 2s 3s Avg. 1s 2s 3s Avg. FPS Memory OccWorld [16] O25.78 15.14 10.51 17.14 34.63 25.07 20.18 26.63 0.43 1.08 1.99 1.17 0.07 0.38 1.35 0.60 10.70 15,714 OccNet [28] O&M&B--------1.29 2.31 2.98 2.25 0.20 0.56 1.30 0.69 --OccLLaMA [18] O&LLM 25.05 19.49 15.26 19.93 34.56 28.53 24.41 29.17 0.37 1.02 2.03 1.14 0.04 0.24 1.20 0.49 --OccLLM [19] O&LLM 24.02 21.65 17.29 20.99 36.65 32.14 28.77 32.52 0.12 0.24 0.49 0.28 ------
+> CascadeOcc (Ours) O31.17 17.91 11.94 20.34 39.72 28.60 22.50 30.28 0.43 1.12 2.11 1.22 0.12 0.31 1.35 0.59 6.00 13,784 TABLE III ABLATION STUDIES OF CASCADE OCC (BEST , S ECOND -BEST )Components Forecasting Planning Cascade TimeMixer mIoU IoU L2 Col. Rate
+> ✗✗26.63 17.14 1.17 0.60
+> ✓✗28.99 18.92 1.61 0.58
+> ✗✓28.83 19.37 1.54 1.14
+> ✓✓30.28 20.34 1.22 0.59
+
+B. Performance Evaluation 1) 3D Occupancy Reconstruction: To demonstrate the effectiveness of the proposed approach in complex driving scenarios, we conducted experiments on the Occ3D-nuScenes validation dataset, reporting IoU and mIoU over 17 semantic classes for 3D occupancy reconstruction. As shown in Table I, our method outperforms OccWorld with gains of 2.24% in IoU and 4.6% in mIoU, effectively minimizing information loss. Notably, we achieve substantial improvements in rare classes (e.g., traffic cones +6.77%, bicycles +6.45%) as well as dominant classes (e.g., vegetation +2.55%), demonstrating enhanced representational capacity across diverse semantic categories. These results suggest that our approach enhances the representational capacity for both dynamic and sparse classes while improving overall understanding of the driving environment. 
+
+2) 4D Occupancy Forecasting: We evaluated our model on the Occ3D-nuScenes dataset for the forecasting task, predicting the future 3s conditioned on a 2s history. As reported in Table II, our method achieves significant gains over OccWorld, with improvements of 3.65% in IoU and 3.2% in mIoU. As shown in Figure 2, these quantitative gains translate into visually superior predictions that accurately capture the evolution of dynamic objects and fine-grained static details. Consistent improvements across all time steps (1s–3s) suggest that superior occupancy reconstruction ensures rich feature representations, which are pivotal for boosting forecasting performance. Notably, our method outperforms OccLLaMA and delivers performance comparable to OccLLM, demonstrating its capability in complex driving scenes. 
+
+3) Motion Planning: While precise forecasting of environ-mental dynamics is essential in autonomous driving, gener-ating collision-free and reliable trajectories without manual intervention is of paramount importance. Evaluated on the nuScenes dataset (Table II), our method exhibits L2 errors comparable to prior arts with negligible margins. However, considering the potential bias in L2 error metrics noted by BEVPlanner [31], our state-of-the-art collision rate is particularly noteworthy. Specifically, significant improvements in the long-term horizon (2s–3s) further demonstrate that our high-fidelity reconstruction and forecasting capabilities effectively ensure robust downstream planning. 
+
+4) Ablation study of CascadeOcc: We conducted an ablation study on the nuScenes-Occ3D dataset to validate the efficacy of CascadeOcc’s key components: the Cascade Occupancy World(Sec. II-B ) and TimeMixer(Sec. II-C ). As reported in Table III, the Cascade Occupancy World improves mIoU and IoU by 2.36% and 1.78%, respectively, indicating that its intrinsic structural representation effectively preserves fine-grained details. Similarly, TimeMixer achieves gains of 2.20% and 2.23%, attributed to the effective aggregation of temporal hierarchies that fuses long- and short-range contexts. Finally, integrating both modules yields impressive improvements of 3.65% in mIoU and 3.20% in IoU. This proves that the proposed components function synergistically to facilitate robust decision-making for autonomous driving. IV. C ONCLUSION 
+
+In this letter, we rethink the fundamental representation capacity of Autoregressive Occupancy World Models, diverg-ing from the recent trend of simply incorporating auxiliary knowledge such as Large Language Models (LLMs) or explicit action inputs. We propose CascadeOcc, a novel framework designed to maximize intrinsic representational power through a coarse-to-fine multi-scale VQVAE. Furthermore, by leveraging the proposed TimeMixer with a dual-hierarchy mechanism, our method achieves state-of-the-art performance in both occupancy forecasting and safety-critical motion planning. Although our method demonstrates robust performance, we note occasional object omission or flickering in highly dense environments. For future work, we envision integrating recent advancements, such as LLMs, into CascadeOcc in a plug-and-play manner to compensate for these challenging cases and further enrich semantic understanding. JOURNAL OF L ATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2015 5
+
+REFERENCES [1] C. Yang, Y. Chen, H. Tian, C. Tao, X. Zhu, Z. Zhang, G. Huang, H. Li, Y. Qiao, L. Lu et al. , “Bevformer v2: Adapting modern image backbones to bird’s-eye-view recognition via perspective supervision,” in Proceedings of the IEEE/CVF conference on computer vision and pattern recognition , 2023, pp. 17 830–17 839. [2] J. Huang, G. Huang, Z. Zhu, Y. Ye, and D. Du, “Bevdet: High-performance multi-camera 3d object detection in bird-eye-view,” arXiv preprint arXiv:2112.11790 , 2021. [3] A.-Q. Cao and R. De Charette, “Monoscene: Monocular 3d semantic scene completion,” in Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , 2022, pp. 3991–4001. [4] Y. Li, Z. Yu, C. Choy, C. Xiao, J. M. Alvarez, S. Fidler, C. Feng, and A. Anandkumar, “Voxformer: Sparse voxel transformer for camera-based 3d semantic scene completion,” in Proceedings of the IEEE/CVF conference on computer vision and pattern recognition , 2023, pp. 9087– 9098. [5] V. Guizilini, I. Vasiljevic, R. Ambrus, G. Shakhnarovich, and A. Gaidon, “Full surround monodepth from multiple cameras,” IEEE Robotics and Automation Letters , vol. 7, no. 2, pp. 5397–5404, 2022. [6] Y. Wei, L. Zhao, W. Zheng, Z. Zhu, Y. Rao, G. Huang, J. Lu, and J. Zhou, “Surrounddepth: Entangling surrounding views for self-supervised multi-camera depth estimation,” in Conference on robot learning . PMLR, 2023, pp. 539–549. [7] A. Schmied, T. Fischer, M. Danelljan, M. Pollefeys, and F. Yu, “R3d3: Dense 3d reconstruction of dynamic scenes from multiple cameras,” in 
+
+Proceedings of the IEEE/CVF International Conference on Computer Vision , 2023, pp. 3216–3226. [8] X. Xu, Z. Chen, and F. Yin, “Monocular depth estimation with multi-scale feature fusion,” IEEE Signal Processing Letters , vol. 28, pp. 678–682, 2021. [9] K. Li, Z. Fu, H. Wang, Z. Chen, and Y. Guo, “Adv-depth: Self-supervised monocular depth estimation with an adversarial loss,” IEEE Signal Processing Letters , vol. 28, pp. 638–642, 2021. [10] Z. Li, W. Wang, H. Li, E. Xie, C. Sima, T. Lu, Q. Yu, and J. Dai, “Bevformer: learning bird’s-eye-view representation from lidar-camera via spatiotemporal transformers,” IEEE Transactions on Pattern Analysis and Machine Intelligence , 2024. [11] J. Philion and S. Fidler, “Lift, splat, shoot: Encoding images from arbitrary camera rigs by implicitly unprojecting to 3d,” in European conference on computer vision . Springer, 2020, pp. 194–210. [12] Y. Wei, L. Zhao, W. Zheng, Z. Zhu, J. Zhou, and J. Lu, “Surroundocc: Multi-camera 3d occupancy prediction for autonomous driving,” in 
+
+Proceedings of the IEEE/CVF International Conference on Computer Vision , 2023, pp. 21 729–21 740. [13] X. Tian, T. Jiang, L. Yun, Y. Mao, H. Yang, Y. Wang, Y. Wang, and H. Zhao, “Occ3d: A large-scale 3d occupancy prediction benchmark for autonomous driving,” Advances in Neural Information Processing Systems , vol. 36, pp. 64 318–64 330, 2023. [14] X. Wang, Z. Zhu, W. Xu, Y. Zhang, Y. Wei, X. Chi, Y. Ye, D. Du, J. Lu, and X. Wang, “Openoccupancy: A large scale benchmark for surrounding semantic occupancy perception,” in Proceedings of the IEEE/CVF International Conference on Computer Vision , 2023, pp. 17 850–17 859. [15] Y. Huang, W. Zheng, Y. Zhang, J. Zhou, and J. Lu, “Tri-perspective view for vision-based 3d semantic occupancy prediction,” in Proceedings of the IEEE/CVF conference on computer vision and pattern recognition ,2023, pp. 9223–9232. [16] W. Zheng, W. Chen, Y. Huang, B. Zhang, Y. Duan, and J. Lu, “Occworld: Learning a 3d occupancy world model for autonomous driving,” in 
+
+European conference on computer vision . Springer, 2024, pp. 55–72. [17] A. Van Den Oord, O. Vinyals et al. , “Neural discrete representation learning,” Advances in neural information processing systems , vol. 30, 2017. [18] J. Wei, S. Yuan, P. Li, Q. Hu, Z. Gan, and W. Ding, “Occllama: An occupancy-language-action generative world model for autonomous driving,” arXiv preprint arXiv:2409.03272 , 2024. [19] T. Xu, H. Lu, X. Yan, Y. Cai, B. Liu, and Y. Chen, “Occ-llm: Enhancing autonomous driving with occupancy-based large language models,” arXiv preprint arXiv:2502.06419 , 2025. [20] Z. Yan, W. Dong, Y. Shao, Y. Lu, L. Haiyang, J. Liu, H. Wang, Z. Wang, Y. Wang, F. Remondino et al. , “Renderworld: World model with self-supervised 3d label,” arXiv preprint arXiv:2409.11356 , 2024. [21] E. Guo, P. An, Y. Yang, Q. Liu, and A.-A. Liu, “Fsf-net: Enhance 4d occupancy forecasting with coarse bev scene flow for autonomous driving,” Pattern Recognition , p. 112372, 2025. [22] Y. Hu, J. Yang, L. Chen, K. Li, C. Sima, X. Zhu, S. Chai, S. Du, T. Lin, W. Wang et al. , “Planning-oriented autonomous driving,” in Proceedings of the IEEE/CVF conference on computer vision and pattern recognition ,2023, pp. 17 853–17 862. [23] A. Razavi, A. Van den Oord, and O. Vinyals, “Generating diverse high-fidelity images with vq-vae-2,” Advances in neural information processing systems , vol. 32, 2019. [24] H. Caesar, V. Bankiti, A. H. Lang, S. Vora, V. E. Liong, Q. Xu, A. Krishnan, Y. Pan, G. Baldan, and O. Beijbom, “nuscenes: Amultimodal dataset for autonomous driving,” in Proceedings of the IEEE/CVF conference on computer vision and pattern recognition , 2020, pp. 11 621–11 631. [25] T.-Y. Lin, P. Doll ´ar, R. Girshick, K. He, B. Hariharan, and S. Belongie, “Feature pyramid networks for object detection,” in Proceedings of the IEEE conference on computer vision and pattern recognition , 2017, pp. 2117–2125. [26] X. Gu, Z. Fan, S. Zhu, Z. Dai, F. Tan, and P. Tan, “Cascade cost volume for high-resolution multi-view stereo and stereo matching,” in 
+
+Proceedings of the IEEE/CVF conference on computer vision and pattern recognition , 2020, pp. 2495–2504. [27] A. Van Den Oord, S. Dieleman, H. Zen, K. Simonyan, O. Vinyals, A. Graves, N. Kalchbrenner, A. Senior, K. Kavukcuoglu et al. , “Wavenet: A generative model for raw audio,” arXiv preprint arXiv:1609.03499 ,vol. 12, p. 1, 2016. [28] W. Tong, C. Sima, T. Wang, L. Chen, S. Wu, H. Deng, Y. Gu, L. Lu, P. Luo, D. Lin et al. , “Scene as occupancy,” in Proceedings of the IEEE/CVF International Conference on Computer Vision , 2023, pp. 8406–8415. [29] D. Lee, C. Kim, S. Kim, M. Cho, and W.-S. Han, “Autoregressive image generation using residual quantization,” in Proceedings of the IEEE/CVF conference on computer vision and pattern recognition , 2022, pp. 11 523–11 532. [30] M. Ranzato, S. Chopra, M. Auli, and W. Zaremba, “Sequence level train-ing with recurrent neural networks,” arXiv preprint arXiv:1511.06732 ,2015. [31] Z. Li, Z. Yu, S. Lan, J. Li, J. Kautz, T. Lu, and J. M. Alvarez, “Is ego status all you need for open-loop end-to-end autonomous driving?” in Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , 2024, pp. 14 864–14 873.
