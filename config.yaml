@@ -25,5 +25,57 @@ subscriptions:
     stage: A
     diff_threshold_pct: 15
   keyword_recall_mode: or
-  intent_profiles: []
-source_backends: {}
+  intent_profiles:
+    - tag: video-wam
+      description: 基于视频生成模型的World Action Model相关论文
+      enabled: true
+      paper_sources:
+        - arxiv
+      keywords:
+        - keyword: world action model
+          keyword_cn: 世界动作模型
+          query: world action model
+        - keyword: world model
+          keyword_cn: 世界模型
+          query: world model
+        - keyword: generative world model
+          keyword_cn: 生成式世界模型
+          query: generative world model
+        - keyword: video action model
+          keyword_cn: 视频动作模型
+          query: video action model
+        - keyword: video world model
+          keyword_cn: 视频世界模型
+          query: video world model
+      intent_queries:
+        - query: World Action Model using video generation models
+          query_cn: 使用视频生成模型的世界动作模型
+          enabled: true
+          source: manual
+          note: ''
+        - query: video based world action prediction
+          query_cn: 基于视频的世界动作预测
+          enabled: true
+          source: manual
+          note: ''
+        - query: research on video generation for world models
+          query_cn: 视频生成在世界模型中的研究
+          enabled: true
+          source: manual
+          note: ''
+      updated_at: '2026-06-30T14:12:40.720Z'
+source_backends:
+  arxiv:
+    papers_table: arxiv_papers
+    use_vector_rpc: true
+    vector_rpc: match_arxiv_papers
+    vector_rpc_exact: match_arxiv_papers_exact
+    use_bm25_rpc: true
+    bm25_rpc: match_arxiv_papers_bm25
+    sync_table: arxiv_sync_status
+    sync_success_value: success
+    schema: public
+    kind: supabase
+    enabled: true
+    url: https://lyucdwgefyfbmaiopjbk.supabase.co
+    anon_key: sb_publishable_lX-oi64Uxyd7SIVv3_w2Uw_MTOojeKq
