@@ -1,0 +1,930 @@
+Title: Ask the World Before Acting: Budgeted Environment Probing for World-Model Calibration
+
+URL Source: https://arxiv.org/pdf/2606.31422v1
+
+Published Time: Wed, 01 Jul 2026 00:53:14 GMT
+
+Number of Pages: 16
+
+Markdown Content:
+# Ask the World Before Acting: Budgeted Environment Probing for World-Model Calibration 
+
+Xinyuan Song 1 Zekun Cai 2,31Emory University, Atlanta, GA, USA 2The University of Tokyo, Tokyo, Japan 
+
+> 3
+
+LocationMind, Tokyo, Japan 
+
+xinyuan.song@emory.edu, caizekun@csis.u-tokyo.ac.jp 
+
+Abstract 
+
+Long-horizon language agents do not only choose actions; they carry a private model of the world from one decision to the next. When that model drifts, a later failure can be de-cided before the failing action is ever taken. We study a direct repair mechanism: before committing to the next task action, an agent may ask the environment about one belief field and write the answer back into its world model. This makes environment interaction a scarce calibration resource, not merely a way to ad-vance the task. We introduce EnvProbe, a bud-geted probing operator for structured belief ta-bles. The useful probes are not the same ev-erywhere. Procedural beliefs, such as tool de-pendencies, can often be repaired by targeted checks, but those checks spend steps that the task may need. Spatial beliefs, such as ob-ject locations and graph edges, rely more on structural cues; the agent’s own confidence can be a poor guide when the world changes off-screen. A type-stratified analysis formal-izes this probe-action frontier, and controlled experiments show that mid-planning environ-ment evidence reduces terminal world-model error when the probe policy follows the struc-ture of the task. Code and environments are available at github.com/Hik289/Environment-reduce-error. 
+
+1 Introduction 
+
+Language agents increasingly work by carrying state. They remember which tool has been initial-ized, where an object was last seen, which pre-condition is satisfied, and which edge in a graph is traversable. This running model is implicit in reasoning-and-acting agents such as ReAct, Reflex-ion, and LATS (Yao et al., 2023; Shinn et al., 2023; Zhou et al., 2024a), explicit in many tool-use and embodied systems (Schick et al., 2023; Qin et al., 2024; Huang et al., 2022; Ahn et al., 2022), and central to recent web and long-horizon benchmarks (Shridhar et al., 2021; Wang et al., 2022; Zhou et al., 2024b; Deng et al., 2023; Luo et al., 2025). The loop is simple: reason over the model, act, ob-serve, and continue. It is also fragile, because the reasoning step quietly assumes that the model is still close enough to the environment. Long horizons make this assumption fragile. The model can drift even when every local generation looks plausible: a tool believed to be loaded may have become unavailable; a key believed to be in a room may have moved; a route that looked open may now be blocked. Once the agent plans on top of the stale premise, the eventual error looks like a bad final action, even though the failure began earlier in the belief state (Wang et al., 2026; Luo et al., 2025). This is a different failure mode from insufficient chain-of-thought or weak tool selection. The agent may have the right high-level plan but the wrong world on which to execute it. The environment itself contains the missing ev-idence. The agent can ask whether a particular field is still true, just as a software system can query an API, a robot can look at a drawer again, or a web agent can re-open a page before execut-ing a dependent step. The question is not whether more information is useful in the abstract. Each check consumes the same limited horizon as task-advancing actions. An agent that probes too lit-tle acts confidently on stale beliefs; an agent that probes too much spends the episode verifying the world instead of changing it. The same tension appears in classical partially observable planning and value-of-information methods (Kaelbling et al., 1998; Ross et al., 2008; Chaloner and Verdinelli, 1995; Golovin and Krause, 2011), but language-agent world models add a new wrinkle: the be-lief state is a symbolic table written by a model, and the available probe signals include noisy self-reports such as confidence and recency. Prior work shows that such confidence can be useful yet mis-calibrated (Guo et al., 2017; Kadavath et al., 2022); 
+
+> arXiv:2606.31422v1 [cs.AI] 30 Jun 2026
+
+our question is when it should control an environ-ment query. We introduce EnvProbe, a probing operator for language agents with explicit structured belief ta-bles. At each planning step, EnvProbe scores can-didate fields using task structure, belief recency, verbalized confidence, and dependency role. The chosen probe returns the current environment value for that field and updates the world model before the next plan is formed. Unlike retrieval augmen-tation, reflection, or asking the user for missing information (Shinn et al., 2023; Hu et al., 2024; Fang and Ke, 2025; Dongre et al., 2024), EnvProbe treats the environment itself as the evidence source and asks which already-populated belief should be verified now. The experiments separate two regimes. Procedu-ral beliefs, such as tool preconditions and subgoal dependencies, benefit from targeted checks because the action trace gives clues about what may have gone stale. The same checks, however, compete with the dependency chain for scarce action slots. Spatial beliefs, such as object locations and graph edges, behave differently: structural task cues re-main useful, while the agent’s own uncertainty re-port can mislead when exogenous changes leave little trace in the history. Our contributions are: • a budgeted environment-probing operator for structured world models in language agents; • a type-stratified mathematical account that sepa-rates belief repair from task-action displacement; • controlled environments and probe-aware met-rics that expose world-model error before task success collapses; and • empirical evidence that structural probe scores re-duce terminal belief error, while self-reported un-certainty must be treated as a noisy signal rather than a reliable oracle. 
+
+2 Related Work 
+
+LLM agents with implicit or explicit state. Re-Act, Reflexion, Toolformer, ToolLLM, and LATS establish the now-standard pattern of interleaving language reasoning with environment or tool ac-tions (Yao et al., 2023; Shinn et al., 2023; Schick et al., 2023; Qin et al., 2024; Zhou et al., 2024a). Embodied and web-agent systems further ground language plans in affordances or interactive in-terfaces (Huang et al., 2022; Ahn et al., 2022; Wang et al., 2024; Zhou et al., 2024b). These systems update state through observations, execu-tion traces, reflection, or memory, but they do not isolate probing as a budgeted action whose pur-pose is only to repair a structured belief table. Re-cent work on memory-environment realignment and rule-augmented memory recognizes related drift phenomena (Yin and Du, 2026; Yuan et al., 2026), while EnvProbe studies the selection prob-lem: which field should be checked when only a few checks are affordable? 
+
+Information gathering under partial observ-ability. Classical POMDPs provide a formal ac-count of belief-state planning under partial ob-servability (Kaelbling et al., 1998; Ross et al., 2008). Bayesian experimental design and adaptive submodularity formalize the value of information and greedy selection under uncertainty (Chaloner and Verdinelli, 1995; Golovin and Krause, 2011; Krause and Golovin, 2014). EnvProbe inherits the same information-action tension, but differs in two ways: the belief state is a collection of symbolic fields maintained by an LLM, and the selector uses noisy self-reports such as staleness and confidence. This makes the surrogate-quality question empiri-cal as well as mathematical. 
+
+LLM uncertainty and confidence calibration. 
+
+Modern neural predictors are often miscalibrated (Guo et al., 2017), and language models can some-times estimate answer validity while still failing under distribution shift or open-ended generation (Kadavath et al., 2022). UoT uses model-estimated uncertainty to ask informative questions (Hu et al., 2024); InfoSeeker plans information gathering under partial observability (Fang and Ke, 2025); ReSpAct adds speaking actions for clarification (Dongre et al., 2024). Our setting is different: the agent is not asking a user for missing facts, but deciding whether to spend scarce environment ac-tions to verify an already populated belief field. The confident-wrong rate measured in our environ-ments motivates a formal miscoverage bound for uncertainty-only probing (Proposition 5.5). 
+
+Agent benchmarks and evaluation metrics. 
+
+Benchmarks such as ALFWorld, WebArena, Visu-alWebArena, Mind2Web, AgentBench, and Ultra-Horizon evaluate long-horizon or interactive agents (Shridhar et al., 2021; Zhou et al., 2024b; Koh et al., 2024; Deng et al., 2023; Liu et al., 2023; Luo et al., 2025). They primarily report task completion, which is the right end metric but makes it difficult Figure 1: Probe-action budget trade-off. Long-horizon agents can use the environment during planning to repair stale world-model fields. The benefit depends on belief type: procedural fields are easier to target but more exposed to action displacement, while spatial fields often favor structural probes over self-reported uncertainty. 
+
+to diagnose whether a failure came from stale be-liefs, invalid plans, or execution. Our environments expose gold field states so that world-state accu-racy, useful-probe rate, and collapse onset can be measured alongside task success. 
+
+Positioning. EnvProbe connects these threads by treating environment checks as first-class, budgeted actions in LLM agents. The paper’s contribution is not a new POMDP solver; it is an empirical and theoretical characterization of when LLM-derived probe scores are reliable, when they are misleading, and how this reliability changes across belief types. 
+
+3 Problem Setup 
+
+We consider a long-horizon language agent that maintains an explicit belief world model . The model is a structured table rather than a raw con-versation transcript: each field records a fact that can be queried, used by the planner, and compared with environment truth. 
+
+Belief fields and accuracy. Let F = {1, . . . , n }
+
+be the set of belief fields. Field i takes values in Vi.At step t ∈ { 0, . . . , H }, the environment has gold value git ∈ V i, while the agent stores belief bit ∈ V i.The terminal world-state accuracy is 
+
+AH = 1
+
+n
+
+> n
+
+X
+
+> i=1
+
+1{biH = giH }. (1) Task success is a separate event: an agent may have a more accurate world model yet still fail if it spends too many actions checking the world. 
+
+Definition 3.1 (Probe API) . At step t, PROBE (i) re-turns the current gold value git and updates bit+1 ←
+
+git. A probe consumes one environment step and does not execute a task action. Each episode has horizon H and probe budget B = ⌊H/ 4⌋.
+
+Definition 3.2 (Belief-type taxonomy) . We parti-tion fields into procedural and spatial types, F =
+
+Fproc ⊔ F spat . Procedural fields encode action-dependent state such as tool dependencies, subgoal completion, and inventory. Spatial fields encode ex-ogenous state such as object locations, door states, and graph edges. The distinction matters because an action trace is informative about procedural mutations but only weakly informative about exoge-nous spatial mutations. 
+
+Probe policies. A policy chooses at each step either a task action or a probe. We com-pare No-Probe , Random-Probe , Periodic-Probe ,
+
+Self-Uncertainty , EnvProbe-Simple , EnvProbe-Judge , and Oracle-Probe . Random and periodic policies are non-adaptive sensing baselines; Self-Uncertainty follows the uncertainty-sampling intu-ition from active learning (Lewis and Gale, 1994; Settles, 2009) and the confidence calibration lit-erature (Guo et al., 2017; Kadavath et al., 2022). Oracle-Probe uses gold mismatches and is reported only as an upper-bound diagnostic. LLM Agent 
+
+belief table 
+
+bt
+
+EnvProbe 
+
+score fields  
+
+> i
+
+= ci + si + ui + di
+
+probe if useful 
+
+Environment 
+
+gold state 
+
+probe API   
+
+> task action budget world-model accuracy AH
+
+Environment evidence enters the planning loop 
+
+> A probe can repair a stale field, but it spends a step from the same horizon.
+
+Figure 2: EnvProbe pipeline. The agent maintains a structured belief table while the environment evolves. Before executing the next task action, EnvProbe scores candidate fields, probes a high-value field when the score and budget permit, and writes the returned environment value back into the world model. The same horizon pays for both probing and acting, producing the belief-accuracy/task-success frontier analyzed in Section 5. 
+
+4 EnvProbe: Environment Evidence During Planning 
+
+4.1 Scoring Belief Fields 
+
+EnvProbe assigns each field a probe score 
+
+ρi(t) = ci + si(t) + ui(t) + di(t), (2) where all components are normalized to [0 , 1] :• ci = wi/ max j wj is criticality , derived from task-importance weights wi.• si(t) = min(1 , ˆτi(t)/10) is reported staleness ,where ˆτi(t) is the agent’s estimate of how long the field has gone unchecked. • ui(t) = 1 − conf i(t) is verbalized uncertainty .• di(t) ∈ { 0, 0.5, 1} is the dependency role : di-rect blocker, transitive dependency, or unrelated to the next planned action. The score has a useful decomposition: 
+
+ρi(t) = ci + di(t)
+
+| {z } 
+
+> ρstr
+> i(t)
+
++ si(t) + ui(t)
+
+| {z } 
+
+> ρself
+> i(t)
+
+. (3) The structural part comes from the task graph and proposed action. The self-report part comes from the model’s own memory and confidence. Our experiments show that this distinction is not cos-metic: structural signals are stable across belief types, while self-reports can become anti-signals when the model is confidently wrong. 
+
+4.2 Algorithms EnvProbe-Simple. Algorithm 1 is a greedy threshold policy. It probes the highest-scoring field when max i ρi(t) ≥ 1.5 and budget remains; other-wise it executes the next task action. 
+
+EnvProbe-Judge. The judge variant gives a sec-ondary model the belief table and top scored can-didates, then asks for a binary override. This tests whether a contextual language-model critic adds signal beyond the explicit score, as in reflection and agent-critique systems (Shinn et al., 2023; Zhou et al., 2024a). 
+
+Structural variant and oracles. EnvProbe-
+
+(c+d) keeps only ρ(c+d) 
+
+> i
+
+= ci + di(t) and re-moves the self-report terms. Oracle-Probe probes a known mismatched field and is not deployable. 
+
+Oracle-TW probes arg max i wi1{bit̸ = git}, align-ing the oracle with task-weighted field importance. 
+
+5 A Type-Stratified Probe-Action Theory 
+
+The theory isolates two quantities that are easy to conflate in an agent trace: how much a probe repairs the belief table, and how much the probe displaces task actions. We write the results for a fixed trajectory prefix and then evaluate the same quantities empirically under paired seeds. 
+
+5.1 Belief-Side Gain 
+
+For type T ∈ { proc , spat }, let FT ⊆ F be the corresponding field set and nT = |F T |. The type-specific terminal accuracy is 
+
+ATH = 1
+
+nT
+
+X
+
+> i∈F T
+
+1{biH = giH }. (4) Algorithm 1 EnvProbe-Simple 
+
+Require: Belief table b0 = g0, task graph G, hori-zon H, budget B = ⌊H/ 4⌋ 
+
+> 1:
+
+probes_used ← 0; t ← 0 
+
+> 2:
+
+while t ≤ H do  
+
+> 3:
+
+// Score all belief fields  
+
+> 4:
+
+for each field i ∈ F do  
+
+> 5:
+
+Compute ci from task-weight table w 
+
+> 6:
+
+si ← min(1 , ˆτi(t)/10) (LLM-reported staleness)  
+
+> 7:
+
+ui ← 1 − conf i(t) (LLM-reported confidence)  
+
+> 8:
+
+di ← dep_role (i, next_action (t), G ) 
+
+> 9:
+
+ρi(t) ← ci + si + ui + di 
+
+> 10:
+
+end for  
+
+> 11:
+
+if ρ⋆(t) ≜ max i ρi(t) ≥ 1.5 and 
+
+probes_used < B then  
+
+> 12:
+
+i⋆ ← arg max i ρi(t) 
+
+> 13:
+
+Execute P ROBE (i⋆): set bi⋆ 
+
+> t+1
+
+← gi⋆ 
+
+> t
+> 14:
+
+probes_used += 1 ; ˆτi⋆ ← 0 
+
+> 15:
+
+else  
+
+> 16:
+
+Execute task action at (advance task)  
+
+> 17:
+
+end if  
+
+> 18:
+
+t ← t + 1  
+
+> 19:
+
+end while 
+
+For a set S ⊆ F T probed before the agent contin-ues, define 
+
+GT (S) = EATH | PROBE (S)
+
+− EATH | PROBE (∅) . (5) Thus GT measures belief repair, not task comple-tion. 
+
+Assumption 5.1 (Diminishing belief repair) . For each T , the set function GT : 2 FT → R≥0 is monotone and submodular: 
+
+GT (S) ≤ GT (R) ∀S ⊆ R ⊆ F T , (6) 
+
+∆T (i | S) ≥ ∆T (i | R) ∀S ⊆ R, i / ∈ R, (7) 
+
+where 
+
+∆T (i | S) = GT (S ∪ { i}) − GT (S). (8) 
+
+This is the standard diminishing-return condition used in submodular sensing and adaptive informa-tion gathering (Nemhauser et al., 1978; Golovin and Krause, 2011; Krause and Golovin, 2014). 
+
+Definition 5.2 (Marginal selection quality) . Ascore ρ has type-T marginal quality γT (ρ) ∈ [0 , 1] 
+
+if the field iρ(S) selected at a greedy step satisfies 
+
+E[∆ T (iρ(S) | S)] ≥ γT (ρ) max   
+
+> j∈F T\S
+
+∆T (j | S),
+
+∀S ⊆ F T .
+
+(9) 
+
+Oracle selection has γT = 1 . Random and periodic policies can have small γT when the useful fields are rare. 
+
+Lemma 5.3 (Targeted belief-repair bound) . Un-der Assumption 5.1, let a greedy policy allo-cate BT probes to type T and satisfy Eq. (9) .If Sρ,T is the set it probes and S⋆T (BT ) ∈
+
+arg max |S|≤ BT GT (S), then 
+
+E[GT (Sρ,T )] ≥
+
+
+
+1 − e−γT (ρ)
+
+GT (S⋆T (BT )) .
+
+(10) 
+
+Interpretation. Eq. (10) says that probing helps only through the quality of the field selector. A probe spent on a low-gain field still pays the same action cost. Proof in Appendix Section A.1. 
+
+Empirical surrogate quality. We estimate γT (ρ)
+
+indirectly by comparing realized gain with a task-weighted oracle under matched seeds. This is why the experiments report both the full score and the structural (c + d) score: the two scores can have different effective γT even under the same probe budget. 
+
+Lemma 5.4 (Self-report perturbation by belief type) . Let hi(t) = ( ci, d i(t)) be the structural fea-tures and zi(t) = ( si(t), u i(t)) the self-report fea-tures. For a spatial field, define 
+
+mi(h, z ) = E[∆ i(t) | hi(t) = h, z i(t) = z],
+
+(11) 
+
+m0 
+
+> i
+
+(h) = E[∆ i(t) | hi(t) = h]. (12) 
+
+If 
+
+mi(hi(t), z i(t)) − m0 
+
+> i
+
+(hi(t)) ≤ εspat ∀i, t, 
+
+(13) 
+
+then 
+
+sup 
+
+> ϕ(h,z )
+
+E[∆ ϕ(h,z )(t)] − sup 
+
+> ψ(h)
+
+E[∆ ψ(h)(t)] ≤ 2εspat .
+
+(14) 
+
+Interpretation. Self-reports can improve spatial probing only if they carry conditional information about true correction gain beyond task structure. When exogenous spatial mutations leave little trace in the agent history, Eq. (14) predicts the small gains observed for the full score. Proof in Appendix Section A.2. Proposition 5.5 (Uncertainty-only miscoverage) .
+
+Let Et = {i : bit̸ = git} be the wrong-belief set and let Ct = {i ∈ Et : conf i(t) ≥ α} be the confidently wrong subset. If |Ct|/|Et| ≥ pcw and an uncertainty-only policy probes only fields with 
+
+conf i(t) < α , then its one-step wrong-field recall obeys 
+
+Recall t = |Et \ Ct||Et| ≤ 1 − pcw (|Et| > 0) .
+
+(15) 
+
+Interpretation. Confidence is dangerous when wrong beliefs are confidently held: the selector excludes exactly the fields it most needs to repair. Proof in Appendix Section A.3. 
+
+Proposition 5.6 (Non-adaptive allocation loss) .
+
+Let qi = E[G({i})] and q(1) ≥ · · · ≥ q(n) be the sorted gains. A uniform non-adaptive single-probe policy has expected gain 
+
+Gunif = ¯ q = 1
+
+n
+
+> n
+
+X
+
+> i=1
+
+qi, (16) 
+
+whereas the best targeted single probe has gain 
+
+Gtar = q(1) . Its relative efficiency is 
+
+Eff unif = Gunif 
+
+Gtar 
+
+= ¯qq(1) 
+
+< 1 (17) 
+
+whenever the gains are not all equal. 
+
+Interpretation. This is the mathematical reason periodic or random checks can look reasonable in average probe count yet weak in terminal accuracy: they ignore heterogeneity in which fields matter. Proof in Appendix Section A.4. 
+
+5.2 Task-Side Displacement Lemma 5.7 (Probe-action displacement) . Let Pπ
+
+be the number of probes used by policy π, so that 
+
+Nπ = H − Pπ task-action slots remain. Suppose task success requires at least K effective task ac-tions and each task action is effective with proba-bility at most ηπ. Then 
+
+Pr[success( π)] ≤ E
+
+
+
+min 
+
+
+
+1, ηπNπ
+
+K
+
+ 
+
+. (18) 
+
+If Pπ is deterministic, the bound becomes 
+
+Pr[success( π)] ≤ min(1 , η π(H − Pπ)/K ).
+
+Interpretation. The bound does not claim that probes are bad; it states the accounting identity that every probe must earn back the task action it displaces. Proof in Appendix Section A.5. 
+
+Theorem 5.8 (Probe-action frontier) . For a policy 
+
+π, let BT (π) be the number of probes assigned to type T , Pπ = Bproc (π) + Bspat (π), and λT =
+
+nT /n . Define the belief gain 
+
+B(π) = E[AH (π)] − E[AH (NoProbe)] . (19) 
+
+Under Assumption 5.1 and Eq. (9) , any greedy score policy satisfies 
+
+B(π) ≥ X 
+
+> T∈{ proc ,spat }
+
+λT RT (π),RT (π) = 
+
+
+
+1 − e−γT (ρ)
+
+GT (S⋆T (BT (π))) .
+
+(20) 
+
+At the same time, task success is bounded by 
+
+Pr[success( π)] ≤ E
+
+
+
+min 
+
+
+
+1, ηπ(H − Pπ)
+
+K
+
+ 
+
+.
+
+(21) 
+
+Consequently, when GT (S⋆T (BT )) is strictly in-creasing for some type and ηπ does not increase enough to offset the loss of H − Pπ, varying the probe budget traces a Pareto frontier between ter-minal world-model accuracy and task success. 
+
+Interpretation. The frontier is not an empirical accident. Eq. (20) rewards well-targeted informa-tion, while Eq. (21) charges the same horizon for collecting it. The right probe rate therefore depends on whether the downstream objective values cal-ibrated beliefs, completed tasks, or a mixture of both. Proof in Appendix Section A.6. 
+
+6 Experiments 
+
+6.1 Experimental Setup Environments. We evaluate in three controlled environments that expose gold field states, allowing us to measure belief drift directly rather than infer-ring it from task success. This diagnostic design complements embodied, web, and long-horizon benchmarks such as ALFWorld, ScienceWorld, We-bArena, Mind2Web, AgentBench, and UltraHori-zon (Shridhar et al., 2021; Wang et al., 2022; Zhou et al., 2024b; Deng et al., 2023; Liu et al., 2023; Luo et al., 2025). 
+
+ObjectStateWorld is a room-and-object task with mutable object locations and lock states. 
+
+ToolDAGWorld models API/tool workflows with prerequisite dependencies and mutable activation state, following the tool-use motivation of Tool-former and ToolLLM (Schick et al., 2023; Qin et al., 2024). It is dominated by procedural fields. 
+
+GraphNavWorld is a partially observable graph navigation task with exogenous edge mutations and is dominated by spatial fields. Each environ-ment exposes the same probe API: given a field i,the environment returns git and consumes one step, analogous to checking a database record, calling a status endpoint, or re-opening an interface before a dependent action. 
+
+Stress regimes. We evaluate low, medium, and high mutation regimes with average mutation rates 
+
+¯μ ∈ { 0.02 , 0.10 , 0.30 }. The medium regime is the primary setting for all paired comparisons; the low-and high-stress regimes test whether the observed frontier is tied to a single mutation rate. 
+
+Baselines. We compare seven strategies under the same budget B = ⌊H/ 4⌋: No-Probe, Random-Probe, Periodic-Probe, Self-Uncertainty, EnvProbe-Simple, EnvProbe-Judge, and Oracle-Probe. Ran-dom and periodic policies test non-adaptive allo-cation; Self-Uncertainty tests whether verbalized confidence alone is enough, as commonly assumed by uncertainty-sampling methods (Lewis and Gale, 1994; Settles, 2009). Oracle-Probe and Oracle-TW are upper-bound diagnostics that access gold mis-match. 
+
+Metrics. World-state accuracy (WSA, AH ):fraction of belief fields matching gold at episode end; continuous in [0 , 1] ; primary metric . Task suc-cess (TS) : binary episode completion; secondary. 
+
+Useful-probe rate (UPR) : fraction of probes that correct a wrong field. Collapse onset ( τc): step at which At first falls below 0.6. 
+
+Statistics. All primary comparisons use paired seeds: n = 220 for ToolDAGWorld, n = 440 
+
+for the spatial pool, and n = 660 when all envi-ronments are pooled. Confidence intervals and p-values are computed with 10,000 paired bootstrap resamples (Efron and Tibshirani, 1994); families of comparisons use Bonferroni correction. 
+
+Agent. The main agent uses GPT-4o mini through the OpenAI API (OpenAI, 2024). Prompts elicit JSON belief updates, staleness estimates ˆτi,and confidence estimates conf i at each step. Imple-mentation details are deferred to the appendix. 
+
+6.2 Results 6.2.1 Result: Probing Repairs the World Model 
+
+Table 1 answers the first question: does querying the environment in the middle of planning reduce terminal world-model error? Yes. Relative to Periodic-Probe, EnvProbe-Simple improves end-state accuracy on the procedural ToolDAGWorld stratum by +11 .76 points, and the gain remains positive when all environments are pooled. The spatial gain is smaller, as predicted by Lemma 5.4: exogenous location and edge changes are less visi-ble in the agent’s own self-reports, so the selector has less useful signal to exploit. 
+
+Pareto trade-off and uncertainty anti-signal. 
+
+The same table also shows why belief accuracy can-not be the only metric. On ToolDAGWorld, high-value probes compete with a dependency chain that also needs action slots. The structural score 
+
+(c + d) achieves the best observed procedural accu-racy, while the full score completes fewer episodes than lighter probing policies. Removing ui im-proves belief accuracy but pushes the policy to the belief-heavy extreme, confirming that verbalized uncertainty can misallocate probes. 
+
+6.2.2 Result: Structural Cues Explain the Gains 
+
+Table 2 shows that method ordering is not mono-tone in probe count. The reliable jump is from non-targeted periodic probing to EnvProbe-Simple on procedural fields. Judge helps in some proce-dural cases because the extra model can interpret dependency context, but the main story is already visible in the explicit score: probes are useful when they are aimed at fields that block future actions. The oracle rows are diagnostic rather than deploy-able, because an unweighted oracle can correct many mismatches that do not matter for the next action. 
+
+6.2.3 Secondary Metrics Collapse-onset delay. The procedural setting gives a non-degenerate world-accuracy trajectory: EnvProbe-Simple delays collapse from τc = 1 .68 
+
+under Periodic-Probe to τc = 7 .48 ( ˆ∆ = +5 .80 
+
+steps, p < 0.001 ). Spatial collapse onset is satu-rated in this protocol because many spatial fields begin below the fixed accuracy threshold; Figure 4 shows this diagnostic and explains why collapse Table 1: World-state accuracy and probe-action frontier. The upper block compares EnvProbe-Simple with Periodic-Probe under paired seeds. The lower block compares structural variants against the full score on ToolDAG-World. Task-success differences use McNemar tests.                                                             
+
+> Stratum / Comparison nMethod AHReference AHˆ∆(pp) 95% CI (pp) pTakeaway
+> Procedural (ToolDAGWorld) 220 0.431 0.313 +11 .76 [+10.77, +12.75] <0.001 targeted repair Combined (all envs) 660 0.371 0.306 +6 .45 [+5.89, +7.02] <0.001 consistent gain Spatial (Graph+Object) 440 0.341 0.303 +3 .79 [+3.26, +4.34] <0.001 smaller but reliable
+> Procedural variants vs. full EnvProbe-Simple; †task McNemar
+> (c+d)-only vs. Simple AH220 0.491 0.431 +6 .03 [+4.87, +7.18] <0.001 task 15.9% vs 20.5% ( p†= 0 .22 )
+> −u(no uncertainty) vs. Simple 220 0.488 0.431 +5 .76 [+4.57, +6.96] <0.001 task 8.2% vs 20.5% ( p†= 0 .0001 )0% 20% 40% 60% 80% 100%
+
+Task Success Rate (fraction of episodes completed) 
+
+> 0.25
+> 0.30
+> 0.35
+> 0.40
+> 0.45
+> 0.50
+> 0.55
+> AH (World-State Accuracy, mean)
+> Probe-Heavy
+> Zone
+> Light-Probe
+> Zone
+
+Fundamental trade-off: belief accuracy ( AH) task completion rate       
+
+> (c+d)-only [key finding] c[task champion] Pareto-optimal Dominated Pareto frontier
+> (c+d)-only
+
+u 
+
+> TW-Oracle
+> Full Simple
+> s
+> No-Probe
+> Periodic
+> d
+> Random
+> c
+> Highest observed AH;
+> probe-heavy regime
+
+Figure 3: Procedural Pareto frontier (ToolDAGWorld, n = 220 paired). Each point is a probe policy or ablation; the x-axis is task success and the y-axis is world-state accuracy AH . Filled markers are nondominated under the two objectives, and hollow markers are dominated. Structural, probe-heavy methods occupy the high-accuracy/low-task region, while light-probe policies occupy the high-task/low-accuracy region. The frontier visualizes Theorem 5.8: probe actions can repair beliefs, but every probe spends a step that cannot advance the task. 
+
+onset is used as supporting evidence rather than a primary spatial claim. 
+
+Drift before action collapse. On spatial episodes (n = 2 ,210 ), world-state drift precedes action-validity collapse by +2 .422 steps on average ( p =0.0001 ). On procedural episodes, action inva-lidity can occur before the aggregate world-state threshold is crossed, because a single wrong tool-precondition belief can invalidate the next call. A timing breakdown appears in Appendix G; Figure 5 visualizes the spatial timing pattern directly. 
+
+Useful-probe rate. Raw UPR is distorted by selective triggering and oracle fallback behavior; budget-normalized ]UPR recovers the predicted or-dering (Tables 5 and 6 in the appendix). 
+
+Confident-wrong guardrail ( pcw ). The logs con-tain many high-confidence wrong beliefs: ˆpcw =0.940 [0.933 , 0.947 ] on the main scan, with pilot and false-positive audits at 0.924 and 0.991 . Propo-sition 5.5 explains why Self-Uncertainty misses such fields by construction; Table 7 reports the estimator audit. 
+
+Component ablation. Table 3 and Figure 6 give the mechanism. Removing criticality or depen-dency sharply reduces accuracy, establishing them as the load-bearing structural terms. Staleness is weakly useful. Removing uncertainty improves 
+
+AH but worsens task success, which is exactly the pattern expected when confidence is a noisy probe-routing signal rather than a calibrated estimate of environment error. Table 2: Adjacent method comparisons on AH in the medium-stress regime. The table compares neighboring policies in the expected accuracy ordering. Two rows are marked diagnostic because implementation details of the scorer or oracle objective change their interpretation; these diagnostics motivate the task-weighted oracle and the normalized useful-probe metric reported in the additional-experiment appendix. 
+
+Comparison n Higher-policy AH Lower-policy AH ˆ∆ (pp) Interpretation 
+
+No-Probe vs. Self-Uncertainty (spatial) 440 0.387 0.352 +3 .9 reliable gain Self-Uncertainty vs. Periodic (spatial) † 440 0.303 0.307 −0.4 scorer-sensitive Periodic vs. EnvProbe-Simple (procedural) 220 0.431 0.313 +11 .76 reliable gain EnvProbe-Simple vs. Judge (spatial) 440 0.339 0.341 +2 .39 small judge gain Judge vs. Oracle † 150 0.341 0.364 −2.39 oracle objective diagnostic 1 10 20 30         
+
+> Step
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> WSA  At w=0.6
+> ToolDAGWorld
+> (procedural)
+> EnvProbe-Simple
+> c= 7.5 steps
+> Periodic
+> c= 1.7
+> 110 20 30
+> Step
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> w=0.6
+> GraphNavWorld
+> (spatial)
+> 110 20 30
+> Step
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> w=0.6
+> ObjectStateWorld
+> (spatial)
+
+WSA Collapse Curves (pilot\_med, = 0.10 )    
+
+> No-Probe Periodic EnvProbe-Simple EnvProbe-Judge Oracle (upper bd.)
+
+Figure 4: World-state accuracy trajectories. The curves show At over the episode for the medium-stress regime. ToolDAGWorld has a non-degenerate collapse trajectory: EnvProbe-Simple delays the first crossing of the At < 0.6
+
+threshold relative to Periodic-Probe. GraphNavWorld and ObjectStateWorld start near or below the same threshold for many methods, so collapse-onset is saturated and less informative for spatial analysis. Table 3: Component ablation on ToolDAGWorld (n = 220 paired). ˆ∆AH = change in AH vs. full 4-dim baseline (0.431 ). Positive values indicate that removing the component improves accuracy; negative values indicate that the component is load-bearing. Task-success differences are evaluated by two-sided McNemar tests. 
+
+Ablation AH ˆ∆AH (pp) p (AH ) TS McNemar p
+
+Full EnvProbe-Simple 0.431 — — —
+
+−ci (no criticality) 0.271 −15 .92 [−16 .88 , −14 .93 ] <0.001 <0.001 
+
+−di (no dependency) 0.310 −12 .08 [−13 .27 , −10 .83 ] <0.001 0.004 
+
+−si (no staleness) 0.405 −2.59 [−4.15 , −0.97 ] 0.002 0.31 
+
+−ui (no uncertainty) 0.488 +5 .76 [+4 .57 , +6 .96 ] <0.001 <0.001 
+
+(c + d)-only (removes s, u ) 0.491 +6 .03 [+4 .87 , +7 .18 ] <0.001 0.22 0 5 10 15 20 25 30 
+
+τd (WSA first < 0.6, step) 
+
+0
+
+5
+
+10 
+
+15 
+
+20 
+
+25 
+
+30 
+
+> τc (action first < 0.6,  step)
+
+Drift Precedes Collapse (G3, n = 2813 episodes) 
+
+drift-fi rst 
+
+49% of episodes 
+
+V-collapse fi rst 
+
+12% of episodes       
+
+> simultaneous: 39%
+> ToolDAGWorld (proc.)
+> GraphNavWorld (spat.)
+> ObjectStateWorld (spat.)
+> τd=τc(simultaneous)
+> Mean ( ̄τd= 1.8,  ̄ τc= 4.0)
+
+̄
+
+τc −̄ τd = +2.21 steps Figure 5: Drift precedes collapse on spatial episodes. Scatter of τd (first At < 0.6, x-axis) vs. τc (first action-validity < 0.6, y-axis) per episode. Points below diagonal are drift-first episodes. In the spatial subset, drift comes first in 49% of episodes and action collapse comes first in 1.3%. The mean offset is ¯τc − ¯τd = +2 .42 steps (n = 2 ,210 ); the plotted pilot scatter contains n = 121 episodes. Full     
+
+> Simple
+> csud(c+d)
+> only
+> 0%
+> 20%
+> 40%
+> 60%
+> 80%
+> 100%
+> Value  (A_H or Task Success Rate)
+> 0.271
+> 91.8%
+> 0.488
+> 8.2%
+> 0.491 task-AH
+> trade-off
+
+Ablation: Dual-Metric (AH and Task Success)     
+
+> AH(world-state accuracy) AH- ( c+d)-only Task success rate
+
+Figure 6: Component ablation on ToolDAGWorld. Blue/teal bars report AH and amber bars report task success. Removing criticality or dependency lowers AH , showing that these structural terms are load-bearing. Removing uncertainty raises AH to 0.488 but drops task success to 8.2% , exposing the belief-heavy extreme. The (c + d) rule gives the best observed AH in this ablation ( 0.491 ) with task success statistically comparable to the full score. 7 Discussion 
+
+Probe-action budget trade-off. The procedural results expose the budget constraint directly. The policies that repair belief state most aggressively spend probes on the right fields, but those same probes consume horizon steps that could have ad-vanced the task. This is why (c + d) reaches the highest observed AH , whereas Periodic-Probe keeps the best task success among the non-ablated baselines. The theorem should be read in that light: probing helps when corrected state is useful down-stream, but its rate must be set against the actions needed to finish the task. 
+
+Spatial vs. procedural asymmetry. The same budget behaves differently on spatial tasks. Spatial chains are shorter, and exogenous location or edge changes leave weak traces in the LLM’s action his-tory. Self-reported uncertainty therefore adds little, while the structural terms still identify fields worth checking. Figure 7 shows the result: the procedural frontier collapses into a dominance relation for the spatial regime. 
+
+Component-level interpretation. The ablation explains why the full score is not the best belief-accuracy policy. Criticality and dependency carry most of the useful signal; staleness helps only mod-estly, and uncertainty is harmful in the procedural setting. This matches prior calibration results show-ing that confidence estimates need not remain reli-able decision signals under distribution shift (Guo et al., 2017; Kadavath et al., 2022). A practical rule follows: use structural probe scores when a downstream planner will consume the repaired be-lief state, and lower the probe budget when task completion is the binding objective. 
+
+8 Conclusion 
+
+EnvProbe treats active environment queries as bud-geted calibration for explicit world models. Aprobe can reduce terminal world-model error when it checks a structurally important field, but it can also displace a task action. In our experiments, the structural (c + d) variant is the strongest belief-accuracy policy and Pareto-dominates on spatial tasks, while verbalized uncertainty is an anti-signal on procedural fields. Probe policies should there-fore be type-aware: query beliefs that matter for the next plan, and set the probe rate against the downstream objective. 
+
+Broader Impact 
+
+EnvProbe can reduce undetected belief drift in long-horizon LLM agents, with direct relevance to soft-ware automation, API orchestration, and database management. Even Oracle-Probe achieves AOr  
+
+> H
+
+<
+
+1, so safety-critical deployments still require safe-guards beyond EnvProbe. Code and environments are available open-source. 
+
+References                                     
+
+> Michael Ahn, Anthony Brohan, Noah Brown, Yev-gen Chebotar, Omar Cortes, Byron David, Chelsea Finn, Chuyuan Fu, Keerthana Gopalakrishnan, Karol Hausman, Alex Herzog, Daniel Ho, Jasmine Hsu, Julian Ibarz, Brian Ichter, Alex Irpan, Eric Jang, Rosario Jauregui Ruano, Kyle Jeffrey, and 26 oth-ers. 2022. Do as i can, not as i say: Grounding language in robotic affordances. arXiv preprint arXiv:2204.01691 .Kathryn Chaloner and Isabella Verdinelli. 1995. Bayesian experimental design: A review. Statisti-cal Science , 10(3):273–304. Xiang Deng, Yu Gu, Boyuan Zheng, Shijie Chen, Samuel Stevens, Boshi Wang, Huan Sun, and Yu Su. 2023. Mind2Web: Towards a generalist agent for the web. In Advances in Neural Information Processing Systems (NeurIPS) .Vardhan Dongre, Xiaocheng Yang, Emre Can Acikgoz, Suvodip Dey, Gokhan Tur, and Dilek Hakkani-Tur. 2024. ReSpAct: Harmonizing reasoning, speaking, and acting towards building large language model-based conversational AI agents. arXiv preprint arXiv:2411.00927 .Bradley Efron and Robert J. Tibshirani. 1994. An Intro-duction to the Bootstrap . Chapman and Hall/CRC. Djengo Cyun-Jyun Fang and Tsung-Wei Ke. 2025. Information seeking for robust decision mak-ing under partial observability. arXiv preprint arXiv:2510.01531 .Daniel Golovin and Andreas Krause. 2011. Adaptive submodularity: Theory and applications in active learning and stochastic optimization. Journal of Arti-ficial Intelligence Research , 42:427–486. Chuan Guo, Geoff Pleiss, Yu Sun, and Kilian Q. Wein-berger. 2017. On calibration of modern neural net-works. In Proceedings of the 34th International Con-ference on Machine Learning (ICML) , pages 1321– 1330. Zhiyuan Hu, Chumin Liu, Xidong Feng, Yilun Zhao, See-Kiong Ng, Anh Tuan Luu, Junxian He, Pang Wei Koh, and Bryan Hooi. 2024. Uncertainty of thoughts: Uncertainty-aware planning enhances information seeking in LLMs. In Advances in Neural Information Processing Systems (NeurIPS) .15% 20% 25% 30% 35% 40% 45% 50%
+> Task Success Rate
+> 0.24
+> 0.26
+> 0.28
+> 0.30
+> 0.32
+> 0.34
+> 0.36
+> 0.38
+> 0.40
+> AH (World-State Accuracy)  Spatial: trade-off vanishes; (c+d)Pareto-dominant
+> (c+d)-only [Pareto-dominant] No-Probe [Pareto] Dominated Pareto frontier
+> (c+d)-only
+> Oracle
+> Full Simple
+> Self-Unc.
+> TW-Oracle
+> Judge
+> Random
+> Periodic
+> No-Probe
+> (c+d)-only dominates
+> all probing methods
+> (higher AHand task)
+
+Figure 7: Spatial Pareto frontier (GraphNavWorld + ObjectStateWorld, n = 440 paired). Contrast with Figure 3: the procedural Pareto trade-off vanishes on spatial belief. (c+d)-only Pareto-dominates all baselines on both AH and task success simultaneously. Spatial chains are shorter (3–5 transitions vs. 9 for ToolDAGWorld), so the probe cost is small relative to the belief-accuracy gain. Wenlong Huang, Fei Xia, Ted Xiao, Harris Chan, Jacky Liang, Pete Florence, Andy Zeng, Jonathan Tompson, Igor Mordatch, Yevgen Chebotar, Pierre Sermanet, Noah Brown, Tomas Jackson, Linda Luu, Sergey Levine, Karol Hausman, and Brian Ichter. 2022. In-ner monologue: Embodied reasoning through plan-ning with language models. In Conference on Robot Learning (CoRL) .Saurav Kadavath, Tom Conerly, Amanda Askell, Tom Henighan, Dawn Drain, Ethan Perez, Nicholas Schiefer, Zac Hatfield-Dodds, Nova DasSarma, Eli Tran-Johnson, Scott Johnston, Sheer El-Showk, Andy Jones, Nelson Elhage, Tristan Hume, Anna Chen, Yuntao Bai, Sam Bowman, Stanislav Fort, and 17 others. 2022. Language models (mostly) know what they know. arXiv preprint arXiv:2207.05221 .Leslie Pack Kaelbling, Michael L. Littman, and An-thony R. Cassandra. 1998. Planning and acting in partially observable stochastic domains. Artificial Intelligence , 101(1–2):99–134. Jing Yu Koh, Robert Lo, Lawrence Jang, Vikram Duvvur, Ming Chong Lim, Po-Yu Huang, Graham Neubig, Shuyan Zhou, Ruslan Salakhutdinov, and Daniel Fried. 2024. VisualWebArena: Evaluat-ing multimodal agents on realistic visual web tasks. 
+
+arXiv preprint arXiv:2401.13649 .Andreas Krause and Daniel Golovin. 2014. Submodular function maximization. In Lucas Bordeaux, Youssef Hamadi, and Pushmeet Kohli, editors, Tractability: Practical Approaches to Hard Problems , pages 71– 104. Cambridge University Press. David D. Lewis and William A. Gale. 1994. A se-quential algorithm for training text classifiers. In 
+
+Proceedings of the 17th Annual International ACM SIGIR Conference on Research and Development in Information Retrieval , pages 3–12. Xiao Liu, Hao Yu, Hanchen Zhang, Yifan Xu, Xuanyu Lei, Hanyu Lai, Yu Gu, Hangliang Ding, Kaiwen Men, Kejuan Yang, Shudan Zhang, Xiang Deng, Ao-han Zeng, Zhengxiao Du, Chenhui Zhang, Sheng Shen, Tianjun Zhang, Yu Su, Huan Sun, and 3 oth-ers. 2023. AgentBench: Evaluating LLMs as agents. 
+
+arXiv preprint arXiv:2308.03688 .Haotian Luo, Huaisong Zhang, Xuelin Zhang, Haoyu Wang, Zeyu Qin, Wenjie Lu, and 1 others. 2025. UltraHorizon: Benchmarking agent capabilities in ultra long-horizon scenarios. arXiv preprint arXiv:2509.21766 .George L. Nemhauser, Laurence A. Wolsey, and Mar-shall L. Fisher. 1978. An analysis of approxima-tions for maximizing submodular set functions—I. 
+
+Mathematical Programming , 14(1):265–294. Greedy 
+
+(1 − 1/e ) approximation for monotone submodular maximization under cardinality constraint. OpenAI. 2024. GPT-4o mini: Advancing cost-efficient intelligence. https://openai.com/index /gpt-4o-mini-advancing-cost-effic ient-intelligence/ . Accessed 2026-06-26. Yujia Qin, Shihao Liang, Yining Ye, Kunliang Zhu, Lan Yan, Yaxi Lu, Yankai Lin, Xin Cong, Xiangru Tang, Bill Qian, Sihan Zhao, Lauren Hong, Runchu Tian, Ruobing Xie, Jie Zhou, Mark Gerstein, Dahai Li, Zhiyuan Liu, and Maosong Sun. 2024. ToolLLM: Facilitating large language models to master 16000+ real-world APIs. In International Conference on Learning Representations (ICLR) .Stéphane Ross, Joelle Pineau, Sébastien Paquet, and Brahim Chaib-draa. 2008. Online planning algo-rithms for POMDPs. Journal of Artificial Intelli-gence Research , 32:663–704. Timo Schick, Jane Dwivedi-Yu, Roberto Dessì, Roberta Raileanu, Maria Lomeli, Eric Hambro, Luke Zettle-moyer, Nicola Cancedda, and Thomas Scialom. 2023. Toolformer: Language models can teach themselves to use tools. In Advances in Neural Information Pro-cessing Systems (NeurIPS) .Burr Settles. 2009. Active learning literature survey. Technical Report 1648, University of Wisconsin– Madison. Noah Shinn, Federico Cassano, Ashwin Gopinath, Karthik R. Narasimhan, and Shunyu Yao. 2023. Re-flexion: Language agents with verbal reinforcement learning. In Advances in Neural Information Pro-cessing Systems (NeurIPS) .Mohit Shridhar, Xingdi Yuan, Marc-Alexandre Côté, Yonatan Bisk, Adam Trischler, and Matthew Hausknecht. 2021. ALFWorld: Aligning text and embodied environments for interactive learning. In 
+
+International Conference on Learning Representa-tions (ICLR) .Guanzhi Wang, Yuqi Xie, Yunfan Jiang, Ajay Man-dlekar, Chaowei Xiao, Yuke Zhu, Linxi Fan, and Anima Anandkumar. 2024. Voyager: An open-ended embodied agent with large language models. Trans-actions on Machine Learning Research (TMLR) .Ruoyao Wang, Peter Jansen, Marc-Alexandre Côté, and Prithviraj Ammanabrolu. 2022. ScienceWorld: Is your agent smarter than a 5th grader? In Proceed-ings of the 2022 Conference on Empirical Methods in Natural Language Processing (EMNLP) , pages 11279–11298. Zehong Wang, Fang Wu, Hongru Wang, Xiangru Tang, Bolian Li, and Zhenfei Yin. 2026. Why reasoning fails to plan: A planning-centric analysis of long-horizon decision making in LLM agents. arXiv preprint arXiv:2601.22311 .Shunyu Yao, Jeffrey Zhao, Dian Yu, Nan Du, Izhak Shafran, Karthik R. Narasimhan, and Yuan Cao. 2023. ReAct: Synergizing reasoning and acting in language models. In International Conference on Learning Representations (ICLR) .Xingkun Yin and Hongyang Du. 2026. GLOVE: Global verifier for LLM memory-environment realignment. 
+
+arXiv preprint arXiv:2601.19249 .Zhenhang Yuan, Shenghai Yuan, and Lihua Xie. 2026. Rpms: Enhancing llm-based embodied planning through rule-augmented memory synergy. Preprint ,arXiv:2603.17831. Andy Zhou, Kai Yan, Michal Shlapentokh-Rothman, Haohan Wang, and Yu-Xiong Wang. 2024a. Lan-guage agent tree search unifies reasoning acting and planning in language models. In International Con-ference on Machine Learning (ICML) .Shuyan Zhou, Frank F. Xu, Hao Zhu, Xuhui Zhou, Robert Lo, Abishek Sridhar, Xianyi Cheng, Tianyue Ou, Yonatan Bisk, Daniel Fried, Uri Alon, and Gra-ham Neubig. 2024b. WebArena: A realistic web environment for building autonomous agents. In In-ternational Conference on Learning Representations (ICLR) .A Proofs 
+
+We provide proof details for the statements in Sec-tion 5. 
+
+A.1 Proof of Lemma 5.3 
+
+Let Sj be the set selected after j probes of type T ,and let S⋆T be the optimal set with |S⋆T | ≤ BT . By monotonicity and submodularity, 
+
+max  
+
+> i∈F T\Sj
+
+∆T (i | Sj ) ≥ GT (S⋆T ) − GT (Sj )
+
+BT
+
+. (22) The marginal-quality condition in Definition 5.2 gives 
+
+E[GT (Sj+1 ) − GT (Sj ) | Sj ]
+
+≥ γT
+
+BT
+
+(GT (S⋆T ) − GT (Sj )) . (23) Let Rj = GT (S⋆T ) − E[GT (Sj )] . Taking expecta-tions yields Rj+1 ≤ (1 − γT /B T )Rj . Iterating for 
+
+BT steps, 
+
+RBT ≤
+
+
+
+1 − γT
+
+BT
+
+BT
+
+GT (S⋆T ) ≤ e−γT GT (S⋆T ).
+
+(24) Rearranging proves the claim. 
+
+A.2 Proof of Lemma 5.4 
+
+Write m(h, z ) = E[∆ i(t) | hi(t) = h, z i(t) = z]
+
+and m0(h) = E[∆ i(t) | hi(t) = h]. By assump-tion, |m(h, z )−m0(h)| ≤ εspat for every field. Let 
+
+iz be the best field selected by any rule that may use both h and z, and let i0 be the best structural field using h alone. Then 
+
+m(hiz , z iz ) ≤ m0(hiz ) + εspat (25) 
+
+≤ m0(hi0 ) + εspat (26) 
+
+≤ m(hi0 , z i0 ) + 2 εspat . (27) Thus adding self-report features can improve ex-pected one-step gain by at most 2εspat in the spatial regime. If a particular linear score using z selects a worse field than i0, the difference is precisely its ranking regret. 
+
+A.3 Proof of Proposition 5.5 
+
+Self-Uncertainty is allowed to probe only fields with confidence below α. Every field in Ct is wrong but has confidence at least α, so none of these fields is eligible for selection. Since 
+
+|Ct|/|Et| ≥ pcw , at most a (1 − pcw ) fraction of wrong fields can be recalled by such a selector in that step. 
+
+A.4 Proof of Proposition 5.6 
+
+Under uniform non-adaptive sampling, the ex-pected gain of a single probe is n−1 P 
+
+> i
+
+qi = ¯ q.A targeted selector with access to the gain ordering chooses the top field and obtains q(1) . The relative efficiency is therefore ¯q/q (1) . If gains are not all equal, ¯q < q (1) .
+
+A.5 Proof of Lemma 5.7 
+
+Condition on Nπ, the number of task-action slots left after probing. Let M be the number of effective task actions. By assumption, E[M | Nπ] ≤ ηπNπ.Since task success requires M ≥ K, Markov’s inequality gives 
+
+Pr[success( π) | Nπ] ≤ Pr[ M ≥ K | Nπ]
+
+≤ min 
+
+
+
+1, ηπNπ
+
+K
+
+
+
+. (28) Taking expectation over Nπ proves the first state-ment. The deterministic Pπ case follows by substi-tuting Nπ = H − Pπ.
+
+A.6 Proof of Theorem 5.8 
+
+Apply Lemma 5.3 separately to T ∈ { proc , spat }.Since AH = P 
+
+> T
+
+λT ATH with λT = nT /n , linear-ity of expectation gives 
+
+B(π) = X
+
+> T
+
+λT E[GT (Sρ,T )] 
+
+≥ X
+
+> T
+
+λT (1 − e−γT (ρ))GT (S⋆T (BT (π))) .
+
+(29) This is Eq. (20) . Lemma 5.7 gives Eq. (21) af-ter substituting Pπ = Bproc (π) + Bspat (π). If increasing BT strictly increases the oracle repair gain for some type, the belief bound moves upward. The same increase also weakly decreases H − Pπ;therefore the task-success bound moves downward unless ηπ increases enough to offset the lost task-action slots. The two objectives are therefore not jointly monotone in the probe budget, which yields the claimed Pareto frontier. 
+
+B Implementation Details 
+
+Environments. All three environments are imple-mented in Python with deterministic seeding. Gold-state trajectories are stored as JSONL files with full field-level provenance. Episode seeds span 
+
+[0 , 219] for the main paired cells; low- and high-stress regime checks use disjoint held-out seeds. Hyperparameters. Probe threshold ρ⋆ = 1 .5;horizon H ∈ { 20 , 30 , 40 } for low/medium/high complexity; budget B = ⌊H/ 4⌋; staleness normal-ization divisor = 10 . Full hyperparameter table in Table 4. 
+
+Table 4: Hyperparameter configuration for main results.                             
+
+> Parameter Value Notes LLM backbone GPT-4o-mini main agent Judge LLM GPT-4o-mini same backbone Temperature 0deterministic decoding Max tokens (belief up-date) 512 Probe threshold ρ⋆1.5 Staleness divisor 10 si= min(1 ,ˆτi/10)
+> Bootstrap resamples 10,000 per comparison Bonferroni family size 6primary comparison family Episode seeds 0–219 n= 220 paired seeds Horizon H30 medium-stress setting Budget B⌊30 /4⌋= 7
+
+Reproducibility. All episodes are deterministic given the tuple (seed, environment, method). The released code stores gold-state trajectories and be-lief snapshots so that world-state accuracy, useful-probe rate, and collapse timing can be recomputed from raw logs. 
+
+C Dataset and Environment Details 
+
+ObjectStateWorld contains object-location, lock-state, and inventory fields. GraphNavWorld contains node-location and dynamic-edge fields. ToolDAGWorld contains tool-loaded, dependency-satisfied, and subgoal-complete fields. Each envi-ronment defines a gold transition kernel, an agent-facing textual observation, and a probe API that returns the current value of a requested field. Pro-cedural purity is highest in ToolDAGWorld, while the spatial pool contains fields whose mutations are exogenous to the action trace. 
+
+D Failure Case Analysis 
+
+A typical procedural failure occurs when a high-uncertainty but low-criticality field receives a probe before the tool-precondition field that blocks the next API call. The probe improves local belief accuracy but leaves too few actions to complete the dependency chain. A typical spatial failure oc-curs when reported staleness is high for a field that has not actually mutated; the probe is correct but unhelpful, while an exogenously changed object-location field remains stale. These cases motivate the structural (c + d) variant: dependency role and criticality are more stable signals than verbalized uncertainty or self-reported recency. 
+
+E Broader Impact 
+
+See also the main-paper broader impact statement. 
+
+EnvProbe’s primary application is improving the reliability of LLM agents in long-horizon auto-mated tasks. Improved reliability reduces costly action errors in deployments such as software work-flows, database manipulation, and API orchestra-tion. The main societal benefit is reduced agent fail-ure cost in production systems. One concern is that more reliable agents may be deployed in higher-stakes settings (medical decision support, financial automation) without adequate human oversight; we emphasize that Oracle-Probe’s upper bound in our experiments still leaves substantial accuracy gaps ( AOr  
+
+> H
+
+< 1), and no version of EnvProbe elimi-nates the need for human-in-the-loop verification in high-stakes deployments. The environments and evaluation code are available under an open-source license, enabling independent reproducibility veri-fication. 
+
+F Additional Results and Visual Diagnostics 
+
+The main visual diagnostics now appear next to the claims they support: collapse trajectories in Figure 4, drift timing in Figure 5, the ablation plot in Figure 6, and the spatial frontier in Figure 7. This appendix keeps the table-level audits that are useful for reproducibility but would interrupt the main argument. 
+
+F.1 Useful-Probe Rate Diagnostics 
+
+Table 5 reports raw useful-probe rate. It supports the secondary metric discussion in Section 6.2.3: EnvProbe-Simple fires useful probes reliably on the spatial pool, while the ToolDAGWorld row is kept only as a scorer diagnostic because uninstantiated procedural fields distort the raw numerator. Table 6 removes the selective-trigger confound by normalizing useful probes by the available bud-get. This is the more interpretable diagnostic for comparing policies that fire probes at different rates. Table 5: Useful-probe rate on the spatial pool. UPR is the fraction of fired probes that correct an incorrect field. ToolDAGWorld is shown only as a diagnostic row because its useful-probe scorer is affected by uninstantiated procedural fields. 
+
+Stratum n Simple Random ˆ∆ (pp) 95% CI (pp) p LCB ≥ 50% ?
+
+Spatial pool (Graph+Object) 319 0.735 0.550 +18 .5 [+13.5, +23.3] < 0.001 ✓ (0.633) Combined (all envs) 492 0.477 0.460 +1 .7 [−2.3, +5.7] 0.210 –ToolDAGWorld † 173 0.000 0.294 −29 .4 [−33.2, −25.7] > 0.99 –
+
+Table 6: Budget-normalized useful-probe rate. ]UPR = #useful /B normalizes by the available probe budget, reducing the selective-trigger confound that inflates raw UPR for policies that fire rarely. 
+
+Env Simple ]UPR Random Periodic SU Oracle 
+
+GraphNavWorld 0.91 0.49 0.74 0.46 0.97 ObjectStateWorld 0.31 0.29 0.67 0.75 0.20 
+
+Spatial pool 0.61 0.39 0.71 0.61 0.58 ToolDAGWorld † 0.00 0.19 0.14 0.70 0.00 
+
+F.2 Confident-Wrong Estimator Audit 
+
+Table 7 reports the estimators used to validate the confident-wrong rate cited in Section 6.2.3. The main text uses the canonical per-belief estimator; the remaining rows are sanity checks that confirm the same failure mode under alternative scans. 
+
+Table 7: pcw estimator audit. The canonical per-belief estimator is used in the main text and Lemma 5.5; the remaining rows are robustness checks showing that the confident-wrong rate stays above the 0.87 guardrail un-der alternative scans.                   
+
+> Estimator Definition nˆpcw Use Canonical (cite)
+> Pr( ˆ∆i>0|conf i≥0.7) ,per belief 22,317 0.924 Main text, Lemma 5.5 per-action self-check fraction of no-probe self-checks marked correct when At<
+> 0.6
+> 1,007 0.991 sanity check high-confidence scan high-conf beliefs on steps with wsa <0.5
+> 4,051 0.940 sanity check smaller per-belief sample same definition as canonical on a smaller log slice 584 0.849 lower-bound check
+
+G Additional Mechanism Details 
+
+Procedural action-validity coupling. ToolDAG-World has a sharper action-validity boundary than the spatial environments: a single wrong belief about whether a prerequisite tool is loaded can invalidate the next API call before the aggregate world-state accuracy falls below threshold. This explains why procedural episodes sometimes show action collapse before measured drift, whereas spa-tial episodes more often show drift first. The ob-served timing summary is:                     
+
+> Stratum nMean offset (steps) Median Drift-first Action-first Combined 2,813 +2 .22 0.0 49.2% 11.8% Spatial (Graph+Object) 2,210 +2 .42 0.0 49.0% 1.3% Procedural (ToolDAG) 603 +1 .45 −2.049.6% 50.4%
+
+Task-weighted oracle. The unweighted oracle corrects the largest raw mismatch, but this is not always the field that matters for the next task action. A task-weighted oracle instead probes 
+
+arg max i wi1{bit̸ = git}, aligning oracle behavior with the same weighted objective used in AH . We use this oracle only as a diagnostic upper bound; it is not available to the agent. 
+
+Uncertainty anti-signal. The procedural abla-tion shows that verbalized uncertainty can push probes toward fields that are uncertain but not task-critical. Removing ui raises AH but also drives the policy toward excessive belief checking, which is why task success falls. The (c + d) score pre-serves the useful structural signal while removing this self-report failure mode.

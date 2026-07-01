@@ -1,0 +1,595 @@
+Title: Learning Video Dynamics with Predictive Differentiable Rendering
+
+URL Source: https://arxiv.org/pdf/2606.31050v1
+
+Published Time: Wed, 01 Jul 2026 00:29:36 GMT
+
+Number of Pages: 18
+
+Markdown Content:
+# Learning Video Dynamics with Predictive Differentiable Rendering 
+
+Yujin Tang 1,* , Tian Zhou 2,6,* , Xin Lin 3, Cheng Tan 4, Yifan Hu 5, Rong Jin 2,SouYoung Jin 1, and Liang Sun 2,6,†
+
+> 1
+
+Dartmouth College, USA 2DAMO Academy, Alibaba Group, China 3University of California, San Diego, USA 4Westlake University, China 5Tsinghua University, China 6Ant Group, China 
+
+yujin.tang.gr@dartmouth.edu {tian.zt, ls537724}@antgroup.com 
+
+Abstract. How to accurately predict a high-fidelity future world? While the visual world is inherently continuous, existing deterministic video prediction models operate in discrete pixel space and are mainly opti-mized with pixel-wise mean squared error (MSE), which often leads to over-smoothed predictions and a lack of fine-grained visual details. To address these limitations, we propose Predictive Differentiable Rendering (PDR ), a novel end-to-end video prediction paradigm that bridges the gap between discrete and continuous representations. Inspired by recent progress in 3D reconstruction with 3D Gaussian Splatting, we introduce 
+
+PredGS , a lightweight and plug-and-play adapter based on 2D Gaus-sian representation, which could be seamlessly integrated with existing pixel space predictors, significantly improving spatial detail preserva-tion with negligible computational overhead. Furthermore, we develop 
+
+predgsplat , a CUDA-accelerated differentiable 2D Gaussian renderer supporting arbitrary channels. Each Gaussian is defined by 5 + C learn-able parameters (position, scale, rotation, and C channel amplitudes) and achieves up to 10 × faster rendering than the baseline. Optimized by a combined L1 and SSIM loss, PDR overcomes the inherent blurring tendencies of MSE Loss, significantly enhancing the prediction perfor-mance. Extensive experiments on diverse real-world benchmarks, includ-ing TaxiBJ, WeatherBench, KTH, and Human3.6M, demonstrate that PDR consistently surpasses existing methods, delivering superior detail preservation, visual fidelity, and predictive accuracy. 
+
+Keywords: Spatio-Temporal Predictive Learning · Video Prediction ·
+
+2D Gaussian Splatting 
+
+1 Introduction 
+
+Video prediction, the task of predicting future frames based on a sequence of observed inputs, is fundamental to a variety of real-world applications, including weather forecasting [2,25,27], traffic flow modeling [6,44], precipitation nowcast-ing [9, 29, 52], and human motion analysis [39, 54]. These applications require  
+
+> *
+
+Equal contribution. † Corresponding author. 
+
+> arXiv:2606.31050v1 [cs.CV] 30 Jun 2026
+
+2 Y. Tang et al. (b) Quantitative Comparison     
+
+> Lightweight
+> PredGS TAU: t=25 PDR: t=25
+> Discrete Pixel Space Continuous Gaussian Space
+> (a) Paradigm Comparison
+> Coords
+> Scale
+> Rotation
+> Amplitude
+> MLPs
+> PDR
+
+Fig. 1: (a) Paradigm and Qualitative Comparison. PDR bridges discrete pixel space prediction with continuous Gaussian space modeling through lightweight PredGS. PDR produces sharper and more accurate predictions than the pixel-based baseline. (b) Quantitative Comparison. When integrated into TAU [31], our PDR substantially reduces MSE on TaxiBJ [53] and WeatherBench [27] and improves SSIM on KTH [28] and Human3.6M [27], introducing marginal increases in parameters and FLOPs. Parameter and FLOP measurements are computed using fvcore [5] and the FLOPs difference between TAU and PDR on KTH and Human3.6M is below 1G. 
+
+models that can learn complex spatial structures and temporal dynamics from high-dimensional visual data. Recent deterministic video prediction methods have achieved remarkable progress in model architecture design, including Recurrent Neural Networks (RNNs) [3,10,18,29,34,35,40–44], Convolutional Neural Networks (CNNs) [7,31, 32], and Transformers [9, 36], encompassing both recurrent-based and recurrent-free architectures, demonstrating promising predictive performance. Despite these advances, most existing data-driven forecasting approaches op-erate in a discrete pixel space and are optimized using pixel-wise losses such as mean squared error (MSE). While simple and effective for minimizing average error, MSE loss encourages models to regress toward the expected value across all possible futures [1,20]. As a result, deterministic video prediction models tend to produce overly smooth outputs, lacking in sharp motion boundaries and fine structural detail. This blurring effect becomes particularly problematic in long-range forecasting scenarios, where accumulated errors lead to degraded spatial fidelity and visual coherence. To address the aforementioned limitations, we turn to continuous 2D Gaus-sian representations, which model spatial signals as parametric continuous fields rather than discrete grids. This formulation introduces inherent spatial smooth-ness and differentiability, allowing models to capture fine-grained structures and dynamic variations with greater fidelity. While recent advances in 3D Gaussian Splatting (3DGS) [14,19,46,50] have achieved impressive results in detailed scene rendering and object reconstruction, and 2D GS has demonstrated strong per-formance in continuous image representation [11, 16, 26, 55], their potential for video prediction remains largely unexplored. Building on this insight, we propose Predictive Differentiable Rendering ( PDR ), a novel end-to-end video prediction paradigm that unifies discrete pixel space and Learning Video Dynamics with Predictive Differentiable Rendering 3
+
+continuous Gaussian space within a single predictive framework. To enable prac-tical integration, we design a lightweight and plug-and-play adapter, PredGS, which can be seamlessly attached to existing pixel space predictors, allowing them to benefit from continuous-field modeling without architectural modifica-tions. We further implement a simplified and fully differentiable 2D Gaussian renderer with arbitrary channel support, powered by a dedicated CUDA pack-age, predgsplat. This flexibility is crucial for spatiotemporal forecasting, as data vary widely in channel dimensionality, ranging from RGB video frames to multi-variable weather and traffic fields, enabling the renderer to generalize effectively across heterogeneous modalities. As illustrated in Figure 1(a), pixel-based mod-els trained with MSE in a discrete space tend to produce overly smoothed and blurry predictions, whereas optimization in a continuous Gaussian space pre-serves sharper boundaries and richer fine-grained textures. The main contributions can be summarized as follows: 
+
+– We propose Predictive Differentiable Rendering ( PDR ), a pioneering end-to-end deterministic video prediction paradigm that bridges discrete and continuous representations by leveraging continuous 2D Gaussian fields to mitigate blurring artifacts inherent in pixel-based approaches. 
+
+– We design a lightweight and plug-and-play PredGS adapter jointly with a dedicated CUDA package, predgsplat , forming an efficient differentiable 2D Gaussian rendering pipeline that supports arbitrary channel dimensions and achieves up to 10 × faster performance over the baseline, exceeding 1000 FPS at 256 ×256 resolution. 
+
+– We adopt a hybrid L1+SSIM loss for video prediction, effectively alleviating the over-smoothing problem in MSE-based training and improving percep-tual quality. 
+
+– Extensive experiments on diverse benchmarks demonstrate the effectiveness of PDR. Compared with TAU, PDR reduces MSE by 9.7% on TaxiBJ and 7.8% on WeatherBench, while reducing LPIPS by 29.0% on KTH and 21.2% on Human3.6M, yielding sharper details, higher visual fidelity, and greater predictive accuracy. 
+
+2 Related Work 
+
+Gaussian Splatting. 3D Gaussian Splatting (3DGS) [14] introduces real-time scene modeling through Gaussian primitives and differentiable splatting, and has been adapted across SLAM [21, 47], dynamic scenes [17, 19, 30, 46, 50], content creation [4, 13, 58], and driving applications [48, 57]. STCGS [45] explores a two-stage pipeline for 3D radar modeling, where each sequence is individually repre-sented using 3DGS and trained to predict future Gaussian fields. However, this per-sequence optimization design requires substantial computational overhead. Recently, simplified 2D Gaussian Splatting (2DGS) has become a promising al-ternative for continuous image representation. GaussianImage [55] represents images with eight-parameter Gaussian primitives but supports RGB data, limit-ing its applicability to spatiotemporal forecasting, where channel dimensionality 4 Y. Tang et al. Downsampler       
+
+> Pixel Space
+> Predictor
+> coords
+> scale
+> rotation
+> Amplitude
+> Discrete Pixel Space Prediction
+> Parametrized
+> 2D Gaussians
+> Lightweight
+> MLP
+> tanh
+> sigmoid
+> tanh
+> sigmoid
+> Continuous Gaussian Space Prediction
+> Activation
+> Function
+> PredGS
+> Intermediate Seq
+> [B T C H W]
+> Input Seq
+> [B T C H W] [B T N 2]
+> [B T N 2]
+> [B T N 1]
+> [B T N C]
+> Differentiable 2D GS Renderer
+> +Base Grid Registration
+> Improvement
+> +PredGS Cuda Kernel
+> Acceleration ×10
+> Base
+> predgsplat Rendered Seq
+> [B T C H W]
+> Concat
+> Conv
+> Fusion
+> Discrete Continuous
+> Prediction Integration
+> [B T 2C H W]
+> Output Seq
+> [B T C H W]
+> Output
+> Seq
+> GT
+> Seq
+> Optimization
+
+PDR 
+
+Fig. 2: An overview of the PDR framework. Coarse predictions from a pixel-space backbone are refined using a lightweight PredGS adapter that learns per-frame 2D Gaussian parameters. These are rendered via a fast, differentiable 2D Gaussian renderer 
+
+predgsplat and fused with the original output to enhance spatial detail. 
+
+varies widely across modalities such as weather and traffic. GaussianSR [11] ex-tended this to image super-resolution using adaptive Gaussian kernels; however, the lack of CUDA acceleration limits its real-time applicability. Different from previous work, we introduce the first end-to-end video pre-diction paradigm that bridges discrete and continuous representations by lever-aging continuous 2D Gaussian fields. Our PDR framework further generalizes to arbitrary channel dimensions, extending applicability to multi-channel spa-tiotemporal scenarios. 
+
+Video Prediction. Video prediction methods can be broadly categorized into de-terministic and probabilistic approaches. Deterministic models include recurrent-based architectures, such as ConvLSTM [29] and its variants [3,18,34,35,40–44], as well as recurrent-free encoder–decoder frameworks like SimVP [7] and its ex-tensions [23, 31, 32], and Transformer-based models such as Earthformer [9] and PredFormer [36]. USTEP [33] provides a unified perspective that reconciles the recurrent-based and recurrent-free methods by jointly modeling micro-temporal and macro-temporal dynamics. In contrast, probabilistic approaches introduce multi-modality by generating a distribution over future outcomes. Represen-tative examples include diffusion-based methods such as PreDiff [8] and Dif-fCast [52], which reconstruct fine-grained spatial details and capture diverse temporal dynamics. SyncVP [24] leverages pre-trained modality-specific diffu-sion models incorporating depth as an auxiliary modality. However, these bene-fits come with significantly higher computational and latency costs .
+
+In this work, we aim to enhance deterministic video prediction from a perceptual perspective. Traditional deterministic models operate in a discrete pixel space and are typically optimized by MSE, which tends to blur fine details through pixel averaging. Unlike these approaches, our PDR Learning Video Dynamics with Predictive Differentiable Rendering 5
+
+introduces a novel paradigm that bridges discrete and continuous 2D Gaussian representations optimized with a joint L1+SSIM loss, generating sharper and perceptually faithful predictions. Meanwhile, unlike diffusion-based approaches that incur expensive iterative sampling and high training costs, PDR retains real-time inference and lightweight optimization, making it suitable for practical forecasting and closed-loop decision systems. 
+
+3 Method 
+
+3.1 PDR Paradigm 
+
+We introduce Predictive Differentiable Rendering (PDR) , a unified paradigm that reformulates video prediction from discrete pixel regression into structured dynamics learning in both discrete and continuous domains (See Figure 2). In-stead of directly forecasting future pixels, our framework parameterizes each predicted frame as a compact, continuous scene representation. Temporal evolu-tion is learned jointly across two complementary domains: a pixel-space predictor captures global motion and coarse structures, while a parameter-space adapter models fine-grained dynamics. Formally, given an observed video sequence X1: T = {x1, x 2, . . . , x T }, the goal is to forecast the future frames bXT +1: T +τ . Under the PDR paradigm, the system jointly models temporal dynamics in both discrete and continuous spaces. Given past frames X1: T , the pixel space predictor Fp produces a coarse future forecast: 
+
+eXT +1: T +τ = Fp(X1: T ). (1) The continuous space module refines this coarse prediction by predicting a parametric representation and rendering it into a pixel-aligned map, where Fc
+
+denotes the continuous-space predictor and R is the differentiable renderer that converts the parametric outputs into the pixel grid: 
+
+YT +1: T +τ = R Fc( eXT +1: T +τ ). (2) The final prediction is obtained by fusing the coarse and rendered branches, where Φ is a lightweight learnable fusion function: 
+
+bXT +1: T +τ = Φ
+
+ eXT +1: T +τ
+
+| {z }
+
+> pixel space prediction
+
+, YT +1: T +τ
+
+| {z }
+
+> continuous space prediction
+
+
+
+(3) In the next section, we instantiate PDR using 2D Gaussian representations to demonstrate its effectiveness. 
+
+3.2 Instantiation of PDR Preliminary on 2D Gaussian Splatting We employ a 2D Gaussian field as a continuous representation of each video frame. Formally, each frame is repre-sented by a set of N anisotropic 2D Gaussians G = {(μi, s i, θ i, a i)}Ni=1 , where each Gaussian is defined by four key learnable components: 6 Y. Tang et al. 
+
+– Coordinates μi ∈ R2: spatial center of the Gaussian. 
+
+– Scale si ∈ R2: axis-aligned radius controlling spread along x and y.
+
+– Rotation θi ∈ R: in-plane orientation. 
+
+– Amplitude ai ∈ RC : channel-aware intensity vector modulating contribu-tions across C channels. Each Gaussian defines a local spatial density over the image plane: 
+
+fi(p|μi, Σ i) = 12πp|Σi| exp 
+
+
+
+− 12 (p − μi)⊤Σ−1 
+
+> i
+
+(p − μi)
+
+
+
+(4) We construct the covariance matrix using the rotation matrix R and scaling matrix S, defined respectively as: 
+
+Σ = ( RS )( RS )T , (5) where 
+
+R =
+
+cos( θ) − sin( θ)sin( θ) cos( θ)
+
+
+
+, S =
+
+s1 00 s2
+
+
+
+(6) Here, θ represents the rotation angle, and s1 and s2 are scaling factors in different eigenvector directions. To ensure stability and interpretability, we constrain all Gaussian parameters within valid physical ranges. Spatial coordinates μi are normalized to [−1, 1] via a tanh activation. For rotations θi, we apply a tanh activation followed by a scaling factor of π/ 2, resulting in θi ∈ [−π/ 2, π/ 2] . Meanwhile, scales si and amplitudes ai are restricted to [0 , 1] using sigmoid functions. The rendered image is obtained by additive accumulation over all Gaussians: 
+
+x(p) = 
+
+> N
+
+X
+
+> i=1
+
+ai · fi(p). (7) Unlike traditional RGB-based splatting pipelines that rely on explicit opacity blending, this amplitude-based formulation naturally extends to arbitrary chan-nel dimensions, making it applicable to diverse spatiotemporal modalities. 
+
+PredGS To bridge discrete pixel predictions with continuous parametric rep-resentations, we introduce PredGS , a lightweight plug-and-play adapter that learns to map pixel space features into Gaussian parameter space. This adapter enables any existing video prediction backbone to be extended into the PDR framework without architectural modification. Given the spatiotemporal fea-tures F ∈ RB×T ×C×H×W extracted by a pixel space predictor (e.g., TAU [31]), the downsampler in the adapter first performs spatial average pooling to obtain compact feature descriptors that encode temporal and contextual information while reducing computational cost. These descriptors are then projected into the Gaussian parameter space through four dedicated multilayer perceptrons (MLPs), each responsible for regressing one specific parameter set: coordinates 
+
+(μ), scales (s), rotation angles (θ), and channel-aware amplitudes (a):Learning Video Dynamics with Predictive Differentiable Rendering 7
+
+(μ, s, θ, a ) =  MLP μ(F), MLP s(F), MLP θ (F), MLP a(F). (8) This process yields N parameterized Gaussians per frame, which are sub-sequently rendered into pixel space using the differentiable 2D Gaussian ren-derer. The rendered results are fused with the original pixel-space predictions via channel-wise concatenation followed by a 1×1 convolution layer, producing the final output bXT +1: T +τ .
+
+3.3 Training and Optimization 
+
+The training of PDR involves jointly optimizing the pixel space predictor, the PredGS adapter, and the differentiable Gaussian renderer in an end-to-end man-ner. Although the framework is conceptually simple, effective convergence and real-time efficiency require careful designs. This section details three key as-pects that stabilize and enhance training: (i) a robust initialization strategy for Gaussian coordinates, (ii) a CUDA-optimized differentiable rendering, and (iii) a perceptually aligned loss function. 
+
+Gaussian Coordinate Initialization The initialization of Gaussian coordi-nates plays a critical role in the convergence of PDR. Poor initialization often leads to unstable parameter updates, particularly during early training when gradients are dominated by random noise. We introduce a systematic initializa-tion scheme for the coordinate prediction MLPs, corresponding to the parameter regression heads in Eq. 8 that produces (μ, s, θ, a ).All weights of the coordinate MLP are zero-initialized to avoid biasing toward any spatial direction, while biases are initialized using spatial features extracted from the final frame of the first training sequence. We investigate four spatial initialization strategies for positioning Gaussian centers within the normalized domain [−1, 1] : (i) uniform Cartesian grid sampling, (ii) Harris corner-based feature sampling, (iii) top-N brightest pixels sampling, and (iv) random uniform sampling. We observe from the ablation study (See Table 8) that the uniform grid initialization leads to the most stable and consistent convergence behavior. 
+
+Efficient Differentiable Rendering To meet real-time performance demands, we design a highly optimized differentiable renderer implemented as a dedicated CUDA package, predgsplat . While prior 2D Gaussian rendering implementa-tions (e.g., GaussianSR [11]) suffer from substantial computational overhead due to repeated affine transformations and inefficient memory access, our renderer achieves significant acceleration through two key optimizations. 
+
+(1) Coordinate normalization without affine transformation. Instead of performing costly per-Gaussian affine transformations to align coordinates with the rendering grid, we predefine a normalized base grid and directly add the predicted coordinates, which are already constrained to [−1, 1] . This simple but effective design eliminates matrix multiplications, minimizes memory movement, and ensures alignment stability during training. 8 Y. Tang et al. 
+
+(2) Fully vectorized CUDA kernel for Gaussian rasterization. We implement a custom CUDA kernel that parallelizes computation across both Gaussian instances and channel dimensions. The kernel supports arbitrary chan-nel numbers and efficiently aggregates Gaussian contributions through additive accumulation in a single pass. Algorithm 1 summarizes the rendering procedure used in predgsplat. To-gether, these optimizations yield up to a 10 × speedup compared with the baseline (GaussianSR) implementation, achieving over 1000 FPS at 256 ×256 resolution. 
+
+Algorithm 1 predgsplat Rendering Acceleration Algorithm                                                                       
+
+> Require: coords ([B, T, N, 2] ∈[−1,1] ), scale ([B, T, N, 2] ∈[0 ,1] ), rotation
+> ([B, T, N ]∈[−π/ 2, π/ 2] ), amplitudes ([B, T, N, C ]∈[0 ,1] )
+> Ensure: Rendered video of shape [B, T, C, H, W ]
+> 1: Initialize: frame size (H, W ), kernel size K
+> 2: Construct local 2D grid of shape [K, K, 2] in range [−5,5]
+> 3: Construct normalized base grid of shape [1 , H, W, 2] in range [−1,1] , register as
+> base_grid
+> 4: Reshape all inputs to shape [B×T, N, . . . ]
+> 5: Render Gaussian kernels using custom CUDA kernel:
+> gaussians ←predgsplat (coords, scale, rotation, grid, amplitudes)
+> 6: Pad kernels with zeros to match frame size (H, W )
+> 7: Flatten to [P, C, H, W ]where P=B×T×N
+> 8: Generate sampling grid: sampling_grid ←base_grid +coords
+> 9: Sample patches using grid_sample and sampling_grid
+> 10: Reshape to [B, T, N, C, H, W ], then sum over N
+> 11: return rendered video of shape [B, T, C, H, W ]
+
+Loss Function Most existing video prediction models are trained with the MSE loss, which encourages pixel-wise averaging and over-smoothed predictions. To better capture perceptual structure and local coherence, we employ a hybrid ob-jective that combines the pixel-wise L1 loss with the Structural Similarity Index Measure (SSIM) Loss. The L1 term preserves accurate intensity reconstruction, while the SSIM term emphasizes structural consistency and contrast, effectively mitigating the blurring artifacts of MSE-based training. The overall objective function is defined as: 
+
+L = λ L1 + (1 − λ) LSSIM , (9) where the balance coefficient λ is empirically set to 0.5 for all experiments. Learning Video Dynamics with Predictive Differentiable Rendering 9
+
+4 Experiment 
+
+Datasets. We evaluate PDR across four widely used video prediction bench-marks, namely TaxiBJ [53], WeatherBench [27], Human3.6M [27], and 
+
+KTH [28], covering diverse spatial resolutions, temporal horizons, and chan-nel dimensionalities. Together, these datasets span resolutions from 32 ×32 to 
+
+256 ×256 , cover both short- and long-term forecasting scenarios, and include modalities ranging from RGB videos to multi-variable real-world datasets. 
+
+Baselines. We compare PDR with a comprehensive set of recurrent-based mod-els and recurrent-free deterministic video prediction baselines. In our main exper-iments, we adopt TAU [31] as the pixel-space predictor. PDR not only surpasses TAU but also outperforms all baselines across the four datasets. It obtains the highest SSIM on Human3.6M and KTH, as well as significant reductions in MSE and MAE on TaxiBJ and WeatherBench, while maintaining real-time inference speed with negligible additional parameters and FLOPs. In addition, our ab-lation studies extensively examine how the proposed PDR paradigm improves various temporal translators within the SimVP [7] framework, further demon-strating its generality and plug-and-play capability. 
+
+Implementation Details. All models are implemented in PyTorch and trained on NVIDIA A800 GPUs (4 GPUs for Human3.6M and 1 GPU for the other datasets), following the official TAU training protocol [31]. We use the AdamW optimizer with a weight decay of 1 × 10 −2 and adopt the hybrid L1 + SSIM objective with a balancing coefficient λ = 0 .5. For fairness, PDR is trained with the same number of epochs as TAU across all datasets. We apply dataset-specific spatial downsampling and Gaussian configurations to balance accuracy and efficiency: TaxiBJ and WeatherBench use 2× downsampling with N = 300 
+
+Gaussians and a kernel size of 15, while KTH and Human3.6M adopt 8× and 
+
+16 × downsampling, respectively, with N = 400 and a kernel size of 51. All other hyperparameter details are provided in the Appendix. 
+
+Evaluation Metrics. We evaluate model performance using both accuracy and perceptual quality metrics. For quantitative assessment, we report pixel-wise errors including MSE, MAE, and RMSE. To measure perceptual fidelity and structural consistency, we adopt SSIM, PSNR, and LPIPS. We compare computational efficiency between TAU and PDR, reporting parameters, FLOPs measured on an NVIDIA A800 GPU as depicted in Figure 1(b). 
+
+4.1 Real-world Prediction: TaxiBJ and WeatherBench 
+
+PDR achieves state-of-the-art performance on both TaxiBJ and WeatherBench benchmarks. On TaxiBJ, it outperforms TAU with an 8.9% reduction in MSE and a 4.1% reduction in MAE, while further improving SSIM and PSNR by 0.2% and 0.7%, respectively, leading to sharper and more spatially consistent predic-tions. On WeatherBench, PDR continues to deliver consistent gains, lowering MSE and RMSE by 2.5% and 0.9%, respectively. These results demonstrate that integrating continuous Gaussian-space modeling substantially enhances both ac-curacy and perceptual fidelity in real-world forecasting tasks. 10 Y. Tang et al. 
+
+Table 1: Performance on TaxiBJ (4 → 4 frames) and WeatherBench (T2m) (12 →
+
+12 frames). The best and second-best results are highlighted in red and yellow. Dataset TaxiBJ WeatherBench(T2m)                                                                                                       
+
+> Metric MSE ↓MAE ↓SSIM ↑PSNR ↑MSE ↓MAE ↓RMSE ↓
+> ConvLSTM [29](NeurIPS’2015) 0.3358 15.32 0.9836 39.45 1.521 0.7949 1.233 PredNet [18](ICLR’2017) 0.3516 15.91 0.9828 39.29 –––PredRNN [42](NeurIPS’2017) 0.3194 15.31 0.9838 39.51 1.331 0.7246 1.154 PredRNN++ [40](ICML’2018) 0.3348 15.37 0.9834 39.47 1.634 0.7883 1.278 MIM [44](CVPR’2019) 0.3110 14.96 0.9847 39.65 1.784 0.8716 1.336 E3DLSTM [41](ICLR’2019) 0.3421 14.98 0.9842 39.64 1.592 0.8059 1.233 PhyDNet [10](CVPR’2020) 0.3622 15.53 0.9828 39.46 285.9 8.7370 16.91 MAU [3](NeurIPS’2021) 0.3268 15.26 0.9834 39.52 1.251 0.7036 1.119 PredRNNv2 [43](TPAMI’2022) 0.3834 15.55 0.9826 39.49 1.545 0.7986 1.243 SimVP [7](CVPR’2022) 0.3282 15.45 0.9835 39.71 1.238 0.7037 1.113 TAU [31](CVPR’2023) 0.3108 14.93 0.9848 39.74 1.162 0.6707 1.078 DMVFN [12](CVPR’2023) 0.3517 15.72 0.9833 31.14 –––WAST [23](AAAI’2024) 0.3080 14.90 0.9840 39.73 1.098 0.6338 1.044 USTEP [33](TPAMI’2025) ––––1.215 0.6961 1.072 PredFormer [36](TMLR’2026) 0.2840 14.40 0.9860 –1.116 0.6510 1.057
+> PDR (Ours) 0.2807 14.29 0.9865 39.99 1.071 0.6353 1.035
+
+4.2 Video Prediction: Human3.6M and KTH 
+
+On Human3.6M, PDR achieves state-of-the-art performance, improving SSIM and PSNR by 0.2% and 0.7%, respectively, while reducing LPIPS by a remark-able 21.2% compared to TAU, yielding sharper and more perceptually faithful predictions. On KTH, PDR continues to outperform TAU, achieving a 0.6% gain in SSIM and a substantial 29.0% reduction in LPIPS, demonstrating its strong generalization across different motion dynamics. 
+
+4.3 Comparison with Diffusion-based Video Prediction 
+
+Beyond the deterministic baselines above, we further compare PDR against state-of-the-art diffusion-based video prediction methods on KTH (Tab. 3). PDR attains the best PSNR and SSIM among all methods. The LPIPS gap re-flects an expected trade-off: a deterministic single-pass predictor sacrifices some perceptual sharpness relative to iterative diffusion sampling, yet PDR runs 33 ×
+
+faster than the strongest diffusion competitor (ARFree [15]), sustaining real-time throughput that diffusion-based samplers cannot reach. This supports our cen-tral claim that continuous Gaussian-space modeling improves fidelity without forfeiting the efficiency required for real-time forecasting. 
+
+4.4 PredGS as a Plug-and-Play Adapter 
+
+To assess the generality of our plug-and-play representation ability, we inte-grate the PDR framework and PredGS adapter into a range of MetaFormer backbones on the WeatherBench dataset. As summarized in Table 4, PDR con-sistently enhances prediction accuracy across all architectures, demonstrating its strong adaptability and backbone-agnostic design. From a relative improvement Learning Video Dynamics with Predictive Differentiable Rendering 11 
+
+Table 2: Performance on Human3.6M (4 → 4 frames) and KTH (10 → 20 frames). Dataset Human3.6M KTH 
+
+Metric SSIM ↑ PSNR ↑ LPIPS ↓ SSIM ↑ PSNR ↑ LPIPS ↓
+
+ConvLSTM [29](NeurIPS’2015) 0.9813 33.40 0.03557 0.8977 26.99 0.26686 PredNet [18](ICLR’2017) 0.9786 31.76 0.03264 0.8094 22.45 0.32159 PredRNN [42](NeurIPS’2017) 0.9831 33.94 0.03245 0.9097 27.95 0.21892 PredRNN++ [40](ICML’2018) 0.9832 34.02 0.03196 0.9124 28.13 0.19871 E3D-LSTM [41](ICLR’2019) 0.9803 32.52 0.04133 0.8153 21.78 0.48358 MIM [44](CVPR’2019) 0.9829 33.97 0.03338 0.9025 27.78 0.18808 PhyDNet [10](CVPR’2020) 0.9804 33.05 0.03709 0.8322 23.41 0.50155 MAU [3](NeurIPS’2021) 0.9812 33.33 0.03561 0.8945 26.73 0.25442 PredRNN.V2 [43](TPAMI’2022) 0.9827 33.84 0.03334 0.9099 28.01 0.21478 SimVP [7](CVPR’2022) 0.9834 34.08 0.03224 0.9065 27.46 0.26496 TAU [31](CVPR’2023) 0.9839 34.03 0.02783 0.9086 27.10 0.22856 DMVFN [12](CVPR’2023) 0.9833 34.05 0.03189 0.8976 26.65 0.12842 WAST [23](AAAI’2024) 0.9839 34.19 – – – –USTEP [33](TPAMI’2025) 0.9838 34.11 – 0.9135 28.47 0.20350 PredFormer [36](TMLR’2026) 0.9839 34.14 0.03069 – – –
+
+PDR (Ours) 0.9857 34.27 0.02192 0.9145 26.98 0.16237 
+
+Table 3: PDR vs. state-of-the-art diffusion-based video prediction on KTH (64 ×64 ,
+
+10 → 30 frames). Diffusion baselines are re-aggregated from ARFree [15] (Tab. 1); FPS measured on an NVIDIA A800 GPU. Best results in red .Method (Venue’Year) PSNR ↑ SSIM ↑ LPIPS ↓ FPS ↑
+
+RVD [49] (arXiv’22) 24.18 0.769 0.125 0.10 MCVD [38] (NeurIPS’22) 25.04 0.823 0.102 2.47 LFDM [22] (CVPR’23) 22.47 0.685 0.154 2.03 STDiff [51] (AAAI’24) 24.16 0.773 0.107 0.76 ExtDM [56] (CVPR’24) 22.16 0.711 0.167 48.19 ARFree [15] (ICIP’25) 25.74 0.813 0.068 4.41 
+
+PDR+TAU (Ours) 26.69 0.825 0.130 146 
+
+perspective, PDR yields the largest MSE reduction of 8.1% on the MLP-Mixer backbone, while achieving the greatest MAE improvement of 6.7% on ConvNeXt. These results highlight that the continuous Gaussian space modeling in PDR effectively complements diverse architectural priors, making it a powerful and universally applicable prediction booster. 
+
+4.5 Ablation Study and Visualization 
+
+To better understand the contribution of each component in PDR, we conduct a set of ablation studies emphasizing four key design aspects: loss function, representation capacity, initialization strategy, and fusion mechanism. 
+
+(1) What loss function best supports perceptually faithful prediction? 
+
+Table 5 reveals an important discovery about the interplay between continuous representation and loss function design. Switching from L2+regularization to L1+SSIM yields minor improvement for TAU (0.6% MSE reduction on Tax-iBJ), but the same change substantially boosts PDR, achieving 9.7% MSE re-12 Y. Tang et al. 
+
+Table 4: Boosting performance: PDR for various MetaFormers on WeatherBench(T2m). MetaFormer MSE ↓ MAE ↓                                                                 
+
+> w/o w PDR ∆↑w/o w PDR ∆↓
+> SimVP 1.238 1.229 0.73% 0.7037 0.6869 2.39%
+> TAU 1.162 1.071 7.83% 0.6707 0.6353 5.28%
+> SimVPv2 1.105 1.078 2.44% 0.6567 0.6349 3.32%
+> ConvNeXt 1.277 1.196 6.34% 0.7220 0.6735 6.72%
+> HorNet 1.201 1.157 4.16% 0.6906 0.6579 4.74%
+> MogaNet 1.152 1.092 5.21% 0.6665 0.6353 4.68%
+> ViT 1.146 1.127 1.66% 0.6712 0.6479 3.47%
+> Swin 1.143 1.101 3.67% 0.6735 0.6414 4.77%
+> Uniformer 1.204 1.153 4.24% 0.6885 0.6623 3.81%
+> Poolformer 1.156 1.104 4.50% 0.6715 0.6391 4.83%
+> VAN 1.150 1.110 3.48% 0.6803 0.6478 4.78%
+> MLP-Mixer 1.255 1.154 8.05% 0.7011 0.6563 6.39%
+
+Table 5: Ablation of Loss Func-tion. Replacing L2 + reg with L1 +
+
+SSIM improves performance; com-bining with PDR yields the largest gains. Module TaxiBJ WeatherBench KTH                                            
+
+> MSE ↓MAE ↓MSE ↓MAE ↓SSIM ↑LPIPS ↓
+> TAU+L2+reg 0.3108 14.93 1.162 0.6707 0.9086 0.22856
+> (base) (base) (base) (base) (base) (base)
+> TAU+L1+SSIM 0.3088 14.43 1.136 0.6547 0.9137 0.20216
+> 0.6% ↓3.3% ↓2.2% ↓2.4% ↓0.6% ↑11.6% ↓
+> PDR+L2+reg 0.3400 15.27 1.177 0.6764 0.9127 0.21850
+> 9.4% ↑2.3% ↑1.3% ↑0.8% ↑0.5% ↑4.4% ↓
+> PDR+L1+SSIM 0.2807 14.29 1.071 0.6353 0.9145 0.16237
+> 9.7% ↓4.3% ↓7.8% ↓5.3% ↓0.6% ↑29.0% ↓
+
+Table 6: Ablation of PredGS on Weath-erBench (Gaussian count; Downsampling & MLP dim).                   
+
+> Gaussian Count Down & MLP Dim
+> Num MSE ↓MAE ↓Rate Dim MSE ↓
+> 100 1.107 0.6437 464 1.097 200 1.098 0.6451 2256 1.071 300 1.071 0.6353 11024 1.098 400 1.107 0.6459 500 1.097 0.6428
+
+Table 7: Ablation of Gaussian kernel size 
+
+K on TaxiBJ and WeatherBench. 
+
+TaxiBJ WeatherBench 
+
+K MSE ↓ MAE ↓ MSE ↓ MAE ↓
+
+7 0.3035 14.42 1.081 0.6367 11 0.2967 14.48 1.082 0.6378 15 0.2807 14.29 1.071 0.6353 21 0.3038 14.48 1.085 0.6371 
+
+duction on TaxiBJ and 29.0% LPIPS reduction on KTH. Notably, PDR even underperforms TAU under L2+regularization, showing that continuous Gaussian representation alone is insufficient. When trained with the same L1+SSIM loss, PDR converges faster and attains lower validation error (Figure 3) than TAU, indicating that continuous representation and perceptual supervision must be used together to realize the full benefit. Finally, the ablation in Table 8 shows that balancing the two terms with λ = 0 .5 yields the best trade-off. 
+
+(2) How sensitive is PredGS to representation granularity? We first analyze the impact of representation granularity in Table 6. A few hundred Gaussians with moderate downsampling and a mid-sized MLP yield the best performance. These results indicate that PredGS achieves strong local modeling capacity without heavy parameterization. Table 7 investigates the Gaussian ker-nel size K. We observe a consistent speed–accuracy trade-off: small K truncates spatial support and degrades quality, while large K increases computation with diminishing gains. Constraining K to be a value no larger than half of the spatial resolution provides stable performance. 
+
+(3) Does coordinate initialization matter? As shown in Table 8, among several schemes (random, feature-based, color-based, and grid-based), uniform grid initialization produces the lowest prediction errors. This highlights that a spatially even Gaussian prior helps the model learn structured motion faster Learning Video Dynamics with Predictive Differentiable Rendering 13 
+
+Fig. 3: Training and validation loss curves on KTH. We compare TAU and PDR under the same L1 + SSIM objective. PDR exhibits faster convergence and consistently lower validation loss, indicating improved stability and generalization during training. 
+
+Table 8: Ablation on TaxiBJ: coordinate initialization, fusion strategy, and loss weight.                                      
+
+> Coord. Init. Fusion Method Loss Weight λ
+> Method MSE ↓MAE ↓Method MSE ↓MAE ↓λMSE ↓MAE ↓
+> w/o init 0.2893 14.36 TAU 0.3108 14.93 00.3852 16.58 grid 0.2807 14.29 GS only 0.3501 15.33 0.5 0.2807 14.29
+> color 0.3024 14.37 add 0.2998 14.31 0.8 0.2850 14.30 corner 0.3052 14.42 concat 0.2807 14.29 10.2907 14.32
+
+and more reliably. Training without init still converges and outperforms TAU, confirming that PredGS learns dynamics. 
+
+(4) How should pixel-space and Gaussian-space predictions be fused? 
+
+We explore various fusion operators between the discrete and continuous outputs in Table 8. Simple addition provides limited improvement, whereas channel-wise concatenation followed by a lightweight convolution achieves the best perfor-mance. This confirms that the two domains encode complementary cues—coarse motion from pixels and fine-grained structure from Gaussian space—and benefit from adaptive, learnable integration. 
+
+Rendering Efficiency Analysis. Table 9 summarizes the rendering performance of different implementations of our 2D Gaussian renderer across multiple res-olutions on an NVIDIA A800 GPU. First, a lightweight base grid registration eliminates costly affine transformations by directly offsetting a pre-defined nor-malized grid with predicted coordinates, yielding a 1.3∼3.4× speedup. Second, we design a fully vectorized CUDA kernel that supports arbitrary-channel ren-dering and parallel Gaussian rasterization. This kernel provides an additional 
+
+2∼5× acceleration. When combined, these two optimizations deliver an over-all improvement of up to 13 × over the baseline implementation, maintaining real-time throughput even at high resolutions. 
+
+Temporal Coherence. A natural concern is whether predicting Gaussian param-eters on a per-frame basis introduces temporal flicker. To verify this, we report 14 Y. Tang et al. 
+
+Table 9: FPS comparison of different rendering variants at various resolutions, averaged over 100 runs on an NVIDIA A800 GPU.                                  
+
+> Resolution 32 ×32 64 ×64 128 ×128 256 ×256
+> Kernel size 15 15 51 51 Gaussians 300 300 400 400 Base 1086 508 209 90 + base_grid 1381 803 399 307 + CUDA 2764 1447 430 114
+> predgsplat 7648 6665 3242 1149
+> Acceleration Rate ×7×13 ×16 ×13
+
+Table 10: Concentration analysis on KTH. Comparison of distribution statis-tics (kurtosis, saturation, diversity, and upper percentile) across methods.                      
+
+> Method Kurtosis ↑Saturation ↓Diversity ↑90th %ile
+> (peakiness) (pixels =1.0) (unique vals) (threshold) GT 10.97 9.56% 211 0.996 TAU 3.85 10.42% 167 1.000
+> (−64.9%) (+9.0%) (−20.9%) (+0.4%)
+> PDR 6.95 9.78% 192 0.996
+> (−36.6%) (+2.3%) (−9.0%) (0.0%)
+
+Table 11: Temporal Warping Error (TWE) on KTH. Lower is not strictly better: values should approach the GT RAFT noise floor without dropping below it (which would indicate over-smoothing). PDR sits between the over-smoothed TAU baseline and the GT floor. Source TWE-L1 TWE-L2 GT (RAFT noise floor) 0.01388 0.00219 TAU+ L2+reg 0.00753 0.00079   
+
+> PDR prediction 0.00812 0.00129
+
+the Temporal Warping Error (TWE) on KTH (Tab. 11), computed by estimat-ing RAFT-small [37] optical flow between consecutive ground-truth frames and warping the prediction at t into t+1 . Crucially, TWE must be read jointly with sharpness rather than minimized in isolation: a degenerate all-gray video trivially attains TWE → 0. A method is temporally coherent when it (i) approaches the ground-truth RAFT noise floor without exceeding it and (ii) preserves compet-itive SSIM/LPIPS. PDR’s TWE lies between the over-smoothed TAU baseline and the GT floor, indicating that it restores sharper, GT-closer detail without 
+
+entering the flicker regime. Together with the distributional analysis above, this confirms that PDR improves per-frame fidelity while preserving temporal con-sistency. 
+
+Visualization and Analysis. Figure 4 presents qualitative comparisons on the KTH dataset. TAU yields blurred contours and smoothed motion, whereas PDR retains sharper shapes and limb boundaries. To understand this improvement, we examine intensity distributions (Figure 5a). KTH contains inherently multi-modal motion patterns (e.g., arm swing directions). Under MSE training, TAU collapses these modes and produces over-flattened predictions, reflected by re-duced kurtosis and lower intensity diversity, along with an excessive saturation spike at 1.0. In contrast, PDR substantially restores the peaked intensity dis-tribution and recovers 56% of the kurtosis gap and 57% of the diversity gap between TAU and ground truth, while matching the GT 90th-percentile thresh-old. This distributional evidence confirms that PDR ’s continuous Gaussian rep-Learning Video Dynamics with Predictive Differentiable Rendering 15 Input: t=1->t=10 
+
+GT: t=11->t=30 
+
+TAU: t=11->t=30 
+
+PDR: t=11->t=30 
+
+Fig. 4: Visualization on KTH. 0.0 0.2 0.4 0.6 0.8 1.0                            
+
+> Normalized Intensity
+> 0
+> 1000
+> 2000
+> 3000
+> 4000
+> 5000
+> 6000
+> 7000
+> Count
+> GT
+> Full Histogram
+> 90th = 0.996
+> 0.5 0.6 0.7 0.8 0.9 1.0
+> Normalized Intensity
+> 0
+> 1000
+> 2000
+> 3000
+> 4000
+> 5000
+> 6000
+> 7000
+> Count
+> High Intensity (>0.5)
+> 90th %ile
+> Original Frame
+> Kurt: 11.0
+> Unique: 211
+> Sat: 9.6%
+> Pixels > 90th Percentile
+> 0.0 0.2 0.4 0.6 0.8 1.0
+> Normalized Intensity
+> 0
+> 1000
+> 2000
+> 3000
+> 4000
+> 5000
+> 6000
+> 7000
+> Count
+> TAU
+> 90th = 1.000
+> 0.5 0.6 0.7 0.8 0.9 1.0
+> Normalized Intensity
+> 0
+> 1000
+> 2000
+> 3000
+> 4000
+> 5000
+> 6000
+> 7000
+> Count
+> 90th %ile Kurt: 3.8
+> Unique: 167
+> Sat: 10.4%
+> 0.0 0.2 0.4 0.6 0.8 1.0
+> Normalized Intensity
+> 0
+> 1000
+> 2000
+> 3000
+> 4000
+> 5000
+> 6000
+> 7000
+> Count
+> PDR
+> 90th = 0.996
+> 0.5 0.6 0.7 0.8 0.9 1.0
+> Normalized Intensity
+> 0
+> 1000
+> 2000
+> 3000
+> 4000
+> 5000
+> 6000
+> 7000
+> Count
+> 90th %ile Kurt: 6.9
+> Unique: 192
+> Sat: 9.8%
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> KTH Diagnostic Analysis: Mode Selection Comparison
+
+(a) Comprehensive diagnostic analysis on KTH. Input 
+
+GT 
+
+TAU 
+
+Error 
+
+PDR 
+
+Error 
+
+PDR 
+
+Pred 
+
+PDR Error TAU Error 
+
+(1) TaxiBJ 
+
+(2) WeatherBench(T2m) 
+
+t=20 
+
+TAU Pred PDR Pred 
+
+t=6 
+
+(3) Human3.6m (b) Visualization on TaxiBJ, WeatherBench, and Human3.6M. 
+
+Fig. 5: Qualitative and diagnostic results across datasets. Left: KTH diagnostic anal-ysis. Right: Visual comparisons on TaxiBJ, WeatherBench, and Human3.6M. 
+
+resentation selectively preserves salient motion modes, mitigating deterministic over-smoothing and improving long-term prediction fidelity. Figure 5b further compares results on TaxiBJ, WeatherBench, and Human3.6M. Table 10 presents quantitative evidence for mode selection failure in TAU and partial recovery in PDR. TAU’s dramatic kurtosis reduction ( −64.9%) demonstrates extreme dis-tributional flattening, while PDR recovers to 6.95, representing 56% recovery of the gap between TAU and GT. Similarly, PDR recovers 57% of the intensity diversity gap, maintaining 192 unique values compared to TAU’s 167 and GT’s 211. We provide a more detailed analysis in the Appendix. 
+
+5 Conclusion 
+
+In this work, we introduce PDR, a unified end-to-end framework for video pre-diction that bridges discrete and continuous 2D Gaussian representations. By incorporating a lightweight and plug-and-play PredGS adapter, we extend pixel space predictors with a continuous rendering predictor. Our optimized differen-tiable renderer enables real-time inference, making the approach practical for large-scale forecasting. Comprehensive experiments show that PDR consistently improves visual realism and predictive accuracy. Overall, PDR establishes a novel paradigm for embedding continuous space representations into efficient determin-istic forecasting models, paving the way for future research in this direction. 16 Y. Tang et al. 
+
+References 
+
+1. Babaeizadeh, M., Finn, C., Erhan, D., Campbell, R.H., Levine, S.: Stochastic vari-ational video prediction. In: ICLR (2018) 2. Bi, K., Xie, L., Zhang, H., Chen, X., Gu, X., Tian, Q.: Accurate medium-range global weather forecasting with 3d neural networks. In: Nature (2023) 3. Chang, Z., Zhang, X., Wang, S., Ma, S., Ye, Y., Xinguang, X., Gao, W.: Mau: A motion-aware unit for video prediction and beyond. In: NeurIPS (2021) 4. Chen, Z., Wang, F., Wang, Y., Liu, H.: Text-to-3d using gaussian splatting (2024) 5. Facebook AI Research: fvcore. https://github.com/facebookresearch/fvcore 
+
+(2019), accessed: 2026-06-25 6. Fang, S., Zhang, Q., Meng, G., Xiang, S., Pan, C.: Gstnet: Global spatial-temporal network for traffic flow prediction. In: IJCAI (2019) 7. Gao, Z., Tan, C., Wu, L., Li, S.Z.: Simvp: Simpler yet better video prediction. In: CVPR (2022) 8. Gao, Z., Shi, X., Han, B., Wang, H., Jin, X., Maddix, D., Zhu, Y., Li, M., Wang, Y.B.: Prediff: Precipitation nowcasting with latent diffusion models. In: NeurIPS (2023) 9. Gao, Z., Shi, X., Wang, H., Zhu, Y., Wang, Y.B., Li, M., Yeung, D.Y.: Earthformer: Exploring space-time transformers for earth system forecasting. In: NeurIPS (2022) 10. Guen, V.L., Thome, N.: Disentangling physical dynamics from unknown factors for unsupervised video prediction. In: CVPR (2020) 11. Hu, J., Xia, B., Chen, B., Yang, W., Zhang, L.: Gaussiansr: High fidelity 2d gaus-sian splatting for arbitrary-scale image super-resolution. In: AAAI (2025) 12. Hu, X., Huang, Z., Huang, A., Xu, J., Zhou, S.: A dynamic multi-scale voxel flow network for video prediction. In: CVPR (2023) 13. Huang, Y.H., Sun, Y.T., Yang, Z., Lyu, X., Cao, Y.P., Qi, X.: Sc-gs: Sparse-controlled gaussian splatting for editable dynamic scenes. arXiv preprint arXiv:2312.14937 (2023) 14. Kerbl, B., Kopanas, G., Leimkühler, T., Drettakis, G.: 3d gaussian splatting for real-time radiance field rendering. ACM Transactions on Graphics 42 (4) (2023) 15. Ko, W., Park, J.B., Chun, I.Y.: Autoregression-free video prediction using diffusion model for mitigating error propagation. ICIP (2025) 16. Li, H., Chen, C., Li, X., Lu, G.: 2d gaussian splatting with semantic alignment for image inpainting. In: Arxiv (2025) 17. Lin, X., Luo, S., Shan, X., Zhou, X., Ren, C., Qi, L., Yang, M.H., Vasconcelos, N.: Hqgs: High-quality novel view synthesis with gaussian splatting in degraded scenes. In: ICLR (2025) 18. Lotter, W., Kreiman, G., Cox, D.: Deep predictive coding networks for video pre-diction and unsupervised learning. In: ICLR (2017) 19. Luiten, J., Kopanas, G., Leibe, B., Ramanan, D.: Dynamic 3d gaussians: Tracking by persistent dynamic view synthesis. arXiv preprint arXiv:2308.09713 (2023) 20. Mathieu, M., Couprie, C., LeCun, Y.: Deep multi-scale video prediction beyond mean square error. In: ICLR (2016) 21. Matsuki, H., Murai, R., Kelly, P.H.J., Davison, A.J.: Gaussian Splatting SLAM. In: cvpr (2024) 22. Ni, H., Shi, C., Li, K., Huang, S.X., Min, M.R.: Conditional image-to-video gen-eration with latent flow diffusion models. In: CVPR (2023) 23. Nie, X., Yan, Y., Li, S., Tan, C., Chen, X., Jin, H., Zhu, Z., Li, S.Z., Qi, D.: Wavelet-driven spatiotemporal predictive learning: Bridging frequency and time variations. In: AAAI (2024) Learning Video Dynamics with Predictive Differentiable Rendering 17 24. Pallotta, E., Azar, S.M., Li, S., Zatsarynna, O., Gall, J.: Syncvp: joint diffusion for synchronous multi-modal video prediction. In: CVPR (2025) 25. Pathak, J., Subramanian, S., Harrington, P., Raja, S., Chattopadhyay, A., Mar-dani, M., Kurth, T., Hall, D., Li, Z., Azizzadenesheli, K., et al.: Fourcastnet: A global data-driven high-resolution weather model using adaptive fourier neural op-erators. In: Arxiv (2022) 26. Peng, L., Wu, A., Li, W., Xia, P., Dai, X., Zhang, X., Di, X., Sun, H., Pei, R., Wang, Y., et al.: Pixel to gaussian: Ultra-fast continuous super-resolution with 2d gaussian modeling. In: Arxiv (2025) 27. Rasp, S., Dueben, P.D., Scher, S., Weyn, J.A., Mouatadid, S., Thuerey, N.: Weath-erbench: a benchmark data set for data-driven weather forecasting. In: Journal of Advances in Modeling Earth Systems (2020) 28. Schuldt, C., Laptev, I., Caputo, B.: Recognizing human actions: a local svm ap-proach. In: Proceedings of the 17th International Conference on Pattern Recogni-tion, 2004. ICPR 2004. vol. 3, pp. 32–36. IEEE (2004) 29. Shi, X., Chen, Z., Wang, H., Yeung, D.Y., Wong, W.K., Woo, W.c.: Convolu-tional lstm network: A machine learning approach for precipitation nowcasting. In: NeurIPS (2015) 30. Song, M., ...: D 2GS: Depth-and-density guided gaussian splatting... arXiv preprint arXiv:2510.08566 (2025) 31. Tan, C., Gao, Z., Wu, L., Xu, Y., Xia, J., Li, S., Li, S.Z.: Temporal attention unit: Towards efficient spatiotemporal predictive learning. In: CVPR (2023) 32. Tan, C., Li, S., Gao, Z., Guan, W., Wang, Z., Liu, Z., Wu, L., Li, S.Z.: Openstl: A comprehensive benchmark of spatio-temporal predictive learning. In: NeurIPS (2023) 33. Tan, C., Wang, J., Gao, Z., Li, S., Wu, L., Xia, J., Li, S.Z.: Ustep: Spatio-temporal predictive learning under a unified view. In: TPAMI (2025) 34. Tang, S., Li, C., Zhang, P., Tang, R.: Swinlstm: Improving spatiotemporal predic-tion accuracy using swin transformer and lstm. In: ICCV (2023) 35. Tang, Y., Dong, P., Tang, Z., Chu, X., Liang, J.: Vmrnn: Integrating vision mamba and lstm for efficient and accurate spatiotemporal forecasting. In: CVPRW (2024) 36. Tang, Y., Qi, L., Xie, F., Li, X., Ma, C., Yang, M.H.: Video prediction transformers without recurrence or convolution. In: TMLR (2026) 37. Teed, Z., Deng, J.: RAFT: Recurrent all-pairs field transforms for optical flow. In: ECCV (2020) 38. Voleti, V., Jolicoeur-Martineau, A., Pal, C.: MCVD: Masked conditional video diffusion for prediction, generation, and interpolation. In: NeurIPS (2022) 39. Wang, P., Li, W., Ogunbona, P., Wan, J., Escalera, S.: Rgb-d-based human mo-tion recognition with deep learning: A survey. In: Computer Vision and Image Understanding (2018) 40. Wang, Y., Gao, Z., Long, M., Wang, J., Philip, S.Y.: Predrnn++: Towards a reso-lution of the deep-in-time dilemma in spatiotemporal predictive learning. In: ICML (2018) 41. Wang, Y., Jiang, L., Yang, M.H., Li, L.J., Long, M., Fei-Fei, L.: Eidetic 3d lstm: A model for video prediction and beyond. In: ICLR (2018) 42. Wang, Y., Long, M., Wang, J., Gao, Z., Yu, P.S.: Predrnn: Recurrent neural net-works for predictive learning using spatiotemporal lstms. In: NeurIPS (2017) 43. Wang, Y., Wu, H., Zhang, J., Gao, Z., Wang, J., Philip, S.Y., Long, M.: Predrnn: A recurrent neural network for spatiotemporal predictive learning. In: TPAMI (2022) 18 Y. Tang et al. 44. Wang, Y., Zhang, J., Zhu, H., Long, M., Wang, J., Yu, P.S.: Memory in mem-ory: A predictive neural network for learning higher-order non-stationarity from spatiotemporal dynamics. In: CVPR (2019) 45. Wang, Z., Qin, Y., Zeng, L., Zhang, R.: High-dynamic radar sequence prediction for weather nowcasting using spatiotemporal coherent gaussian representation. In: ICLR (2025) 46. Wu, G., Yi, T., Fang, J., Xie, L., Zhang, X., Wei, W., Liu, W., Tian, Q., Xinggang, W.: 4d gaussian splatting for real-time dynamic scene rendering. arXiv preprint arXiv:2310.08528 (2023) 47. Yan, C., Qu, D., Xu, D., Zhao, B., Wang, Z., Wang, D., Li, X.: Gs-slam: Dense visual slam with 3d gaussian splatting. In: CVPR (2024) 48. Yan, Y., Lin, H., Zhou, C., Wang, W., Sun, H., Zhan, K., Lang, X., Zhou, X., Peng, S.: Street gaussians for modeling dynamic urban scenes. arXiv preprint arXiv:2401.01339 (2024) 49. Yang, R., Srivastava, P., Mandt, S.: Diffusion probabilistic modeling for video generation. arXiv preprint arXiv:2203.09481 (2022) 50. Yang, Z., Yang, H., Pan, Z., Zhang, L.: Real-time photorealistic dynamic scene rep-resentation and rendering with 4d gaussian splatting. In: International Conference on Learning Representations (ICLR) (2024) 51. Ye, X., Bilodeau, G.A.: STDiff: Spatio-temporal diffusion for continuous stochastic video prediction. In: AAAI (2024) 52. Yu, D., Li, X., Ye, Y., Zhang, B., Luo, C., Dai, K., Wang, R., Chen, X.: Diffcast: A unified framework via residual diffusion for precipitation nowcasting. In: CVPR (2024) 53. Zhang, J., Zheng, Y., Qi, D.: Deep spatio-temporal residual networks for citywide crowd flows prediction. In: AAAI (2017) 54. Zhang, L., Zhu, G., Shen, P., Song, J., Afaq Shah, S., Bennamoun, M.: Learning spatiotemporal features using 3dcnn and convolutional lstm for gesture recognition. In: ICCVW (2017) 55. Zhang, X., Ge, X., Xu, T., He, D., Wang, Y., Qin, H., Lu, G., Geng, J., Zhang, J.: Gaussianimage: 1000 fps image representation and compression by 2d gaussian splatting. In: ECCV (2024) 56. Zhang, Z., Hu, J., Cheng, W., Paudel, D., Yang, J.: ExtDM: Distribution extrap-olation diffusion model for video prediction. In: CVPR (2024) 57. Zhou, X., Lin, Z., Shan, X., Wang, Y., Sun, D., Yang, M.H.: Drivinggaussian: Composite gaussian splatting for surrounding dynamic autonomous driving scenes. In: arXiv (2024) 58. Zielonka, W., Bagautdinov, T., Saito, S., Zollhöfer, M., Thies, J., Romero, J.: Drivable 3d gaussian avatars. In: 3DV (2025)
