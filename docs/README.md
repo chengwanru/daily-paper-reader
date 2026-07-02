@@ -6,71 +6,41 @@
 </div>
 
 ## 每次日报
-- 最新运行日期：2026-07-01
-- 运行时间：2026-07-01 20:46:18 UTC
+- 最新运行日期：2026-07-02
+- 运行时间：2026-07-02 20:20:05 UTC
 - 运行状态：成功
-- 本次总论文数：17
-- 精读区：6
-- 速读区：11
+- 本次总论文数：7
+- 精读区：5
+- 速读区：2
 
 ### 今日简报（AI）
-今日精选6篇精读、11篇速读，聚焦世界模型与可控视频动力学方向。最值得关注的是满分论文《Orca: The World is in Your Mind》及9.0分的《DreamForge-World 0.1 Preview》，前者探索意识与世界的关联，后者实现低算力实时可控世界模型。建议优先精读这两篇，深入理解世界模型的前沿框架与低计算量应用潜力。
-- 详情：[/202607/01/README](/202607/01/README)
+今日日报收录7篇论文，精读5篇，重点推荐《From World Models to World Action Models》与《Orca》。最值得关注的是世界模型向机器人动作模型的转化教程（满分10分）和Orca提出的“世界在你心中”认知框架（9分）。建议优先精读这两篇高评分论文，再速读《MemoBench》了解动态环境下的世界模型基准。
+- 详情：[/202607/02/README](/202607/02/README)
 
 ### 精读区论文标签
-1. [Orca: The World is in Your Mind](/202607/01/2606.30534v2-orca-the-world-is-in-your-mind)  
+1. [From World Models to World Action Models: A Concise Tutorial for Robotics](/202607/02/2607.00836v1-from-world-models-to-world-action-models-a-concise-tutorial-for-robotics)  
    标签：评分：10.0/10、query:video-wam
-   evidence：通过多模态信号（包括视频）的下一状态预测构建通用世界基础模型
-2. [DreamForge-World 0.1 Preview: A Low-Compute Real-Time Controllable World Model](/202607/01/2606.30292v1-dreamforge-world-01-preview-a-low-compute-real-time-controllable-world-model)  
+   evidence：直接关于世界动作模型的教程
+2. [Orca: The World is in Your Mind](/202607/02/2606.30534v2-orca-the-world-is-in-your-mind)  
    标签：评分：9.0/10、query:video-wam
-   evidence：实时可控世界模型，采用自回归视频生成和动作路径
-3. [Efficient Sim-to-Real Transfer of World-Action Models from Synthetic Priors](/202607/01/2606.31101v1-efficient-sim-to-real-transfer-of-world-action-models-from-synthetic-priors)  
+   evidence：通用世界基础模型，通过多模态信号进行下一状态预测，包含视频
+3. [WorldRoamBench: An Open-World Benchmark for Long-Horizon Stability of Interactive World Models](/202607/02/2606.31672v1-worldroambench-an-open-world-benchmark-for-long-horizon-stability-of-interactive-world-models)  
    标签：评分：9.0/10、query:video-wam
-   evidence：世界动作模型的仿真到真实迁移
-4. [DVG-WM: Disentangled Video Generation Enables Efficient Embodied World Model for Robotic Manipulation](/202607/01/2606.32028v1-dvg-wm-disentangled-video-generation-enables-efficient-embodied-world-model-for-robotic-manipulation)  
+   evidence：交互式世界模型基准，评估动作和物理
+4. [ABot-M0.5: Unified Mobility-and-Manipulation World Action Model](/202607/02/2607.00678v1-abot-m05-unified-mobility-and-manipulation-world-action-model)  
    标签：评分：9.0/10、query:video-wam
-   evidence：解耦视频生成世界模型用于高效具身世界建模
-5. [MemoBench: Benchmarking World Modeling in Dynamically Changing Environments](/202607/01/2606.27537v2-memobench-benchmarking-world-modeling-in-dynamically-changing-environments)  
+   evidence：标题和方法直接包含世界动作模型
+5. [3D Point World Models: Point Completion Enables More Accurate Dynamics Learning](/202607/02/2607.00148v1-3d-point-world-models-point-completion-enables-more-accurate-dynamics-learning)  
    标签：评分：8.0/10、query:video-wam
-   evidence：针对动态环境中视频生成世界模型的基准测试
-6. [Perceptual 3D Simulation With Physical World Modeling](/202607/01/2606.27575v1-perceptual-3d-simulation-with-physical-world-modeling)  
-   标签：评分：8.0/10、query:video-wam
-   evidence：用于3D仿真的物理世界建模
+   evidence：3D点云世界模型，学习动作条件下的动力学
 
 ### 速读区论文标签
-1. [A Physics-Grounded Benchmark for Multi-Agent Dynamics in World Models](/202607/01/2606.28757v1-a-physics-grounded-benchmark-for-multi-agent-dynamics-in-world-models)  
-   标签：评分：8.0/10、query:video-wam
-   evidence：评估世界模型物理合理性的物理基础基准
-2. [Learning Video Dynamics with Predictive Differentiable Rendering](/202607/01/2606.31050v1-learning-video-dynamics-with-predictive-differentiable-rendering)  
-   标签：评分：8.0/10、query:video-wam
-   evidence：使用可微渲染进行视频预测以模拟未来世界状态
-3. [MemLearner: Learning to Query Context memory for Video World Models](/202607/01/2606.31734v1-memlearner-learning-to-query-context-memory-for-video-world-models)  
-   标签：评分：8.0/10、query:video-wam
-   evidence：视频世界模型的记忆机制
-4. [World Narrative Model for Highly Controllable Video Generation: A Paradigm Shift from Pixel Sampling to Physical World Orchestration](/202607/01/2606.31946v1-world-narrative-model-for-highly-controllable-video-generation-a-paradigm-shift-from-pixel-sampling-to-physical-world-orchestration)  
-   标签：评分：8.0/10、query:video-wam
-   evidence：世界叙事模型用于可控视频生成，通过物理世界编排
-5. [Qwen-AgentWorld: Language World Models for General Agents](/202607/01/2606.24597v1-qwen-agentworld-language-world-models-for-general-agents)  
+1. [MemoBench: Benchmarking World Modeling in Dynamically Changing Environments](/202607/02/2606.27537v3-memobench-benchmarking-world-modeling-in-dynamically-changing-environments)  
    标签：评分：7.0/10、query:video-wam
-   evidence：基于语言的世界模型用于通用智能体环境模拟
-6. [Self-Evolving World Models for LLM Agent Planning](/202607/01/2606.30639v1-self-evolving-world-models-for-llm-agent-planning)  
-   标签：评分：7.0/10、query:video-wam
-   evidence：用于LLM智能体规划的世界模型
-7. [Delta-JEPA: Learning Action-Sensitive World Models via Latent Difference Decoding](/202607/01/2606.31232v1-delta-jepa-learning-action-sensitive-world-models-via-latent-difference-decoding)  
-   标签：评分：7.0/10、query:video-wam
-   evidence：动作敏感的世界模型
-8. [Ask the World Before Acting: Budgeted Environment Probing for World-Model Calibration](/202607/01/2606.31422v1-ask-the-world-before-acting-budgeted-environment-probing-for-world-model-calibration)  
-   标签：评分：7.0/10、query:video-wam
-   evidence：通过预算环境探测进行世界模型校准
-9. [Physics Question Scene Graph: Fine-grained Evaluation of Physical Plausibility in Text-to-Video Generation](/202607/01/2606.25306v1-physics-question-scene-graph-fine-grained-evaluation-of-physical-plausibility-in-text-to-video-generation)  
+   evidence：动态环境中的世界建模基准
+2. [DeWorldSG: Depth-Aware 3D Semantic Scene Graph Generation via World-Model Priors](/202607/02/2607.00889v1-deworldsg-depth-aware-3d-semantic-scene-graph-generation-via-world-model-priors)  
    标签：评分：6.0/10、query:video-wam
-   evidence：视频生成中物理合理性的细粒度评估，与世界模型评估相关
-10. [Look-Before-Move: Narrative-Grounded World Visual Attention in Dynamic 3D Story Worlds](/202607/01/2606.26964v2-look-before-move-narrative-grounded-world-visual-attention-in-dynamic-3d-story-worlds)  
-   标签：评分：6.0/10、query:video-wam
-   evidence：动态3D环境中的世界视觉注意力
-11. [Bridging Video Understanding and Generation in a Unified Framework](/202607/01/2606.31326v1-bridging-video-understanding-and-generation-in-a-unified-framework)  
-   标签：评分：6.0/10、query:video-wam
-   evidence：统一视频理解与生成框架，与世界模型生成相关
+   evidence：使用世界模型先验（V-JEPA）进行场景图生成
 
 
 <div class="dpr-home-promo-card">
