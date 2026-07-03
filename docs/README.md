@@ -6,41 +6,44 @@
 </div>
 
 ## 每次日报
-- 最新运行日期：2026-07-02
-- 运行时间：2026-07-02 20:20:05 UTC
+- 最新运行日期：2026-07-03
+- 运行时间：2026-07-03 20:29:16 UTC
 - 运行状态：成功
-- 本次总论文数：7
-- 精读区：5
+- 本次总论文数：8
+- 精读区：6
 - 速读区：2
 
 ### 今日简报（AI）
-今日日报收录7篇论文，精读5篇，重点推荐《From World Models to World Action Models》与《Orca》。最值得关注的是世界模型向机器人动作模型的转化教程（满分10分）和Orca提出的“世界在你心中”认知框架（9分）。建议优先精读这两篇高评分论文，再速读《MemoBench》了解动态环境下的世界模型基准。
-- 详情：[/202607/02/README](/202607/02/README)
+今日精读6篇，速读2篇，重点聚焦两篇9.0分论文：解耦视频生成驱动的具身世界模型与机器人世界行动模型教程。最值得关注的方向是具身世界模型与行动模型的结合，以及视频预测中的意外性分块方法。建议优先精读《DVG-WM》和《From World Models to World Action Models》以快速掌握前沿框架。
+- 详情：[/202607/03/README](/202607/03/README)
 
 ### 精读区论文标签
-1. [From World Models to World Action Models: A Concise Tutorial for Robotics](/202607/02/2607.00836v1-from-world-models-to-world-action-models-a-concise-tutorial-for-robotics)  
-   标签：评分：10.0/10、query:video-wam
-   evidence：直接关于世界动作模型的教程
-2. [Orca: The World is in Your Mind](/202607/02/2606.30534v2-orca-the-world-is-in-your-mind)  
+1. [DVG-WM: Disentangled Video Generation Enables Efficient Embodied World Model for Robotic Manipulation](/202607/03/2606.32028v2-dvg-wm-disentangled-video-generation-enables-efficient-embodied-world-model-for-robotic-manipulation)  
    标签：评分：9.0/10、query:video-wam
-   evidence：通用世界基础模型，通过多模态信号进行下一状态预测，包含视频
-3. [WorldRoamBench: An Open-World Benchmark for Long-Horizon Stability of Interactive World Models](/202607/02/2606.31672v1-worldroambench-an-open-world-benchmark-for-long-horizon-stability-of-interactive-world-models)  
+   evidence：通过解耦视频生成实现机器人操作的世界动作模型
+2. [From World Models to World Action Models: A Concise Tutorial for Robotics](/202607/03/2607.00836v2-from-world-models-to-world-action-models-a-concise-tutorial-for-robotics)  
    标签：评分：9.0/10、query:video-wam
-   evidence：交互式世界模型基准，评估动作和物理
-4. [ABot-M0.5: Unified Mobility-and-Manipulation World Action Model](/202607/02/2607.00678v1-abot-m05-unified-mobility-and-manipulation-world-action-model)  
+   evidence：世界动作模型与视频生成的教程
+3. [Bridge-WA: Predicting Where and How the World Changes for Robotic Action](/202607/03/2607.02195v1-bridge-wa-predicting-where-and-how-the-world-changes-for-robotic-action)  
    标签：评分：9.0/10、query:video-wam
-   evidence：标题和方法直接包含世界动作模型
-5. [3D Point World Models: Point Completion Enables More Accurate Dynamics Learning](/202607/02/2607.00148v1-3d-point-world-models-point-completion-enables-more-accurate-dynamics-learning)  
+   evidence：轻量级世界动作框架
+4. [WorldDirector: Building Controllable World Simulators with Persistent Dynamic Memory](/202607/03/2607.02517v1-worlddirector-building-controllable-world-simulators-with-persistent-dynamic-memory)  
+   标签：评分：9.0/10、query:video-wam
+   evidence：具有持久内存的可控视频世界模型框架
+5. [MemoBench: Benchmarking World Modeling in Dynamically Changing Environments](/202607/03/2606.27537v4-memobench-benchmarking-world-modeling-in-dynamically-changing-environments)  
    标签：评分：8.0/10、query:video-wam
-   evidence：3D点云世界模型，学习动作条件下的动力学
+   evidence：基于视频生成的世界模型一致性基准
+6. [WorldOdysseyBench: An Open-World Benchmark for Long-Horizon Stability of Interactive World Models](/202607/03/2606.31672v2-worldodysseybench-an-open-world-benchmark-for-long-horizon-stability-of-interactive-world-models)  
+   标签：评分：8.0/10、query:video-wam
+   evidence：交互世界模型的基准，包含动作评估
 
 ### 速读区论文标签
-1. [MemoBench: Benchmarking World Modeling in Dynamically Changing Environments](/202607/02/2606.27537v3-memobench-benchmarking-world-modeling-in-dynamically-changing-environments)  
+1. [SUNTA: Hierarchical Video Prediction with Surprise-based Chunking](/202607/03/2607.02087v1-sunta-hierarchical-video-prediction-with-surprise-based-chunking)  
    标签：评分：7.0/10、query:video-wam
-   evidence：动态环境中的世界建模基准
-2. [DeWorldSG: Depth-Aware 3D Semantic Scene Graph Generation via World-Model Priors](/202607/02/2607.00889v1-deworldsg-depth-aware-3d-semantic-scene-graph-generation-via-world-model-priors)  
+   evidence：基于预测误差分层的视频预测方法，适用于世界模型视频生成。
+2. [AdaJEPA: An Adaptive Latent World Model](/202607/03/2606.32026v1-adajepa-an-adaptive-latent-world-model)  
    标签：评分：6.0/10、query:video-wam
-   evidence：使用世界模型先验（V-JEPA）进行场景图生成
+   evidence：自适应潜在世界模型，测试时适应模型预测控制
 
 
 <div class="dpr-home-promo-card">
