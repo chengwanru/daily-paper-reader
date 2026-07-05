@@ -1,0 +1,69 @@
+{
+  "label": "2026-07-05",
+  "date": "2026-07-05",
+  "generated_at": "2026-07-05T20:54:03",
+  "count": 4,
+  "papers": [
+    {
+      "paper_id": "202607/05/2606.31101v1-efficient-sim-to-real-transfer-of-world-action-models-from-synthetic-priors",
+      "section": "deep",
+      "title_en": "Efficient Sim-to-Real Transfer of World-Action Models from Synthetic Priors",
+      "authors": "Zixing Wang, Kausik Sivakumar, Jinghuan Shang, Yafei Hu, Zhaoming Xie, Ran Gong, Xiaohan Zhang, Karl Schmeckpeper",
+      "date": "2026-06-30",
+      "pdf": "https://arxiv.org/pdf/2606.31101v1",
+      "score": "9.0",
+      "evidence": "使用合成先验将世界动作模型从仿真迁移到真实",
+      "tldr": "从仿真到真实的迁移是机器人操作策略部署的核心挑战。本文首次将world-action模型从合成数据零样本迁移到真实机器人操作。基于Cosmos Policy视频扩散模型，在仿真中通过广泛域随机化和AnyTask规划生成约800个演示，零样本部署到Franka机器人，在物体提升、抽屉打开和拾取任务中达到35%平均成功率。该方法无需真实演示，证明了合成先验的可行性。",
+      "tags": "query:video-wam",
+      "abstract_en": "Bridging the sim-to-real gap is a core challenge in deploying learned manipulation policies. Sim-to-real learning is attractive because it can replace expensive real robot demonstrations with scalable synthetic data, yet world-action models have not previously been shown to transfer from simulation to real robotic manipulation. We study whether a world-action model can be trained from synthetic priors and deployed zero-shot in the real world. To this end, we build upon Cosmos Policy, a video diffusion model adapted for visuomotor control. We construct simulation environments with extensive domain randomization and generate demonstrations using the AnyTask motion planning pipeline. We evaluate our approach across object lifting, drawer opening, and pick-and-place tasks using ${\\sim}800$ synthetic demonstrations per task and no real demonstrations. When deployed zero-shot on a Franka Robot, our policy attains a 35\\% average success rate. To our knowledge, this represents the first successful sim-to-real transfer of a world-action model for robotic manipulation.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "paper_id": "202607/05/2606.30514v2-3d-scene-adaptive-trajectory-controllable-human-image-animation-with-camera-movement",
+      "section": "quick",
+      "title_en": "3D Scene-Adaptive Trajectory-Controllable Human Image Animation with Camera Movement",
+      "authors": "Deyin Liu, Jicheng Xu, Lin Yuanbo Wu, Xiaowei Zhao, Xiatian Zhu, Zhe Jin, Anjan Dutta",
+      "date": "2026-06-29",
+      "pdf": "https://arxiv.org/pdf/2606.30514v2",
+      "score": "6.0",
+      "evidence": "3D场景自适应视频生成，控制动作和相机",
+      "tldr": "现有2D骨架驱动的人像动画难以在3D场景中控制人体轨迹和相机视角。本文提出场景自适应框架，通过地面自适应运动重定向实现自然地面姿态调整，并设计视角自适应潜在融合机制，利用点云可见性掩码注入几何先验，在标准数据集上视频生成指标全面超越SOTA。该方法首次实现了3D场景中运动与相机轨迹联合可控的动画生成。",
+      "tags": "query:video-wam",
+      "abstract_en": "Human image animation, which aims to generate a video of a reference subject following a provided action sequence, has received increasing research interest. With the development of diffusion-based/flow-based video foundation models, existing animation works have began to upgrade the guidance information from 2D skeleton/pose to 3D modeling conditions. Despite achieving reasonable results, these approaches face challenges in synthesizing trajectory-controllable human motion within natural scene under changed camera views. In this work, we present a scene-adaptive human image animation framework that controls both human motion and camera trajectories within a reconstructed 3D environment for video generation. To achieve this, we first develop a ground-adaptive 3D motion retargeting approach to enable user-friendly motion trajectory control adapting to the changes of elevations of ground and orientations automatically. Then we design a viewpoint-adaptive latent fusion mechanism to inject point-cloud geometric priors through scene-visibility masking into the generative process, providing precise guidance of viewpoint changes under camera control. Experiments on two standard human image animation benchmark datasets demonstrate remarkable improvements of our method over the state of the arts in related video generation metics. Project page: https://robinhood256100.github.io/web-disp",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "paper_id": "202607/05/2607.01202v1-world-from-motion-generative-dynamic-gaussian-reconstruction-from-monocular-video",
+      "section": "quick",
+      "title_en": "World from Motion: Generative Dynamic Gaussian Reconstruction from Monocular Video",
+      "authors": "Liyuan Zhu, Shengyu Huang, Amrita Mazumdar, Tianye Li, Zan Gojcic, Gordon Wetzstein, Iro Armeni, Shalini De Mello, Alex Trevithick",
+      "date": "2026-07-01",
+      "pdf": "https://arxiv.org/pdf/2607.01202v1",
+      "score": "6.0",
+      "evidence": "基于视频的生成式动态3D重建，与世界模型生成相关",
+      "tldr": "从单目视频重建动态4D场景面临渲染伪影和缺失区域挑战。本文提出World from Motion，利用视频模型以密集的像素对齐渲染为条件，沿输入和目标相机轨迹编码外观、几何与3D运动，通过蒸馏生成一致的高质量动态3D高斯表示。该方法在4D重建基准上达到新最优，并能泛化到具有大视角变化和动态运动的野外视频，显著提升新视角合成与3D运动质量。",
+      "tags": "query:video-wam",
+      "abstract_en": "We present World from Motion, a method for generating freely renderable dynamic 3D Gaussian representations from monocular videos. Our approach conditions a video model on dense, pixel-aligned renderings that encode appearance, geometry, and 3D scene motion along both input and target camera trajectories to correct rendering artifacts and fill in missing regions from an initial reconstruction. To train this model, we construct a dataset of aligned multiview video pairs and dynamic 3DGS representations, with simulated artifacts characteristic of monocular reconstruction. At test time, we distill the model's generations, including newly observed regions and motions, back into a single consistent, high-quality dynamic 3DGS, improving both novel-view synthesis and the underlying 3D motion. Our method sets a new state of the art in 4D reconstruction and seamlessly generalizes to in-the-wild videos with large viewpoint changes and dynamic motions.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "paper_id": "202607/05/2607.01766v1-simworlds-a-multi-agent-system-for-dynamic-3d-scene-creation",
+      "section": "quick",
+      "title_en": "SimWorlds: A Multi-Agent System for Dynamic 3D Scene Creation",
+      "authors": "Chunjiang Liu, Xiaoyuan Wang, Haoyu Chen, Yizhou Zhao, Ming-Hsuan Yang, László A. Jeni",
+      "date": "2026-07-02",
+      "pdf": "https://arxiv.org/pdf/2607.01766v1",
+      "score": "6.0",
+      "evidence": "动态4D场景创建作为视频生成的物理学训练数据",
+      "tldr": "现有文本生成3D场景的系统多聚焦静态输出，动态4D场景（流体、粒子、刚体等）的生成仍是空白。挑战在于协调空间、物理、时序、相机和光照，且验证动态正确性更难。本文提出SimWorlds，一个多智能体框架，融合Blender程序化知识、规划-编码-评审工作流、分层场景协议和运行时状态检查工具，从文本生成可编辑的4D场景。同时构建4DBuildBench基准评估视觉与物理一致性，实验表明SimWorlds优于先前动态Blender生成方法。",
+      "tags": "query:video-wam",
+      "abstract_en": "LLM agents are increasingly used to translate natural language into 3D scenes in a procedural way, but existing systems focus on static output. Dynamic 4D scenes from text alone, in which liquids flow, particles emit, rigid bodies cascade, and articulated mechanisms move, remain largely unexplored despite their value as editable content and as physics-grounded training data for video generation and embodied AI. Two challenges set the dynamic case apart from static text-to-scene work: an agent must jointly coordinate spatial layout, multiple physics solvers, temporal sequencing, camera, and lighting in a single coherent scene, and verifying motion correctness from rendered video is fundamentally harder than judging a single image. We present SimWorlds: a multi-agent framework that produces dynamic, editable 4D scenes from text, with Blender-specific procedural knowledge, a planner-coder-reviewer workflow driving a fixed ordered sequence of construction stages, a layered scene protocol enforced by a deterministic verifier, and a runtime-state inspection tool suite that catches mechanism failures the rendered image cannot reveal. We also introduce 4DBuildBench, a benchmark for assessing both visual fidelity and physical consistency of the procedural dynamic 3D scenes generated from text prompts. Experiments show that SimWorlds outperforms prior dynamic Blender generation baselines.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    }
+  ],
+  "errors": []
+}
