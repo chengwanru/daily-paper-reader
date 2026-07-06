@@ -1,0 +1,262 @@
+Title: Scene-aware Prediction of Diverse Human Movement Goals
+
+URL Source: https://arxiv.org/pdf/2606.29942v1
+
+Published Time: Tue, 30 Jun 2026 02:15:30 GMT
+
+Number of Pages: 15
+
+Markdown Content:
+# Scene-aware Prediction of Diverse Human Movement Goals 
+
+Qiaoyue Yang 1[0009 −0009 −8529 −0652 ], Amadeus Weber 1[0009 −0009 −7335 −8488 ], Magnus Jung 2[0009 −0006 −1353 −4185 ], Ayoub AI-Hamadi 2[0000 −0002 −3632 −2402 ], and Sven Wachsmuth 1[0000 −0001 −5371 −7214 ] 
+
+> 1
+
+COSY@Home-Lab, Faculty of Technology, Bielefeld University, 33619 Bielefeld, Germany 
+
+{qyang, amweber, swachsmuth}@techfak.uni-bielefeld.de  
+
+> 2
+
+Institute for Information Technology and Communications (IIKT), Otto von Guericke University Magdeburg, 39106 Magdeburg, Germany 
+
+{magnus.jung, ayoub.al-hamadi}@ovgu.de 
+
+Abstract. Anticipation of human behaviours facilitates autonomous systems in proactive planning. Human behaviour could be stochastic due to varying goals. Human goals typically guide their own movement and could therefore help to predict the human trajectory and human motion in the long-term. To infer the human movement intentions, the environmental context plays a significant role, in addition to the social cues expressed by the individual. Previous works on hu-man goals prediction either require semantic knowledge of the scene, or only tackle interactions with objects. In this paper, we propose a novel multi-goal prediction method using the generative model to address the stochasticity of human movement. It leverages the current RGB scene and the human pose to predict diverse potential future goals of human movement based on the Con-ditional Variational Autoencoder (CVAE). Our results demonstrate that our ap-proach is capable of generating multiple movement goals in the scene via sam-plings in latent space of the CVAE and exhibits generalization capability across scenarios in GTA-IM dataset and PROX dataset. Code is publicly available at 
+
+https://github.com/Q-Y-Yang/DiverseGoalsPrediction .
+
+Keywords: Human Intentions; Human Goals Prediction; Probablistic Motion Prediction; Variational Autoencoder. 
+
+# 1 Introduction 
+
+Human behaviour is inherently stochastic, for example, a person could suddenly change his or her mind while being engaged in an activity. But this is often driven by goals. To understand human movement intentions, human trajectory prediction resolves 2D way-points along the path and human motion/pose prediction tackles 3D full body motion. In order to cover uncertainties in the future, probabilistic forecasting attracts more at-tention than deterministic methods [31,30]. Long-term human trajectory can be planned conditioned on the future movement destinations [1,3,5,26], and these waypoints also contribute to the accuracy of long-term human motion predictions [2,4]. The intention of a person is often implicitly hidden in the mind because people do not always ex-press them verbally. But it is usually associated with the surrounding environment, for  
+
+> arXiv:2606.29942v1 [cs.CV] 29 Jun 2026 2Q. Yang et al.
+
+example, the desire to interact with a specific object such as a table, chair, cup, coffee machine, fridge, etc. [6], or to navigate in the environment such as passing through a doorway and walking up the stairs. In human robot cooperation, it is imperative for robots to possess visual perception capabilities towards humans as partners, rather than merely detecting humans as com-mon obstacles. For instance, these applies to environments where humans and robots coexist, such as public areas like museums and shops where robots provide services to customers [7], and home scenarios where robots perform as a helper to healthcare [7] and housework. In robot navigation, a multi-layer costmap [32] is usually deployed to guide the global and local planning. Among them, a social navigation layer [33] pro-vides the possibility to adjust the costs for navigating around humans. Predicting po-tential goals of human partners benefits the robot’s behavioral planning in a proactive and safe way, for instance, avoiding impeding the potential movement areas of human counterparts in advance [6]. Besides, in autonomous driving, self-driving cars should also be capable of anticipating pedestrians’ potential movement destinations, in order to react in advance to avoid accidents. Possible human goals in the scenario could help overcome the difficulty of long-term forecasting of human trajectories and human motions by serving as priors. These future goals could also directly benefit proactive autonomous systems. In this work, we propose a method based on Conditional Variational Autoencoders (CVAE) that fore-casts scene-aware future goals of the human movement from only a single frame of the current scene and the human pose. Figure 1 demonstrates scene-compliant predictions of the human movement goals. The contributions of this paper can be summarized as: (1) An end-to-end method for predicting scene-compliant targets of long-term hu-man motion, based on the current RGB scene image and the human pose. (2) Addressing stochastic nature of human behaviour by anticipating multiple pos-sible targets, without the need for multiple goal positions as labels.     
+
+> (a) (b) (c) (d)
+> Fig. 1. Predictions of possible movement areas in the future. (a) The subject walks straight to the door. (b) The subject turns right towards the doors. (c) The subject turns right into the corridor. (d) The subject turns left into the corridor.
+
+# 2 RELATED WORK 
+
+Goal-directed Forecasting. Previous works leverage goal prediction to address long-term human trajectory and motion prediction problems [28,29,1,3,5,2,4,26]. [28,29] forecast deterministic human motion along a set of contact points in the scene point Scene-aware Prediction of Diverse Human Movement Goals 3
+
+cloud, but they do not take into account multiple potential human intentions. [2] predict human motion goals based on a sequence of heatmaps of past human joints and a scene image to benefit long term 3D motion prediction. However, a set of joint heatmaps during a past time slot might not fit in a single scene frame because the scene may have changed over time. Additionally, generating a sequence of heatmaps of human joints is not computational efficient during inference on the real robot, because the time required increases linearly with the number of heatmaps. In the real application, the requirement for a fixed length of history reduces flexibility, i.e. the prediction system can only work if such a length of history is available. [27] also utilizes a series of observed 2D human poses and images to forecast 3D human poses. However, it only predicts a fixed future path and poses, neglecting the inherent stochasticity of human behaviors. In outdoor scenarios from bird view, a semantic map is often required to incor-porate scene information and derive movement goals. For instance, Y-net [3] uses a semantic segmentation map of the scene and the past trajectory to forecast goals and waypoints based on U-Net architectures. The SNS-LSTM model [5] takes the observed trajectory, a navigation map and a semantic map as inputs to extract future positions by LSTM (long short-term memory). GoalGAN [8] also firstly predicts goals via a convo-lutional neural network (CNN) from an RGB scene and dynamic features of the pedes-trian. PECNet [1] proposes an endpoint variational autoencoder (VAE) to predict final goals of all pedestrians based on history trajectories and ground truth endpoints, but the ground truth endpoints are not available during inference. [26] divides the boundary of the scene into grids as potential destinations. However, other areas of the scene are neglected and dividing into grids could corrupt the scene information by introducing artifacts. In home scenarios, the layout of the environment could be changed more frequently, compared to public environments such as streets, museums, and train stations. For in-stance, tables and chairs at home can be easily moved. If the forecasting relies on a pre-established model of the environment, then the home model has to be frequently adjusted. In addition, some approaches concentrate on human object interactions. The prob-abilistic transition model [6] predicts the human’s navigation goal in accordance with past human poses and object interactions. [4] propose a GoalNet that estimates posi-tions and directions of contact points between the human and the interactive object with known object geometry. Nevertheless, they can only handle targets related to interactive objects, and do not cover other aspects of an entire scene. 
+
+Variational Autoencoders (VAEs). VAE as one of the generative models has achieved promising performances in various applications such as image reconstruction, image generation, representation learning, semi-supervised learning, anomaly detection, and data augmentation [21]. An Autoencoder (AE) learns a compressed representation of the input data via an encoder network and reconstructs the input from that compressed latent space through a decoder network [23]. VAE [10] further extends the compressed space to a probabilistic distribution such as a Gaussian distribution and generates new samples from that distribution. The Conditional Variational Autoencoder (CVAE) [22] was originally proposed to generate new handwritten digits from the MNIST dataset by conditioning on 10 classes of digits. It further proved great performances in face image 4 Q. Yang et al. 
+
+manipulation conditioned on a set of face attributes such as gender, expression, hair colour, age, and eyewear etc. [24]. 
+
+# 3 PROPOSED METHOD 
+
+3.1 Problem Formulation 
+
+The problem we address in this work is to predict human movement goals G in the future time T from the perspective of the current time 0. To cover the stochastic nature of human behaviour, multiple goals GFT should be resolved, given the human H0 and the scene S0 at zero time, as in Equation 1. The future time horizon is defined by a criterion that the future position at time T is already present in the scene at time 0. 
+
+(S0, H0) → GFT . (1) 
+
+3.2 Proposed Approach 
+
+Our approach forecasts interactive goals by learning features of goal areas, such as walking along a corridor, going towards a chair, instead of relying on a past trajectory as previous methods did. Given a past trajectory, it is possible to calculate the speed and direction of movement, and therefore estimate the future position. However, this only works if a fixed-length history is available and if the person does not change their mind during this time period. Instead, our approach predicts potential interaction goals in the scene at every moment by sampling in a 200-dimensional latent space. Figure 2 illustrates the overall pipeline of our approach. The model F takes a scene image S0 and a heatmap of human joints HJ,0 at current time 0 as inputs, to anticipate multiple goals GFT with corresponding confidence scores CFT at frame T in the future, 
+
+ GFT ,CFT
+
+ = F (S0, HJ,0) , (2) where F refers to the number of forecasts, and T is defined to 2 seconds in our case. Concretely, the encoder Fencode learns a latent vector z from the inputs, and the decoder Fdecode predicts goal heatmaps ˆHG,T at frame T from the samplings of the latent vector z with the condition of the joint heatmap HJ,0,
+
+z ∼ N (0, I) = Fencode (S0, HJ,0) , (3) ˆHG,T = Fdecode (HJ,0, z) . (4) The assumption of the Gaussian distribution for the approximated posterior qencode (z |
+
+(S0, HJ,0)) makes gradient decent more efficient [21]. The distribution of the latent vari-able p(z) is also assumed to be a high-dimensional mixture of Gaussians with zero mean and unit variance N (0, I) [20]. The dimension of our latent vector z is set to 200, since higher dimensions have stronger capability to represent complex features of scenes [13,12]. Lighter areas of the output ˆ HG,T indicate higher probabilities of being goal areas. Scene-aware Prediction of Diverse Human Movement Goals 5
+
+Fig. 2. Method. The encoder takes a scene image and a heatmap of human joints as input. The encoded latent vector z and the heatmap of human joints as condition are fed to the decoder. In the training stage, the MSE loss between the ground truth goal heatmap and the decoder output, and the KL divergence between the posterior of z and the Gaussian distribution are computed to optimise the weights of the CVAE (blue arrows only exist during training). During inference, temperature scaling is used to generate multiple samples as diverse goal areas (purple arrows only work during inference). The results ˆ HFG,T show the predicted destination in the sofa, the chair, the desk and the way to another room respectively (from top to bottom). 
+
+3.3 Training and Loss Function. 
+
+We use the torso position at time T as the ground truth goal position at time 0 and generate the corresponding ground truth goal heatmap Hgt G,T , so that manual labelling is not necessary. In particular, our method does not require labelling of multiple goals within the scene, despite the capability to predict various goals. The model is trained with a loss function L consisting of a KL-divergence LKL 
+
+between the variational posterior qencode (z | (S0, HJ,0)) of encoder and a normal dis-tribution N (μ, σI), and Mean Squared Error (MSE) LMSE between the predicted goal heatmap ˆ HG,T and the ground truth goal heatmap Hgt G,T ,
+
+L = LKL + LMSE , (5) 
+
+LKL = KL [qencode (z | (S0, HJ,0)) || N (μ, σI)] , (6) 
+
+LMSE = MSE ( ˆHG,T , Hgt G,T ). (7) Unlike other goal prediction methods [2,8], a L2 loss that measures distance be-tween the predicted goal position and the ground truth goal position is not chosen in our approach. Our ground truth is not just a coordinate of the target position, but a heatmap generated by a Gaussian distribution centred on the target coordinate. The size of the generated goal area is determined by the criterion that the features of the target area are covered. A too large area of the ground truth goal results in greater inaccuracy of goal positions and a too small area lacks features. The purpose of using MSE loss between the predicted and ground truth heatmaps is to implicitly learn features of goal areas from the scene, which benefits the generalization of predictions. Comparably, [8] 6 Q. Yang et al. 
+
+uses a cross entropy loss for the probability that a predicted grid cell corresponds to the ground-truth goal. However, the grid segmentation of the scene could corrupt spatial information, for instance, a door may be divided into two or more grid cells. 
+
+3.4 Inference via Generation 
+
+We generate more than one prediction ˆ H( f ) 
+
+> G,T
+
+via temperature scaling (changing the vari-ance σ of the latent vector z) [15] to address the stochasticity of human behaviour during inference, even though the ground truth goal is only fixed during training. Equation 8 describes the reparametrization trick [10] of VAE with temperature scaling: 
+
+z = μ + σ · ε · τ, (8) where ε ∼ N(0, 1) works as white noise, τ refers to the temperature that controls diversity of generation. A higher scaling τ leads to more variety to cover potential pos-sibilities for future goals. It turns to deterministic prediction when τ → 1, which can be applied to scenes such as stair climbing where there are not many behavioural options. In the post-processing stage, bounding boxes of possible goal areas BNT are ex-tracted by selecting N argmax of each generated goal heatmap ˆH( f ) 
+
+> G,T
+
+(Equation 9). These raw bounding boxes BNT are then merged by performing non-maximal suppres-sion (NMS) [11] to propose M bounding boxes predictions BMT with corresponding confidence scores CMT (Equation 10). The purpose of this is to take into account local maxima rather than solely extracting one argmax , as the output heatmap often displays multiple local maxima. Finally, each predicted goal G(m) 
+
+> T
+
+is extracted by argmax op-eration from every proposed bounding box B(m) 
+
+> T
+
+(Equation 11). The goals GMT can be ranked by their corresponding confidence scores CMT , and the goal with the highest con-fidence score can be selected as a final prediction. In particular, the size of the bounding boxes is determined by the size of the ground truth target area, the former being slightly larger than the latter to ensure that the bounding boxes are able to detect the region of interest. 
+
+BNT = argmax ( ˆH( f ) 
+
+> G,T
+
+), (9) 
+
+BMT ,CMT = NMS (BNT ), (10) 
+
+GMT = argmax (BMT ), (11) where N denotes the number of raw bounding boxes, and M denotes the number of proposed bounding boxes with the corresponding confidence scores. 
+
+# 4 EXPERIMENTS 
+
+4.1 Experimental Setups 
+
+Datasets. GTA Indoor Motion dataset (GTA-IM) [2] is a synthetic dataset that con-tains various human behaviors such as going upstairs and downstairs, walking towards Scene-aware Prediction of Diverse Human Movement Goals 7
+
+another room, going to sit on a chair or sofa, lying on a bed, going to drink in the kitchen, etc. It also includes 10 different scenes, multiple subjects, and provides 21 hu-man joints positions in the camera coordinate and in the world coordinate. Notably, the camera in the GTA game engine moves along with the subject so that it keeps capturing the human, which is similar with cameras on mobile robots rather than fixed cameras in the space. PROX (Proximal Relationships with Object eXclusion) [25] is a real-world dataset that records human movements in and interactions with the world. It includes 12 scenarios such as bedrooms, living rooms, offices, and sitting booths [25]. 10 of these were used for training, and the remaining two scenarios were used to test the model’s ability to generalise across scenes. Compared to the synthetic GTA-IM dataset [2], the scenes of PROX data are more compact and disordered. For instance, more pieces of furniture are placed in the room, facing in different directions. 
+
+Evaluation Metric. Final Displacement Error (FDE) [16] measures average Euclidean distance between predicted and ground truth goals (endpoints). This metric is frequently deployed in trajectory prediction to assess the accuracy of destination forecasts, so it is also highly applicable to our research. FDE avg , as in Equation 12, computes the average error across multiple goal predictions for each test data, and then averages these errors over the entire test set. FDE min , as in Equation 13, selects the prediction with the smallest error for each test data and then averages these minimal errors across all test data. The assessment is performed in 2D image space in pixels. 
+
+FDE avg = 1
+
+S
+
+1
+
+F
+
+> S
+
+# ∑
+
+> s=1
+> F
+
+# ∑ 
+
+> f=1
+
+min  
+
+> m
+
+∥Ggt T − G(s, f ,m) 
+
+> T
+
+∥2, (12) 
+
+FDE min = 1
+
+S
+
+> S
+
+# ∑
+
+> s=1
+
+min  
+
+> f
+
+min  
+
+> m
+
+∥Ggt T − G(s, f ,m) 
+
+> T
+
+∥2, (13) where S refers to the set of test data and F refers to the number of probabilistic forecasts for the test data. Ggt T and GT represent the ground truth goal coordinate and the predicted goal coordinate respectively. m denotes the local maxima that yields the minimal error of every forecast f . For deterministic goal prediction, F equals to 1, and F = 3, 5, 10 are evaluated for probabilistic prediction. 
+
+Baseline. Given the limited research on probabilistic destination forecasting in indoor scenarios, we compare our Goal CVAE with the GoalNet [2] in GTA-IM dataset and PROX dataset. GoalNet [2] was reproduced since it is not open-sourced, and we re-trained and evaluated under the same conditions as our method. Since the baseline does not provide the information how to generate probabilistic forecasts in their paper, we de-ployed our Inference via Generation as explained in Section 3.4 on the baseline model. A 1-second history was used by the GoalNet [2] to predict destinations 2 seconds ahead. 
+
+Implementation Details Our work is implemented in PyTorch [19], trained with the ADAM optimizer [18]. 2 Epochs were trained with a batch size of 64 on NVIDIA GeForce GTX 1060. Learning rate is 10 −4. In order to avoid overfitting and ensure the diversity of our predictions, the frames per second (FPS) of training data was reduced to 5, so that there are fewer duplicate inputs. 8 Q. Yang et al. 
+
+4.2 Results Qualitative Analysis 
+
+Deterministic Predictions. Our CVAE also shows promising results for deterministic target prediction without temperature scaling. Figure 3 (a) and (b) present single fore-casts in scenes where only one fixed behaviour can be performed. The prediction errors of these two scenes are 5 and 2 pixels respectively. Figure 4 shows goal heatmaps of deterministic predictions and the corresponding scenes in the real world. One subject is going to the table and the other continues to lie on the bed.   
+
+> (a) (b)
+> Fig. 3. Deterministic Predictions in GTA-IM. Within the bounding boxes of the predicted goal areas, the red dots represent the predicted goal positions and the green dots represent the ground truth goal positions. (a) Climbing stair. (b) Standing still.
+
+Probabilistic Predictions. When the temperature τ > 1, the model turns to generative prediction. As shown in Figure 5, there is a trend towards more diversity as τ increases, with more forecasts being delivered. Figure 6 presents various predictions with increas-ing temperature τ in the real world. A larger τ covers more possibilities of potential goals within the scene. 
+
+Generalization across Scenarios. Although our model is trained on real movement sequences of subjects without diverse manual labels, it shows generalization to be-havioural options that never happened and to scenes unseen during training. Figure 7 (a) anticipates the sofa as one of the potential target areas, even though the subjects never go to this sofa in our training data. Figure 7 (b) is a bedroom not encompassed within our training dataset, but our model still delivers highly plausible forecasts. In this moment, the subject could either go to the bed or sit on the chair positioned behind. Two scenes of PROX dataset that are not seen during training, as shown in Figure 8, also yield promising predictions. In particular, the bedroom depicted at the bottom right of Figure 8 has a relatively compact layout. 
+
+Quantitative Analysis Average final displacement errors ( FDEs avg ) and minimal final displacement errors ( FDEs min ) are analyzed as defined in Equation 12 and 13. Table1 Scene-aware Prediction of Diverse Human Movement Goals 9                                                           
+
+> Fig. 4. Deterministic Predictions in PROX. The left column displays the predicted goal heatmaps, from which the goal areas are extracted. The right column presents the correspond-ing scenes with the predicted goals.
+> Table 1. The final displacement errors (FDEs) in pixel of our model compared to the baseline [2] in GTA-IM dataset and PROX dataset. The lower, the better. We set the temperature τto 100 in the evaluation of probabilistic predictions. GTA-IM PROX Method F=1F=3F=5F=10 F=1F=3F=5F=10 GoalNet (min) 22.5 23.4 22.7 17.1 24.4 27.0 24.9 21.5 Ours (min) 10.9 7.9 6.8 5.2 10.38 7.0 6.2 5.4
+> GoalNet (avg) −38.2 37.9 38.3 −40.1 39.9 39.5 Ours (avg) −13.1 13.3 12.9 −10.1 10.1 10.0
+
+lists the FDEs of deterministic prediction ( F = 1) and probabilistic prediction with varying numbers of samples ( F = 3, 5, 10) for our method and the baseline in GTA-IM and PROX dataset respectively. Overall, our minimal and average errors in both probabilistic and deterministic forecasting are significantly lower than the baseline in both benchmarking datasets. Our FDEs min continue to decrease as the number of fore-casts increases, indicating that more accurate predictions are generated. Our FDEs avg 
+
+remain nearly constant even with the increasing number of forecasts, showing that the generation quality is stable, as the temperature parameter τ remains constant during this evaluation. Moreover, in order to enable real-time deployment of our model on edge devices for robotic applications, the Average Inference Time (AIT) was also measured. Our average inference time of 43.8ms guarantees real-time capability for applications, and is also around 11% faster than the baseline, as listed in Table 2. 10 Q. Yang et al. 
+
+Fig. 5. Probabilistic Predictions in GTA-IM. From left to right by column, the temperature 
+
+τ = 1, 200 , 500. τ = 1 means deterministic prediction. 
+
+Fig. 6. Probabilistic Predictions in PROX. From top to bottom by row, the temperature τ =
+
+100 , 200 , 300. The subject would turn left and walk through the open space to the door, or back to the table behind. 
+
+Fig. 7. Generalization across Scenarios in GTA-IM. (a) Generalisation to interactive objects. (b) Generalisation to unseen scenes. 
+
+(a) (b) Scene-aware Prediction of Diverse Human Movement Goals 11     
+
+> Fig. 8. Generalization across Scenarios in PROX. Predictions in scenarios not seen during training. (Top) The subject walks through the open space. (Bottom) The subject sits on the chair, or may go to the bed.
+> Table 2. Average Inference Time (AIT) in millisecond of our model and the baseline [2]. Method GoalNet Ours Average Inference Time (AIT) 49.4 43.8
+
+Ablation Study We conducted ablation studies to test the effects of the components in our method, as listed in Table 3. First, the dimension of the latent space was investi-gated. With a smaller dimension of latent space, the performance of deterministic and probabilistic predictions is worse, indicating that 30 dimensions are not sufficient to represent features. Second, we tested different conditions of the CVAE. Our model, whether condi-tioned on the human history trajectory, a torso heatmap, or left unconditioned, is not capable of probabilistic prediction, because it cannot generate multiple maxima. In par-ticular, when conditioning on a set of human trajectory points, it is easy to overfit to positions close to the last trajectory point in the history, indicating that the scene context does not contribute to the prediction. Its deterministic forecasting is also less accurate. Conditioning on a torso heatmap means HJ,0 only contains one Gaussian around the torso position without other joints to represent the human position. It performs slightly worse than our proposed model in deterministic prediction, while it also has no ca-pability for probabilistic prediction because it can only generate a single maximum. Additionally, we removed the condition in our training and inference, which makes our model a VAE. The input modality becomes a scene image without explicit information of the human. It is found out that no scene structure is learned and no target can be pre-dicted. This proves the necessity of human information, as our model is not designed to 12 Q. Yang et al.                                      
+
+> Table 3. Ablation Studies. %denotes the impossibility of generating predictions. F=3 in the evaluation of probabilistic prediction. Method Deterministic Prediction Probabilistic Prediction
+> FDE min (GTA) FDE min (PROX) FDE min (GTA) FDE min (PROX) Ours (Z = 30) 15.6 14.9 12.9 12.3 Ours (condition on history trajectory) 18.3 15.5 %%
+> Ours (condition on torso heatmap) 13.3 12.4 %%
+> w/o condition %%%%
+> w/o multi-maxima 20.4 21.3 17.7 19.1 Our full model 10.9 10.3 7.9 7.0
+
+detect humans within the scene image and intuitively the current location is required to derive the future destination. Third, extracting only one maximum from the predicted heatmap has larger er-rors than extracting multiple maxima, which demonstrate the positive effect of multi-maxima that takes local maxima into account. The temperature parameter τ introduces variation into sampling process of the latent space [14]. The setting of this parameter is a trade-off between anticipating a single but possibly more precise destination and generating more flexible predictions according to the scene. Table 4 investigates the influence of τ in probabilistic forecasting. As the 
+
+τ rises, the average FDE continues to increase. Because a higher temperature scaling factor yields more bad samples due to more variation. The averaged minimum FDE is relatively stable up to τ = 300, which demonstrates the stable capability to generate good samples.                                
+
+> Table 4. Ablation study on the parameter τfor inference via generation. F=3. Parameters τ=50 τ=80 τ=200 τ=300 τ=500
+> FDE avg 11.9 12.1 15.1 16.1 19.8
+> FDE min 7.6 8.6 8.6 8.5 9.9
+
+Limitations and Future Work Our evaluations show that our multi-goal prediction provides more accurate samples than just predicting one deterministic goal. But so far the generation by random sampling is not fully controlled to only sample in the real data distribution of the latent space. Currently, we are mostly able to distinguish good sam-ples from bad ones, as the bad samples usually have a lower variance of values or lower maximal values, indicating low confidence in the prediction. The efficient generation of effective samples is still a challenging problem [34] and is planned to be explored in the future. In the robotic applications, apart from selecting a final prediction with the highest confidence score among the M forecasts, the historical trajectory of the human can also be used to guide the selection of an optimal prediction. This is because a future Scene-aware Prediction of Diverse Human Movement Goals 13 
+
+position can be estimated based on the current position and velocity. Therefore, the final prediction could be chosen by selecting a forecast that minimizes the distance to the simple estimate of the future position. The prediction accuracy using confidence scores or using historical trajectory could be compared in the future. 
+
+# 5 CONCLUSION 
+
+In summary, our work presents a scene-aware method for anticipating diverse human movement goals. Firstly, we trained the CVAE model to deliver pixel-wise outputs, and then in post-processing extracted target areas represented by bounding boxes and pre-dicted the coordinates of the human movement goal. Secondly, in the inference stage, diverse goals are obtained by sampling in the latent space via temperature scaling. Be-sides, our model shows the generalization capability across interactive objects in the scene and unknown scenarios, since it has been trained to implicitly understand the features of scenes within the target area. The evaluation shows that our method sig-nificantly outperforms the baseline. In the future, the integration of this method into a collaborative robot environment is planned, for instance, our predicted goal heatmap could be transferred to the social cost layer for robot navigation. 
+
+Acknowledgments. This work was funded by Deutsche Forschungsgemeinschaft (DFG, Ger-man Research Foundation) under grant number 502483052. 
+
+Disclosure of Interests. The authors have no competing interests to declare that are relevant to the content of this article. 
+
+# References 
+
+1. Mangalam, K., Girase, H., Agarwal, S., Lee, K., Adeli, E., Malik, J. & Gaidon, A. It Is Not the Journey But the Destination: Endpoint Conditioned Trajectory Prediction. Computer Vision – ECCV . pp. 759-776 (2020) 2. Cao, Z., Gao, H., Mangalam, K., Cai, Q., Vo, M. & Malik, J. Long-Term Human Motion Pre-diction with Scene Context. Computer Vision – ECCV: 16th European Conference, Glasgow, UK, August 23–28, Proceedings, Part I . pp. 387-404 (2020) 3. Mangalam, K., An, Y., Girase, H. & Malik, J. From Goals, Waypoints & Paths To Long Term Human Trajectory Forecasting. IEEE/CVF International Conference On Computer Vi-sion (ICCV) . pp. 15213-15222 (2021) 4. Hassan, M., Ceylan, D., Villegas, R., Saito, J., Yang, J., Zhou, Y. & Black, M. Stochastic Scene-Aware Motion Prediction. Proc. International Conference On Computer Vision (ICCV) .pp. 11354-11364 (2021) 5. Lisotto, M., Coscia, P. & Ballan, L. Social and Scene-Aware Trajectory Prediction in Crowded Spaces. 2019 IEEE/CVF International Conference On Computer Vision Workshops, ICCV Workshops, Seoul, Korea (South), October 27-28 . pp. 2567-2574 (2019) 6. Bruckschen, L., Dengler, N. & Bennewitz, M. Human Motion Prediction Based on Object Interactions. European Conference On Mobile Robots (ECMR) . pp. 1-6 (2019) 14 Q. Yang et al. 7. Bartneck, Christoph and Belpaeme, Tony and Eyssel, Friederike and Kanda, Takayuki and Keijsers, Merel and Šabanovi´ c, Selma Human-robot interaction : an introduction. (Cambridge University Press, 2020) 8. Dendorfer, P., Ošep, A. & Leal-Taixé, L. Goal-GAN: Multimodal Trajectory Prediction Based on Goal Position Estimation. Computer Vision – ACCV . pp. 405-420 (2020) 9. Sohn, K., Lee, H. & Yan, X. Learning Structured Output Representation using Deep Condi-tional Generative Models. Advances In Neural Information Processing Systems . 28 (2015) 10. Kingma, D. & Welling, M. Auto-Encoding Variational Bayes. 2nd International Conference On Learning Representations, ICLR, Banff, AB, Canada, April 14-16, Conference Track Pro-ceedings . (2014) 11. Neubeck, A. & Van Gool, L. Efficient Non-Maximum Suppression. Proceedings Of The 18th International Conference On Pattern Recognition - Volume 03 . pp. 850-855 (2006) 12. White, T. Sampling Generative Networks. (2016). [Online]. Available: https://arxiv.org/abs/1609.04468 13. Foster, D. Generative Deep Learning: Teaching Machines to Paint, Write, Compose, and Play. (O’Reilly Media, Inc., 2020) 14. Foster, D. Generative Deep Learning: Teaching Machines to Paint, Write, Compose, and Play. (O’Reilly Media, 2019) 15. Mehta, S., Kirkland, A., Lameris, H., Beskow, J., Székely, É. & Henter, G. OverFlow: Putting flows on top of neural transducers for better TTS. Proc. Interspeech . pp. 4279-4283 (2023) 16. Alahi, A., Goel, K., Ramanathan, V., Robicquet, A., Fei-Fei, L. & Savarese, S. Social LSTM: Human Trajectory Prediction in Crowded Spaces. Proceedings Of The IEEE Conference On Computer Vision And Pattern Recognition (CVPR) . (2016) 17. Ionescu, C., Papava, D., Olaru, V. & Sminchisescu, C. Human3.6M: Large Scale Datasets and Predictive Methods for 3D Human Sensing in Natural Environments. IEEE Transactions On Pattern Analysis And Machine Intelligence . 36 , 1325-1339 (2014) 18. Kingma, D. & Ba, J. Adam: A Method for Stochastic Optimization. International Conference On Learning Representations (ICLR) . (2015) 19. Paszke, A., Gross, S., Massa, F., Lerer, A., Bradbury, J., Chanan, G., Killeen, T., Lin, Z., Gimelshein, N., Antiga, L., Desmaison, A., Köpf, A., Yang, E., DeVito, Z., Raison, M., Tejani, A., Chilamkurthy, S., Steiner, B., Fang, L., Bai, J. & Chintala, S. PyTorch: an imperative style, high-performance deep learning library. Proceedings Of The 33rd International Conference On Neural Information Processing Systems . (2019) 20. Chan, S. Tutorial on Diffusion Models for Imaging and Vision. (2024). [Online]. Available: https://arxiv.org/abs/2403.18103 21. Sanchez, D. Variational Autoencoders - Theory and Applications: Exploring Variational Au-toencoder Models and Their Applications in Generative Modeling, Representation Learning, and Beyond. Advances In Deep Learning Techniques . 4, 18-32 (2024) 22. Kingma, D., Rezende, D., Mohamed, S. & Welling, M. Semi-Supervised Learning with Deep Generative Models. (2014) 23. Wei, R., Garcia, C., El-Sayed, A., Peterson, V. & Mahmood, A. Variations in Variational Autoencoders - A Comparative Evaluation. IEEE Access . 8 pp. 153651-153670 (2020) 24. Yan, X., Yang, J., Sohn, K. & Lee, H. Attribute2Image: Conditional Image Generation from Visual Attributes. Computer Vision – ECCV . pp. 776-791 (2016) 25. Hassan, M., Choutas, V., Tzionas, D. & Black, M. Resolving 3D Human Pose Ambiguities with 3D Scene Constraints. International Conference On Computer Vision . pp. 2282-2292 (2019) 26. Tran, H., Le, V. & Tran, T. Goal-driven Long-Term Trajectory Prediction. 2021 IEEE Winter Conference On Applications Of Computer Vision (WACV) . pp. 796-805 (2020) Scene-aware Prediction of Diverse Human Movement Goals 15 27. Mohamed, A., Chen, H., Wang, Z. & Claudel, C. Skeleton-Graph: Long-Term 3D Mo-tion Prediction From 2D Observations Using Deep Spatio-Temporal Graph CNNs. CoRR .
+
+abs/2109.10257 (2021) 28. Scofano, L., Sampieri, A., Schiele, E., Matteis, E., Leal-Taixé, L. & Galasso, F. Staged Contact-Aware Global Human Motion Forecasting. BMVC . pp. 589-594 (2023) 29. Mao, W., Liu, M., Hartley, R. & Salzmann, M. Contact-aware Human Motion Forecasting. (2022) 30. Lyu, K., Chen, H., Liu, Z., Zhang, B. & Wang, R. 3D human motion prediction: A survey. 
+
+Neurocomputing . 489 pp. 345-365 (2022) 31. Marchellus, M. & Park, I. Deep Learning for 3D Human Motion Prediction: State-of-the-Art and Future Trends. IEEE Access . 10 pp. 35919-35931 (2022) 32. Marder-Eppstein, E., Berger, E., Foote, T., Gerkey, B. & Konolige, K. The Office Marathon: Robust navigation in an indoor office environment. IEEE International Conference On Robotics And Automation . pp. 300-307 (2010) 33. Lu, D., Hershberger, D. & Smart, W. Layered costmaps for context-sensitive navigation. 
+
+IEEE/RSJ International Conference On Intelligent Robots And Systems . pp. 709-715 (2014) 34. Yuan, Y. & Kitani, K. Dlow: Diversifying latent flows for diverse human motion prediction. 
+
+Proceedings Of The European Conference On Computer Vision (ECCV) . (2020)

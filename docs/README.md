@@ -6,34 +6,46 @@
 </div>
 
 ## 每次日报
-- 最新运行日期：2026-07-05
-- 运行时间：2026-07-05 20:53:55 UTC
+- 最新运行日期：2026-07-06
+- 运行时间：2026-07-06 21:50:32 UTC
 - 运行状态：成功
-- 本次总论文数：4
-- 精读区：1
-- 速读区：3
+- 本次总论文数：8
+- 精读区：2
+- 速读区：6
 
 ### 今日简报（AI）
-今日精读一篇高分仿真到现实迁移论文，速读三篇3D动画、重建与场景生成研究。  
-最值得关注的是高效迁移世界动作模型的合成先验方法，以及SimWorlds多智能体动态场景创建系统。  
-建议先吃透精读论文的迁移框架，再尝试将多智能体协作融入动态场景生成。
-- 详情：[/202607/05/README](/202607/05/README)
+今日精读聚焦机器人通用策略评估的快速神经模拟器，以及单目视频转4D物理场景生成技术。  
+最值得关注的是《RoboWorld》提出的高效模拟器与《One Video, One World》的单目重建方法，前者显著提升策略评估速度，后者实现从普通视频中提取完整4D场景。  
+建议普通读者关注这两项技术在机器人仿真训练和虚拟现实内容创作中的实际应用潜力，尤其适合低资源场景下的快速原型验证。
+- 详情：[/202607/06/README](/202607/06/README)
 
 ### 精读区论文标签
-1. [Efficient Sim-to-Real Transfer of World-Action Models from Synthetic Priors](/202607/05/2606.31101v1-efficient-sim-to-real-transfer-of-world-action-models-from-synthetic-priors)  
+1. [RoboWorld: Fast and Reliable Neural Simulators for Generalist Robot Policy Evaluation](/202607/06/2607.01060v1-roboworld-fast-and-reliable-neural-simulators-for-generalist-robot-policy-evaluation)  
    标签：评分：9.0/10、query:video-wam
-   evidence：使用合成先验将世界动作模型从仿真迁移到真实
+   evidence：用于机器人策略评估的视频世界模型，采用步进强制
+2. [One Video, One World: Turning Monocular Video into Physical 4D Scenes](/202607/06/2606.31388v1-one-video-one-world-turning-monocular-video-into-physical-4d-scenes)  
+   标签：评分：8.0/10、query:video-wam
+   evidence：单目视频到物理4D场景重建
 
 ### 速读区论文标签
-1. [3D Scene-Adaptive Trajectory-Controllable Human Image Animation with Camera Movement](/202607/05/2606.30514v2-3d-scene-adaptive-trajectory-controllable-human-image-animation-with-camera-movement)  
+1. [L2D2-GS: Learning to Densify for Feedforward Dynamic Gaussian Scene Reconstruction](/202607/06/2606.29374v1-l2d2-gs-learning-to-densify-for-feedforward-dynamic-gaussian-scene-reconstruction)  
+   标签：评分：7.0/10、query:video-wam
+   evidence：大规模世界建模的重建方法
+2. [HandsOnWorld: Unconstrained Egocentric Video Generation with Camera-Disentangled Hand Control](/202607/06/2607.02075v1-handsonworld-unconstrained-egocentric-video-generation-with-camera-disentangled-hand-control)  
+   标签：评分：7.0/10、query:video-wam
+   evidence：手控第一人称视频生成，可作为视频世界模型组件
+3. [Scene-aware Prediction of Diverse Human Movement Goals](/202607/06/2606.29942v1-scene-aware-prediction-of-diverse-human-movement-goals)  
    标签：评分：6.0/10、query:video-wam
-   evidence：3D场景自适应视频生成，控制动作和相机
-2. [World from Motion: Generative Dynamic Gaussian Reconstruction from Monocular Video](/202607/05/2607.01202v1-world-from-motion-generative-dynamic-gaussian-reconstruction-from-monocular-video)  
+   evidence：基于生成模型从视频预测人体运动目标
+4. [Unified Panoramic-Gaussian Representation for Monocular 4D Scene Synthesis](/202607/06/2607.01663v1-unified-panoramic-gaussian-representation-for-monocular-4d-scene-synthesis)  
    标签：评分：6.0/10、query:video-wam
-   evidence：基于视频的生成式动态3D重建，与世界模型生成相关
-3. [SimWorlds: A Multi-Agent System for Dynamic 3D Scene Creation](/202607/05/2607.01766v1-simworlds-a-multi-agent-system-for-dynamic-3d-scene-creation)  
+   evidence：视频生成用于全景高斯4D场景合成
+5. [VLA-Corrector: Lightweight Detect-and-Correct Inference for Adaptive Action Horizon](/202607/06/2607.01804v1-vla-corrector-lightweight-detect-and-correct-inference-for-adaptive-action-horizon)  
    标签：评分：6.0/10、query:video-wam
-   evidence：动态4D场景创建作为视频生成的物理学训练数据
+   evidence：视觉-语言-动作策略的矫正推理
+6. [NeoMap: Training-free Novel-View Synthesis from Single Images and Videos](/202607/06/2607.01962v1-neomap-training-free-novel-view-synthesis-from-single-images-and-videos)  
+   标签：评分：6.0/10、query:video-wam
+   evidence：使用预训练视频模型的无训练新视图合成
 
 
 <div class="dpr-home-promo-card">
