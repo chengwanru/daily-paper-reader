@@ -1,0 +1,322 @@
+Title: DynaWM: A Base-VLA-Guided World Foundation Model for Moving-Object Manipulation
+
+URL Source: https://arxiv.org/pdf/2607.02604v1
+
+Published Time: Tue, 07 Jul 2026 00:03:41 GMT
+
+Number of Pages: 17
+
+Markdown Content:
+# DynaWM: A Base-VLA-Guided World Foundation Model for Moving-Object Manipulation 
+
+Chongkei Chang 1 and Zhidong Deng 1⋆
+
+Department of Computer Science and Technology, THUAI, Tsinghua University, Beijing 100084, China 
+
+michael@tsinghua.edu.cn 
+
+Abstract. Although vision-language-action (VLA) models have re-ceived widespread attention, many challenges remain in manipulating dynamic moving objects. In most existing approaches, end-to-end for-ward or inverse dynamics models, i.e., world models, are incorporated into high-performance base VLA architectures, which may degrade the performance of well-pretrained base VLA models due to inappropriate fine-tuning. In this paper, we propose DynaWM, a base-VLA-guided world foundation model that adapts to a wide variety of fine-tuned and coarse-tuned base-VLA checkpoints for moving-object manipulation. DynaWM uses a Mamba-3-based action encoder to encode the base action chunk produced by the base VLA into an action-conditioning representation, a V-JEPA 2.1 vision encoder to extract features from multi-view observation history, and a proprioceptive state encoder to encode robotic-arm proprioceptive states. These feature representa-tions jointly condition a flow-matching DiT to regenerate motion-aware action trajectories for moving-object manipulation. For systematic evaluation, we construct the DynaGrasp-32 benchmark, covering six categories of moving-object manipulation tasks, including velocity varia-tion, trajectory variation, and multi-object manipulation, as well as the 
+
+DynaGrasp-1600 dataset, which consists of 32 scenarios, 1,600 demon-stration trajectories, and approximately 1.53M images. For fine-tuned base-VLA checkpoints, DynaWM achieves percentage improvements of 7.19, 45.31, 1.88, and 10.94 over SmolVLA, X-VLA, π0, and π0.5, respec-tively. For coarse-tuned base-VLA checkpoints, performance increases by 35.13, 44.06, 35.69, and 26.13 percentage, respectively. Ablation experiments show that visual encoding enhances success by 27.50%, while reducing success by 45.44% if action conditioning is removed. 
+
+Keywords: Vision-language-action model · World foundation model ·
+
+Moving-object manipulation · Action-conditioned generation · Robot learning benchmark  
+
+> ⋆
+
+Corresponding author.  
+
+> arXiv:2607.02604v1 [cs.CV] 1 Jul 2026 2C. Chang and Z. Deng
+
+## 1 Introduction 
+
+Vision-language-action (VLA) models connect visual–language knowledge with executable robot control. RT-2 and RT-X transferred web-scale representations to robotic actions [6,12]. Octo and OpenVLA made generalist policies accessi-ble [40,20]. Flow-based π0 and π0.5 improved continuous control and open-world adaptation [4,42], while SmolVLA and X-VLA explored compact community models and cross-embodiment adaptation [43,61]. Most recently, π0.7 demon-strated a complementary route through a single steerable policy conditioned by language, metadata, history, and world-model-generated visual subgoals [41]. Most progress, however, is achieved on tasks where the target is stationary or its motion is caused mainly by the robotic arm’s own action. Interception of independently moving targets remains underexplored, especially across hetero-geneous VLA architectures. Thus moving object grasping is a dynamic interception problem rather than a static manipulation one with extra appearance variation. Throughout this paper, a base VLA refers to a VLA adapted to the benchmark and kept frozen during DynaWM training and evaluation, while a base action chunk refers to the action sequence it emits. Note that the base VLA predicts from current observations rather than visual history. Such an observation is used to detect the position pt
+
+of the target instead of its future direction and speed. When intercepting a moving target, the robotic arm cannot rely only on the currently observed position, because the target may have already moved during the delay from observation to action generation and execution. Therefore, the model needs to use sequential multi-view history to predict the target’s motion trend and continuously update the action trajectory during execution [55,13,52,46]. Existing approaches attack different parts of this temporal gap. Dynamics-aware VLAs such as DynamicVLA and PUMA jointly train perception and con-trol for changing scenes [55,13]. World-model methods integrate future obser-vations, latent states, or visual subgoals into a policy [59,44,10,47,41]. AHEAD freezes OpenVLA but predicts future tokens in that specific model’s representa-tion space [46]. Streaming and asynchronous action-generation methods reduce waiting and discontinuity [18,5,29]. These works show that anticipation and low latency matter, but leave open whether one base-action-conditioned world foun-dation model can support multiple base-VLA checkpoints with different tuning extents. Directly integrating a world-model configuration into each VLA is valid, but it ties motion modeling to model-specific visual tokens, action decoders, and training. We instead use a world foundation model that takes action trajectories produced by base VLA policies such as SmolVLA, X-VLA, π0, and π0.5 as input and extracts action-conditioned representations. Our key observation is that the emitted action chunk already reflects much of the semantic problem: what to manipulate, the approaching direction, and the grasp phase. Despite different VLA token spaces, output action trajectories share physical meaning and can serve as action-conditioning signals. The missing DynaWM for Moving-Object Manipulation 3
+
+signal is how the scene is changing : sequential multi-view history lets the new module regenerate trajectories toward new interception points rather than chase the latest observed position. The proposed DynaWM is shown in Fig. 1. For each base VLA, the unaug-mented and augmented evaluations use the same frozen checkpoint. As a result, any improvements cannot be attributed to base-VLA training. A Mamba-3-based action encoder [21] generates a representation of the sequential base action chunk, while a V-JEPA 2.1 encoder [34] represents observed multi-view history without rolling out future images or latent states. Together with proprioceptive states, these conditions jointly condition a flow-matching DiT that generates the action chunk without accessing VLA language tokens, visual tokens, hidden states, or gradients. Benchmarks such as Meta-World, LIBERO, and RoboTwin evaluate multi-task skill acquisition, knowledge transfer, long-horizon behavior, bimanual co-ordination, and scene variation [56,25,33,9]. Yet their variation usually comes from initial configurations, objects, instructions, or visual randomization. Ob-ject motion is often induced by robotic-arm contact rather than treated as an independent pre-contact variable. Dedicated dynamic-manipulation benchmarks establish the problem’s importance [7,23], but a common diagnostic suite for het-erogeneous base VLA variants remains limited. We therefore construct DynaGrasp-32 , a 32-task benchmark with six diag-nostic families: basic interception, appearance and geometry transfer, collision-driven path changes, visual variation, multi-object sequencing with language bindings, and speed variation. As its paired dataset, our DynaGrasp-1600 
+
+contains 1,600 demonstrations collected by human teleoperation in simulation, roughly 510K control steps, and 1.53M images from three views. Each task is evaluated in 50 closed-loop episodes. Our contributions are summarized below: 
+
+– We introduce DynaWM, a base-VLA-guided world foundation model for moving-object manipulation. It adapts to various fine-tuned and coarse-tuned base-VLA checkpoints and uses the base action chunk outputted by each base VLA as a conditioning signal for regenerating actions toward moving targets without modifying the base-VLA architecture. 
+
+– We use the action chunk produced by the base VLA as a conditioning input and design an action-regeneration module composed of a Mamba-3-based ac-tion encoder, a V-JEPA 2.1 vision encoder, a proprioceptive state encoder, and a flow-matching DiT. The Mamba-3 encoder encodes the action chunk, the V-JEPA 2.1 encoder extracts features from multi-view observation history, and the proprioceptive state encoder represents robotic-arm states. These three types of features jointly condition the DiT to regenerate motion-aware execu-tion trajectories. 
+
+– We construct both the DynaGrasp-32 benchmark and the DynaGrasp-1600 dataset for systematic evaluation of moving-object manipulation. They cover six dynamic task families, 32 scenarios, 1,600 demonstration trajecto-ries, and approximately 1.53M images. Evaluation across four base VLAs and 4 C. Chang and Z. Deng 
+
+two checkpoint types, forming eight model-checkpoint combinations, shows consistent gains in model-level average success rates, ranging from 1.88% to 
+
+45 .31% .
+
+## 2 Related Work 
+
+Generalist VLA models. Robot learning has progressively moved from task-specific visuomotor policies toward generalist models that connect Internet-scale visual–language knowledge with physical control. RT-2 transferred web knowl-edge into discretized robot actions [6], Open X-Embodiment and RT-X expanded training across robot embodiments [12], and Octo and OpenVLA made gener-alist policy development more accessible through open models and data recipes [40,20]. In parallel, continuous control shifted from direct regression toward dif-fusion and flow-based action generation [11,24]: RDT-1B applies diffusion to bi-manual manipulation [27], while π0 uses a flow-matching action expert and π0.5
+
+extends it toward open-world generalization [4,42]. GR00T N1 targets generalist humanoid control, Gemini Robotics emphasizes embodied reasoning and cross-embodiment transfer, Qwen-VLA unifies manipulation, navigation, and trajec-tory prediction, and π0.7 combines memory, multimodal prompting, and world-model-generated subgoals in a steerable policy [39,15,50,41]. These systems pur-sue generality primarily through broader pretraining mixtures, specialized pol-icy architectures, and model-specific adaptation. They leave a complementary question: whether a base-action-conditioned world foundation model can provide missing capabilities without modifying an already trained base VLA or resuming its training. 
+
+Dynamic manipulation. Dynamic manipulation first developed around explicit interception and motion-aware control. Early systems combined grasp reachabil-ity with target-motion prediction [1] or learned dynamic grasping through ad-versarial reinforcement learning [53]. DGBench then established a reproducible benchmark for grasping under relative motion [7]; subsequent work extended the problem to whole-body legged manipulation [23]. Modern VLA research replaces hand-designed motion pipelines with learned spatiotemporal policies. Dynam-icVLA combines a compact model with continuous inference and action stream-ing [55]. DOMINO provides large-scale dynamic training data, while PUMA combines historical optical flow with short-horizon future queries [13]; ST-VLA and LaMP introduce 4D-aware or scene-flow motion priors [54,51], and OFlow injects object-aware temporal flow into action generation [49]. F2F-AP predicts future observations to compensate for asynchronous-policy latency [52]. Most closely related, AHEAD wraps a frozen OpenVLA with a latent predictive world model [46]. Together, these works establish the value of temporal prediction, but they generally either train a dedicated dynamic policy or operate inside a particular policy’s feature space. However, base-action-conditioned generation without access to policy-specific internal representations remains underexplored across structurally different frozen base VLAs. DynaWM for Moving-Object Manipulation 5
+
+Time-Series Prediction and Action Refinement. Two complementary lines of work address the mismatch between an observed scene and the action eventu-ally executed. The first predicts how the world will evolve. Cosmos and Cosmos 3 extend world foundation models toward Physical AI [36,37]. Generative world models couple video and action diffusion or use generated visual futures to guide control [62,59,30], while latent approaches predict action-relevant state transi-tions or structured temporal features [45,10,47]. V-JEPA and V-JEPA 2 learn predictive video representations without pixel-level reconstruction [3,2], and V-JEPA 2.1 exposes denser spatiotemporal features [34]. The second line revises when and how action chunks are generated. Action chunking improves temporal coherence and amortizes policy inference [60], but an open-loop chunk can be-come stale as the scene changes. Streaming Flow Policy aligns flow progression with execution time [18]; Real-Time Chunking asynchronously inpaints the next chunk without retraining the underlying policy [5]; and FASTER prioritizes near-term actions to reduce reaction latency [29]. Native continuation and adaptive chunking study cross-cycle reuse and when to replan [28,14], while DFM-VLA and π0-EqM enable iterative action correction [8,26]. Some policy-internal meth-ods instead maintain short-horizon action context or action-updated scene state inside the policy [22,57]. DynaWM connects these two lines through a world foundation model conditioned on base action chunks, recent multi-view history, and robotic-arm state. A Mamba-3-based action encoder [16,21] preserves the base chunk’s sequential structure, while visual motion features provide scene-change evidence for regeneration without accessing policy-specific hidden states. 
+
+Benchmarks and datasets. Manipulation benchmarks have expanded along several axes. RLBench and Meta-World established multi-task evaluation [17,56]; CALVIN emphasized language-conditioned long-horizon control [32]; and LIBERO studied lifelong knowledge transfer [25]. RoboCasa and VLABench broaden scene and long-horizon diversity [35,58]. RoboTwin and RoboTwin 2.0 scale bimanual task generation and domain randomization [33,9]. Large datasets such as BridgeData V2, MimicGen, and DROID provide increasingly diverse demonstrations for policy training [48,31,19]. Dynamic benchmarks form a smaller but growing branch: DGBench isolates relative-motion grasping, whole-body legged manipulation extends dynamic grasping across embodiments, and DOMINO introduces a broad dynamic task hierarchy [7,23,13]. What remains limited is a diagnostic suite that controls distinct sources of motion difficulty while supporting the same closed-loop comparison across heterogeneous base-VLA checkpoints with different tuning extents. DynaGrasp-32 targets this gap through six task families: basic interception, transfer across object appearance and geometry, collision-driven trajectory change, visual variation, multi-object sequencing with language bindings, and controlled variation in target velocity. 6 C. Chang and Z. Deng 
+
+## 3 Method 
+
+3.1 Problem Formulation 
+
+At time t, a base VLA πb receives the current observation ot, language instruction or subtask ℓt, and robotic-arm state st. It predicts a base action chunk 
+
+Abt = πb(ot, ℓ t, s t) ∈ RH×Da , (1) where ℓt denotes the instruction or subtask at time t, H is the action horizon, and Da is the action dimension. In our implementation, H = 10 and Da = 7 .The base-VLA checkpoint is fixed. It is not updated during DynaWM training. Our goal is to learn DynaWM as a conditional world foundation model gθ with trainable parameters θ that produces a motion-aware action chunk 
+
+ˆAt = gθ (Abt , V t, s t), (2) where Vt is a short multi-view video ending at t. DynaWM does not access the base VLA’s language, visual, or action tokens; it uses emitted physical actions as one condition, making the interface compatible with VLAs whose internal architectures and representation dimensions differ. 
+
+3.2 Design Principle: From Reaction to Interception 
+
+The base VLA observes a current scene and proposes how to act from that scene. For a stationary target, executing this proposal later usually remains spa-tially valid; for a moving target, aiming at the current position becomes reactive tracking, causing the robotic arm to follow where the object was observed rather than where the robotic arm and object can meet. Let pt and pt+1 denote target positions in two consecutive observations. The local target displacement is 
+
+δt = pt+1 − pt, (3) which cannot generally be identified from the current observation ot alone. Re-cent frames provide temporal differences that constrain δt through direction, relative speed, and path-change evidence. DynaWM does not explicitly regress pt, pt+1 , velocity, or δt. Instead, it learns the operational equivalent: visual motion features condition a new action trajec-tory whose contact region and timing shift away from the base VLA’s current-position response. We decompose the required information into three conditions: 
+
+Abt : base action chunk ,Vt : recent scene motion ,st : current robotic-arm state .
+
+(4) DynaWM recombines these three inputs without reinterpreting language or requiring the base VLA to relearn motion estimation. DynaWM for Moving-Object Manipulation 7(a) Offline preparation and  DynaWM  training 
+
+(b) Online closed-loop inference      
+
+> Same DynaWM architecture and training recipe
+> SmolVLA X-VLA
+> π0 π0.5
+> Human
+> demonstrations
+> Fine-tune
+> base VLA
+> Freeze
+> checkpoint
+> Run frozen VLA
+> on demonstrations
+> Cache 10-step
+> base actions No gradient
+> to base VLA
+> ▮
+> ▮
+> ▮
+> 5-frame × 3-view video + 9D state
+> + demonstrated actions Train
+> DynaWM
+> Isaac Sim /
+> robot
+> Current images +
+> instruction + state ▲DOC
+> DynaWM
+> Frozen
+> base VLA
+> Base action
+> chunk
+> Latest 5 frames × 3 views
+> + 9D state
+> ▮
+> ▮
+> ▮
+> Regenerated
+> action chunk
+> Action
+> queue
+> Execute DynaWM actions only
+> Isaac Sim /
+> robot
+> Observations
+> ZMQ
+
+×❄
+
+Fig. 1. System framework. (Offline) The frozen base VLA is run over demonstrations to cache base action chunks, which train the corresponding DynaWM model together with recent multi-view history, robotic-arm states, and demonstrated actions. (Online) DynaWM combines the base action chunk with recent visual dynamics to regenerate a motion-aware chunk for execution. The base action chunk is used as a condition rather than executed directly, and the DynaWM architecture and training recipe are shared across the four base VLA variants. 
+
+Fig. 1 summarizes offline training and online execution. Offline, DynaWM trains from cached base action chunks, recent multi-view history, robotic-arm states, and demonstrated actions. Online, the base action chunk is used only as a condition for regenerating a motion-aware chunk. The unaugmented and augmented evaluations use the same frozen base-VLA checkpoint, separating action-conditioned generation from base-VLA training. The following subsec-tions define the action, visual, and generative components of DynaWM. 
+
+3.3 Action Trajectories as Conditioning Signals 
+
+Different VLAs may use autoregressive tokens, diffusion, flow matching, or sep-arate action experts, but when instantiated on the same robotic-arm interface their output action trajectories share physical meaning. We treat Abt as an ob-servable short-horizon conditioning signal: its sequential structure captures ap-proach direction, gripper phase, local control trend, and transitions between reaching, grasping, and transport. Because adjacent actions are coupled by con-trol continuity, we encode the chunk with a state-space sequence model whose recurrent scan accumulates trajectory context in action order. Mamba-3 provides an efficient encoder for this continuous action signal, while alternative temporal encoders could be studied within the same framework. Actions are normalized per dimension using statistics from cached base ac-tion chunks and demonstrations. Let Ea denote the Mamba-3 action encoder. 8 C. Chang and Z. Deng Mamba-3 based action encoder 
+
+V-JEPA 2.1 vision encoder           
+
+> Base action
+> chunk Ab
+> (10 × 7)
+> Norm. /
+> Projection
+> Mamba-3
+> Sequence
+> Encoder
+> Action-
+> conditioning
+> representation
+> za
+> ❄Frozen base VLA
+> Front view (5 frames)
+> Wrist view (5 frames)
+> Third view (5 frames)
+> Shared
+> V-JEPA 2.1
+> ViT-L
+> (300M)
+> Visual
+> motion
+> tokens zv
+> V-JEPA provides visual motion features, not future images.
+> Robotic-arm
+> state s
+> State Encoder
+> (MLP) Proprioceptive
+> feature zs
+> Fusion &
+> Conditioning
+> Fuse zaand zs
+> into global
+> condition c0
+> Global condition
+> c0
+
+Flow-Matching DiT Generator                
+
+> Noisy action tokens xτ
+> (10 × 7) +flow time τ
+> Self-Attention
+> (on action tokens)
+> Cross-Attention
+> (to visual motion tokens zv)
+> MLP
+> (token-wise)
+> Predicts flow velocity vθ
+> / trajectory regeneration
+> global condition c0
+> +
+> via AdaLN
+> visual motion tokens zv
+> via cross-attention
+> Regenerated action
+> chunk Â
+> (10 × 7)
+> based action encoder vision encoder state encoder Flow-Matching DiT Generator Data flow Conditioning
+
+Proprioceptive state encoder 
+
+Fig. 2. Internal architecture of DynaWM. Mamba-3 encodes the base action chunk into an action-conditioning representation, and V-JEPA 2.1 encodes recent multi-view observations into visual motion tokens. Action and robotic-arm-state fea-tures modulate the DiT through adaptive LayerNorm, visual motion tokens provide motion evidence through cross-attention, and the conditional flow generates the action chunk from Gaussian noise. 
+
+Mamba-3 processes the normalized sequence ¯Abt in trajectory order: 
+
+za = Ea( ¯Abt ). (5) In our implementation, the ordered chunk is mapped through a 128-dimensional Mamba state to a 256-dimensional action-conditioning repre-sentation. The representation at the final valid step summarizes the preceding control sequence and serves as the action-conditioning representation. The output actions do not require recovering all language or visual informa-tion inside the base VLA. They only need to carry enough task-relevant action information to condition dynamic execution. Section 4.4 tests whether this re-stricted conditioning signal becomes a performance bottleneck. 
+
+3.4 Multi-View Short-Horizon Dynamics 
+
+For each synchronized camera view k, we collect a recent clip 
+
+V kt = {Ikt−L+1 , . . . , I kt }, (6) where Ikt is the image from view k at time t and L denotes the observation-history length. In our implementation, L = 5 . Each clip is encoded by a shared V-JEPA 2.1 model [34]. During DynaWM inference, each observed clip is mapped directly to dense spatiotemporal tokens. No future image or latent-state rollout is performed: 
+
+Zv = [ Ev (V 1
+
+t ); . . . ; Ev (V Kt )] , (7) DynaWM for Moving-Object Manipulation 9
+
+where Ev denotes the V-JEPA 2.1 vision encoder and K is the number of camera views. In our implementation, K = 3 . The dense tokens preserve local spatial structure and temporal consistency. Inter-frame displacement and its changes indicate direction, relative speed, rebound, or acceleration, while multiple views reduce ambiguity under wrist motion and partial occlusion. These cues let the generator learn motion-dependent interception behavior without explicit veloc-ity or future-coordinate labels. The V-JEPA encoder is part of the trainable DynaWM model; only the base VLA is frozen. 
+
+3.5 Conditional Flow-Based Trajectory Regeneration 
+
+Fig. 2 shows the internal architecture of DynaWM. Our generator is called a Diffusion Transformer (DiT), operating on action tokens. The current robotic-arm state is embedded as zs = Es(st), where Es is the proprioceptive state encoder, and concatenated with the action representation into the global con-dition c0 = [ za; zs]. Visual motion tokens remain unpooled and enter the gen-erator through cross-attention, allowing action tokens to attend to local motion evidence. The DiT uses eight transformer blocks with 512-dimensional hidden states and eight attention heads. Each block contains action-token self-attention, cross-attention to Zv , and a token-wise MLP, with adaptive LayerNorm modu-lation from c0 and the flow-time embedding. Thus, the action condition persists throughout generation and visual motion evidence can revise each action token. Let the normalized demonstration action chunk be x1 = ¯Agt  
+
+> t
+
+and let x0 = ϵ,where ϵ ∼ N (0 , I ). For a sampled flow time τ ∈ [0 , 1] , we construct the linear probability path 
+
+xτ = τ x 1 + (1 − τ )x0, uτ = x1 − x0. (8) The conditional velocity field is trained with 
+
+LFM = E
+
+h
+
+∥vθ (xτ , τ | za, z s, Z v ) − uτ ∥22
+
+i
+
+. (9) This is called trajectory regeneration : the base action chunk is a condition but not the initial sample, and the output is not constrained to the form Abt +∆A .Starting from noise permits larger corrections when a reactive base action chunk points toward an outdated target location; fixed residuals or flows initialized at that chunk may bias learning toward local repair, whereas regeneration can preserve the base action information while reconstructing interception geometry. At inference, we draw an initial sample from N (0 , I ), numerically integrate the learned velocity field with ten Euler steps, and de-normalize the resulting chunk into robotic-arm action units. For training, each base VLA is run once over the demonstrations to cache base action chunks; DynaWM then trains from cached base action chunks, recent multi-view clips, robotic-arm states, and demonstrated chunks, with no base VLA in the training graph. Separate DynaWM weights fit each base VLA’s action distribution, while the architecture and optimization recipe remain fixed 10 C. Chang and Z. Deng 
+
+across SmolVLA, X-VLA, π0, and π0.5. At deployment, DynaWM receives action chunks emitted by the frozen base VLA; both evaluations use the same base-VLA checkpoint to separate action-conditioned generation from base-VLA training. 
+
+## 4 Experiments 
+
+4.1 Benchmark and Evaluation Protocol 
+
+DynaGrasp-32 contains 32 Isaac Sim tasks in which the target object moves during physical action execution. All tasks are grouped into six diagnostic fami-lies, categorized as appearance transfer, collision response, scene variation, multi-object sequencing, velocity variation, and basic interception (Table 1). Fig. 3 shows representative layouts and rollout states. 
+
+Table 1. The six diagnostic families of DynaGrasp-32 .Family # Primary variation and capability Base 2 Orthogonal motion directions; basic interception Objects 6 Color, shape, size, and direction; object transfer Obstacle 6 Collision surfaces and rebound; path-change response Environment 6 Illumination, floor, and distractors; visual robustness Amount 6 Multiple objects and container bindings; sequencing Speed 6 Episode-wise velocity variation; motion and timing 
+
+Fig. 3. Simulation platform and diagnostic structure of DynaGrasp-32 .
+
+All panels use the same Franka Panda workspace and front-camera pose. Objects and Environment show representative variants; Base, Obstacle, Amount, and Speed show temporally separated rollout states. Frame indices indicate time, not predicted object trajectories. DynaWM for Moving-Object Manipulation 11 
+
+The benchmark uses the Franka Panda arm, three 256 × 256 RGB cameras, a 9D robotic-arm state, a 7D action space, and a 30 Hz environment. In Ta-ble 1, the Base tasks require lifting a moving ball to at least 0.20 m, while the remaining tasks generally require placing moving objects into language-specified baskets; multi-object tasks require all objects to be placed correctly. The six families evaluate basic interception (Base), appearance and geometry transfer (Objects), collision-induced path changes (Obstacle), visual robustness under scene variation (Environment), multi-object interception with object–container binding and ordering (Amount), and episode-wise velocity variation (Speed). 
+
+Simulation platform and reproducibility. We use Isaac Sim because the bench-mark requires articulated robotic-arm control, rigid-body contact and rebound, synchronized multi-view sensing, and controlled intervention on motion, appear-ance, and scene geometry within one closed-loop environment. Isaac Sim provides physics, sensing, randomization, synthetic-data tools, and ROS 2 interfaces [38], letting DynaGrasp-32 vary one dynamic difficulty source while holding the robotic arm, control frequency, observations, and success criteria fixed. Its digi-tal specification supports reproducibility through distributable scene assets, task logic, motion distributions, camera geometry, control timing, and success con-ditions. We therefore position DynaGrasp-32 as a shared diagnostic testbed that supports reproducible evaluation and provides a controlled foundation for subsequent hardware validation. 
+
+DynaGrasp-1600 provides 50 demonstrations per task, collected by human teleoperation in simulation, totaling 1,600 trajectories, approximately 510K ac-tion steps, and 1.53M RGB images across three cameras. We evaluate SmolVLA [43], X-VLA [61], π0 [4], and π0.5 [42] using fine-tuned checkpoints (4–5 epochs for SmolVLA/X-VLA and 2–3 for π0/π 0.5) and coarse-tuned checkpoints (about 0.5 epoch). Every model–task configuration is evaluated in closed loop for 50 episodes, so the 32-task macro-average equals the pooled success rate over 1,600 episodes. Augmented and unaugmented variants use the same frozen base-VLA checkpoint; the DynaWM architecture and optimization recipe are fixed across base VLA variants, with separate DynaWM weights for each base VLA’s action distribution. Experiments are run on an NVIDIA RTX PRO 6000 GPU with 96 GB memory. 
+
+4.2 Dynamic Capability Across VLAs 
+
+Table 2 reports the results achieved in the primary cross-VLA evaluation. Dy-naWM improves the 32-task average in all eight combinations of base VLA and checkpoint type while leaving every base-VLA checkpoint unchanged. For fine-tuned checkpoints, the equal-weight mean rises from 59 .06% to 75 .39% 
+
+(+16 .33% ), and for coarse-tuned checkpoints from 41 .66% to 76 .91% (+35 .25% ). Across all eight comparisons, mean success increases from 50 .36% to 76 .15% .The gain is largest when the base VLA has more dynamic headroom. Fine-tuned π0 begins at 72 .56% and gains only 1.88% , whereas fine-tuned X-VLA begins at 36 .56% and gains 45 .31% . For every base VLA variant, coarse-tuned 12 C. Chang and Z. Deng 
+
+Table 2. The success rate on DynaGrasp-32 . Each value averages 32 tasks with 50 episodes per task. Up/Tie/Down counts task-level changes after adding DynaWM. Gains are computed from unrounded success rates. Checkpoint Base VLA Base SR (%) + DynaWM (%) Gain (%) Up/Tie/Down Fine-tuned SmolVLA 62.50 69.69 +7.19 23/1/8 X-VLA 36.56 81.88 +45.31 32/0/0                         
+
+> π072.56 74.44 +1.88 14/4/14
+> π0.564.63 75.56 +10.94 21/5/6 Coarse-tuned SmolVLA 40.63 75.75 +35.13 32/0/0 X-VLA 37.69 81.75 +44.06 32/0/0
+> π039.88 75.56 +35.69 31/1/0
+> π0.548.44 74.56 +26.13 31/0/1
+
+Table 3. The success rate across diagnostic families. Values are averaged within each task family and then across the four base VLA variants; global 32-task averages remain the primary metric. Fine-tuned checkpoints Coarse-tuned checkpoints Family Base + DynaWM Gain Base + DynaWM Gain Base 66.25 88.25 +22.00 49.75 83.75 +34.00 Objects 80.17 91.83 +11.67 65.83 92.42 +26.58 Obstacle 43.17 65.25 +22.08 23.08 68.83 +45.75 Environment 73.17 85.67 +12.50 59.75 84.75 +25.00 Amount 48.17 61.00 +12.83 26.25 62.08 +35.83 Speed 48.25 68.92 +20.67 30.67 74.17 +43.50 
+
+checkpoints also yield a larger gain than fine-tuned checkpoints. After regener-ation, the eight systems occupy a narrower 69 .69% –81 .88% range, supporting a capability-compensation interpretation. Task-level counts show the boundary: the four coarse-tuned checkpoints improve on at least 31 of 32 tasks, but the already strong fine-tuned π0 improves on 14 tasks and regresses on 14. Its clear-est regressions occur in multi-object Amount tasks, suggesting that local motion correction can disturb an otherwise valid object order or language-conditioned binding. 
+
+4.3 Where Do the Gains Come From? 
+
+Table 3 shows that the aggregate improvement is not driven by one easy task family. For fine-tuned checkpoints, the largest mean gains occur on Obstacle (+22 .08% ), Base ( +22 .00% ), and Speed ( +20 .67% ). For coarse-tuned check-points, Obstacle and Speed improve by 45 .75% and 43 .50% . These settings re-quire updating contact geometry from motion evidence because velocity varies across episodes or collisions invalidate pre-impact trajectories. Objects and Environment also improve, showing that the learned motion-conditioned generation remains useful under appearance and scene variation, but Amount exposes the clearest boundary. It improves weak policies yet can regress for strong ones: fine-tuned π0.5 drops 4.33% on Amount despite an overall gain DynaWM for Moving-Object Manipulation 13 
+
+Table 4. The ablation on visual dynamics. All values are success rates averaged over the indicated task family. These systems use V-JEPA features to augment the action model, but do not use the base action chunk as a conditioning input. Configuration All Base Objects Obstacle Environment Amount Speed Qwen3.5-0.8B 39.94 33.00 72.33 25.67 27.67 60.33 16.00 + V-JEPA 2.1 80M 55.00 68.00 79.67 47.33 61.33 38.00 44.33 + V-JEPA 2.1 300M 67.44 77.00 91.00 56.67 75.00 54.33 57.00 
+
+Table 5. Base-action conditioning diagnostics. (a) The Qwen–V-JEPA reference uses language-conditioned visual features inside the model, whereas DynaWM uses the base action chunk as its base-policy condition. (b) The direct-start baseline tests whether the base action chunk is more effective as flow initialization or as a persistent encoded condition. 
+
+(a) Base-action conditioning diagnostic 
+
+Configuration SR (%) Internal Qwen + V-JEPA 300M 67.44 SmolVLA + DynaWM 69.69 X-VLA + DynaWM 81.88 
+
+π0 + DynaWM 74.44 
+
+π0.5 + DynaWM 75.56 DynaWM mean 75.39 
+
+(b) Action-conditioning formulation 
+
+Configuration SR (%) Frozen π0 72.56 Direct action start, no action encoder 29.00 
+
+π0 + DynaWM 74.44 
+
+of 10 .94% . These tasks require object–container bindings and completion order across chunks, so local interception alone does not ensure correct sequencing. 
+
+4.4 What Makes Action-Conditioned Generation Work? Temporal Visual Evidence Table 4 shows that sequential visual features substantially improve the image–language action model: V-JEPA 2.1 80M raises average success from 39 .94% to 55 .00% , and the 300M encoder reaches 67 .44% .The 300M model improves every family over 80M, indicating that richer obser-vation history provides useful motion evidence for dynamic action generation. 
+
+Base Action Chunks as Conditioning Signals As a reference, the Qwen–V-JEPA model directly fuses language-conditioned image features with temporal visual features inside the model, whereas DynaWM uses only the base action chunk as a conditioning input. Nevertheless, all four fine-tuned DynaWM vari-ants exceed the 67 .44% internal reference, with a mean of 75 .39% (Table 5(a)), suggesting that the action sequence retains enough short-horizon action infor-mation for action-conditioned generation. 
+
+Why Encode the Action Sequence? The base action chunk could instead initialize rectified flow directly (Table 5(b)). Removing the Mamba action en-coder and flowing from the normalized base action chunk to the demonstration 14 C. Chang and Z. Deng 
+
+drops success to 29 .00% , far below the unchanged base VLA ( 72 .56% ) and Dy-naWM ( 74 .44% ). The largest drops occur on Amount and Obstacle, where suc-cess falls to 5.67% and 19 .67% , respectively, and preserving sequential action structure while revising long or abruptly changing trajectories is critical. Thus, the base action chunk is more effective as a persistent encoded condition than as generation’s initial geometry alone. 
+
+## 5 Conclusion 
+
+We introduced DynaWM, a base-VLA-guided world foundation model for moving-object manipulation. DynaWM regenerates action chunks from base action chunks, recent multi-view evidence, and robotic-arm states without accessing internal VLA representations or continuing to train the base VLA. Across fine-tuned and coarse-tuned checkpoints of SmolVLA, X-VLA, π0, and 
+
+π0.5, DynaWM improves all eight model-level averages on DynaGrasp-32 ,with having performance gains of 1.88% –45 .31% . The strongest improvements appear for base VLAs with weaker dynamic performance and for task families involving velocity variation and collision-induced path changes. These results show that DynaWM enhances the moving-object manipulation capability of fine-tuned and coarse-tuned base-VLA checkpoints. 
+
+Acknowledgments. This work was supported in part by Beijing Municipal Science & Technology Commission No. Z251100004625090 and by the National Science Foun-dation of China (NSFC) under Grant No. 62176134. 
+
+Disclosure of Interests. The authors declare no competing interests. 
+
+## References 
+
+1. Akinola, I., Xu, J., Song, S., Allen, P.K.: Dynamic grasping with reachability and motion awareness (2021) 2. Assran, M., Bardes, A., Fan, D., Garrido, Q., Howes, R., Mojtaba, et al.: V-JEPA 2: Self-supervised video models enable understanding, prediction and planning (2025) 3. Bardes, A., Garrido, Q., Ponce, J., Chen, X., Rabbat, M., LeCun, Y., et al.: Re-visiting feature prediction for learning visual representations from video (2024) 4. Black, K., Brown, N., Driess, D., Esmail, A., Equi, M., Finn, C., et al.: π0: A vision-language-action flow model for general robot control (2024) 5. Black, K., Galliker, M.Y., Levine, S.: Real-time execution of action chunking flow policies (2025) 6. Brohan, A., Brown, N., Carbajal, J., Chebotar, Y., Chen, X., Choromanski, K., et al.: RT-2: Vision-language-action models transfer web knowledge to robotic con-trol (2023) 7. Burgess-Limerick, B., Lehnert, C., Leitner, J., Corke, P.: DGBench: An open-source, reproducible benchmark for dynamic grasping (2022) 8. Chen, J., Song, W., Chen, S., Wang, J., Li, Z., Li, H.: DFM-VLA: Iterative action refinement for robot manipulation via discrete flow matching (2026) DynaWM for Moving-Object Manipulation 15 9. Chen, T., Chen, Z., Chen, B., Cai, Z., Liu, Y., Li, Z., et al.: RoboTwin 2.0: A scalable data generator and benchmark with strong domain randomization for robust bimanual robotic manipulation (2025) 10. Chen, Y., Ge, Y., Zhou, H., Ding, M., Ge, Y., Liu, X.: DIAL: Decoupling intent and action via latent world modeling for end-to-end VLA (2026) 11. Chi, C., Xu, Z., Feng, S., Cousineau, E., Du, Y., Burchfiel, B., et al.: Diffusion policy: Visuomotor policy learning via action diffusion (2023) 12. Embodiment Collaboration, O’Neill, A., Rehman, A., Gupta, A., Maddukuri, A., Gupta, A., et al.: Open X-Embodiment: Robotic learning datasets and RT-X mod-els (2023) 13. Fang, H., Li, S., Wang, S., Xi, X., Liang, D., Bai, X.: Towards generalizable robotic manipulation in dynamic environments (2026) 14. Feng, X., Cheng, Y., Shi, C., Han, B., Yan, Y., Hong, Y., et al.: Denoising tells when to replan: Denoising-variance adaptive chunking for flow-based robot policies (2026) 15. Gemini Robotics Team, Abdolmaleki, A., Abeyruwan, S., Ainslie, J., Alayrac, J.B., Arenas, M.G., et al.: Gemini Robotics 1.5: Pushing the frontier of generalist robots with advanced embodied reasoning, thinking, and motion transfer (2025) 16. Gu, A., Dao, T.: Mamba: Linear-time sequence modeling with selective state spaces (2023) 17. James, S., Ma, Z., Arrojo, D.R., Davison, A.J.: RLBench: The robot learning benchmark & learning environment (2019) 18. Jiang, S., Fang, X., Roy, N., Lozano-Pérez, T., Kaelbling, L.P., Ancha, S.: Stream-ing flow policy: Simplifying diffusion/flow-matching policies by treating action tra-jectories as flow trajectories (2025) 19. Khazatsky, A., Pertsch, K., Nair, S., Balakrishna, A., Dasari, S., Karamcheti, S., et al.: DROID: A large-scale in-the-wild robot manipulation dataset (2024) 20. Kim, M.J., Pertsch, K., Karamcheti, S., Xiao, T., Balakrishna, A., Nair, S., et al.: OpenVLA: An open-source vision-language-action model (2024) 21. Lahoti, A., Li, K.Y., Chen, B., Wang, C., Bick, A., Kolter, J.Z., et al.: Mamba-3: Improved sequence modeling using state space principles (2026) 22. Lian, S., Yu, B., Lin, X., Shen, Z., Yang, L.T., Jin, Y., et al.: IntentVLA: Short-horizon intent modeling for aliased robot manipulation (2026) 23. Liang, Q., Cai, B., He, R., Li, H., Teng, T., Duan, H., et al.: Whole-body coordi-nation for dynamic object grasping with legged manipulators (2025) 24. Lipman, Y., Chen, R.T.Q., Ben-Hamu, H., Nickel, M., Le, M.: Flow matching for generative modeling (2022) 25. Liu, B., Zhu, Y., Gao, C., Feng, Y., Liu, Q., Zhu, Y., et al.: LIBERO: Benchmarking knowledge transfer for lifelong robot learning (2023) 26. Liu, H., Xu, C., Ji, J., Mu, Y.: π0-EqM: Equilibrium matching for closed-loop vision-language-action control (2026) 27. Liu, S., Wu, L., Li, B., Tan, H., Chen, H., Wang, Z., et al.: RDT-1B: a diffusion foundation model for bimanual manipulation (2024) 28. Liu, Y., Yu, H., Zhao, J., Li, B., Zhang, D., Li, M., et al.: Learning native contin-uation for action chunking flow policies (2026) 29. Lu, Y., Liu, Z., Fan, X., Yang, Z., Hou, J., Li, J., et al.: FASTER: Rethinking real-time flow VLAs (2026) 30. Ma, T., Zheng, J., Wang, Z., Jiang, C., Cui, A., Liang, J., et al.: DiT4DiT: Jointly modeling video dynamics and actions for generalizable robot control (2026) 16 C. Chang and Z. Deng 31. Mandlekar, A., Nasiriany, S., Wen, B., Akinola, I., Narang, Y., Fan, L., et al.: Mim-icgen: A data generation system for scalable robot learning using human demon-strations (2023) 32. Mees, O., Hermann, L., Rosete-Beas, E., Burgard, W.: CALVIN: A benchmark for language-conditioned policy learning for long-horizon robot manipulation tasks (2021) 33. Mu, Y., Chen, T., Peng, S., Chen, Z., Gao, Z., Zou, Y., et al.: RoboTwin: Dual-arm robot benchmark with generative digital twins (early version) (2024) 34. Mur-Labadia, L., Muckley, M., Bar, A., Assran, M., Sinha, K., Rabbat, M., et al.: V-JEPA 2.1: Unlocking dense features in video self-supervised learning (2026) 35. Nasiriany, S., Maddukuri, A., Zhang, L., Parikh, A., Lo, A., Joshi, A., et al.: RoboCasa: Large-scale simulation of everyday tasks for generalist robots (2024) 36. NVIDIA, et al.: Cosmos World Foundation Model Platform for Physical AI. arXiv:2501.03575 (2025) 37. NVIDIA, et al.: Cosmos 3: Omnimodal World Models for Physical AI. arXiv:2606.02800 (2026) 38. NVIDIA: NVIDIA Isaac Sim documentation (2026) 39. NVIDIA, Bjorck, J., Castañeda, F., Cherniadev, N., Da, X., Ding, R., et al.: GR00T N1: An open foundation model for generalist humanoid robots (2025) 40. Octo Model Team, Ghosh, D., Walke, H., Pertsch, K., Black, K., Mees, O., et al.: Octo: An open-source generalist robot policy (2024) 41. Physical Intelligence: π0.7: A steerable generalist robotic foundation model with emergent capabilities. Tech. rep., Physical Intelligence (Apr 2026) 42. Physical Intelligence, Black, K., Brown, N., Darpinian, J., Dhabalia, K., Driess, D., et al.: π0.5: a vision-language-action model with open-world generalization (2025) 43. Shukor, M., Aubakirova, D., Capuano, F., Kooijmans, P., Palma, S., Zouitine, A., et al.: SmolVLA: A vision-language-action model for affordable and efficient robotics (2025) 44. Sun, J., Zhang, W., Qi, Z., Ren, S., Liu, Z., Zhu, H., et al.: VLA-JEPA: Enhancing vision-language-action model with latent world model (2026) 45. Sun, X., Xu, Z., Cao, C., Liu, Z., Sun, Y., Pang, J., et al.: AtomVLA: Scalable post-training for robotic manipulation via predictive latent world models (2026) 46. Syed, S.N., Jakobsson, A., Hao, H., Ichnowski, J.: Intercepting the future: Latent-space predictive world model for dynamic vla manipulation (2026) 47. Tian, Y., Jin, Y., Yu, B., Shi, Y., Wu, H., Liu, C.H., et al.: Starry: Spatial-temporal action-centric world modeling for robotic manipulation (2026) 48. Walke, H., Black, K., Lee, A., Kim, M.J., Du, M., Zheng, C., et al.: BridgeData V2: A dataset for robot learning at scale (2023) 49. Wang, K., Fan, K., Qiu, C., Shangguan, Z., Fu, Y., Fu, Y., et al.: OFlow: Injecting object-aware temporal flow matching for robust robotic manipulation (2026) 50. Wang, Q., Li, M., Guan, J., Ye, J., Xie, S., Liu, Y., et al.: Qwen-VLA: Unifying vision-language-action modeling across tasks, environments, and robot embodi-ments (2026) 51. Wang, X., Wang, C., Xu, Y., Ye, M., Zhang, F.C., Tian, J., et al.: LaMP: Learning vision-language-action policies with 3D scene flow as latent motion prior (2026) 52. Wei, H., Xu, X., Cheng, Z., Yin, H., Ma, A., Yu, B., et al.: F2F-AP: Flow-to-future asynchronous policy for real-time dynamic manipulation (2026) 53. Wu, T., Zhong, F., Geng, Y., Wang, H., Zhu, Y., Wang, Y., et al.: GraspARL: Dynamic grasping via adversarial reinforcement learning (2022) 54. Wu, Y., Chen, Z., Ou, C., Wang, W., Huang, W., Cao, L., et al.: ST-VLA: Enabling 4D-aware spatiotemporal understanding for general robot manipulation (2026) DynaWM for Moving-Object Manipulation 17 55. Xie, H., Wen, B., Zheng, J., Chen, Z., Hong, F., Diao, H., et al.: DynamicVLA: A vision-language-action model for dynamic object manipulation (2026) 56. Yu, T., Quillen, D., He, Z., Julian, R., Narayan, A., Shively, H., et al.: Meta-World: A benchmark and evaluation for multi-task and meta reinforcement learning (2019) 57. Zhang, C., Lu, R., Tong, J., Li, X., Wang, Y., Li, H.: EvoScene-VLA: Evolving scene beliefs inside the action decoder for chunked robot control (2026) 58. Zhang, S., Xu, Z., Liu, P., Yu, X., Li, Y., Gao, Q., et al.: VLABench: A large-scale benchmark for language-conditioned robotics manipulation with long-horizon reasoning tasks (2024) 59. Zhang, W., Liu, H., Qi, Z., Wang, Y., Yu, X., Zhang, J., et al.: DreamVLA: A vision-language-action model dreamed with comprehensive world knowledge (2025) 60. Zhao, T.Z., Kumar, V., Levine, S., Finn, C.: Learning fine-grained bimanual ma-nipulation with low-cost hardware (2023) 61. Zheng, J., Li, J., Wang, Z., Liu, D., Kang, X., Feng, Y., et al.: X-VLA: Soft-prompted transformer as scalable cross-embodiment vision-language-action model (2025) 62. Zhu, C., Yu, R., Feng, S., Burchfiel, B., Shah, P., Gupta, A.: Unified world models: Coupling video and action diffusion for pretraining on large robotic datasets (2025)
