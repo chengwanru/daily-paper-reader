@@ -6,79 +6,64 @@
 </div>
 
 ## 每次日报
-- 最新运行日期：2026-07-07
-- 运行时间：2026-07-07 22:11:01 UTC
+- 最新运行日期：2026-07-08
+- 运行时间：2026-07-08 21:47:26 UTC
 - 运行状态：成功
-- 本次总论文数：19
-- 精读区：8
-- 速读区：11
+- 本次总论文数：14
+- 精读区：6
+- 速读区：8
 
 ### 今日简报（AI）
-1) 今日聚焦“世界动作模型”，精读两篇满分论文：统一移动与操作的ABot-M0.5及双系统精细操作基础模型DSWAM。  
-2) 最值得关注的是世界动作模型在机器人移动-操作统一与精细操作中的突破性进展，速读《From World Models to World Action Models》教程可助快速入门。  
-3) 建议普通读者优先阅读精读论文的摘要与教程，关注如何将世界模型扩展为可执行动作的基础模型，对理解下一代机器人操作能力至关重要。
-- 详情：[/202607/07/README](/202607/07/README)
+今日精选14篇世界模型论文，重点关注多智能体交互世界模型与4D几何先验的推理高效行动模型。
+最值得关注的是两篇9.0高分研究：通过表示自编码器实现多玩家交互世界模型，以及利用4D几何先验构建推理高效的世界行动模型。
+建议读者优先阅读这两篇满分论文，并结合速读中《MoWorld: A Flash World Model》等8分工作，快速把握世界模型在交互与机器人操作中的前沿进展。
+- 详情：[/202607/08/README](/202607/08/README)
 
 ### 精读区论文标签
-1. [ABot-M0.5: Unified Mobility-and-Manipulation World Action Model](/202607/07/2607.00678v2-abot-m05-unified-mobility-and-manipulation-world-action-model)  
-   标签：评分：10.0/10、query:video-wam
-   evidence：提出移动操作世界动作模型
-2. [DSWAM: A Dual-System World Action Foundation Model for Fine-Grained Robot Manipulation](/202607/07/2607.04927v1-dswam-a-dual-system-world-action-foundation-model-for-fine-grained-robot-manipulation)  
-   标签：评分：10.0/10、query:video-wam
-   evidence：提出DSWAM双系统世界动作基础模型，直接基于世界动作模型概念
-3. [WorldBagel: Uncovering the Power of Unified Multimodal Models for Vision-Language-Action-World Modeling](/202607/07/2607.03461v1-worldbagel-uncovering-the-power-of-unified-multimodal-models-for-vision-language-action-world-modeling)  
+1. [Multiplayer Interactive World Models with Representation Autoencoders](/202607/08/2607.05352v1-multiplayer-interactive-world-models-with-representation-autoencoders)  
    标签：评分：9.0/10、query:video-wam
-   evidence：统一VLAW框架用于世界动作建模
-4. [WSA$_1$: a 3D-Centric World-Spatial-Action Model for Generalizable Robot Control](/202607/07/2607.03941v1-wsa1-a-3d-centric-world-spatial-action-model-for-generalizable-robot-control)  
+   evidence：多人生成式世界模型使用潜扩散
+2. [Learning 4D Geometric Priors for Inference-Efficient World Action Models](/202607/08/2607.05468v1-learning-4d-geometric-priors-for-inference-efficient-world-action-models)  
    标签：评分：9.0/10、query:video-wam
-   evidence：世界-空间-动作模型用于机器人控制
-5. [Worldscape-MoE: A Unified Mixture-of-Experts World Model for Scalable Heterogeneous Action Control](/202607/07/2607.03964v1-worldscape-moe-a-unified-mixture-of-experts-world-model-for-scalable-heterogeneous-action-control)  
+   evidence：带4D几何先验的世界动作模型
+3. [AlayaWorld: Long-Horizon and Playable Video World Generation](/202607/08/2607.06291v1-alayaworld-long-horizon-and-playable-video-world-generation)  
    标签：评分：9.0/10、query:video-wam
-   evidence：用于视频生成和动作控制的统一混合专家世界模型
-6. [HALO-WA: Hybrid-Attention Latent-Guided Online Reinforcement Learning for World-Action Models](/202607/07/2607.04265v1-halo-wa-hybrid-attention-latent-guided-online-reinforcement-learning-for-world-action-models)  
+   evidence：可游玩的视频世界生成
+4. [RynnWorld-Teleop: An Action-Conditioned World Model for Digital Teleoperation](/202607/08/2607.06558v1-rynnworld-teleop-an-action-conditioned-world-model-for-digital-teleoperation)  
    标签：评分：9.0/10、query:video-wam
-   evidence：具有在线强化学习适应能力的世界动作模型
-7. [Mask2Real-WM: Segmentation Masks as a Sim-to-Real Bridge for Controllable Dexterous World Models](/202607/07/2607.04546v1-mask2real-wm-segmentation-masks-as-a-sim-to-real-bridge-for-controllable-dexterous-world-models)  
-   标签：评分：9.0/10、query:video-wam
-   evidence：基于视频扩散的灵巧操作动作条件世界模型
-8. [UNIVERSE: Unified Video Action Models for Autonomous Driving with Flexible Mask-Modulated Modality Generation](/202607/07/2607.05133v1-universe-unified-video-action-models-for-autonomous-driving-with-flexible-mask-modulated-modality-generation)  
-   标签：评分：9.0/10、query:video-wam
-   evidence：用于世界动作模型的统一视频-动作模型
+   evidence：动作条件生成式世界模型用于数字遥操作
+5. [DREAMSTEER: Latent World Models Can Steer VLA Policies During Deployment Without Any Finetuning](/202607/08/2607.02865v1-dreamsteer-latent-world-models-can-steer-vla-policies-during-deployment-without-any-finetuning)  
+   标签：评分：8.0/10、query:video-wam
+   evidence：潜在世界模型引导VLA策略
+6. [Multiplayer Interactive World Models with Representation Autoencoders](/202607/08/2607.05352v2-multiplayer-interactive-world-models-with-representation-autoencoders)  
+   标签：评分：8.0/10、query:video-wam
+   evidence：首个多人世界模型，使用潜在扩散，扩展世界模型概念
 
 ### 速读区论文标签
-1. [WorldRoamBench: An Open-World Benchmark for Long-Horizon Stability of Interactive World Models](/202607/07/2606.31672v3-worldroambench-an-open-world-benchmark-for-long-horizon-stability-of-interactive-world-models)  
+1. [MoWorld: A Flash World Model](/202607/08/2607.06216v1-moworld-a-flash-world-model)  
    标签：评分：8.0/10、query:video-wam
-   evidence：交互世界模型基准，与视频生成世界模型相关
-2. [From World Models to World Action Models: A Concise Tutorial for Robotics](/202607/07/2607.00836v3-from-world-models-to-world-action-models-a-concise-tutorial-for-robotics)  
+   evidence：高效世界模型，支持高帧率推理
+2. [A Definition and Roadmap for World Models](/202607/08/2607.06401v1-a-definition-and-roadmap-for-world-models)  
    标签：评分：8.0/10、query:video-wam
-   evidence：关于世界模型和世界动作模型的教程
-3. [KAM-WM: Kinematic Affordance Maps from Latent World Models for Robot Manipulation](/202607/07/2607.04652v1-kam-wm-kinematic-affordance-maps-from-latent-world-models-for-robot-manipulation)  
+   evidence：提供世界模型的定义和发展路线图
+3. [RynnWorld-4D: 4D Embodied World Models for Robotic Manipulation](/202607/08/2607.06559v1-rynnworld-4d-4d-embodied-world-models-for-robotic-manipulation)  
    标签：评分：8.0/10、query:video-wam
-   evidence：利用潜在视频世界模型提取动作可供性
-4. [InternVLA-A1.5: Unifying Understanding, Latent Foresight, and Action for Compositional Generalization](/202607/07/2607.04988v1-internvla-a15-unifying-understanding-latent-foresight-and-action-for-compositional-generalization)  
-   标签：评分：8.0/10、query:video-wam
-   evidence：统一理解、潜在预见和动作的机器人操作
-5. [DynaWM: A Base-VLA-Guided World Foundation Model for Moving-Object Manipulation](/202607/07/2607.02604v1-dynawm-a-base-vla-guided-world-foundation-model-for-moving-object-manipulation)  
+   evidence：用于操作的4D具身世界模型
+4. [Track the Noise, Move the World:3D-Grounded Motion-Consistent Noise for Controllable Video Generation](/202607/08/2607.02798v1-track-the-noise-move-the-world3d-grounded-motion-consistent-noise-for-controllable-video-generation)  
    标签：评分：7.0/10、query:video-wam
-   evidence：DynaWM是一个基于基础VLA引导的世界基础模型，用于移动物体操作，融入了世界模型概念
-6. [Flex-Forcing: Towards a Unified Autoregressive and Bidirectional Video Diffusion Model](/202607/07/2607.03509v1-flex-forcing-towards-a-unified-autoregressive-and-bidirectional-video-diffusion-model)  
+   evidence：通过噪声操作实现可控视频生成，支持物体和相机运动
+5. [Reduced-Order Models: The Mother of World Models](/202607/08/2607.03198v1-reduced-order-models-the-mother-of-world-models)  
    标签：评分：7.0/10、query:video-wam
-   evidence：提出了统一自回归与双向的视频扩散框架，适用于世界模型中的视频生成
-7. [ProxyUp: Training-Free Proxy-Conditioned Video Generation for Controllable Dynamics](/202607/07/2607.03732v1-proxyup-training-free-proxy-conditioned-video-generation-for-controllable-dynamics)  
+   evidence：从控制理论角度回顾世界模型历史
+6. [Learning Task-Sufficient World Models by Synergizing Agentic Exploration and Structured Modeling](/202607/08/2607.04409v1-learning-task-sufficient-world-models-by-synergizing-agentic-exploration-and-structured-modeling)  
    标签：评分：7.0/10、query:video-wam
-   evidence：利用代理视频控制动态的无训练视频生成方法
-8. [Geographic Diversity Beats Data Volume for Cross-Domain Generalization in Zero-Label JEPA Driving World Models](/202607/07/2607.04500v1-geographic-diversity-beats-data-volume-for-cross-domain-generalization-in-zero-label-jepa-driving-world-models)  
-   标签：评分：7.0/10、query:video-wam
-   evidence：驾驶世界模型泛化研究
-9. [DynaVieW: Schema-Guided World Modeling for Understanding Hierarchical Visual Dynamics](/202607/07/2607.04112v1-dynaview-schema-guided-world-modeling-for-understanding-hierarchical-visual-dynamics)  
+   evidence：研究用于决策的世界模型学习
+7. [Towards Memory-Efficient Autoregressive Video Generation via Instance-Specific Parametric Absorption](/202607/08/2607.00712v1-towards-memory-efficient-autoregressive-video-generation-via-instance-specific-parametric-absorption)  
    标签：评分：6.0/10、query:video-wam
-   evidence：架构引导的世界模型用于理解视觉动态
-10. [MV-Forcing: Long Multi-View Video Generation via 4D-Grounded Spatio-Temporal Self-Forcing](/202607/07/2607.05376v1-mv-forcing-long-multi-view-video-generation-via-4d-grounded-spatio-temporal-self-forcing)  
+   evidence：高效内存的自回归视频生成（可用于世界模型）
+8. [SparseCtrl-HOI: Sparse Temporal Control for Human-Object Interaction Video Generation](/202607/08/2607.05994v1-sparsectrl-hoi-sparse-temporal-control-for-human-object-interaction-video-generation)  
    标签：评分：6.0/10、query:video-wam
-   evidence：通过4D接地实现长多视角一致视频生成，可用于需要多视角的世界模型
-11. [Deform360: A Massive Multi-view Visuotactile Dataset for Deformable World Models](/202607/07/2607.05390v1-deform360-a-massive-multi-view-visuotactile-dataset-for-deformable-world-models)  
-   标签：评分：6.0/10、query:video-wam
-   evidence：大规模可变形世界模型数据集
+   evidence：稀疏时间控制的人-物交互视频生成，可用于基于视频的世界模型
 
 
 <div class="dpr-home-promo-card">

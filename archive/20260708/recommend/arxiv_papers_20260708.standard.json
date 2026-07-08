@@ -1,0 +1,670 @@
+{
+  "mode": "standard",
+  "generated_at": "2026-07-08T21:33:52.069425+00:00",
+  "stats": {
+    "mode": "standard",
+    "tag_count": 1,
+    "deep_divecandidates": 9,
+    "deep_cap": 6,
+    "deep_selected": 6,
+    "quick_candidates": 8,
+    "quick_skim_target": 11,
+    "quick_selected": 8
+  },
+  "deep_dive": [
+    {
+      "id": "2607.05352v1",
+      "source": "arxiv",
+      "title": "Multiplayer Interactive World Models with Representation Autoencoders",
+      "abstract": "We introduce the first multiplayer world model for highly dynamic environments governed by complex physical interactions. Whereas single-player world models treat the other agents as part of the environment, ours conditions on the action streams of multiple agents, learning to attribute changes in the scene to the correct player and to stay coherent under arbitrary combinations of their actions. We study this problem in the game of Rocket League, where players compete and cooperate under fast, tightly coupled dynamics. Trained on 10,000 hours of gameplay collected with publicly available bots, our 5-billion-parameter latent diffusion model generates four-player matches in real time, producing 20 frames per second on a single Nvidia B200 GPU. Although trained only on short clips, its rollouts stay stable far beyond the training horizon: distributional quality holds steady out to five minutes, the longest horizon we measure, and in practice we observe rollouts continuing for hours with no sign of collapse. We systematically investigate the central design choices: the video codec, the generative objective, and the multiplayer conditioning scheme. In addition, we characterize how behavior changes with model and data scale, including the capabilities that emerge and the failure modes that persist. We further develop targeted evaluations that probe the model's physical understanding rather than visual appearance alone. To support continued research on multiplayer world models, we release our dataset, our full training and inference codebase, and a live demo.",
+      "authors": [
+        "Anthony Hu",
+        "Václav Volhejn",
+        "Adrien Ramanana Rahary",
+        "Chris Mulder",
+        "Aditya Makkar",
+        "Amélie Royer",
+        "Manu Orsini",
+        "Alyx Liao",
+        "Adam Jelley",
+        "Eloi Alonso",
+        "Florian Laurent",
+        "Fredrik Norén",
+        "James Swingos",
+        "Jan Hünermann",
+        "Kent Rollins",
+        "Lucas Hosseini",
+        "Matthieu Le Cauchois",
+        "Maxim Peter",
+        "Pim de Witte",
+        "Tim Brown",
+        "Vincent Micheli",
+        "Moritz Böhle",
+        "Gabriel de Marmiesse",
+        "Viktoriia Sharmanska",
+        "Lucia Specia",
+        "Michael Black",
+        "Patrick Pérez"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV",
+        "cs.AI",
+        "cs.LG"
+      ],
+      "published": "2026-07-06T17:31:52+00:00",
+      "link": "https://arxiv.org/pdf/2607.05352v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 9.0,
+      "llm_evidence_en": "multiplayer generative world model using latent diffusion",
+      "llm_evidence_cn": "多人生成式世界模型使用潜扩散",
+      "llm_evidence": "多人生成式世界模型使用潜扩散",
+      "canonical_evidence": "多人生成式世界模型使用潜扩散",
+      "llm_tldr_en": "First multiplayer world model conditioned on multiple players action streams, generating coherent 4-player matches in real time using a latent diffusion model.",
+      "llm_tldr_cn": "现有单玩家世界模型将其他智能体视为环境一部分，无法处理多智能体交互。本文提出首个多人世界模型，以多个玩家的动作流为条件，学习正确归因场景变化并保持一致性。在火箭联盟游戏中，使用5B参数潜扩散模型实时生成四玩家比赛视频，达到20 FPS。该工作为多智能体动态场景的世界建模开辟了新方向。",
+      "llm_tldr": "现有单玩家世界模型将其他智能体视为环境一部分，无法处理多智能体交互。本文提出首个多人世界模型，以多个玩家的动作流为条件，学习正确归因场景变化并保持一致性。在火箭联盟游戏中，使用5B参数潜扩散模型实时生成四玩家比赛视频，达到20 FPS。该工作为多智能体动态场景的世界建模开辟了新方向。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "generative world model",
+      "matched_requirement_id": "req-3",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2607.05468v1",
+      "source": "arxiv",
+      "title": "Learning 4D Geometric Priors for Inference-Efficient World Action Models",
+      "abstract": "World Action Models (WAMs) have shown strong potential for robotic manipulation by jointly modeling visual future dynamics and executable action sequences. However, existing video-action co-training methods primarily optimize appearance-oriented video latents, which may insufficiently capture the temporally evolving geometry required for precise manipulation. We propose MECo-WAM, a Multi-Expert Co-Training World Action Model that injects action-relevant 4D geometric priors into video-action representations while preserving the original lightweight inference graph. During training, MECo-WAM combines video and action experts with a lightweight 4D expert supervised by relational targets from a frozen VGGT encoder. Asymmetric expert visibility prevents non-causal shortcuts from auxiliary geometry to action generation. To transfer geometric knowledge into the deployed video-action pathway, we introduce decayed 4D read-mask attention, which provides restricted current-frame geometric guidance early in training and progressively removes this dependency. We further propose action-aware temporal geometric distillation, which aligns within-frame geometric relations and their temporal evolution while emphasizing visual regions most relevant to robot actions. At deployment, all auxiliary 4D components are removed. Experiments on LIBERO (98.2%), RoboTwin 2.0 (92.6%), and challenging real-world manipulation tasks show that MECo-WAM improves manipulation performance without increasing inference cost.",
+      "authors": [
+        "Jianjun Zhang",
+        "Jian Zhu",
+        "Taiyi Su",
+        "Chong Ma",
+        "Zitai Huang",
+        "Yi Xu",
+        "Hanli Wang"
+      ],
+      "primary_category": "cs.RO",
+      "categories": [
+        "cs.RO",
+        "cs.AI"
+      ],
+      "published": "2026-07-06T07:10:22+00:00",
+      "link": "https://arxiv.org/pdf/2607.05468v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 9.0,
+      "llm_evidence_en": "world action model with 4D geometric priors",
+      "llm_evidence_cn": "带4D几何先验的世界动作模型",
+      "llm_evidence": "带4D几何先验的世界动作模型",
+      "canonical_evidence": "带4D几何先验的世界动作模型",
+      "llm_tldr_en": "MECo-WAM injects 4D geometric priors into video-action representations via multi-expert co-training, preserving lightweight inference for robotic manipulation.",
+      "llm_tldr_cn": "本文提出MECo-WAM，一种多专家协同训练的世界动作模型。它通过引入一个轻量级4D专家（从冻结的VGGT编码器获取关系目标）向视频-动作表示注入动作相关的4D几何先验，同时保持原始轻量级推理图。该方法解决了现有视频-动作联合训练方法过度优化外观潜在表示而忽略时间演化几何的问题，提升了操作精度。",
+      "llm_tldr": "本文提出MECo-WAM，一种多专家协同训练的世界动作模型。它通过引入一个轻量级4D专家（从冻结的VGGT编码器获取关系目标）向视频-动作表示注入动作相关的4D几何先验，同时保持原始轻量级推理图。该方法解决了现有视频-动作联合训练方法过度优化外观潜在表示而忽略时间演化几何的问题，提升了操作精度。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "world action model",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2607.06291v1",
+      "source": "arxiv",
+      "title": "AlayaWorld: Long-Horizon and Playable Video World Generation",
+      "abstract": "Game worlds have traditionally been built through labor-intensive production pipelines, making them costly to develop, difficult to customization, and expensive to modify after deployment. Recent advances in video world models offer a fundamentally different paradigm. Rather than explicitly authoring every component of a virtual environment, these models autoregressively synthesize future observations conditioned on the current world state and user interactions, enabling playable worlds to be generated online. Trained on both gameplay recordings and real-world videos, they can capture diverse visual appearances and physical dynamics, opening new opportunities for interactive applications beyond gaming, including embodied intelligence. In this paper, we present \\textbf{AlayaWorld}, a full-stack open-source framework for building interactive generative worlds. AlayaWorld enables open-ended real-time interaction, allowing users to freely navigate and perform diverse actions such as combat, spell casting, and monster summoning. The framework unifies the complete development-from data preparation model architecture, model training, inference acceleration, and deployment-within a modular and extensible architecture. Alongside the framework, we release reproducible pipelines, reference implementations, evaluation tools, and comprehensive documentation, establishing a practical foundation for future research and real-time applications of generative world models.",
+      "authors": [
+        "AlayaWorld Team",
+        "Kaipeng Zhang",
+        "Chuanhao Li",
+        "Yifan Zhan",
+        "Yongtao Ge",
+        "Yuanyang Yin",
+        "Jiaming Tan",
+        "Kang He",
+        "Liaoyuan Fan",
+        "Ruicong Liu",
+        "Xiaojie Xu",
+        "Xuangeng Chu",
+        "Zhen Li",
+        "Zhengyuan Lin",
+        "Zhixiang Wang",
+        "Zian Meng",
+        "Zihui Gao"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV",
+        "cs.HC"
+      ],
+      "published": "2026-07-07T13:59:57+00:00",
+      "link": "https://arxiv.org/pdf/2607.06291v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 9.0,
+      "llm_evidence_en": "playable video world generation",
+      "llm_evidence_cn": "可游玩的视频世界生成",
+      "llm_evidence": "可游玩的视频世界生成",
+      "canonical_evidence": "可游玩的视频世界生成",
+      "llm_tldr_en": "Presents AlayaWorld, a video world model that autoregressively synthesizes future observations for long-horizon playable world generation, trained on gameplay and real-world videos.",
+      "llm_tldr_cn": "针对游戏世界构建成本高的问题，提出AlayaWorld，一种长程可玩视频世界生成模型。它基于视频世界模型自回归合成未来观测，支持用户交互。在游戏和真实视频上训练后，能捕捉多样化的视觉外观和物理动态，为交互式应用和具身智能提供新范式。",
+      "llm_tldr": "针对游戏世界构建成本高的问题，提出AlayaWorld，一种长程可玩视频世界生成模型。它基于视频世界模型自回归合成未来观测，支持用户交互。在游戏和真实视频上训练后，能捕捉多样化的视觉外观和物理动态，为交互式应用和具身智能提供新范式。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "video world model",
+      "matched_requirement_id": "req-5",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2607.06558v1",
+      "source": "arxiv",
+      "title": "RynnWorld-Teleop: An Action-Conditioned World Model for Digital Teleoperation",
+      "abstract": "Scaling robot learning requires massive, diverse trajectory data, yet collection is currently bottlenecked by physical teleoperation, where every demonstration binds operator time to specific hardware and workspaces. We introduce digital teleoperation, a paradigm that decouples data collection from physical constraints by replacing the real robot with a generative world model. In this framework, an operator's hand-pose stream drives a robot-centric generative world model to synthesize high-fidelity egocentric videos from a single reference image. The recorded pose stream serves as an embodiment-agnostic action label transferable to any target robot via standard retargeting, yielding complete state-action trajectories for imitation learning independent of physical hardware. We instantiate this paradigm in RynnWorld-Teleop, a system that integrates depth-aware skeletal conditioning, progressive human-to-robot training on a video Diffusion Transformer, and streaming autoregressive distillation. This pipeline compresses the generative process into a single-pass inference, enabling 40+ FPS, real-time interactive generation on a single H100 GPU. Policies trained exclusively on RynnWorld-Teleop-generated data achieve effective zero-shot Sim2Real transfer across dexterous and diverse bimanual tasks. Moreover, augmenting real-world datasets with our digitally teleoperated data consistently improves success rates, demonstrating that RynnWorld-Teleop serves as a high-fidelity, scalable data engine for the next generation of robotic agents.",
+      "authors": [
+        "Haoyu Zhao",
+        "Xingyue Zhao",
+        "Hangyu Li",
+        "Biao Gong",
+        "Kehan Li",
+        "Siteng Huang",
+        "Xin Li",
+        "Deli Zhao",
+        "Zhongyu Li"
+      ],
+      "primary_category": "cs.RO",
+      "categories": [
+        "cs.RO"
+      ],
+      "published": "2026-07-07T17:58:11+00:00",
+      "link": "https://arxiv.org/pdf/2607.06558v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 9.0,
+      "llm_evidence_en": "action-conditioned generative world model for digital teleoperation",
+      "llm_evidence_cn": "动作条件生成式世界模型用于数字遥操作",
+      "llm_evidence": "动作条件生成式世界模型用于数字遥操作",
+      "canonical_evidence": "动作条件生成式世界模型用于数字遥操作",
+      "llm_tldr_en": "RynnWorld-Teleop introduces digital teleoperation with an action-conditioned generative world model that synthesizes egocentric videos from hand-pose streams, enabling scalable data collection for robot learning.",
+      "llm_tldr_cn": "机器人学习依赖大量轨迹数据，但物理遥操作成本高。本文提出数字遥操作范式，用动作条件生成式世界模型替代真实机器人，从操作者手部姿态流合成高质量第一人称视频，姿态流可作为通用动作标签转移至任意机器人。实验表明该方法生成的视频可用于训练机器人模仿学习策略，性能接近真实数据，为机器人数据收集提供了可扩展方案。",
+      "llm_tldr": "机器人学习依赖大量轨迹数据，但物理遥操作成本高。本文提出数字遥操作范式，用动作条件生成式世界模型替代真实机器人，从操作者手部姿态流合成高质量第一人称视频，姿态流可作为通用动作标签转移至任意机器人。实验表明该方法生成的视频可用于训练机器人模仿学习策略，性能接近真实数据，为机器人数据收集提供了可扩展方案。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "world action model",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2607.02865v1",
+      "source": "arxiv",
+      "title": "DREAMSTEER: Latent World Models Can Steer VLA Policies During Deployment Without Any Finetuning",
+      "abstract": "Pretrained vision-language-action (VLA) policies show promising zero-shot generalization, but often fail under deployment-time distribution shift, leading to decreased robustness and inconsistent instruction following. While prior work commonly tackles this by finetuning on in-distribution data, it assumes demonstrations collected on tasks in the target environment. In this work, we propose DREAMSTEER, a deployment-time steering framework for pretrained VLAs without any finetuning or parameter modifications. The key insight in DREAMSTEER is to leverage a latent world model and a value model to steer pretrained VLA policies. During deployment, DREAMSTEER samples candidate action chunks from a VLA policy and predefined motion primitives, imagines their outcomes using an action-conditioned latent world model, and ranks the imagined trajectories with a language-conditioned value model. Across four real-world manipulation benchmarks with unseen objects, DREAMSTEER improves task success rate from 23.75% to 66.25% and instruction-following accuracy from 38.75% to 56.25% over the base VLA policy.",
+      "authors": [
+        "Hanchen Cui",
+        "Sergio Arnaud",
+        "Arjun Majumdar",
+        "Daniel Dugas",
+        "Elie Aljalbout",
+        "Karthik Desingh",
+        "Krishna Murthy Jatavallabhula",
+        "Franziska Meier"
+      ],
+      "primary_category": "cs.RO",
+      "categories": [
+        "cs.RO"
+      ],
+      "published": "2026-07-03T02:08:50+00:00",
+      "link": "https://arxiv.org/pdf/2607.02865v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 8.0,
+      "llm_evidence_en": "latent world model for steering VLA policies",
+      "llm_evidence_cn": "潜在世界模型引导VLA策略",
+      "llm_evidence": "潜在世界模型引导VLA策略",
+      "canonical_evidence": "潜在世界模型引导VLA策略",
+      "llm_tldr_en": "DREAMSTEER uses a latent world model and value model to steer pretrained VLA policies at deployment time without finetuning, improving robustness under distribution shift.",
+      "llm_tldr_cn": "现有视觉-语言-动作（VLA）策略在部署时易因分布偏移失败，通常需要微调。DREAMSTEER提出一种部署时引导框架，利用潜在世界模型和值模型引导VLA策略，无需微调。实验表明该方法提升策略鲁棒性和指令遵循能力，展示了世界模型在机器人策略部署中的实用价值。",
+      "llm_tldr": "现有视觉-语言-动作（VLA）策略在部署时易因分布偏移失败，通常需要微调。DREAMSTEER提出一种部署时引导框架，利用潜在世界模型和值模型引导VLA策略，无需微调。实验表明该方法提升策略鲁棒性和指令遵循能力，展示了世界模型在机器人策略部署中的实用价值。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "world model",
+      "matched_requirement_id": "req-2",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2607.05352v2",
+      "source": "arxiv",
+      "title": "Multiplayer Interactive World Models with Representation Autoencoders",
+      "abstract": "We introduce the first multiplayer world model for highly dynamic environments governed by complex physical interactions. Whereas single-player world models treat the other agents as part of the environment, ours conditions on the action streams of multiple agents, learning to attribute changes in the scene to the correct player and to stay coherent under arbitrary combinations of their actions. We study this problem in the game of Rocket League, where players compete and cooperate under fast, tightly coupled dynamics. Trained on 10,000 hours of gameplay collected with publicly available bots, our 5-billion-parameter latent diffusion model generates four-player matches in real time, producing 20 frames per second on a single Nvidia B200 GPU. Although trained only on short clips, its rollouts stay stable far beyond the training horizon: distributional quality holds steady out to five minutes, the longest horizon we measure, and in practice we observe rollouts continuing for hours with no sign of collapse. We systematically investigate the central design choices: the video codec, the generative objective, and the multiplayer conditioning scheme. In addition, we characterize how behavior changes with model and data scale, including the capabilities that emerge and the failure modes that persist. We further develop targeted evaluations that probe the model's physical understanding rather than visual appearance alone. To support continued research on multiplayer world models, we release our dataset, our full training and inference codebase, and a live demo.",
+      "authors": [
+        "Anthony Hu",
+        "Václav Volhejn",
+        "Adrien Ramanana Rahary",
+        "Chris Mulder",
+        "Aditya Makkar",
+        "Alyx Liao",
+        "Amélie Royer",
+        "Manu Orsini",
+        "Adam Jelley",
+        "Eloi Alonso",
+        "Florian Laurent",
+        "Fredrik Norén",
+        "James Swingos",
+        "Jan Hünermann",
+        "Kent Rollins",
+        "Lucas Hosseini",
+        "Matthieu Le Cauchois",
+        "Maxim Peter",
+        "Pim de Witte",
+        "Tim Brown",
+        "Vincent Micheli",
+        "Moritz Böhle",
+        "Gabriel de Marmiesse",
+        "Viktoriia Sharmanska",
+        "Lucia Specia",
+        "Michael Black",
+        "Patrick Pérez"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV",
+        "cs.AI",
+        "cs.LG"
+      ],
+      "published": "2026-07-06T17:31:52+00:00",
+      "link": "https://arxiv.org/pdf/2607.05352v2",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 8.0,
+      "llm_evidence_en": "first multiplayer world model with latent diffusion, extended world model concept",
+      "llm_evidence_cn": "首个多人世界模型，使用潜在扩散，扩展世界模型概念",
+      "llm_evidence": "首个多人世界模型，使用潜在扩散，扩展世界模型概念",
+      "canonical_evidence": "首个多人世界模型，使用潜在扩散，扩展世界模型概念",
+      "llm_tldr_en": "Multiplayer Interactive World Models handles multiple agents in dynamic environments, generating real-time coherent game matches.",
+      "llm_tldr_cn": "针对单玩家世界模型无法处理多智能体动态环境的问题，首次提出多人世界模型，通过条件化多个动作流并学习正确归因场景变化，使用50亿参数潜在扩散模型在Rocket League游戏中实时生成四玩家比赛。尽管存在困惑和回滚，但在高动态场景下实现了合理的连贯生成，为世界模型在多智能体环境中的应用开辟新方向。",
+      "llm_tldr": "针对单玩家世界模型无法处理多智能体动态环境的问题，首次提出多人世界模型，通过条件化多个动作流并学习正确归因场景变化，使用50亿参数潜在扩散模型在Rocket League游戏中实时生成四玩家比赛。尽管存在困惑和回滚，但在高动态场景下实现了合理的连贯生成，为世界模型在多智能体环境中的应用开辟新方向。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "world model",
+      "matched_requirement_id": "req-2",
+      "selection_source": "fresh_fetch"
+    }
+  ],
+  "quick_skim": [
+    {
+      "id": "2607.06216v1",
+      "source": "arxiv",
+      "title": "MoWorld: A Flash World Model",
+      "abstract": "The future of World Models depends not only on scaling model capability, but also on scaling practicality and inference efficiency. High-frame-rate inference enables responsive perception, planning, and control in real-world autonomous systems. To this end, we present MoWorld, a cost-effective yet high-performance Flash World Model with an end-to-end framework spanning data generation, pre-training, distillation, and efficient inference, enabling up to 50 FPS real-time interaction with cinematic visual quality without the need of high-end GPUs. To enable large-scale real-world deployment, MoWorld jointly optimizes model capability and cost throughout the entire development pipeline. Specifically, unlike existing approaches that primarily rely on large-scale video corpora, MoWorld is built upon a scalable 3D-native data engine accumulated from our large-scale 3D vision and generative modeling pipeline, enabling the efficient construction of geometrically consistent training data across diverse real-world and synthetic environments. Based on this foundation, a curriculum cross-frame pre-training strategy for stable and scalable World Model learning, an efficient denoising-step distillation algorithm to reduce diffusion training cost, and a mixed-precision parallel inference framework for low-cost real-time deployment. MoWorld is the first real-time interactive World Model built on the Neural Processing Unit (NPU) and can achieves up to 50 FPS in such the devices, enabling practical and efficient deployment at scale. Comprehensive evaluations demonstrate that MoWorld achieves leading performance; notably, its average inference cost is only 30\\%-50\\% of that of existing World Models, providing a practical foundation for large-scale real-world applications of World Models. We also demonstrate diverse applications of MoWorld.",
+      "authors": [
+        "Team Moxin",
+        "Deyi Ji",
+        "Tianrun Chen",
+        "Xin Zhang",
+        "Jiale Yang",
+        "Qi Zhu",
+        "An Zhao",
+        "Zihao Xie",
+        "Han Wang",
+        "Xuanyi Liu",
+        "Yixiang Zhou",
+        "Pei Liu",
+        "Yi Tan",
+        "Cheng Chen",
+        "Dayi Zhu",
+        "Mingyu Wei",
+        "Hanjie Xu",
+        "Jun Liao",
+        "Siqi Li",
+        "Lingyu Lu",
+        "Hongye Fang",
+        "Hongming Tan",
+        "Youjiang Zhu",
+        "Taiyu Zhang",
+        "Zejian Li",
+        "Chaotao Ding",
+        "Lanyun Zhu",
+        "Yunhe Pan",
+        "Lingyun Sun"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV"
+      ],
+      "published": "2026-07-07T12:41:19+00:00",
+      "link": "https://arxiv.org/pdf/2607.06216v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 8.0,
+      "llm_evidence_en": "efficient world model with high frame rate inference",
+      "llm_evidence_cn": "高效世界模型，支持高帧率推理",
+      "llm_evidence": "高效世界模型，支持高帧率推理",
+      "canonical_evidence": "高效世界模型，支持高帧率推理",
+      "llm_tldr_en": "MoWorld is a cost-effective world model achieving 50 FPS real-time interaction via end-to-end optimization of data, pre-training, distillation, and inference.",
+      "llm_tldr_cn": "本文提出MoWorld，一种名为“闪存世界模型”的高效框架。它通过联合优化数据生成、预训练、蒸馏和推理的整个管线，实现了在高帧率（50 FPS）下进行实时交互，且无需高端GPU。MoWorld关注世界模型在实际部署中的成本与性能平衡，与依赖大规模视频语料库的现有方法不同，为世界模型的实用化提供了新思路。",
+      "llm_tldr": "本文提出MoWorld，一种名为“闪存世界模型”的高效框架。它通过联合优化数据生成、预训练、蒸馏和推理的整个管线，实现了在高帧率（50 FPS）下进行实时交互，且无需高端GPU。MoWorld关注世界模型在实际部署中的成本与性能平衡，与依赖大规模视频语料库的现有方法不同，为世界模型的实用化提供了新思路。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "world model",
+      "matched_requirement_id": "req-2",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "8plus"
+    },
+    {
+      "id": "2607.02798v1",
+      "source": "arxiv",
+      "title": "Track the Noise, Move the World:3D-Grounded Motion-Consistent Noise for Controllable Video Generation",
+      "abstract": "Modern image-and-text-to-video diffusion models can synthesize highly realistic videos by iteratively denoising an initial Gaussian noise tensor conditioned on reference image and text inputs. However, existing approaches still lack precise and unified controllability over both object motion and camera motion within a single generation process. We present UniCaMo, a unified framework that enables simultaneous control of object trajectories and camera viewpoints by directly constructing the input noise of the diffusion model. Specifically, UniCaMo builds a shared 3D-grounded motion-consistent noise space across latent video frames. Sparse 3D point tracks are used to warp the Gaussian noise of the reference frame along desired object trajectories, while a virtual spherical noise representation provides globally consistent noise values for newly revealed scene regions under camera motion. By combining local track-guided noise warping with global sphere-based noise sampling, UniCaMo maintains geometric and temporal consistency under both object movement and viewpoint changes. Because UniCaMo modifies only the input noise, it requires no auxiliary adapters, control branches, or architectural changes to the underlying video diffusion model. With lightweight LoRA fine-tuning on large pretrained video diffusion models, including Wan 2.1 (14B), UniCaMo achieves state-of-the-art results in both video quality and motion controllability on standard controllable video generation benchmarks.",
+      "authors": [
+        "Long Vu",
+        "Tan Ngo",
+        "Animesh Karnewar",
+        "Amir Habibian",
+        "Binh-Son Hua",
+        "Hung Bui",
+        "Minh Hoai Nguyen",
+        "Phong Nguyen-Ha"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV",
+        "cs.GR"
+      ],
+      "published": "2026-07-02T22:17:20+00:00",
+      "link": "https://arxiv.org/pdf/2607.02798v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 7.0,
+      "llm_evidence_en": "controllable video generation using noise manipulation for object and camera motion",
+      "llm_evidence_cn": "通过噪声操作实现可控视频生成，支持物体和相机运动",
+      "llm_evidence": "通过噪声操作实现可控视频生成，支持物体和相机运动",
+      "canonical_evidence": "通过噪声操作实现可控视频生成，支持物体和相机运动",
+      "llm_tldr_en": "UniCaMo enables simultaneous control of object trajectories and camera viewpoints in video diffusion by constructing a 3D-grounded motion-consistent noise space.",
+      "llm_tldr_cn": "当前视频扩散模型缺乏对物体运动和相机运动的统一控制。本文提出UniCaMo，通过构建3D空间中对运动一致的噪声空间，实现同时控制物体轨迹和相机视角。利用稀疏3D点轨迹扭曲高斯噪声，在不额外训练的情况下生成符合用户意图的视频。",
+      "llm_tldr": "当前视频扩散模型缺乏对物体运动和相机运动的统一控制。本文提出UniCaMo，通过构建3D空间中对运动一致的噪声空间，实现同时控制物体轨迹和相机视角。利用稀疏3D点轨迹扭曲高斯噪声，在不额外训练的情况下生成符合用户意图的视频。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "research on video generation for world models",
+      "matched_requirement_id": "req-8",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "7"
+    },
+    {
+      "id": "2607.00712v1",
+      "source": "arxiv",
+      "title": "Towards Memory-Efficient Autoregressive Video Generation via Instance-Specific Parametric Absorption",
+      "abstract": "Autoregressive (AR) streaming models have emerged as a powerful paradigm for long video generation. However, the linearly growing Key-Value (KV) cache poses a significant bottleneck, leading to memory overload and degraded inference throughput. A common compression method is to drop redundant KV tokens, which often breaks long-range dependencies, resulting in temporal flickering and identity loss. In this paper, we propose Instance-Specific Parametric Absorption (ISPA), a novel framework that shifts the KV cache compression from discarding to distilling. The core idea is to transit a subset of layers from Full-Attention (F-Layers) to memory-efficient Local-Attention (L-Layers) by \"absorbing\" historical context into the model's weights. Specifically, during a brief warmup phase, ISPA monitors the output discrepancy between global and local attention. At the transition point, we solve a closed-form least-squares problem to compute an instance-specific weight modulation that compensates for the missing history. Experiments across architectures (1.3B to 14B) demonstrate that ISPA can remove up to 50\\% of the KV cache with near-lossless visual quality. We hope this perspective encourages future work to explore parametric memory consolidation beyond external token-level cache management for streaming generative models.",
+      "authors": [
+        "Xiaomeng Fu",
+        "Jia Li",
+        "Yiming Hu",
+        "Yong Wang",
+        "Hayden Kwok-Hay So",
+        "Jiao Dai",
+        "Xiangxiang Chu",
+        "Jizhong Han"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV",
+        "cs.MM"
+      ],
+      "published": "2026-07-01T09:59:28+00:00",
+      "link": "https://arxiv.org/pdf/2607.00712v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "memory-efficient autoregressive video generation",
+      "llm_evidence_cn": "高效内存的自回归视频生成（可用于世界模型）",
+      "llm_evidence": "高效内存的自回归视频生成（可用于世界模型）",
+      "canonical_evidence": "高效内存的自回归视频生成（可用于世界模型）",
+      "llm_tldr_en": "Proposes ISPA for memory-efficient autoregressive video generation by distilling historical context into model parameters, reducing KV cache without losing long-range dependencies.",
+      "llm_tldr_cn": "针对自回归视频生成中KV缓存线性增长导致内存瓶颈的问题，提出实例特定参数吸收（ISPA）。它将部分注意力层从全注意力转换为局部注意力，通过将历史上下文吸收进模型参数，避免丢弃token导致的长期依赖丢失。在长视频生成任务中，ISPA在保持视频质量的同时大幅降低内存消耗。",
+      "llm_tldr": "针对自回归视频生成中KV缓存线性增长导致内存瓶颈的问题，提出实例特定参数吸收（ISPA）。它将部分注意力层从全注意力转换为局部注意力，通过将历史上下文吸收进模型参数，避免丢弃token导致的长期依赖丢失。在长视频生成任务中，ISPA在保持视频质量的同时大幅降低内存消耗。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "research on video generation for world models",
+      "matched_requirement_id": "req-8",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    },
+    {
+      "id": "2607.06401v1",
+      "source": "arxiv",
+      "title": "A Definition and Roadmap for World Models",
+      "abstract": "World models -- internal simulators that learn the structure and dynamics of an environment -- have become one of the most actively debated concepts in AI. From model-based reinforcement learning and video generation to embodied robotics and ultimately, physical AI, researchers across AI subfields are building systems that they call \"world models\", yet there is no consensus on what a world model fundamentally is, what it should predict, or how it should be built. This perspective article provides a scientific definition of world models, discussions of their key technical aspects, and a staged roadmap for developing effective world models.",
+      "authors": [
+        "Xinyuan Chen",
+        "Haoyu Guo",
+        "Shi Guo",
+        "Bingqi Jiang",
+        "Chunhua Shen",
+        "Xing Shen",
+        "Tianfan Xue",
+        "Yufei Xue",
+        "Mulin Yu",
+        "Weinan Zhang",
+        "Bin Zhao",
+        "Bowen Zhou",
+        "Ming Zhou"
+      ],
+      "primary_category": "cs.AI",
+      "categories": [
+        "cs.AI"
+      ],
+      "published": "2026-07-07T15:31:32+00:00",
+      "link": "https://arxiv.org/pdf/2607.06401v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 8.0,
+      "llm_evidence_en": "provides definition and roadmap for world models",
+      "llm_evidence_cn": "提供世界模型的定义和发展路线图",
+      "llm_evidence": "提供世界模型的定义和发展路线图",
+      "canonical_evidence": "提供世界模型的定义和发展路线图",
+      "llm_tldr_en": "This perspective article defines world models, discusses technical aspects, and provides a staged roadmap for development.",
+      "llm_tldr_cn": "针对世界模型概念在AI各子领域缺乏共识的问题，本文从科学角度给出世界模型的定义（学习环境结构和动态的内部模拟器），讨论关键技术方面，并提出了分阶段的发展路线图。该论文有助于统一对世界模型的理解，指导未来研究，是构建世界模型的重要参考。",
+      "llm_tldr": "针对世界模型概念在AI各子领域缺乏共识的问题，本文从科学角度给出世界模型的定义（学习环境结构和动态的内部模拟器），讨论关键技术方面，并提出了分阶段的发展路线图。该论文有助于统一对世界模型的理解，指导未来研究，是构建世界模型的重要参考。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "world model",
+      "matched_requirement_id": "req-2",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "8plus"
+    },
+    {
+      "id": "2607.03198v1",
+      "source": "arxiv",
+      "title": "Reduced-Order Models: The Mother of World Models",
+      "abstract": "World models -- compressed latent representations of an environment that support action-conditioned prediction and planning -- are typically presented as a product of modern self-supervised learning. This paper argues that the functional anatomy of a world model was independently developed, deployed, and formally analyzed decades earlier in the model-order-reduction (MOR) and control literature, under different names and for a different purpose: the real-time operation of physical systems. We trace the anatomy across three communities. Low-dimensional models of turbulence built on proper orthogonal decomposition (POD) supplied latent dynamics learned from data of a chaotic environment; eigenface methods in early computer vision supplied the encoder-decoder half, including a primitive runtime validity check; and measurement-based POD frameworks for facility thermal control assembled the complete loop -- POD coefficients as latent state, parametric dependence on actuator setpoints as action conditioning, modal reconstruction as decoding, and, critically, a priori analytical error bounds as a verification layer that certified when the model's predictions could be trusted in closed loop. We then examine what each tradition possesses that the other lacks: MOR contributes verification, physical grounding, and extreme data efficiency; learned world models contribute nonlinear representation, transferability, and horizon. We argue that the outstanding obstacle to deploying world models in systems that cannot fail -- power, thermal, process control -- is not predictive fidelity but verifiability, and we outline a research agenda for physics-grounded, verifiable world models that unifies the two lineages.",
+      "authors": [
+        "Rajat Ghosh"
+      ],
+      "primary_category": "cs.LG",
+      "categories": [
+        "cs.LG",
+        "math-ph"
+      ],
+      "published": "2026-07-03T11:05:06+00:00",
+      "link": "https://arxiv.org/pdf/2607.03198v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 7.0,
+      "llm_evidence_en": "historical perspective on world models from control theory",
+      "llm_evidence_cn": "从控制理论角度回顾世界模型历史",
+      "llm_evidence": "从控制理论角度回顾世界模型历史",
+      "canonical_evidence": "从控制理论角度回顾世界模型历史",
+      "llm_tldr_en": "This paper argues that world model concepts were developed decades earlier in reduced-order modeling, tracing parallels across turbulence modeling and eigenface methods.",
+      "llm_tldr_cn": "本文认为世界模型的功能架构早年在模型降阶（MOR）与控制文献中独立发展。它追踪了湍流模型中的本征正交分解（POD）提供潜在动力学，以及早期计算机视觉中的特征脸方法提供编码器-解码器等。该工作为理解世界模型的历史根源提供了新视角，但并非直接提出新方法。",
+      "llm_tldr": "本文认为世界模型的功能架构早年在模型降阶（MOR）与控制文献中独立发展。它追踪了湍流模型中的本征正交分解（POD）提供潜在动力学，以及早期计算机视觉中的特征脸方法提供编码器-解码器等。该工作为理解世界模型的历史根源提供了新视角，但并非直接提出新方法。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "world model",
+      "matched_requirement_id": "req-2",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "7"
+    },
+    {
+      "id": "2607.05994v1",
+      "source": "arxiv",
+      "title": "SparseCtrl-HOI: Sparse Temporal Control for Human-Object Interaction Video Generation",
+      "abstract": "Human-Object Interaction (HOI) video generation aims to synthesize realistic videos of humans manipulating diverse objects, serving as a promising avenue for AI-driven live streaming e-commerce. A primary obstacle in this domain lies in the complexity of modeling fine-grained physical dynamics and the intricate spatial-temporal coordination between human hands and objects. Existing approaches to this problem typically rely on dense temporal guidance, e.g., frame-wise hand-object pose sequences, to strictly control the interaction process. However, such dense guidance incurs high annotation costs and affects motion synthesis diversity. To overcome these limitations, we introduce SparseCtrl-HOI, a novel sparse temporal control framework for HOI video generation. It requires only a few keyframes that capture interaction states at designated timestamps. Specifically, we employ a Time-Controlled Rotary Positional Embedding (TiRoPE) mechanism to temporally anchor these keyframes while preserving their spatial integrity. Subsequently, to govern the dynamics across intermediate frames, we propose a Motion Prior Injection Module that leverages Multimodal Large Language Models (MLLMs) to extract high-level motion priors. This empowers the model to hallucinate logically and physically plausible transitions. Furthermore, we build SparseHOI-5K, a high-quality and richly annotated dataset for HOI video generation with sparse temporal control. Comprehensive evaluations confirm that our method substantially reduces annotation overhead while synthesizing superior live-streaming e-commerce videos. Both our code and dataset are publicly available at https://mpi-lab.github.io/SparseCtrl-HOI.",
+      "authors": [
+        "Shenbo Xie",
+        "Mingrui Cai",
+        "Xu Yang",
+        "Yifei Liu",
+        "Changxing Ding"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV"
+      ],
+      "published": "2026-07-07T08:29:25+00:00",
+      "link": "https://arxiv.org/pdf/2607.05994v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "sparse temporal control for human-object interaction video generation, useful for video-based world models",
+      "llm_evidence_cn": "稀疏时间控制的人-物交互视频生成，可用于基于视频的世界模型",
+      "llm_evidence": "稀疏时间控制的人-物交互视频生成，可用于基于视频的世界模型",
+      "canonical_evidence": "稀疏时间控制的人-物交互视频生成，可用于基于视频的世界模型",
+      "llm_tldr_en": "SparseCtrl-HOI introduces sparse temporal control for HOI video generation, reducing annotation cost while maintaining interaction fidelity.",
+      "llm_tldr_cn": "针对人-物交互视频生成中密集时间引导（如逐帧手物姿态序列）标注成本高且限制动作多样性的问题，提出SparseCtrl-HOI稀疏时间控制框架，仅用少量关键帧引导生成，降低了标注开销并提升了动作多样性。在多个基准上验证了生成质量和控制精度的优势，为视频世界模型的交互建模提供了高效控制手段。",
+      "llm_tldr": "针对人-物交互视频生成中密集时间引导（如逐帧手物姿态序列）标注成本高且限制动作多样性的问题，提出SparseCtrl-HOI稀疏时间控制框架，仅用少量关键帧引导生成，降低了标注开销并提升了动作多样性。在多个基准上验证了生成质量和控制精度的优势，为视频世界模型的交互建模提供了高效控制手段。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "research on video generation for world models",
+      "matched_requirement_id": "req-8",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    },
+    {
+      "id": "2607.06559v1",
+      "source": "arxiv",
+      "title": "RynnWorld-4D: 4D Embodied World Models for Robotic Manipulation",
+      "abstract": "Robotic manipulation in the open world requires not only recognizing what a scene looks like, but also anticipating how its 3D structure moves under interaction. We argue that synchronized RGB, depth, and optical flow, namely RGB-DF, provide a physically grounded representation that captures the underlying 4D dynamics of a scene. Compared to 2D pixel videos, this multi-modal synergy aligns visual appearance with geometric structure and temporal motion, creating a representation space significantly closer to the low-level end-effector actions demanded by robotic systems, thereby narrowing the gap between world prediction and policy learning. Building on this insight, we introduce RynnWorld-4D, a generative model that co-produces future RGB frames, depth maps, and optical flow from a single RGB-D image and a language instruction within one unified diffusion process. This 4D world model features a tri-branch architecture that integrates cross-modal attention with frame-wise 3D RoPE, ensuring that appearance, geometry, and motion evolve consistently. To supply training data at scale, we curate Rynn4DDataset 1.0, a massive dataset of over 254.4 million frames across egocentric human and robotic manipulation videos with high-quality pseudo-labels for depth and optical flow. We further propose RynnWorld-4D-Policy, an inverse dynamics head that consumes the internal 4D representations of RynnWorld-4D in a single forward pass, bypassing expensive multi-step denoising, to output robot actions in a closed-loop manner. Experiments show that RynnWorld-4D produces temporally and spatially coherent 4D predictions, and that RynnWorld-4D-Policy achieves state-of-the-art performance on real-world dexterous bimanual manipulation tasks, particularly excelling in tasks demanding spatial precision and temporal coordination.",
+      "authors": [
+        "Haoyu Zhao",
+        "Xingyue Zhao",
+        "Siteng Huang",
+        "Xin Li",
+        "Deli Zhao",
+        "Zhongyu Li"
+      ],
+      "primary_category": "cs.RO",
+      "categories": [
+        "cs.RO"
+      ],
+      "published": "2026-07-07T17:58:15+00:00",
+      "link": "https://arxiv.org/pdf/2607.06559v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 8.0,
+      "llm_evidence_en": "4D embodied world models for manipulation",
+      "llm_evidence_cn": "用于操作的4D具身世界模型",
+      "llm_evidence": "用于操作的4D具身世界模型",
+      "canonical_evidence": "用于操作的4D具身世界模型",
+      "llm_tldr_en": "Introduces RynnWorld-4D, a generative model that co-produces future RGB, depth, and optical flow as a 4D world model for robotic manipulation, narrowing the gap between prediction and action.",
+      "llm_tldr_cn": "针对机器人操作中世界预测与策略学习之间的差距，提出RynnWorld-4D，一种生成式4D世界模型。它同步生成未来RGB、深度和光流，形成包含几何与运动的多模态表示，更贴近底层动作空间。实验表明该方法在多种操作任务上优于2D视频世界模型，提升了策略学习的样本效率。",
+      "llm_tldr": "针对机器人操作中世界预测与策略学习之间的差距，提出RynnWorld-4D，一种生成式4D世界模型。它同步生成未来RGB、深度和光流，形成包含几何与运动的多模态表示，更贴近底层动作空间。实验表明该方法在多种操作任务上优于2D视频世界模型，提升了策略学习的样本效率。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "world model",
+      "matched_requirement_id": "req-2",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "8plus"
+    },
+    {
+      "id": "2607.04409v1",
+      "source": "arxiv",
+      "title": "Learning Task-Sufficient World Models by Synergizing Agentic Exploration and Structured Modeling",
+      "abstract": "Learning and planning in imagination using world models provides an effective paradigm for training agents for decision-making. However, existing approaches often rely on high-dimensional latent spaces or generic visual embeddings that retain many factors irrelevant to control, limiting efficiency and generalization across tasks. To this end, we study how agents can learn world models with representations that are task-specific, minimal, and sufficient for decision-making. We achieve this via a closed-loop synergy between the agent and the world model, in which structured world-model learning distills task-sufficient representations from informative interaction data. On the agent side, agents actively probe the environment to collect informative trajectories that expose task-relevant latent factors, guided by an adaptive curriculum. On the world-model side, we learn structured representations over observations to distill compact, task-sufficient latent states from the collected interaction data. This synergy enables the empirical recovery of task-sufficient latent representations that capture all control-relevant factors. Leveraging these representations, the resulting policies achieve improved sample efficiency and generalization, including generalization across skills, object-skill compositions, and previously unseen tasks on standard continuous-control and robotic-manipulation benchmarks.",
+      "authors": [
+        "Fan Feng",
+        "Yujia Zheng",
+        "Minghao Fu",
+        "Yongqiang Chen",
+        "Guangyi Chen",
+        "Kevin Murphy",
+        "Biwei Huang",
+        "Kun Zhang"
+      ],
+      "primary_category": "cs.LG",
+      "categories": [
+        "cs.LG"
+      ],
+      "published": "2026-07-05T17:02:40+00:00",
+      "link": "https://arxiv.org/pdf/2607.04409v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 7.0,
+      "llm_evidence_en": "studies learning world models for decision-making",
+      "llm_evidence_cn": "研究用于决策的世界模型学习",
+      "llm_evidence": "研究用于决策的世界模型学习",
+      "canonical_evidence": "研究用于决策的世界模型学习",
+      "llm_tldr_en": "Proposes a closed-loop synergy between agentic exploration and structured world model learning to obtain task-sufficient representations, improving efficiency and generalization.",
+      "llm_tldr_cn": "现有世界模型常使用高维潜在空间或通用视觉嵌入，保留了许多与控制无关的因素，限制了效率和泛化。本文通过智能体探索和结构化世界模型学习的闭环协同，蒸馏出任务充分的最小化表示。实验表明该方法能更高效地学习控制相关特征，提升决策性能。",
+      "llm_tldr": "现有世界模型常使用高维潜在空间或通用视觉嵌入，保留了许多与控制无关的因素，限制了效率和泛化。本文通过智能体探索和结构化世界模型学习的闭环协同，蒸馏出任务充分的最小化表示。实验表明该方法能更高效地学习控制相关特征，提升决策性能。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "world model",
+      "matched_requirement_id": "req-2",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "7"
+    }
+  ]
+}

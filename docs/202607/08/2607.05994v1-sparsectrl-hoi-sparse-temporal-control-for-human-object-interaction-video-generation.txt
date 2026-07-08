@@ -1,0 +1,562 @@
+Title: SparseCtrl-HOI: Sparse Temporal Control for Human-Object Interaction Video Generation
+
+URL Source: https://arxiv.org/pdf/2607.05994v1
+
+Published Time: Wed, 08 Jul 2026 00:41:33 GMT
+
+Number of Pages: 28
+
+Markdown Content:
+# SparseCtrl-HOI: Sparse Temporal Control for Human-Object Interaction Video Generation 
+
+Shenbo Xie, Mingrui Cai, Xu Yang, Yifei Liu, and Changxing Ding ⋆
+
+South China University of Technology 
+
+eeshbx34@scut.edu.cn, chxding@scut.edu.cn 𝑡 → 0 𝑡 → 1.5 𝑡 → 3.5 𝑡 → 5
+
+> Sparse
+> Interaction
+> Keyframes
+
+Fig. 1: Synthesized HOI video examples from our framework, demonstrating its ef-fectiveness in sparse temporal control. For privacy, all avatar reference images are generated using Nano Banana [5]. 
+
+Abstract. Human-Object Interaction (HOI) video generation aims to synthesize realistic videos of humans manipulating diverse objects, serv-ing as a promising avenue for AI-driven live streaming e-commerce. A primary obstacle in this domain lies in the complexity of modeling fine-grained physical dynamics and the intricate spatial-temporal co-ordination between human hands and objects. Existing approaches to this problem typically rely on dense temporal guidance, e.g., frame-wise hand-object pose sequences, to strictly control the interaction process. However, such dense guidance incurs high annotation costs and affects motion synthesis diversity. To overcome these limitations, we introduce SparseCtrl-HOI, a novel sparse temporal control framework for HOI video generation. It requires only a few keyframes that capture inter-action states at designated timestamps. Specifically, we employ a Time-Controlled Rotary Positional Embedding (TiRoPE) mechanism to tem-porally anchor these keyframes while preserving their spatial integrity.  
+
+> ⋆
+
+Corresponding author. arXiv:2607.05994v1 [cs.CV] 7 Jul 2026 2 S. Xie et al. Subsequently, to govern the dynamics across intermediate frames, we pro-pose a Motion Prior Injection Module that leverages Multimodal Large Language Models (MLLMs) to extract high-level motion priors. This em-powers the model to hallucinate logically and physically plausible tran-sitions. Furthermore, we build SparseHOI-5K, a high-quality and richly annotated dataset for HOI video generation with sparse temporal con-trol. Comprehensive evaluations confirm that our method substantially reduces annotation overhead while synthesizing superior live-streaming e-commerce videos. Both our code and dataset are publicly available at https://mpi-lab.github.io/SparseCtrl-HOI.     
+
+> Keywords: Human-Object Interaction ·Human Video Generation ·
+> Live Streaming E-Commerce
+
+## 1 Introduction 
+
+Human-Object Interaction (HOI) video generation [18,26,42,45,50] aims to syn-thesize realistic videos of humans interacting with diverse objects, which serves as a foundational technology for emerging applications in digital entertainment [21] and virtual reality [36,52]. In the context of live streaming e-commerce, this tech-nology holds significant potential by enabling AI-driven avatars to perform con-tinuous, high-fidelity product demonstrations, thereby overcoming the physical and temporal constraints of human streamers. However, generating high-quality HOI videos remains challenging, as it requires modeling fine-grained physical dynamics and precise spatial-temporal coordination between hands and manip-ulated objects. Recent advances in HOI video generation have introduced various control mechanisms to guide the interaction process. These approaches can be broadly divided into two groups by the granularity of their guidance signals. The first relies on dense motion priors [26, 42, 45]. Their generation process is strictly guided by frame-wise conditions, e.g., 2D pose sequences [45], 3D mesh se-quences [42], and relative coordinate maps [26]. The second explores sparse spa-tial control [18, 50]. They derive complex interactions from a small amount of spatial input, e.g., sparse keypoints and object trajectories, by employing tech-niques like decoupled guidance [18] and motion densification [50]. Despite this difference, both groups share a common paradigm: they depend on dense tempo-ral guidance, which requires frame-wise synchronization between the generated videos and control signals. However, this dense guidance paradigm has notable limitations. First, con-ditioning on poses at every frame overrides the generative model’s inherent mo-tion priors. This degrades the model into a mere texture renderer that produces rigid, repetitive motions. Second, any jitter or artifact in the input condition propagates directly to the output video, causing physically implausible transi-tions. Third, obtaining dense frame-level annotations for custom e-commerce scenarios is labor-intensive. These drawbacks motivate a sparse temporal con-SparseCtrl-HOI 3
+
+trol paradigm, where the model receives only key interaction states and au-tonomously synthesizes natural transitions between them. Accordingly, we propose SparseCtrl-HOI, a framework for high-fidelity HOI video generation conditioned on only a few interaction keyframes. We concate-nate these interaction keyframes with noisy latents along the temporal dimension at the DiT [33] input, enabling the model to leverage self-attention to naturally propagate visual information from keyframes to synthesized frames. We fur-ther introduce Time-Controlled Rotary Positional Embedding (TiRoPE), which assigns each keyframe the temporal positional index of its target timestamp, ensuring that specified interaction states appear at their designated moments in the generated video. Although TiRoPE ensures precise alignment at key timestamps, relying solely on positional constraints usually yield suboptimal motion in intermediate frames. To address this, we introduce a motion prior injection method to govern the motion transition between key states. Specifically, we leverage a Multimodal Large Language Model (MLLM) [41] to extract high-level motion priors that encode hand–object pose change from the interaction keyframes. We then employ a Q-Former [22] to compress these priors into motion guidance tokens, which are injected into the DiT via dedicated cross-attention layers. This enables the DiT to produce smooth, physically plausible transitions and ensures that the hand and object movements remain physically plausible even during significant view changes. Finally, recognizing that keyframe alignment and motion transition are complementary yet distinct objectives, we propose a decoupled training strategy that separates their learning, which fully exploits the respective strengths of the MLLM and DiT. We also construct a high-quality Human-Object Interaction video dataset tailored for sparse temporal control, which will be publicly released. To the best of our knowledge, this is the first work that achieves precise sparse temporal control in Human-Object Interaction video generation. By replacing dense tem-poral guidance with a sparse, motion prior-driven paradigm, our approach signif-icantly reduces annotation cost while improving the naturalness of synthesized motions. Experiments show that our method produces superior live-streaming e-commerce videos with coherent object interactions, offering a practical and scalable solution for real-world applications. 
+
+## 2 Related Work 
+
+Human-Object Interaction Video Generation. Existing Human-Object In-teraction (HOI) video generation methods can be generally categorized into two groups based on the granularity of their guidance: dense guidance methods and sparse control methods. The first category relies on dense motion priors or templates which provide frame-wise conditions to guide synthesis [26, 42, 45]. Within this category, ap-proaches can be further divided into full-body interaction generation and local-ized hand-object manipulation. For full-body HOI, recent works leverage dense 4 S. Xie et al. 
+
+signals such as 3D body mesh templates [42], 2D pose sequences [45], and relative coordinate maps [26] to enforce precise human-object alignment throughout the video. For fine-grained hand–object interaction, methods typically rely on de-tailed spatial layouts or structural representations, such as contact-aware encod-ings [32, 46] and layout-instructed diffusion [8]. Despite achieving high-fidelity alignment, these dense controls often produce mechanical, repetitive motions. Relatedly, in the broader context of character animation and editing, methods like Animate Anyone 2 [16] and MIMO [30] adopt environment affordances and spatial decomposition to maintain frame-level structural consistency. For fine-grained hand-object interactions, methods typically rely on detailed spatial lay-outs or structural representations. For instance, recent frameworks [32,46] utilize structure-aware or contact-aware representations, while Re-HOLD [8] employs an adaptive layout-instructed diffusion model for generalizable grasping. Despite achieving high-fidelity alignment, these dense controls often produce mechanical, repetitive motions. To mitigate the heavy annotation burden of dense guidance, the second cat-egory explores sparse control mechanisms that derive complex interactions from minimal user inputs. These methods typically employ trajectory-guided gener-ation. Works like HOMA [18] and VHOI [50] synthesize full-body HOI videos from sparse keypoints or object trajectories. They achieve this by employing decoupled motion guidance or motion densification techniques to produce inter-mediate movements between sparse inputs. Despite reducing input complexity, these methods still convert sparse cues into dense frame-level constraints, leav-ing the generated interactions vulnerable to interpolation artifacts and unnatural jitters. In contrast, our method establishes a genuinely sparse, keyframe-driven paradigm that leverages MLLM-derived motion priors and specialized temporal embeddings to synthesize smooth, physically plausible transitions. 
+
+Audio-Driven Human Video Generation. This task aims to synthesize re-alistic videos of a speaking person that are not only temporally coherent with the input audio but also visually consistent with a given reference image. Ex-isting approaches can be divided into two categories: two-stage methods and end-to-end methods. The two-stage methods first predict intermediate motion representations, such as 2D body keypoints [13,14,47] or coefficients of 3D body models [6], and then render video frames conditioned on these representations. However, errors in these intermediate representations may propagate to the sec-ond stage, resulting in artifacts in the synthesized videos. Recent works thus turn to the end-to-end paradigm that directly synthe-sizes videos from the audio. These methods advance in several complementary directions. One line of works designs richer audio representations for tighter lip synchronization and audio-motion alignment [9, 37]. Another line enhances fine-grained details in critical regions such as hands and faces through region-specific attention [24] or auxiliary 2D keypoints inputs [31]. There are also works that incorporate 3D structural priors to regularize body geometry and refine local details through cascaded refinement [12, 37]. Finally, post-training preference optimization is explored to jointly improve motion naturalness and visual fi-SparseCtrl-HOI 5Wan2.1-DiT   
+
+> VAE
+> MLLM
+> Q-Former
+> Motion Prior Encoding
+> ...
+> TiRoPE
+> Audio
+> Attention Block i
+> Attention Block 1
+> Attention Block N
+> Prompt
+> VAE
+> Freeze Stage 1 Stage 2 LoRA
+> Text Cross-Attention
+> Self-Attention
+> Motion Cross-Attention
+
+Fig. 2: The overall framework of our SparseCtrl-HOI. We adopt a two-stage training strategy built upon the Wan2.1-DiT backbone. Given a reference image Iref , an audio sequence, and sparse interaction keyframes I1ho , . . . , I K 
+
+> ho
+
+at specified timestamps, the pipeline operates as follows. Motion Prior Encoding (Top): A frozen Qwen2.5-VL [38] extracts high-level motion semantics from the prompt and keyframes. These are then compressed by a Q-Former into motion prior tokens Cmllm . Main Pipeline: Visual inputs are encoded by a frozen VAE [41]. We concatenate these latents to zin . Fur-thermore, the TiRoPE mechanism is applied to zho . Within the DiT blocks, we inject LoRA [15] into the Self-Attention and Text Cross-Attention layers (Stage 1), and in-troduce a novel Motion Cross-Attention layer (Stage 2) in each block to integrate the 
+
+Cmllm tokens, enabling coherent human-object interaction video generation. 
+
+delity [23]. In this work, we build our model on the end-to-end paradigm and focus on producing realistic human-object interaction dynamics. 
+
+## 3 Method 
+
+As illustrated in Figure 2, our method takes three inputs: a reference image spec-ifying the person’s identity, an audio sequence, and a sparse set of interaction keyframes. In the following, we first introduce the preliminary formulation and our base generation pipeline in Section 3.1. We then detail our core innovations: Time-Controlled Rotary Positional Embedding (TiRoPE) for precise temporal anchoring (Section 3.2), the Motion Prior Injection Module for synthesizing nat-ural intermediate dynamics (Section 3.3), and our Decoupled Training Strategy (Section 3.4). Finally, we elaborate on the curation pipeline of our HOI video dataset in Section 3.5. 
+
+3.1 Preliminaries and Baseline 
+
+Our base architecture is based on the continuous-time flow matching paradigm formulated in OmniAvatar [9]. An input raw video x0 ∈ RT ×H×W ×3 is com-pressed into a latent representation z0 ∈ R T      
+
+> 4×H
+> 8×W
+> 8×C
+
+through a pre-trained 6 S. Xie et al. 
+
+causal 3D VAE encoder E. The generative process is governed by an Ordinary Differential Equation (ODE) [25], where a Diffusion Transformer (DiT) [33] vθ
+
+predicts the velocity field dzt/dt = vθ (zt, t, c ). Adopting a linear interpolation path zt = (1 − t)z0 + tϵ with noise ϵ ∼ N (0 , I), the model is optimized using the flow matching objective: 
+
+Lflow (θ) = Et∼U [0 ,1] ,z0∼pdata ,ϵ∼pnoise 
+
+h
+
+∥vθ (zt, t, c ) − (ϵ − z0)∥22
+
+i
+
+, (1) where c represents multimodal conditioning signals. Audio signals are integrated via a pixel-wise multi-hierarchical embedding strategy [9]. To construct our baseline, we concatenate a set of latent conditions as in-puts to DiT. Specifically, the inputs comprise the latent noisy video feature 
+
+znoise v ∈ R T      
+
+> 4×H
+> 8×W
+> 8×C
+
+, the latent reference image feature zref ∈ R1× H   
+
+> 8×W
+> 8×C
+
+representing the person’s identity, and the latent interaction keyframe features 
+
+zho ∈ RK× H    
+
+> 8×W
+> 8×C
+
+for timestamps t1, . . . , t K . To align their channel dimension, we pad zho with a random noise tensor ϵho . The above aggregated inputs can be formulated as: 
+
+zin = Concat T
+
+ Concat C (znoise v , zref ), Concat C (ϵho , zho ) , (2) where Concat C and Concat T represent concatenation along the channel and tem-poral dimensions, respectively. This design leverages the inherent self-attention operations within DiT to transfer the human-object interaction poses and ob-ject textures contained in zho to znoise v . Finally, similar to other diffusion-based video generation models [9, 18, 42], this baseline imposes the standard Rotary Positional Embedding (RoPE) [35] on the input of the DiT model. Moreover, we apply hand-object masks to remove background interference in the interaction keyframes. To facilitate smooth blending between the reserved hand-object region and the surrounding background, we refine the masks with morphological operations and Gaussian filtering. Finally, we apply data augmen-tations, including HSV jittering and Scaling, to the hand regions, which enables the DiT model to focus on the hand poses rather than the appearances from the keyframes. 
+
+3.2 Time-Controlled Rotary Positional Embedding 
+
+The baseline described above lacks temporal control over when a specific in-teraction pose occurs. To address this, we introduce Time-Controlled Rotary Positional Embedding (TiRoPE). First, we impose standard RoPE on znoise v .Second, for the latent feature zi 
+
+> ho
+
+of the i-th interaction keyframe, we simply as-sign its target timestamp as the temporal positional index for RoPE. This gives the keyframe and its target video frame identical temporal embeddings, thereby encouraging high attention scores between them during DiT self-attention. We keep the spatial positional index unchanged to maintain spatial consistency with the interaction keyframes. SparseCtrl-HOI 7
+
+3.3 Motion Prior Injection 
+
+While TiRoPE enables effective HOI pose and object texture transfer at spec-ified timestamps, it provides no explicit guidance for the other frames. This results in unnatural transitions between two nearby interaction keyframes. This is particularly severe when the interaction pose undergoes significant changes. To bridge sparse control signals with physically plausible intermediate dy-namics, we leverage the semantic reasoning ability of Multimodal Large Lan-guage Models (MLLMs). Specifically, we feed the interaction keyframes I1ho , . . . , I K
+
+> ho
+
+into Qwen2.5-VL [38] along with a task-specific prompt to extract high-level mo-tion priors that describe the pose changes between keyframes: 
+
+"We are working on the hand-object interaction video generation task, where one person is introducing a product using hands in each generated video. To facilitate generation, we have provided four keyframes in the temporal order. We want you to infer the complete hand-object interac-tion process based on the four keyframes. In particular, we want you to infer the change of hand pose, object pose, the hand-object contact region in this process as priors for the video generation." 
+
+We adopt tokens produced by the final MLLM layer as raw motion priors 
+
+Rmllm . To compress these lengthy representations, we introduce a Q-Former-based architecture [22]. It includes four cascaded modules, each of which contains one self-attention layer, one cross-attention layer, and one feed-forward network. To facilitate the subsequent coordination with DiT, we first project the token dimension in Rmllm to the DiT’s embeddings via an MLP. We then employ 64 learnable queries Q to extract condensed motion priors via cross-attention from 
+
+Rmllm :
+
+Cmllm = Q-Former (Q, MLP (Rmllm )) . (3) Finally, we inject Cmllm into the DiT backbone through dedicated cross-attention layers in each transformer block. Cmllm then guides DiT to hallucinate logical, smooth motion transitions between sparse interaction keyframes. Detailed tensor construction, TiRoPE index mapping, and motion cross-attention formulation are provided in the supplementary material. 
+
+3.4 Decoupled Training 
+
+MLLMs excel at abstract reasoning, while generative models target concrete visual synthesis. They essentially handle features of different purposes and gran-ularities. To avoid their feature entanglement, we propose a decoupled, two-stage training strategy: 
+
+Stage 1: Appearance Feature Transfer. This stage teaches the DiT model to extract the subject and object appearance features from the reference image and interaction keyframes, respectively. It also enables the model to adhere strictly to the interaction poses dictated by the TiRoPE-anchored keyframes. We unfreeze 8 S. Xie et al. 
+
+Table 1: Comparisons between SparseHOI-5K and existing public HOI datasets. “-” indicates that the value is not reported in the official release. Hand Cut /Obj. Cut denote cropped hand/object regions; Obj-free denotes object-removed videos via inpainting. Dataset Videos Dur. (h) Actor Objects Audio Hand Cut Obj. Cut Obj-free HOIGen-1M [27] 1M 2.2k - 15,000+ ✗ ✗ ✗ ✗
+
+AnchorCrafter-400 [45] 356 2 11 286 ✗ ✓ ✓ ✗
+
+SparseHOI-5K 4,850 10 34 1,000+ ✓ ✓ ✓ ✓1. Data Acquisition   
+
+> Search From
+> Internet
+> 2. Data Filtering 3. Interaction Validation
+> LLM HOI
+> Detection
+> Spatial
+> Constraint
+> Validation( IoU )
+> Audio -Visual
+> Alignment Check
+> 4. Annotation
+> 1. Object Mask Generation
+> 2. Hand Segment
+> 3. Obj -free Inpainting
+> Video A
+> Video B
+> General Quality
+> Pruning
+> Valid Keypoints
+> Detection
+> Dynamic
+> Cropping
+> Video C
+> Final Video
+> Obj -free Video
+> Final HO Keyframes
+
+Fig. 3: An overview of SparseHOI-5K dataset collection pipeline. 
+
+the patch embedding and the audio pack [9], and employ Low-Rank Adaptation (LoRA) [15] on the pre-trained DiT blocks. 
+
+Stage 2: Motion Transition Inference. This stage envisions physically plau-sible motion transitions between two nearby interaction keyframes. We freeze all LoRA parameters optimized in Stage 1, thus preserving the visual synthesis abil-ity of the DiT model. We then exclusively train the newly introduced Q-Former alongside cross-attention layers inserted to the DiT model. These new layers of cross-attention acquire motion cues from Cmllm and enable the DiT model to synthesize temporally coherent movements of the hand and the object. In the experimentation section, we justify that this decoupled training strat-egy achieves better performance than naïve one-stage training. 
+
+3.5 Dataset Construction Pipeline 
+
+Although HOIGen-1M [27] offers million-scale text-to-video HOI clips, no public dataset targets audio-driven live-commerce HOI video generation with sparse temporal control, paired audio, hand/object masks, and object-free references. To bridge this gap, we build a high-quality HOI video dataset named SparseHOI-5K that includes 4,850 clips and make it publicly available. It encompasses 34 human identities and over 1000 promoted commodities in live streaming e-commerce scenarios. All videos are unified to a resolution of 512 ×512 pixels at 25 FPS, with synchronized audio sampled at 16 kHz. Moreover, we provide rich multi-modal annotations for each clip, including hand masks, object masks, and inpainted videos frames where the commodities are removed. As summarized in Table 1, SparseHOI-5K offers richer multi-modal annotations than existing pub-lic HOI datasets, which is essential for our sparse keyframe-conditioned setting. In the following, we introduce our rigorous, four-stage data processing pipeline as depicted in Figure 3: SparseCtrl-HOI 9
+
+Phase I: Data Acquisition. We download raw videos from two live-streaming e-commerce platforms, YouTube [10] and Bilibili [1], using the Google Data API and open-source downloaders [11, 49]. We transcode all raw videos to a unified H.264 codec [44]. We also apply a scene detection algorithm [3] to divide each video into segments based on visual continuities. Finally, we sample fixed-length clips of 10 seconds within each segment. 
+
+Phase II: Data Filtering. We further prune low-quality clips based on static content detection [2] and esthetic scores [7]. We also utilize DWpose [48] to detect body bounding boxes and keypoints, by which we keep only single-person sequences. Finally, we center each subject and minimize extraneous background in the resized video frames based on the location of human bounding boxes. 
+
+Phase III: Interaction Validation. We leverage Qwen2.5-VL [38] to validate that each clip contains exactly one person interacting with an object, simulta-neously estimating the bounding boxes of the target objects. To handle MLLM hallucination, we calculate the Intersection over Union (IoU) between bound-ing boxes of the subject and the object; clips with excessive IoU—indicating the model may misidentify the subject as the object—are excluded. Finally, we employ SyncNet [4] to ensure lip-sync consistency, and discard clips with audio-visual mismatches. 
+
+Phase IV: Fine-Grained Annotation. We utilize SAM2 [34] for object seg-mentation. We adopt a cascaded MediaPipe [29] and SAM [20] approach for precise hand segmentation. These steps enable us to obtain hand-object regions in all video frames and therefore facilitate clean interaction keyframe production in Section 3.3. Finally, we employ an image inpainting tool named ProPainter [51] to synthesize object-free versions of all video clips. In this way, we can randomly select one inpainted frame as the reference image of the subject. 
+
+## 4 Experiments 
+
+4.1 Datasets and Metrics Datasets. We partition our SparseHOI-5K dataset into mutually exclusive train-ing and testing sets based on subject identities. They cover 4,800 clips and 50 clips, respectively. This identity-disjoint split ensures that there is no data leak-age during training, allowing us to accurately measure the model’s performance on unseen individuals. Furthermore, to assess the model’s cross-dataset gener-alization capability, we directly evaluate its performance on the AnchorCrafter testing set [45]. The testing set includes 8 celebrity images and 10 source videos in which four persons interact with four simple objects. 
+
+Evaluation Metrics. To comprehensively assess the quality of the generated videos, we employ a combination of standard video generation metrics and cus-tomized protocols tailored for sparse temporal control Human-Object Interac-tions (HOI). For standard metrics, we measure overall spatiotemporal consis-tency and distribution similarity using Fréchet Image Distance (FID), Fréchet Video Distance (FVD) [40] and VBench [17], which includes specifically Motion 10 S. Xie et al. 
+
+Smoothness (MS), Temporal Flickering (TF) and Aesthetic Quality (AQ). For audio-visual alignment, we compute the Sync-C score using SyncNet [4]. Moreover, we introduce the following three customized metrics to evaluate the motion transition naturalness, control precision by interaction keyframes and the quality of human-object interaction: 
+
+MS-RAFT: To rigorously quantify the temporal smoothness of the generated videos at the pixel-level, we introduce the MS-RAFT warping error. Specifically, we use a pre-trained RAFT-Large model [39] to estimate the backward optical flow Ft→t−1 from frame It to frame It−1. We then warp It−1 to the spatial coordinates of It by bilinear interpolation guided by Ft→t−1. We compute the Mean Absolute Error (MAE) between the warped frame and the raw frame. The resulting MS-RAFT score is averaged across all adjacent frames in the sequence, where a lower value signifies superior temporal continuity. 
+
+Ti-SSIM: To evaluate the alignment of HOI poses at designated control times-tamps, we introduce the timestamp structural similarity (Ti-SSIM). We compute the SSIM score [43] between the ground-truth reference frame and the generated frame in designated timestamp with a local temporal window (e.g., ±10 frames). We define the interaction accuracy score as the maximum SSIM value within this window and subsequently compute the mean score across all generated videos. Since the previous method did not control the interactions at sparse timestamps, we only adopt this metric in the ablation experiments. 
+
+HOI-VLM: To evaluate the complex dynamics between humans and objects, we leverage Qwen2.5-VL to automatically score the physical plausibility and di-versity of the interaction. Specifically, we uniformly sample 20 frames from the generated video and provide them as input to Qwen2.5-VL. We instruct the VLM to score the video (from 1 to 5) across two essential dimensions: Physical Plausibility (e.g., absence of interpenetration or unnatural levitation) and Inter-action Diversity (e.g., rich kinematic variations rather than rigid stasis). Higher scores indicate better human-object interactions. 
+
+4.2 Experimental Settings Implementation Details. Our framework is implemented in PyTorch. Follow-ing the decoupled strategy in Section 3.4, training proceeds in two stages on the full training set. Both stages use a learning rate of 5 × 10 −6, a global batch size of 8, and 4 hand-object reference keyframes per video. Stage 1 runs for 15,000 steps to learn appearance feature transfer, and Stage 2 continues for 10,000 steps to refine motion transitions. 
+
+Baselines. We compare the performance of SparseCtrl-HOI with the following four state-of-the-art, open-source models relevant to our task: 
+
+– AnchorCrafter [45] is a dense-control method that uses human pose, hand mesh maps, and object depth maps for HOI video generation. We extract these control signals following its original pipeline. Since it requires object images at ±45 ° viewpoints, which are not available in our setting, we dupli-cate the image of a single available object three times as a substitute. SparseCtrl-HOI 11 
+
+– OmniAvatar [9] is an audio-driven framework that synthesizes talking avatar videos from a single image. As it lacks native HOI support, we adapt it by conditioning it on the first frame of each raw test clip. We also build OmniAvatar-BL , which takes the same inputs (reference image, four keyframes, and audio) but uses only the baseline condition injection with standard 3D RoPE, excluding TiRoPE and Motion Prior Injection. 
+
+– VACE [19] is a unified framework for video creation and editing through multimodal conditions, and Phantom [28] is a subject-consistent video generation model that focuses on identity preservation. We provide both the reference identity image and one inpainted object image for the two models to synthesize the output. To facilitate fair comparison, we use the 14B version of OmniAvatar, VACE, and Phantom models throughout this paper. 
+
+4.3 Qualitative Comparisons 
+
+Figure 4 presents qualitative comparisons between our SparseCtrl-HOI and state-of-the-art methods. As highlighted by the red bounding boxes, existing methods struggle to maintain object consistency during dynamic interactions. When in-teraction motions change, they often produce severe blurring or hallucinate en-tirely different objects. In the AnchorCrafter dataset [45], AnchorCrafter causes hand artifacts whenever the given reference pose is incorrect. However, in the SparseHOI-5K dataset, AnchorCrafter further fails to preserve subject identity and tends to generate globally blurry frames. We attribute the differing margins across the two test sets to data distribution: AnchorCrafter is trained and tested on simpler data, but generalizes poorly to SparseHOI-5K’s more diverse identi-ties, commodities, and hand-object motions. Furthermore, We still outperform it on its own test set using four keyframes instead of dense frame-wise controls. OmniAvatar [9] achieves reasonable realism in human-object interactions, yet its generated poses remain constrained by the reference image and cannot synthe-size large-scale pose variations. Phantom [28] and VACE [19], in turn, tend to produce physically implausible results such as floating or oversized objects. In contrast, our method significantly reduces these artifacts, while enabling precise control over interactions at specified timestamps. Additional video demonstra-tions are provided in the supplementary material. 
+
+4.4 Quantitative Comparisons 
+
+Table 2 presents quantitative comparisons. In the AnchorCrafter dataset, our model demonstrates the best performance across all metrics, indicating the su-periority of our method on the simple human object interaction dataset. In the SparseHOI-5K dataset, our method achieves the best FID and FVD scores, indi-cating superior visual fidelity. In contrast, baseline models show notable degra-dation on these metrics, largely due to poor preservation of subject identity 12 S. Xie et al. Object Image Reference Image  Object Image Reference Image 
+
+Unconsistent Object 
+
+Flawed hands 
+
+Subtle motion 
+
+(a) Comparisons on SparseHOI-5K dataset. AnchorCrafter 
+
+> Phantom Ours
+> VACE  AnchorCrafter VACE
+> Phantom Ours
+
+Reference Image 
+
+Object Image 
+
+Reference Image 
+
+Object Image 
+
+Unconsistent Object  Flawed hands  Subtle motion  Object Levitation 
+
+(b) Comparisons on AnchorCrafter dataset. 
+
+Fig. 4: Overall qualitative comparison. SparseCtrl-HOI 13 
+
+Table 2: Quantitative comparisons between SparseCtrl-HOI and state-of-the-art meth-ods on our SparseHOI-5K dataset and AnchorCrafter dataset. ↑ indicates higher is better and ↓ indicates lower is better. The best results are highlighted in bold .Dataset Method FID ↓ FVD ↓ MS ↑ TF ↑ AQ ↑ Sync-C ↑ MS-RAFT ↓ HOI-VLM ↑
+
+AnchorCrafter AnchorCrafter [45] 91.9 726.4 0.99 0.98 0.46 - 0.43 2.90 VACE [19] 249.0 3809.2 0.98 0.97 0.418 - 0.60 2.90 Phantom [28] 254.3 2544.3 0.96 0.98 0.43 - 0.53 2.50 
+
+SparseCtrl-HOI 91.4 725.8 0.99 0.99 0.48 - 0.27 3.00 
+
+SparseHOI-5K AnchorCrafter [45] 258.4 2859.8 0.99 0.98 0.43 - 0.79 1.18 OmniAvatar [9] 131.2 1207.0 0.99 0.99 0.43 7.04 0.47 2.76 OmniAvatar-BL 129.3 1110.9 0.98 0.98 0.43 6.99 0.49 2.78 VACE [19] 212.9 1613.3 0.98 0.98 0.43 - 0.65 2.86 Phantom [28] 254.2 2701.7 0.99 0.98 0.44 - 0.48 1.56 
+
+SparseCtrl-HOI 89.1 629.6 0.99 0.99 0.43 6.98 0.45 2.92 
+
+Table 3: Ablation study on key architectural component, condition injection scheme, and inference number of sparse keyframes K on SparseHOI-5K. Lower is better for FID, FVD, and MS-RAFT; higher is better for Ti-SSIM.                                                       
+
+> Group Variant FID ↓FVD ↓Ti-SSIM ↑MS-RAFT ↓
+> Component w/o Data Aug. 95.14 709.14 0.65 0.52 w/o TiRoPE 99.28 697.84 0.52 0.64 w/o M.P.I. 90.86 651.18 0.66 0.53 Full model 89.17 629.61 0.66 0.45
+> Injection Reference along temporal axis 111.81 822.67 0.60 0.66 Keyframes along channel axis 202.54 1292.19 0.50 0.79 Full model 89.17 629.61 0.66 0.45
+> Kat inference 2115.64 795.32 0.67 0.45 3102.25 664.77 0.67 0.44
+> 489.17 629.61 0.66 0.45 682.20 544.05 0.66 0.48 881.34 515.84 0.67 0.46
+
+and object texture. Our VBench scores are competitive with all baselines, con-firming strong object consistency and temporal smoothness. Notably, OmniA-vatar achieves a slightly higher Sync-C score (7.04 vs. our 6.98), as it conditions solely on the first frame for speech alignment, whereas our framework must jointly balance audio-visual synchronization with complex hand-object interac-tions. Finally, our method attains state-of-the-art results on both MS-RAFT and HOI-VLM, demonstrating clear advantages in physical plausibility, transi-tion naturalness, and interaction diversity. We further conduct a user study on visual plausibility and motion diversity, where our method receives the highest user preference; the results are reported in the supplementary material. 14 S. Xie et al. 𝑡 → 0𝑠  𝑡 → 1.9𝑠  𝑡 → 3.6𝑠  𝑡 → 4.8𝑠  
+
+> Fig. 5: Qualitative ablations.
+
+4.5 Ablation Study 
+
+We perform ablation studies on SparseHOI-5K to justify the contribution of each proposed component. The results are detailed in Table 3. 
+
+Impact of Data Augmentation. We remove the HSV jittering and morpho-logical operations introduced in Section 3.1. As shown in the first row of Table 3, both FID and FVD scores significantly degrade. Qualitatively, the generated videos exhibit visible cut-and-paste artifacts (Figure 5), confirming that data augmentation is essential for smooth texture fusion. 
+
+Design of Condition Injection. The Injection group in Table 3 validates our asymmetric injection design. In our full model, the reference latent is broadcast along time and concatenated channel-wise so that it conditions every frame, while sparse hand-object interaction latents are appended along the temporal axis to preserve timestamp indices for self-attention propagation. We compare two alter-natives that swap each axis: (i) concatenating the reference latent along the tem-poral axis, and (ii) concatenating sparse hand-object interaction latents along the channel axis. Both degrade all metrics. In particular, channel-wise keyframes suffer from predominantly zero-padded channels, require implicit sparse-to-dense propagation, converge slower (20k vs. 8k steps), and yield the worst results. 
+
+Effectiveness of TiRoPE. We replace TiRoPE with the standard 3D rotary positional encoding used in Wan2.1 [41]. As shown in the second row of Table 3, Ti-SSIM drops drastically. This result indicates that without explicit temporal frequency anchoring, the model loses the ability to align interactions with their designated timestamps. 
+
+Effectiveness of Motion Prior Injection. We remove the Motion Prior In-jection Module and retrain the model. The third row of Table 3 shows a clear SparseCtrl-HOI 15 
+
+degradation in MS-RAFT and FVD, indicating less natural motion transitions. Qualitatively, the generated objects by this variant exhibit unnatural morphing during large viewpoint changes, demonstrating the necessity of MLLM-derived semantic priors for physical plausibility. Further Q-Former design ablations and an interpretability analysis of the injected motion priors are provided in the supplementary material. 
+
+Effectiveness of Decoupled Training Strategy. We compare our two-stage training paradigm against a joint-training variant that optimizes the baseline parameters and the Motion Prior Injection Module simultaneously. Since stan-dard quantitative metrics often fail to capture subtle foreground anomalies in video generation, we therefore validate our decoupled training strategy through qualitative analysis. As shown in Figure 5, joint training produces conspicuous foreground artifacts. We attribute this to feature entanglement, which makes the network over-reliant on the MLLM’s representations for synthesizing HOI textures. Since the MLLM is inherently prone to hallucinating visual details, injecting its produced visual features to DiT severely corrupts the object’s ap-pearance. 
+
+4.6 Robustness to Sparse Keyframes 
+
+We train with four keyframes and vary their number K only at inference to study how the model behaves under different sparsity levels ( K at inference group in Table 3 ). From K=2 to 8, FID/FVD improve while Ti-SSIM stays stable, indicating that denser sparse control improves fidelity without hurting timestamp alignment. More robustness analysis across sampling strategies in the supplementary material. 
+
+## 5 Conclusion 
+
+In this paper, we propose the SparseCtrl-HOI framework, which substitutes tra-ditional dense frame-wise guidance with a sparse temporal control paradigm, effectively addressing the heavy annotation burden and rigid motions in Human-Object Interaction (HOI) video generation. By integrating TiRoPE for precise temporal alignment, an MLLM-driven motion prior injection, and a decoupled training strategy, our method achieves smooth transitions between interaction states and effectively prevents multimodal hallucinations. Extensive experiments demonstrate that our approach significantly outperforms existing baselines. Ulti-mately, SparseCtrl-HOI provides a high-fidelity, scalable, and natural video gen-eration solution for real-world applications such as live-streaming e-commerce. 
+
+## Acknowledgements 
+
+This work was supported by the National Natural Science Foundation of China under Grants 62476099 and 62076101, Guangdong Basic and Applied Basic Re-search Foundation under Grants 2024B1515020082 and 2023A1515010007, and the TCL Young Scholars Program. 16 S. Xie et al. 
+
+## References 
+
+1. Bilibili Inc.: Bilibili. https://www.bilibili.com (2009), accessed: 2026-06-30 2. Bradski, G.: The OpenCV library. Dr. Dobb’s Journal of Software Tools (2000), 
+
+https://github.com/opencv/opencv 
+
+3. Castellano, B.: PySceneDetect: Intelligent video scene change detection and analy-sis tool. https://github.com/Breakthrough/PySceneDetect (2014), version 0.6.4 4. Chung, J.S., Zisserman, A.: Out of time: automated lip sync in the wild. In: Work-shop on Multi-view Lip-reading, ACCV (2016) 5. Comanici, G., et al.: Gemini 2.5: Pushing the frontier with advanced reason-ing, multimodality, long context, and next generation agentic capabilities. arXiv preprint arXiv:2507.06261 (2025) 6. Corona, E., Zanfir, A., Bazavan, E.G., Kolotouros, N., Alldieck, T., Sminchisescu, C.: VLOGGER: Multimodal diffusion for embodied avatar synthesis. In: Proceed-ings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition. pp. 15896–15908 (2025) 7. Emon, R.Y.: A novel nudity detection algorithm for web and mobile application development. arXiv preprint arXiv:2006.01780 (2020) 8. Fan, Y., Yang, Q., Wang, K., Zhou, H., Li, Y., Feng, H., Ding, E., Wu, Y., Wang, J.: Re-HOLD: Video hand object interaction reenactment via adaptive layout-instructed diffusion model. In: Proceedings of the IEEE/CVF Conference on Com-puter Vision and Pattern Recognition. pp. 17550–17560 (2025) 9. Gan, Q., Yang, R., Zhu, J., Xue, S., Hoi, S.: OmniAvatar: Efficient audio-driven avatar video generation with adaptive body animation. arXiv preprint arXiv:2506.18866 (2025) 10. Google: YouTube. https://www.youtube.com (2005), accessed: 2026-06-30 11. Google: YouTube Data API v3. https://developers.google.com/youtube/v3 
+
+(2013), accessed: 2026-06-30 12. Guan, J., Wang, K., Xu, Z., Yang, Q., Sun, Y., He, S., Liang, B., Cao, Y., Li, Y., Feng, H., et al.: AudCast: Audio-driven human video generation by cascaded diffusion transformers. In: Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition. pp. 10678–10689 (2025) 13. He, X., Huang, Q., Zhang, Z., Lin, Z., Wu, Z., Yang, S., Li, M., Chen, Z., Xu, S., Wu, X.: Co-speech gesture video generation via motion-decoupled diffusion model. In: Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition. pp. 2263–2273 (2024) 14. Hogue, S., Zhang, C., Daruger, H., Tian, Y., Guo, X.: DiffTED: One-shot audio-driven TED talk video generation with diffusion-based co-speech gestures. In: Pro-ceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recogni-tion Workshops. pp. 1922–1931 (2024) 15. Hu, E.J., Shen, Y., Wallis, P., Allen-Zhu, Z., Li, Y., Wang, S., Wang, L., Chen, W.: LoRA: Low-rank adaptation of large language models. In: International Con-ference on Learning Representations (2022), https://openreview.net/forum?id= nZeVKeeFYf9 
+
+16. Hu, L., Wang, G., Shen, Z., Gao, X., Meng, D., Zhuo, L., Zhang, P., Zhang, B., Bo, L.: Animate anyone 2: High-fidelity character image animation with environ-ment affordance. In: Proceedings of the IEEE/CVF International Conference on Computer Vision. pp. 10207–10217 (2025) SparseCtrl-HOI 17 17. Huang, Z., He, Y., Yu, J., Zhang, F., Si, C., Jiang, Y., Zhang, Y., Wu, T., Jin, Q., Chanpaisit, N., et al.: VBench: Comprehensive benchmark suite for video gener-ative models. In: Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition. pp. 21807–21818 (2024) 18. Huang, Z., Zhou, Z., Cao, J., Ma, Y., Chen, Y., Rao, Z., Xu, Z., Wang, H., Lin, Q., Zhou, Y., Lu, Q., Tang, F.: HOMA: Towards generic human-object interaction in multimodal driven human animation with weak conditions. In: Proceedings of the SIGGRAPH Asia 2025 Conference Papers. SA Conference Papers ’25, Association for Computing Machinery, New York, NY, USA (2025). https://doi.org/10. 1145/3757377.3763861 
+
+19. Jiang, Z., Han, Z., Mao, C., Zhang, J., Pan, Y., Liu, Y.: VACE: All-in-one video creation and editing. In: Proceedings of the IEEE/CVF International Conference on Computer Vision. pp. 17191–17202 (2025) 20. Kirillov, A., Mintun, E., Ravi, N., Mao, H., Rolland, C., Gustafson, L., Xiao, T., Whitehead, S., Berg, A.C., Lo, W.Y., et al.: Segment anything. In: Proceedings of the IEEE/CVF International Conference on Computer Vision. pp. 4015–4026 (2023) 21. Lei, W., Wang, J., Ma, F., Huang, G., Liu, L.: A comprehensive survey on human video generation: Challenges, methods, and insights. arXiv preprint arXiv:2407.08428 (2024) 22. Li, J., Li, D., Savarese, S., Hoi, S.: BLIP-2: Bootstrapping language-image pre-training with frozen image encoders and large language models. In: International Conference on Machine Learning. pp. 19730–19742. PMLR (2023) 23. Liang, C., Jiang, J., Liao, W., Yang, J., Zeng, W., Liang, H., et al.: AlignHuman: Improving motion and fidelity via timestep-segment preference optimization for audio-driven human animation. arXiv preprint arXiv:2506.11144 (2025) 24. Lin, G., Jiang, J., Liang, C., Zhong, T., Yang, J., Zheng, Z., Zheng, Y.: Cy-berHost: A one-stage diffusion framework for audio-driven talking body gener-ation. In: International Conference on Learning Representations (2025), https: //openreview.net/forum?id=vaEPihQsAA 
+
+25. Lipman, Y., Chen, R.T., Ben-Hamu, H., Nickel, M., Le, M.: Flow matching for generative modeling. arXiv preprint arXiv:2210.02747 (2022) 26. Liu, B., Gong, X., Zhao, Z., Song, Z., Lu, Y., Wu, S., Zhang, J., Banerjee, S., Zhang, H.: ByteLoom: Weaving geometry-consistent human-object interactions through progressive curriculum learning. arXiv preprint arXiv:2512.22854 (2025) 27. Liu, K., Liu, Q., Liu, X., Li, J., Zhang, Y., Luo, J., He, X., Liu, W.: HOIGen-1M: A large-scale dataset for human-object interaction video generation. In: Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (2025) 28. Liu, L., Ma, T., Li, B., Chen, Z., Liu, J., Li, G., Zhou, S., He, Q., Wu, X.: Phantom: Subject-consistent video generation via cross-modal alignment. In: Proceedings of the IEEE/CVF International Conference on Computer Vision. pp. 14951–14961 (2025) 29. Lugaresi, C., Tang, J., Nash, H., McClanahan, C., Uboweja, E., Hays, M., Zhang, F., Chang, C.L., Yong, M.G., Lee, J., et al.: MediaPipe: A framework for building perception pipelines. arXiv preprint arXiv:1906.08172 (2019) 30. Men, Y., Yao, Y., Cui, M., Bo, L.: MIMO: Controllable character video synthesis with spatial decomposed modeling. In: Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition. pp. 21181–21191 (2025) 31. Meng, R., Zhang, X., Li, Y., Ma, C.: EchoMimicV2: Towards striking, simplified, and semi-body human animation. In: Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition. pp. 5489–5498 (2025) 18 S. Xie et al. 32. Pang, Y., Shao, R., Zhang, J., Tu, H., Liu, Y., Zhou, B., Zhang, H., Liu, Y.: ManiVideo: Generating hand-object manipulation video with dexterous and gen-eralizable grasping. In: Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition. pp. 12209–12219 (2025) 33. Peebles, W., Xie, S.: Scalable diffusion models with transformers. In: Proceedings of the IEEE/CVF International Conference on Computer Vision. pp. 4195–4205 (2023) 34. Ravi, N., Gabeur, V., Hu, Y.T., Hu, R., Ryali, C., Ma, T., Khedr, H., Rädle, R., Rolland, C., Gustafson, L., et al.: SAM 2: Segment anything in images and videos. In: International Conference on Learning Representations. vol. 2025, pp. 28085–28128 (2025) 35. Su, J., Ahmed, M., Lu, Y., Pan, S., Bo, W., Liu, Y.: Roformer: Enhanced trans-former with rotary position embedding. Neurocomputing 568 , 127063 (2024) 36. Sui, K., Ghosh, A., Hwang, I., Zhou, B., Wang, J., Guo, C.: A survey on human interaction motion generation. International Journal of Computer Vision 134 (3), 113 (2026) 37. Sun, Y., Xu, Z., Zhou, H., Guan, J., Yang, Q., Wang, K., Liang, B., Li, Y., Feng, H., Wang, J., et al.: Cosh-DiT: Co-speech gesture video synthesis via hybrid audio-visual diffusion transformers. International Journal of Computer Vision 134 (3), 85 (2026) 38. Team, Q.: Qwen2.5-VL (2025), https://qwenlm.github.io/blog/qwen2.5-vl/ 
+
+39. Teed, Z., Deng, J.: RAFT: Recurrent all-pairs field transforms for optical flow. In: European Conference on Computer Vision (ECCV). pp. 402–419 (2020) 40. Unterthiner, T., van Steenkiste, S., Kurach, K., Marinier, R., Michalski, M., Gelly, S.: FVD: A new metric for video generation. In: International Conference on Learn-ing Representations (2019), https://openreview.net/forum?id=rylgEULtdN 
+
+41. Wan, T., Wang, A., Ai, B., Wen, B., Mao, C., Xie, C.W., Chen, D., Yu, F., Zhao, H., Yang, J., Zeng, J., Wang, J., Zhang, J., Zhou, J., Wang, J., Chen, J., Zhu, K., Zhao, K., Yan, K., Huang, L., Feng, M., Zhang, N., Li, P., Wu, P., Chu, R., Feng, R., Zhang, S., Sun, S., Fang, T., Wang, T., Gui, T., Weng, T., Shen, T., Lin, W., Wang, W., Wang, W., Zhou, W., Wang, W., Shen, W., Yu, W., Shi, X., Huang, X., Xu, X., Kou, Y., Lv, Y., Li, Y., Liu, Y., Wang, Y., Zhang, Y., Huang, Y., Li, Y., Wu, Y., Liu, Y., Pan, Y., Zheng, Y., Hong, Y., Shi, Y., Feng, Y., Jiang, Z., Han, Z., Wu, Z.F., Liu, Z.: Wan: Open and advanced large-scale video generative models. arXiv preprint arXiv:2503.20314 (2025) 42. Wang, L., Xia, Z., Hu, T., Wang, P., Wei, P., Zheng, Z., Zhou, M., Zhang, Y., Gao, M.: DreamActor-H1: High-fidelity human-product demonstration video generation via motion-designed diffusion transformers. arXiv preprint arXiv:2506.10568 (2025) 43. Wang, Z., Bovik, A.C., Sheikh, H.R., Simoncelli, E.P.: Image quality assessment: from error visibility to structural similarity. IEEE transactions on image processing 
+
+13 (4), 600–612 (2004) 44. Wiegand, T., Sullivan, G.J., Bjontegaard, G., Luthra, A.: Overview of the H.264/AVC video coding standard. IEEE Transactions on Circuits and Systems for Video Technology 13 (7), 560–576 (2003) 45. Xu, Z., Huang, Z., Cao, J., Zhang, Y., Cun, X., Shuai, Q., Wang, Y., Bao, L., Tang, F.: AnchorCrafter: Animate cyber-anchors selling your products via human-object interacting video generation. IEEE Transactions on Visualization and Computer Graphics (2026) 46. Xue, Z.S., Luo, R., Chen, C., Grauman, K.: HOI-Swap: Swapping objects in videos with hand-object interaction awareness. Advances in Neural Information Process-ing Systems 37 , 77132–77164 (2024) SparseCtrl-HOI 19 47. Yang, X., Huang, S., Xie, S., Chen, X., Liu, Y., Ding, C.: Democratizing high-fidelity co-speech gesture video generation. In: Proceedings of the IEEE/CVF In-ternational Conference on Computer Vision (2025) 48. Yang, Z., Zeng, A., Yuan, C., Li, Y.: Effective whole-body pose estimation with two-stages distillation. In: Proceedings of the IEEE/CVF International Conference on Computer Vision. pp. 4210–4220 (2023) 49. yt-dlp contributors: yt-dlp: A feature-rich command-line audio/video downloader. 
+
+https://github.com/yt-dlp/yt-dlp (2024), accessed: 2026-06-30 50. Zhang, W., Foo, L.G., Dabral, R., Beeler, T., Theobalt, C.: VHOI: Controllable video generation of human–object interactions from sparse trajectories via motion densification. arXiv preprint arXiv:2512.09646 (2025) 51. Zhou, S., Li, C., Chan, K.C., Loy, C.C.: ProPainter: Improving propagation and transformer for video inpainting. In: Proceedings of the IEEE/CVF International Conference on Computer Vision (2023) 52. Zhu, W., Ma, X., Ro, D., Ci, H., Zhang, J., Shi, J., Gao, F., Tian, Q., Wang, Y.: Human motion generation: A survey. IEEE Transactions on Pattern Analysis and Machine Intelligence 46 (4), 2430–2449 (2023) SparseCtrl-HOI: Sparse Temporal Control for Human-Object Interaction Video Generation 
+
+## Supplementary Material 
+
+Shenbo Xie, Mingrui Cai, Xu Yang, Yifei Liu, and Changxing Ding ⋆
+
+> South China University of Technology
+> eeshbx34@scut.edu.cn, chxding@scut.edu.cn
+
+This supplementary material consists of six sections. Section 1 introduces the project demonstration, highlighting our framework and visual results. Section 2 details the user study conducted to subjectively evaluate our method. In Sec-tion 3, we present additional ablation studies on our network design. Section 4 evaluates the impact of different classifier-free guidance (CFG) scales. Section 5 gives more details of our work. Finally, Section 6 discusses the limitations of our current approach. 
+
+## 1 Project Demonstration 
+
+We provide a project demonstration to showcase the overall framework and additional qualitative results of our proposed method, which is available at https://mpi-lab.github.io/SparseCtrl-HOI. 
+
+## 2 User Study 
+
+To further validate the subjective quality of our generated results, we conduct a user study. Participants are presented with 15 sets of 5-second video clips generated by our method and competing baselines. Participants are tasked with ranking the videos within each set across two primary dimensions: Visual Plau-sibility and Motion Diversity . Visual Plausibility assesses the overall visual quality and faithfulness, especially in temporal fluency (the absence of flickering, distortion, or unnatural jumps), fidelity to the reference images (preservation of identity, clothing, and object shape), and spatiotemporal consistency. Motion Diversity evaluates the richness of the dynamic content, encompassing the ex-tent of human movements and the variety of human-object interaction poses. As shown in Table 1, the results demonstrate the overall user preference and the perceptual advantages of our approach. 
+
+## 3 Ablation Studies 
+
+We conduct extended ablation experiments to validate the key architectural designs of our method, with a specific focus on the Q-former module.    
+
+> ⋆Corresponding author. 2S. Xie et al.
+> Table 1: User study results.
+
+# Method Visual Fidelity Motion Diversity Anchorcrafter 6.7% 7.3% 
+
+# Omniavatar 23 .4% 23 .3% 
+
+# VACE 22 .4% 22 .3% 
+
+# Phantom 17 .4% 16 .6% 
+
+# Ours 30 .1% 30 .5%  
+
+> Table 2: Quantitative ablation studies on the Q-former module. The best results are highlighted in bold .
+
+Setting FID ↓ FVD ↓ Ti-SSIM ↑ MS-RAFT ↓
+
+Alternative Architecture (MLP only) 93.68 622.55 0.66 0.51 Module Order (Transformer → MLP) 97.74 659.92 0.66 0.51 Transformer Depth (2 layers) 91.88 639.64 0.67 0.50 Transformer Depth (8 layers) 92.30 624.58 0.67 0.50 Learnable Queries ( N = 8 ) 94.19 631.22 0.65 0.51 Learnable Queries ( N = 16 ) 92.88 641.42 0.66 0.48 Learnable Queries ( N = 32 ) 91.76 658.89 0.67 0.45 
+
+Learnable Queries ( N = 128 ) 86.86 640.50 0.67 0.49 
+
+Ours (N = 64 , 4 layers) 91.28 607.13 0.67 0.46 
+
+– Alternative Architectures: To justify the necessity of the Q-former, we introduce a baseline where the Q-former is entirely replaced by a standard MLP block. 
+
+– Module Order within Q-former: We compare the performance impact of swapping the sequence of the Multi-Layer Perceptron (MLP) and the Transformer blocks within the Q-former. 
+
+– Transformer Depth: We investigate the effect of varying the number of Transformer layers within the Q-former (e.g., 2 layers and 8 layers) to find the optimal capacity for motion prior extraction. 
+
+– Number of Learnable Queries: We evaluate how the capacity of the model changes with varying numbers of learnable queries (e.g., N = 32 and 
+
+N = 128 ), seeking the optimal balance between computational efficiency and representational power. The quantitative comparisons for these architectural variants are summa-rized in Table 2. Necessity of Q-former: Replacing the Q-former module entirely with a simple Multi-Layer Perceptron (MLP) leads to noticeable perfor-mance degradations across all metrics. This demonstrates that a naive MLP lacks SparseCtrl-HOI 3
+
+the capacity to extract complex motion priors. The cross-attention mechanism within the Q-former is essential for effectively querying and integrating motion information. Effect of Module Order: Our default design (MLP → Trans-former) significantly outperforms the reversed sequence (Transformer → MLP) across all metrics. When this order is reversed, the model yields suboptimal con-text extraction and compromised generation quality. Effect of Transformer Depth: We also ablate the number of Transformer layers within the Q-former. Our default depth configuration provides the optimal representational capacity. 
+
+Effect of Query Count ( N ): The number of learnable queries N acts as an in-formation bottleneck, determining the model’s capacity to extract and condense motion priors. As shown in Table 2, increasing N from 8 to 64 steadily improves the Fréchet Video Distance (FVD) from 631.22 to an optimal 607.13, demon-strating significantly enhanced spatiotemporal video quality. However, further increasing N to 128 degrades the FVD to 640.50. While N = 128 yields the best Fréchet Inception Distance (FID) at 86.86, this indicates that an excessively large query set tends to overfit to frame-level spatial details at the severe expense of temporal coherence. N = 64 strikes the optimal balance, achieving the absolute best overall video distribution quality (FVD), the highest structural similarity (Ti-SSIM), and highly competitive temporal motion consistency (MS-RAFT).                  
+
+> Table 3: Ablation on temporal anchoring strategies for interaction keyframes. We compare TiRoPE against three alternatives that inject the target timestamp through positional embedding, additive bias, or a learnable embedding. The best results are highlighted in bold .Temporal Anchoring FID ↓FVD ↓Ti-SSIM ↑MS-RAFT ↓
+> Concatenated keyframe positional embedding 108.5 749.2 0.65 0.58 Additive temporal bias 253.3 1682.7 0.41 0.53 Learnable temporal embedding 210.2 1394.1 0.43 0.57
+> TiRoPE 89.2 629.6 0.66 0.45
+
+Temporal Anchoring Strategy. We further justify our TiRoPE design by comparing it against three alternative ways of anchoring interaction keyframes to their target timestamps, as summarized in Table 3. Concatenated keyframe positional embedding appends a separate positional embedding of the timestamp; 
+
+Additive temporal bias adds a timestamp-dependent bias to the attention logits; and Learnable temporal embedding learns an embedding for each target index. All three alternatives perform substantially worse than TiRoPE across every metric. Unlike these schemes, which require the network to additionally learn the mapping between the injected signal and the target latent frames, TiRoPE lets the keyframe token share the same temporal rotary index as its target frame (Equation 1), directly aligning them within self-attention. This also distinguishes TiRoPE from the zero-padded channel-wise injection discussed in the main text, which dilutes the keyframe signal and converges more slowly. 4 S. Xie et al. 
+
+Keyframe Sampling Strategy. We further evaluate the robustness of our model to how the sparse keyframes are placed along the timeline. As shown in Table 4, random, uniform, and non-uniform (geometric-interval) sampling all yield comparable performance, indicating that our method is not sensitive to the specific keyframe placement.  
+
+> Table 4: Ablation on keyframe sampling strategies on SparseHOI-5K.
+
+Sampling Strategy FID ↓ FVD ↓ Ti-SSIM ↑ MS-RAFT ↓
+
+Random 89.2 629.6 0.66 0.45 Uniform 90.7 597.2 0.67 0.48 Non-uniform (geometric intervals) 95.6 623.0 0.68 0.48 
+
+## 4 Classifier-Free Guidance Scales 
+
+We conduct experiments to evaluate the impact of different Classifier-Free Guid-ance (CFG) scales on the generation quality. As shown in Table 5, we observe that a CFG scale of 3.0 yields the most balanced and optimal performance over-all. Although setting the CFG scale to 4.5 results in a lower FVD score (598.45), it leads to subtle degradation in other metrics. Consequently, taking into ac-count the comprehensive trade-off between visual quality and motion alignment, we empirically adopt a CFG scale of 3.0 as the default configuration for our framework.  
+
+> Table 5: Comparisons in classifier-free guidance scales on our SparseHOI-5K testset.
+
+# CFG scale FID ↓ FVD ↓ Ti-SSIM ↑ MS-RAFT ↓
+
+# 2.5 94.77 623.06 0.66 0.47 3.0 91.28 607.13 0.67 0.46 
+
+# 3.5 93.97 642.45 0.66 0.47 4.0 94.11 633.57 0.65 0.49 4.5 92.92 598.45 0.66 0.51 5.0 92.13 645.63 0.65 0.50 
+
+## 5 Detail Description 
+
+5.1 Details of SparseCtrl-HOI Baseline Input. As briefly formulated in Equation (2) of the main text, the input zin comprises three primary latent components: the noisy video features SparseCtrl-HOI 5
+
+znoise v ∈ R T      
+
+> 4×H
+> 8×W
+> 8×C
+
+, the reference image feature zref ∈ R1× H    
+
+> 8×W
+> 8×C
+
+, and the interaction keyframe features zho ∈ RK× H    
+
+> 8×W
+> 8×C
+
+. First, to enable channel-wise concatenation with the temporally extended video features, the reference image feature zref is repeated T 
+
+> 4
+
+times along the temporal axis. This broadcasts the identity information across all video frames, resulting in a tensor of shape T 
+
+> 4
+
+× H 
+
+> 8
+
+× 
+
+> W
+> 8
+
+×C. Furthermore, the keyframe features zho are concatenated with a sampled noise tensor ϵho ∈ RK× H    
+
+> 8×W
+> 8×C
+
+along the channel dimension. The introduction of ϵho serves a critical dual purpose. Structurally, it pads the channel dimension to align with the combined channel size of the video and reference features (2C). Conceptually, it ensures that the statistical distribution of the padded features remains consistent with that of the noisy video features ( znoise v ), which is vital for maintaining a homogeneous input distribution across the corresponding channels. Following Equation (2), we ultimately obtain the DiT input tensor 
+
+zin ∈ R( T      
+
+> 4+K)×H
+> 8×W
+> 8×2C
+
+.
+
+TiRoPE. In standard video generation models [8] employing Diffusion Trans-formers (DiT), 3D Rotary Positional Embedding (RoPE) [6] is applied to the noisy video latent znoise v to inject spatiotemporal coordinates. Let the sequential temporal index of the latent video features be denoted as t ∈ { 0, 1, . . . , T 
+
+> 4
+
+− 1}.For an interaction keyframe designed to appear at a specific physical timestamp 
+
+τi (in seconds), we must establish a deterministic mapping from physical time to this latent temporal index space. Given a target video frame rate of f (FPS), the physical frame number corresponds to τi · f . Because the video VAE encoder [8] inherently performs temporal downsampling by a factor of 4, the corresponding target latent temporal index ti is formulated as: 
+
+ti =
+
+⌊ τi · f
+
+4
+
+⌋
+
+, (1) where ⌊·⌋ denotes the floor operation. In our TiRoPE formulation, we explicitly assign this calculated target index 
+
+ti as the temporal positional index for the latent feature of the i-th interaction keyframe, zi
+
+> ho
+
+. Formally, if RoPE (z, t, s ) denotes the rotary embedding func-tion for a feature z at temporal index t and spatial index s, the embedding for the interaction keyframe is computed as RoPE (zi
+
+> ho
+
+, t i, s ho ). Here, the spa-tial positional index sho remains mathematically unchanged to maintain spatial consistency with the interaction keyframe. 
+
+Injection of Condensed Motion Priors. We employ a standard cross-attention architecture within each transformer block to inject the condensed motion pri-ors Cmllm into the DiT backbone. Specifically, the intermediate spatiotemporal latent features extracted from the preceding layers of the DiT block are linearly projected to serve as the Query ( Q). Cmllm acts as the conditioning context and is linearly projected to form both the Key ( K) and the Value ( V). Formally, this cross-attention operation can be expressed as: 
+
+Cross-Attention (Q, K, V) = Softmax 
+
+( QK T
+
+√d
+
+)
+
+V, (2) 6 S. Xie et al.    
+
+> (a) Q-Former cross-attention averaged over the learnable queries and mapped back onto the four input keyframes.
+> (b) Per-pixel feature difference at the 39th DiT layer with and without Cmllm , shown at the four target timestamps.
+
+Fig. 1: Interpretability of the Motion Prior Injection (M.P.I.) module. Warmer colors in (a) denote higher attention; the maps in (b) are normalized to [0 , 1] per frame. 
+
+where d represents the feature dimension of the queries and keys. 
+
+Motion-Prior Interpretability. Figure 1 analyzes how the Motion Prior Injec-tion (M.P.I.) module guides generation. We average the Q-Former cross-attention over its learnable queries and map it back onto each input keyframe. As shown in Figure 1(a), the attention concentrates on the hand-object contact regions across all four keyframes, indicating that the condensed motion priors Cmllm primarily summarize the interaction states rather than the global appearance. We also compute the feature difference at the 39th DiT layer between the models with and without Cmllm . As shown in Figure 1(b), injecting Cmllm predominantly modulates the interacting hands and objects at the target timestamps. This is consistent with the FVD/MS-RAFT degradation observed when M.P.I. is re-moved in the main paper’s ablation. The corresponding Qwen2.5-VL textual outputs are provided below. 
+
+MLLM Textual Output. Figure 2 shows the four interaction keyframes fed to Qwen2.5-VL [7], and the quote below lists its textual output obtained with the prompt described in the main paper. The model correctly characterizes the change of hand pose, object pose, and hand-object contact region across the keyframes. These descriptions form the high-level motion prior that is condensed into Cmllm and injected into the DiT backbone. 
+
+“Based on the provided keyframes, here’s an inferred sequence of the hand-object interaction: SparseCtrl-HOI 7 
+
+> Fig. 2: The four input interaction keyframes used to query Qwen2.5-VL for motion-prior extraction.
+
+### Keyframe 1: - **Hand Pose:** The left hand is holding the shoe with the thumb and index finger gripping the side near the heel. - **Object Pose:** The shoe is positioned horizontally, with the sole facing upwards. - **Contact Region:** The thumb and index finger are in contact with the side of the shoe. ### Keyframe 2: - **Hand Pose:** The left hand has moved slightly, with the fingers now more spread out, and the thumb is still gripping the side of the shoe. - **Object Pose:** The shoe remains horizontal, but there is a slight rotation or tilt. - **Contact Region:** The thumb and index finger maintain contact with the side of the shoe, but the grip appears looser. ### Keyframe 3: - **Hand Pose:** The left hand has rotated slightly, with the fingers more spread out, and the thumb is still gripping the side of the shoe. - **Object Pose:** The shoe remains horizontal, but there is a noticeable rotation or tilt compared to Keyframe 1. - **Contact Region:** The thumb and index finger continue to be in contact with the side of the shoe, but the grip is more relaxed. ### Keyframe 4: - **Hand Pose:** The left hand has moved further away from the shoe, with the fingers extended and the thumb no longer gripping the side. - **Object Pose:** The shoe is now positioned verti-cally, with the sole facing downwards. - **Contact Region:** The hand is no longer in contact with the shoe, indicating that the interaction has ended. ### Summary of Hand-Object Interaction Process: 1. **Start (Keyframe 1):** The left hand holds the shoe with a firm grip near the heel. 2. **Middle (Keyframes 2 and 3):** The hand rotates slightly, maintain-ing a loose grip while the shoe rotates. 3. **End (Keyframe 4):** The hand moves away from the shoe, ending the interaction. These keyframes suggest a smooth transition from holding the shoe to releasing it, with one hand moving away from the object. ” 
+
+5.2 Details on Dataset Construction 
+
+In Phase I , we initially compile a comprehensive list of prominent live-streamer IDs from the target e-commerce platforms [1, 2]. We then utilize automated 8 S. Xie et al. 𝑡 = 0𝑠  𝑡 = 0.5𝑠  𝑡 = 2.4𝑠  𝑡 = 4.7𝑠  
+
+> Fig. 3: A failure case of our work.
+
+scripts [3, 9] to batch-download the videos from their lists. To strictly adhere to privacy regulations, portrait rights, and platform copyright policies, we will only publicly release the exact Video IDs (VIDs) alongside our automated download-ing scripts. This allows the research community to independently and legally reconstruct the identical source dataset. In Phase IV , we design an automated, high-fidelity hand segmentation pipeline that cascades MediaPipe [5] and the Segment Anything Model (SAM) [4]. Specifically, for each video frame, we first employ MediaPipe to detect fine-grained 2D hand landmarks. We then compute a tightly bounded rectangular box around the detected hand region with a 10-pixel padding margin. This bounding box is subsequently fed as a spatial prompt into a pre-trained SAM, which predicts the pixel-level boolean mask. 
+
+5.3 Experimental Details 
+
+During training, we construct the reference image by randomly sampling a single frame from the inpainted, object-free video. To extract K interaction keyframes, we select the first and last indices of the clip, and randomly sample the remaining 
+
+K − 2 intermediate indices from evenly partitioned temporal windows. Finally, based on these selected temporal indices, we utilize our pre-extracted masks to crop the corresponding hand-object regions from the original RGB frames. 
+
+## 6 Limitations 
+
+While our method achieves high-quality generation in most scenarios, it still ex-hibits certain limitations. A primary constraint is its limited capability to handle drastic morphological changes of the interacting objects. Specifically, when an object undergoes severe shape deformations or extreme structural variations be-tween the provided interaction keyframes, the model struggles to hallucinate a reasonable and natural spatiotemporal transition. As illustrated in Figure 3, such drastic morphological shifts can occasionally lead to visual artifacts in the gen-erated intermediate frames. Future work will focus on enhancing the temporal prior module to better capture and render complex object state dynamics. SparseCtrl-HOI 9
+
+## References 
+
+1. Bilibili Inc.: Bilibili. https://www.bilibili.com (2009), accessed: 2026-06-30 2. Google: YouTube. https://www.youtube.com (2005), accessed: 2026-06-30 3. Google: YouTube Data API v3. https://developers.google.com/youtube/v3 
+
+(2013), accessed: 2026-06-30 4. Kirillov, A., Mintun, E., Ravi, N., Mao, H., Rolland, C., Gustafson, L., Xiao, T., Whitehead, S., Berg, A.C., Lo, W.Y., et al.: Segment anything. In: Proceedings of the IEEE/CVF International Conference on Computer Vision. pp. 4015–4026 (2023) 5. Lugaresi, C., Tang, J., Nash, H., McClanahan, C., Uboweja, E., Hays, M., Zhang, F., Chang, C.L., Yong, M.G., Lee, J., et al.: MediaPipe: A framework for building perception pipelines. arXiv preprint arXiv:1906.08172 (2019) 6. Su, J., Lu, Y., Pan, S., Murtadha, A., Wen, B., Liu, Y.: RoFormer: Enhanced trans-former with rotary position embedding. arXiv preprint arXiv:2104.09864 (2023) 7. Team, Q.: Qwen2.5-VL (January 2025), https://qwenlm.github.io/blog/qwen2. 5-vl/ 
+
+8. Wan, T., Wang, A., Ai, B., Wen, B., Mao, C., Xie, C.W., Chen, D., Yu, F., Zhao, H., Yang, J., Zeng, J., Wang, J., Zhang, J., Zhou, J., Wang, J., Chen, J., Zhu, K., Zhao, K., Yan, K., Huang, L., Feng, M., Zhang, N., Li, P., Wu, P., Chu, R., Feng, R., Zhang, S., Sun, S., Fang, T., Wang, T., Gui, T., Weng, T., Shen, T., Lin, W., Wang, W., Wang, W., Zhou, W., Wang, W., Shen, W., Yu, W., Shi, X., Huang, X., Xu, X., Kou, Y., Lv, Y., Li, Y., Liu, Y., Wang, Y., Zhang, Y., Huang, Y., Li, Y., Wu, Y., Liu, Y., Pan, Y., Zheng, Y., Hong, Y., Shi, Y., Feng, Y., Jiang, Z., Han, Z., Wu, Z.F., Liu, Z.: Wan: Open and advanced large-scale video generative models. arXiv preprint arXiv:2503.20314 (2025) 9. yt-dlp contributors: yt-dlp: A feature-rich command-line audio/video downloader. 
+
+https://github.com/yt-dlp/yt-dlp (2024), accessed: 2026-06-30
