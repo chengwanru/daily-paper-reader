@@ -1,0 +1,534 @@
+Title: Latent Clarity: Bridging World-Model Kinematics to Semantic Manifolds for Video Anomaly Anticipation
+
+URL Source: https://arxiv.org/pdf/2607.03558v1
+
+Published Time: Tue, 07 Jul 2026 01:16:37 GMT
+
+Number of Pages: 14
+
+Markdown Content:
+# Latent Clarity: Bridging World-Model Kinematics to Semantic Manifolds for Video Anomaly Anticipation 
+
+Abu Anas Ibn Samad 
+
+Sigmind.ai Dhaka 1215, Bangladesh 
+
+abushuvom@sigmind.ai , abushuvom@gmail.com 
+
+## Abstract 
+
+Continuous video anomaly detection is dominated by reactive Multiple Instance Learning (MIL) formulations that collapse dense spatiotemporal features into scalar anomaly scores. We introduce PULS (Predictive Unified Latent Space), a continuous semantic world-model pipeline comprising two core modules: a 490M-parameter KSD Bridge (Kinematic-to-Semantic Distillation) and a 16.8M-parameter Anticipatory State Predictor (ASP) . The KSD Bridge translates V-JEPA 2 physical tensors into the 2048-d Q WEN 3-VL-E MBEDDING -2B text-aligned hypersphere via symmetric InfoNCE with SALT noise injection, trained on a subset of UCF-Crime dataset. This semantic translation alone yields a chunk-level AUROC of 0.8994 for UCF-Crime and 0.8162 for out-of-distribution XD-Violence validation set without MIL or hierarchical fusion. Crucially, we introduce and empirically validate the Latent Clarity Hypothesis :because JEPA’s temporal predictor discards aleatoric pixel noise (motion blur, occlusion) while preserving continuous kinematics, hallucinated future represen-tations are inherently more semantically separable than observed presents. The ASP, trained via symmetric InfoNCE to sharpen these hallucinated future latents within the hypersphere, achieves 44 .5% mean 14-way zero-shot VQA accuracy, exceeding the observation baseline ( 34 .9% ) by +9 .6 pp. Applying the ASP to Observation Tensors collapses accuracy to 7.3% (random chance), proving that Anticipation and Observation occupy geometrically distinct sub-manifolds. A 
+
+Triple-Track Lead-Time protocol with an L1-surprise gate yields a peak +8 .9 pp anticipatory advantage at T −0.5s ( p< 0.001 , N =1 ,000 permutation), structurally separating temporal-physics anticipation from static scene priors. Zero-shot trans-fer to XD-Violence confirms that Newtonian-invariant kinematic representations generalize out-of-distribution for open vocabulary semantic reasoning capability. 
+
+## 1 Introduction 
+
+Video anomaly detection (VAD) in continuous surveillance streams is almost universally cast as Multiple Instance Learning (MIL) over weakly-labeled bags of frames [ 1, 2 , 3 , 4]. These archi-tectures consume dense optical or semantic features and regress a scalar anomaly score per frame, enabling rank-based Area Under the ROC Curve (AUROC) evaluation against the binary ground truth. Although MIL scores have driven steady AUROC progress, the paradigm is structurally reactive :anomalies are detected only after their pixel-level manifestation, and the scalar output carries no semantics of what happened, only that something happened. Replacing the scalar with generative vision–language modeling does not solve the latency problem: autoregressive token generation at every sliding window is prohibitively slow for real-time edge deployment. 
+
+> Preprint.
+> arXiv:2607.03558v1 [cs.CV] 3 Jul 2026
+
+Joint-Embedding Predictive Architectures (JEPAs) [ 5, 6, 7, 8] offer a principled alternative. Instead of reconstructing pixels or tokens, V-JEPA 2 predicts the latent representations of masked future patches in an abstract representation space, discarding unpredictable surface-level details. The resulting features are temporally structured, compact, and carry intuitive physics. With VLJEPA bridges V-JEPA 2’s continuous latent physics into a text-aligned semantic manifold at inference speed compatible with continuous video, however, it’s still reactive for anomaly sensing with static scene bias (Section 8). This paper proposes and empirically validates such a bridge under the PULS (Predictive Unified Latent Space) framework. Concretely, our contributions are: • KSD Bridge. A 490M-parameter bridge (LL AMA-8L, bidirectional) mapping the V-JEPA 2 Observation Tensor [Zctx ; Ztarget ] into the Q WEN 3-VL Hypersphere ( S2047 ) via SALT-augmented InfoNCE. Yields chunk-AUROC 0.8994 on UCF-Crime without MIL (Section 3). • Anticipatory State Predictor (ASP). A 16.8M-parameter residual MLP resolving epis-temic blur. It routes the Anticipation Tensor [Zctx ; ˆZfut ] through the frozen KSD Bridge, sharpening it to outperform the observation baseline by +9 .6pp VQA accuracy, validating the Latent Clarity Hypothesis (Sections 4, 6.1). • Cross-Manifold Probe. Passing Observation Tensors through the ASP collapses Q1 VQA accuracy to 7.3% and binary AUROC to 0.5535 — proving Anticipation and Observation sub-manifolds are geometrically distinct (Section 3.5). • Triple-Track Lead-Time Protocol. A framework to decompos scene bias from temporal physics via ungated, L1-surprise-gated, and context-only tracks. Yields a peak +8 .9pp anticipatory advantage at T −0.5s ( p< 0.001 , N =1000 ); 0% calm-zone saturation proves system forecasts true future kinematics rather than overfitting background priors (Section 7). • Zero-Shot OOD Transfer. Without retraining, PULS transfers to XD-Violence (dynamic cameras), retaining chunk-AUROC 0.816 and a +4 .5pp lead-time advantage at T −1.5s(Section 6.2). 
+
+Notation. PULS = KSD Bridge + ASP. The Semantic Manifold is the unit sphere S2047 ⊂ R2048 
+
+defined by Q WEN 3-VL-E MBEDDING -2B [ 10 ]; a Semantic Latent State s ∈ S 2047 is the output of either the KSD Bridge or the ASP. 
+
+## 2 Related Work 
+
+MIL-based VAD. Sultani et al. [ 1] established UCF-Crime and the MIL-ranking recipe. Subsequent work [ 2, 3, 11 , 12 , 4 ] pushed frame-level AUROC from 75 .4% to 88 .15% . All variants share three limitations: (i) the output is a scalar with no semantics; (ii) detection is reactive with no lead time; and (iii) the representation cannot support zero-shot VQA. 
+
+Joint-Embedding Predictive Architectures. I-JEPA [ 6] and V-JEPA [ 13 ] learn predictable latent structure rather than reconstructing pixels [ 5 , 14 ], discarding aleatoric noise irrelevant to semantic reasoning. V-JEPA 2 [ 7] adds a temporal predictor for action anticipation in closed vocabulary classification tasks. VL-JEPA [ 8 ] extends JEPA to vision–language by predicting continuous text embeddings; our KSD Bridge adapts this to stationary camera video anomaly sensing with V-JEPA 2 tokens. Concurrent V-JEPA 2.1 [ 15 ] alters the latent topology; upgrading PULS requires re-distilling the KSD Bridge, left for future work. 
+
+SALT distillation. Static-teacher Asymmetric Latent Training [ 16 ] replaces the standard EMA teacher with a frozen pretrained anchor and asymmetric noise-injection, avoiding bi-level optimiza-tion [ 17 ]. We apply SALT twice: aligning V-JEPA 2 tokens to the Q WEN 3-VL semantic manifold (KSD Bridge), and aligning hallucinated-future embeddings to observed presents (ASP). 
+
+Vision–language bridges. While large multimodal models [ 18 , 10 , 19 ] achieve strong anomaly classification, their autoregressive decoding induces latencies incompatible with real-time surveillance. PULS sidesteps decoding: the KSD Bridge produces a continuous semantic latent state in a single forward pass, ensuring sub-frame latency on consumer hardware while retaining zero-shot semantic tasks such as discriminative VQA, classification, retrieval and aid generative VQA with reasoning. 2(a) Observation Embedding sobs            
+
+> anch.
+> σobs large
+> JEPA predict
+> (b) Anticipation Embedding ssharp
+> anch.
+> σant ≪σobs
+> −50510 15
+> 0
+> 5
+> 10 sobs cluster
+> ssharp manifold
+> text anchors
+> UMAP dim-1 (cosine metric)
+> UMAP dim-2
+> (c) UMAP Projection of Semantic Embeddings (UCF-Crime)
+> Observation emb. ( sobs )
+> Anticipation emb. ( ssharp )
+> Cross-Manifold Probe
+> Text anchor
+
+Figure 1: The Latent Clarity Hypothesis: conceptual geometry and empirical validation. (a) Ob-servation states ( sobs ) are dispersed on the semantic manifold ( S2047 ) because the underlying Ob-servation Tensors ingest aleatoric noise (motion blur, occlusion, camera shake) at the kinematic peak. (b) Anticipation embeddings ( ssharp ) cluster tightly near the text anchor because V-JEPA 2’s temporal predictor discards stochastic residuals, retaining only the predictable physical trajectory. (c) UMAP projection (cosine metric) [ 9 ] of a subset of real Semantic Latent States on UCF-Crime (n=429 obs, n=429 ant, n=50 CMP, 14 anchors, drawn from the 1,193 -chunk validation set). While Anticipation embeddings maintain consistently higher 2048-D cosine similarity to anchors (yielding superior zero-shot accuracy), UMAP prioritizes local topology, revealing that Observation (red) and Anticipation (green) embeddings occupy geometrically distinct sub-manifolds. Text anchors (blue stars) form an isolated modality cluster. Cross-Manifold Probe points (orange) land completely in the Anticipation region, confirming the ASP acts as a horizon-specific translation operator ( ∆) rather than a generic denoiser—an Asymmetric Geometric Overshoot that explains the 7.3% accuracy collapse (Section 3.5). 
+
+## 3 KSD Bridge: Kinematic-to-Semantic Distillation 
+
+V-JEPA 2 Token Geometry. We use the frozen V-JEPA 2 ViT-Large encoder [ 7 ]. A 16-frame, 
+
+256 ×256 RGB window (sampled at 30 fps, stride 2) is tokenised into 8×256=2048 spatial-temporal tokens Z ∈ R2048 ×1024 . The first 1024 tokens are the context ; the second 1024 are the target . V-JEPA 2’s internal temporal predictor [ 7] autoregresses the target, yielding ˆZfuture ∈ R1024 ×1024 . Two tensors are available per clip: the Observation Tensor Zobs = [ Zctx ; Ztarget ] and the Anticipation Tensor Zant = [ Zctx ; ˆZfuture ].
+
+3.1 Architecture 
+
+We instantiate πθ with the last 8 layers of LL AMA-3.2-1B [ 20 ] (rotary embeddings [ 21 ], bidi-rectional attention). A per-token linear projection Win ∈ R1024 ×2048 maps each V-JEPA 2 token from R1024 to R2048 . Given the projected token sequence ZWin ∈ R2048 ×2048 and query tokens 
+
+XQ ∈ RQ×2048 (embedded via LL AMA’s token embedding layer), concatenation along the sequence dimension yields a (2048+ Q) × 2048 input to πθ . The bridge outputs a Semantic Latent State via masked mean-pooling over non-PAD positions: 
+
+s = L2Norm  MeanPool mask 
+
+ πθ ([ ZWin ; XQ])  ∈ S 2047 . (1) We write fθ (Z, X Q) ≡ L2Norm(MeanPool mask (πθ ([ ZWin ; XQ]))) for the complete bridge and formally treat s as a dynamic state vector on the Semantic Manifold, enabling the ASP to perform temporal operations entirely in the latent domain. 
+
+3.2 Training Objective 
+
+We employ symmetric InfoNCE [22, 18] ( τ =0 .05 ). Following SALT [16], we inject Gaussian noise 
+
+ϵ ∼ N (0 , σ 2I) with σ=0 .01 into the V-JEPA 2 tokens before the bridge during training; the Qwen text encoder is frozen throughout. For a batch of B pairs, let sobs  
+
+> i
+
+= fθ (Zobs  
+
+> i
+
++ϵi, X Q) denote the 3(a) PULS Inference Architecture        
+
+> 16-Frame Clip
+> V-JEPA 2 ViT-L
+> 304M, frozen
+> Obs. Tensor Zobs
+> [Zctx ;Ztgt ]
+> KSD Bridge
+> LLaMA-8L, 490M
+> Temporal Predictor
+> 22M, frozen
+> Ant. Tensor Zant
+> [Zctx ; ˆZfut ]
+> KSD Bridge
+> Shared weights, frozen
+> ASP
+> Residual MLP, 16.8M
+> Shared QWEN Hypersphere S2047
+> Text Anchor
+> Zctx ,Ztgt
+> Zctx
+> Zctx
+> ˆZfut
+> sblur
+> sobs
+> ssharp
+> CMP: 7.3%
+
+(b) PULS Training Pipeline                                     
+
+> ➀Unconditional KSD
+> Zobs
+> (vision only)
+> SALT
+> σ=0 .01
+> KSD Bridge
+> 490M
+> Caption text
+> Qwen3-VL
+> frozen
+> InfoNCE
+> τ=0 .05 , symmetric
+> LR 5×10 −5B=64 AdamW
+> 7,819 chunks ·100 epochs 1×A40 (48 GB)
+> sobs st
+> ➁Query-Conditioned KSD
+> [Zobs ;XQ]
+> fused sequence
+> KSD Bridge
+> fine-tuned
+> Answer text
+> Qwen3-VL
+> frozen
+> InfoNCE
+> τ=0 .05 , symmetric
+> LR 5×10 −5grad ckpt bidir attn
+> 4D all-ones mask →bidirectional causal override (LLaMA →encoder)
+> sobs st
+> weights
+> freeze Stage 2 KSD weights ↓
+> ➂ASP: Anticipatory State Sharpening
+> Zant
+> hallucinated future
+> KSD Bridge
+> frozen
+> ASP (Student)
+> 16.8M, residual MLP
+> Zobs
+> actual future
+> KSD Bridge (Teacher)
+> frozen
+> Symmetric InfoNCE ( τ=0 .07 )
+> LASP = NCE sym (ssharp ,sobs )
+> LR 3×10 −4B=1024 no L1cosine sched
+> 2048 →4096 →2048
+> GELU + skip, L2-norm
+> Query invariant:
+> present-tense only
+> sblur
+> ssharp
+> sobs
+> Frozen Trainable Obs. Tensor Ant. Tensor Loss Hyperparam
+
+Figure 2: The Consolidated PULS Architecture and Training Strategy. Raw video frames are encoded by the frozen V-JEPA 2 ViT-L. (a) Left Track (Observation): The context and target tokens form the Observation Tensor, yielding the observation embedding sobs . During ASP training, this track acts as the frozen teacher. (a) Right Track (Anticipation): The Temporal Predictor hallucinates 
+
+ˆZfut . The Anticipation Tensor yields a blurred state, which the trainable ASP (student) sharpens into 
+
+ssharp . Objective: A Symmetric InfoNCE loss (purple) explicitly distills the student’s output toward the teacher’s target, ensuring both tracks converge onto the Shared Qwen Hypersphere (S2047 ). The Cross-Manifold Probe (dashed red line) explicitly misroutes the observation embedding into the ASP, triggering geometric collapse. Right panel (b): Three-stage training recipe — ➀ unconditional caption alignment, ➁ query-conditioned VQA fine-tuning (both with SALT noise and frozen Qwen teacher), and ➂ ASP sharpening via frozen teacher distillation ( τ =0 .07 , batch 1024). KSD Bridge output on the noise-augmented Observation Tensor, and sti the frozen Q WEN 3-VL embedding of the ground-truth QA caption. (Later, sblur and ssharp denote ASP operations on the Anticipation Tensor Zant ). 
+
+LKSD = − 12B
+
+BX
+
+i=1 
+
+"
+
+log e⟨sobs  
+
+> i
+
+,sti ⟩/τ 
+
+P
+
+j e⟨sobs  
+
+> i
+
+,stj ⟩/τ + log e⟨sti ,sobs  
+
+> i
+
+⟩/τ 
+
+P
+
+j e⟨sti ,sobs  
+
+> j
+
+⟩/τ 
+
+#
+
+. (2) Batches of size 64 are processed on a single NVIDIA A40 (48 GB) GPU. To prevent catastrophic causal masking, we explicitly override the LLaMA default with a bidirectional attention mask (see Appendix B). 
+
+3.3 Training Data Curation Kinematic-peak filtering. UCF-Crime’s temporal annotations [ 1, 23 ] define macro-windows (often 
+
+> 30 s) while the actual kinematic event spans ∼1–2 s. We run a sliding-window optical-flow-magnitude scan and retain the single window of highest variance per annotated segment as the Peak 
+
+chunk. From 13 UCF-Crime anomaly categories plus Normal, this yields 7,819 curated 1-second training chunks. 
+
+Semantic stripping. QA captions (10 per chunk, generated by Q WEN 2.5-7B) describe kinematics and severity, never lighting, clothing, or static scene cues—explicitly mitigating static representation bias (the colloquial “white-shirt” shortcut) [24]. 43.4 KSD Bridge Validation 
+
+On 1,150 held-out UCF-Crime chunks, the KSD Bridge achieves chunk-level AUROC 0.8994 
+
+(via cosine distance against danger-weighted prototypes) and 34 .9% mean zero-shot VQA accuracy. Full-set evaluation on 290 untrimmed videos via Savitzky–Golay temporal broadcasting [ 25 ] yields frame-level AUROC 0.6282 , reflecting a structural penalty incurred by predictive (vs. reactive) detectors (see Section 5, Appendix A and Table 2). 
+
+3.5 Cross-Manifold Probe: The ASP is a Horizon-Specific Operator 
+
+As a decisive negative control, the Cross-Manifold Probe evaluates the ASP on the Observation 
+
+Tensor: scmp = gϕ(fθ (Zobs , X Q)) . On the 1,193-chunk validation set, Q1 accuracy collapses to 
+
+7.29% (below random chance), binary AUROC drops to 0.5535 , and per-task scores plummet. We term this Asymmetric Geometric Overshoot : the ASP applies a delta calibrated for blurred future latents; on an already-sharp observation latent, it overshoots into unoccupied hypersphere regions (confirmed by UMAP [ 9], Fig. 1c). This collapse proves the ASP is not merely a generic classifier head, but a horizon-conditional operator (see Section 8.2 for geometric analysis and Section 6.3 for a per-category breakdown). 
+
+## 4 PULS Pipeline: Anticipatory State Predictor 
+
+4.1 Motivation: Epistemic blur 
+
+The temporal predictor’s hallucination is deterministic (MSE-trained) and therefore outputs the conditional mean over plausible futures — a “blurred” latent. Passing Zant through the frozen KSD Bridge yields a semantic vector sblur that is approximately centred on, but not identical to, the observation vector sobs derived from the actual future. 
+
+4.2 The Anticipatory State Predictor 
+
+We train a lightweight 2-layer residual MLP gϕ : R2048 → R2048 . Maintaining the row-vector convention of the Semantic Manifold, the projection is defined as: 
+
+gϕ(s) = L2Norm( s + GELU( sW1 + b1)W2 + b2) , (3) where W1 ∈ R2048 ×4096 and W2 ∈ R4096 ×2048 (≈16.8M parameters). During training, the KSD Bridge and both tensor extraction paths remain strictly frozen. The geometric expansion–contraction 
+
+2048 →4096 →2048 disentangles mixed future-probability modes before contractive projection back to the unit hypersphere. 
+
+4.3 Loss choice and the collapse of L1
+
+While SALT [ 16 ] prescribes L1 latent regression, in our setting L1 collapsed to a low-magnitude mean vector, dropping 14-way accuracy to 34 .2% . We replace L1 with symmetric InfoNCE [ 22 ]. For a batch of B = 1024 pairs, the loss is defined over the empirical batch expectation: 
+
+LASP = 1
+
+B
+
+> B
+
+X
+
+> i=1
+
+Lsym NCE 
+
+ gϕ(sblur  
+
+> i
+
+), sobs  
+
+> i
+
+; τ =0 .07  . (4) InfoNCE’s uniformity penalty forces the output to span the semantic manifold, restoring angular class structure despite a minor AUROC regression ( 0.8994 → 0.8680 )—a deliberate trade given discriminativity is an angular property on the unit sphere. 
+
+4.4 Query conditioning and temporal invariance 
+
+While the KSD Bridge is query-conditioned for open-vocabulary VQA, ASP training requires strict geometric isolation. Mismatched or future-tense queries (e.g., “What will happen next?”) trigger a temporal double-shift : V-JEPA 2 has already advanced tokens into the physical future, causing the bridge to forecast T +2 semantics from T +1 physics. To prevent manifold misalignment, a strict 5present-tense query invariant ( XQ = “What is the primary action and severity?”) is injected into both paths during ASP distillation. This guarantees the ASP strictly learns to correct the epistemic blur of hallucinated physical geometry, while inheriting the KSD Bridge’s VQA generalisation at inference. 
+
+## 5 Evaluation Protocols and Datasets 
+
+5.1 UCF-Crime 
+
+We evaluate our framework using the UCF-Crime dataset, a large-scale surveillance benchmark containing 13 anomaly categories plus Normal [ 1]. Rather than training on the raw full-length video distribution, our models are trained on a curated kinematic-peak filtered subset of the UCF-Crime training split, and evaluated on held-out validation splits as well as on out-of-distribution (OOD) transfer to the XD-Violence dataset. We structure the dataset splits as follows: 
+
+Training Split. The KSD Bridge and ASP are trained exclusively on the UCF-Crime training split, consisting of 1,401 videos. Applying the kinematic-peak filtering protocol (detailed in Section 3) yields 7,819 high-fidelity kinematic-peak chunks (1 s sliding window with 0.5 s stride). Each chunk produces two core tensor artifacts: an observation tensor [Zctx ; Ztarget ] and an anticipation tensor 
+
+[Zctx ; ˆZfut ], both represented in bfloat16 precision ∈ R2048 ×1024 of V-JEPA 2 ViT-L spatial-temporal tokens. 
+
+Evaluation Splits. Rather than relying on a single aggregate metric, we construct three non-overlapping evaluation splits from the held-out distribution to isolate different facets of the model’s performance: • A1 — Frame-level AUROC (290 videos, 140 anomaly / 150 normal): The official test split from Sultani et al. [ 1 ] containing frame-level temporal annotations. This enables direct comparison against traditional Weakly-Supervised MIL baselines (e.g., RTFM, MGFN, UR-DMU). • A2 — Semantic VQA (1,193 chunks, 413 videos): A chunk-level validation set containing 596 anomaly and 597 normal chunks balanced across all 14 categories. The 1,150 chunks reported in Table 1 represent the strictly held-out test+val intersection, while the full 1,193 set contains the expanded validation distribution used to verify the Cross-Manifold Probe’s geometric collapse. • A3 — Lead-Time Anticipation (561 of 596 untrimmed anomaly videos): Used to evaluate the model’s temporal anticipation horizons. We exclude 35 anomaly videos from the validation set due to missing start-frame annotations which are required to align temporal offsets relative to the anomaly onset T0.The denominators differ between these splits due to metadata constraints: Frame-Level AUROC (A1) requires frame-level ground-truth annotations (available only for the 290 test videos), whereas Se-mantic VQA (A2) relies on video-level labels for 14-way chunk classification. Lead-time anticipation (A3) is restricted to the 561 untrimmed anomaly videos with annotated physical onset times, since normal clips have no onset. 
+
+5.2 XD-Violence (Out-of-Distribution) 
+
+XD-Violence contains 7 anomaly categories (Explosion, Shooting, Riot, Fighting, CarAccident, Abuse, Normal) under both static and dynamic (ego-motion) cameras [ 26 ]. To verify out-of-distribution (OOD) zero-shot transfer, we evaluate on a held-out set of 1,200 chunks (600 anomaly / 600 normal) and frame-level metrics on 800 videos without any retraining (weights are frozen as trained on UCF-Crime). The audio channel is omitted, and license restrictions are respected (research use only). 
+
+5.3 Discriminative VQA Protocol 
+
+We build a prototype cache of 5 × 14 = 70 answer embeddings (5 VQA tasks × 14 categories) via Q WEN 3-VL-E MBEDDING -2B. A chunk is classified per task by arg max c⟨s, aq,c ⟩; we report per-task accuracy, mean across 5 tasks, and majority-vote category. To compute binary AUROC, we project the similarities into a scalar anomaly score, defined formally as y(s) = max q,c 
+
+ ⟨s, aq,c ⟩· wc
+
+,where wc ∈ [0 , 1] is a deterministic danger weight encoding kinetic severity (e.g., Normal=0.0, Shoplifting=0.5, Explosion=1.0). Crucially, these weights are formulated as ontological con-
+
+6Table 1: 14-way zero-shot VQA on UCF-Crime. KSD Bridge and ASP evaluated on 1,150 held-out chunks. The Cross-Manifold Probe (Observation Tensor → KSD Bridge → ASP) is evaluated on the 1,193-chunk validation set. ASP dominates KSD Bridge across all tasks despite consuming 
+
+hallucinated futures. The Cross-Manifold Probe’s collapse to random chance demonstrates ASP is a horizon-specific operator (Section 3.5). 
+
+Task KSD Bridge (obs.) Cross-Manifold Probe ASP (ant.) ∆(ASP −KSD) Q1 — Predictive anticipation 28.7% 7.3% 42.7% +14 .0
+
+Q2 — Incident type 55.6% 16.7% 55.7% + 0 .1
+
+Q3 — Hazard assessment 23.2% 4.8% 34.4% +11 .2
+
+Q4 — Activity recognition 35.3% 6.0% 46.4% +11 .1
+
+Q5 — Severity estimation 31.6% 5.2% 43.3% +11 .6
+
+Mean across tasks 34.9% 8.0% 44.5% + 9 .6
+
+Majority-vote 14-way 37.1% 7.3% 34.2% † − 2.9
+
+Binary AUROC 0.8994 0.5535 0.8680 −0.0314     
+
+> †Under the symmetric InfoNCE objective, the Semantic Manifold is strictly L2-normalized. While this mathematically optimizes the per-task angular separation (driving the +9 .6pp mean gain), it intentionally collapses the scalar magnitude variances that naive majority-voting relies upon, resulting in a minor regression.
+
+stants —representing the inherent physical severity of an event independent of any specific dataset. They are applied identically across both evaluations (UCF-Crime, XD-Violence) without target-domain calibration, ensuring absolute integrity in our zero-shot and out-of-distribution testing proto-cols. Legacy MIL methods perform an equivalent collapse implicitly via their binary output head; our formulation makes this projection explicit and interpretable. 
+
+## 6 Results 
+
+6.1 VQA Results: KSD Bridge vs. ASP on UCF-Crime 
+
+Table 1 reports per-task results. (i) Kinematic gains: Predictive (+14.0pp), severity (+11.6pp), hazard (+11.2pp), and activity (+11.1pp) improve substantially. Q2 (incident type) is unchanged (+0 .1pp), as coarse labels are decided at the context level and do not require future-physics reasoning. 
+
+Baselines: Under the same protocol, VL-JEPA [ 8] scores 19 .5% (Gemma-300M) to 29 .6% (Qwen3-8B), and C3D [ 27 , 1] scores 23 .0% . ASP’s 44 .5% mean exceeds the strongest VL-JEPA ablation by +14 .9pp, without additional supervision. (ii) AUROC–angular trade: Binary AUROC drops (0.8994 → 0.8680 ) because InfoNCE L2-normalises outputs, collapsing scalar magnitude. Against a 
+
+14 -way fine-grained manifold, angular separation is the correct property to optimise. 
+
+Frame-level AUROC. Full-set evaluation over 290 untrimmed UCF-Crime test videos yields frame-level AUROC 0.6282 . Per-category variance validates Semantic Stripping: kinematic-dense cate-gories localize well (Explosion 0.795 , RoadAccidents 0.788 , Fighting 0.743 ), while appearance-based categories fall to chance (Shoplifting 0.400 , Burglary 0.412 ). MIL methods exploit static scene regu-larities in these low-kinematics categories; PULS ignores non-physical cues by design, incurring the anticipated metric penalty. Frame-level AUC additionally penalizes any architecture that anticipates anomalies before the reactive ground-truth mask begins. 
+
+6.2 Out-of-Distribution Evaluation: XD-Violence 
+
+Table 2: Cross-Dataset Evaluation. Comparison of in-distribution (UCF) vs. OOD (XD) metrics, evaluating the KSD Bridge (v8) and ASP (v9). Anticipation Advantage measured at Tonset .
+
+Metric UCF-Crime (In-Dist) XD-Violence (OOD) Retention 
+
+Frame-level AUROC 0.6282 0.7894 —Chunk AUROC (KSD Bridge) 0.8994 0.8162 91% Chunk AUROC (ASP) 0.8680 0.7003 81% Mean 5Q VQA (Observation) 34.9% 27.9% 80% Mean 5Q VQA (Anticipation) 44.5% 27.4% 62% 
+
+∆ (Anticipation − Obs.) +9 .6pp −0.5pp —Anticipation Advantage ( Tonset ) +3 .7pp +3 .0pp —
+
+7Metrics & Distillation Bias. Table 2 details the global OOD transfer metrics. The ASP chunk-AUROC regression relative to UCF-Crime ( −16 .8pp) traces to a dataset-induced distillation bias: the ASP was distilled against a static-camera teacher. XD-Violence’s dynamic cameras produce ego-motion residuals that the surprise gate correctly elevates, but the ASP misinterprets as semantic kinematic escalation. Retraining on a mixed-camera corpus is the direct fix. 
+
+Newtonian-invariant categories. Despite the distribution shift, categories whose kinematic sig-natures are camera-motion-agnostic improve: CarAccident +24 .0pp ( p< 0.001 , McNemar) and Explosion +1 .7pp Q1 accuracy relative to the KSD Bridge. Crucially, open-vocabulary generaliza-tion is preserved: the KSD Bridge achieves 69 .5% zero-shot Q1 accuracy on “Riot”—a category entirely absent from the UCF-Crime training distribution—before degrading to 48 .3% under the ASP due to the aforementioned ego-motion distillation bias. 
+
+Triple-Track on XD-Violence. The peak gated–context advantage is +4 .5pp at T −1.5s and +3 .0pp at T0 (p< 0.001 at all horizons T0–T −2.0s, N =1000 permutation), consistent with the longer kine-matic escalation windows typical of vehicular and crowd-dynamics events. 
+
+Latent Clarity Hypothesis: Claim 1 vs. Claim 2. The avg-5Q VQA accuracy is flat between KSD Bridge ( 27 .9% ) and ASP ( 27 .4% ) on XD-Violence, isolating two separable claims. Claim 1 :the anticipation tensor encodes domain-agnostic predictive structure. Claim 2 : the ASP sharpener decodes it effectively. The OOD lead-time advantage at T0 (+3 .0pp, p< 0.001 ) confirms Claim 1 is OOD-robust — the hallucinated future natively encodes incident-relevant kinematics regardless of camera domain. The flat avg-5Q indicates Claim 2 is domain-specific: the ASP was distilled on UCF-Crime’s static-camera manifold and has not seen XD’s ego-motion geometry. Per-class evidence is mechanistically coherent: Newtonian-invariant categories improve (Explosion avg-5Q 
+
++10 .2pp, CarAccident +9 .2pp) while ego-motion-dominated categories degrade (Fighting −22 .2pp, Shooting −8.1pp) — exactly where UCF-to-XD domain shift is maximal. 
+
+6.3 Cross-Manifold Probe: Per-Category Analysis 
+
+To verify the topological alignment (and crucial separation) between the Observation and Anticipation sub-manifolds, we conduct a fine-grained category-by-category analysis. Table 3 details the zero-shot Q1 VQA accuracy across all categories for the Observation ( sobs ), Anticipation ( ssharp ), and Cross-Manifold Probe (CMP: sobs → ASP ) configurations on both the UCF-Crime validation set (1,193 chunks) and the XD-Violence transfer set (1,200 chunks). Table 3: Per-Category VQA Accuracy (Q1) across Manifolds. Actual results from the validation caches for Observation ( sobs ), Anticipation ( ssharp ), and the Cross-Manifold Probe ( sobs → ASP ). All values are Q1 zero-shot accuracy. The collapse of these categories in the CMP columns confirms the topological separation of the Anticipation and Observation sub-manifolds within the Shared Semantic Hypersphere. UCF results are In-Distribution; XD results are OOD Transfer.                                                                                                        
+
+> UCF-Crime (In-Distribution) XD-Violence (OOD Transfer) Category Obs. Ant. CMP Obs. Ant. CMP
+> Abuse 32.5% 7.5% 2.5% 16.7% 8.3% 100% †
+> Arrest 82.1% 79.5% 0.0% ———Arson 11.8% 50.0% 0.0% ———Assault 0.0% 8.3% 0.0% ———Burglary 34.4% 35.9% 6.3% ———CarAccident 23.3% 55.8% 7.0% 16.2% 40.2% 0.9% Explosion 62.5% 67.5% 0.0% 51.7% 53.4% 0.0% Fighting 67.9% 73.6% 0.0% 41.9% 40.2% 0.9% Riot ———69.5% 48.3% 0.0% Robbery 36.5% 54.1% 66.2% ———Shooting 40.0% 24.0% 0.0% 0.8% 0.0% 0.0% Shoplifting 97.9% 97.9% 19.1% ———Stealing 13.5% 5.4% 0.0% ———Vandalism 53.8% 61.5% 0.0% ———Normal 14.4% 37.4% 0.0% 4.2% 6.2% 2.2%
+> Mean (Q1) 28.7% 42.7% 5.5% 19.9% 21.0% 2.3%
+> †Abuse in XD-Violence contains only 12 samples; results are statistically sensitive to scene priors.
+
+8Table 4: Triple-Track Lead-Time on UCF-Crime (561 videos). Track 2 decays monotonically as the anticipatory horizon extends, saturating cleanly at 0% in the calm zone, while Track 1 is horizon-invariant — the signature of scene-bias classification.                                                  
+
+> Horizon T1 Ungated T2 Gated z=2 T3 Ctx-only Gates opened ∆(T2 −T3)
+> T031.9% 37.0% 33.3% 108 / 561 +3 .7
+> T−0.532.9% 36.5% 27.6% 123 / 554 +8.9
+> T−1.033.3% 35.9% 30.2% 106 / 544 +5 .7
+> T−1.534.4% 34.6% 31.9% 113 / 541 +2 .7
+> T−2.032.5% 29.3% 26.7% 116 / 538 +2 .6
+> T−3.032.8% 0.0% (calm) —0 / 528 n/a
+> T−5.033.5% 0.0% (calm) —0 / 508 n/a
+> T0
+> −0.5
+> −1.0
+> −1.5
+> −2.0
+> −3.0
+> −5.0
+
+0
+
+20 
+
+40 
+
+> +8 .9pp
+> calm zone
+
+Lead time (s before onset) 
+
+> 14-way accuracy (%)
+
+(a) UCF-Crime (561 videos) 
+
+> T1: Ungated
+> T2: Gated ( z=2 )
+> T3: Ctx-only
+> T0
+> −0.5
+> −1.0
+> −1.5
+> −2.0
+> −3.0
+> −5.0
+
+0
+
+20 
+
+40 
+
+> 7-class chance
+> +4 .5pp
+> calm zone
+
+Lead time (s before onset) 
+
+(b) XD-Violence (1200 videos) 
+
+Figure 3: Triple-Track Lead-Time Protocol. (a) UCF-Crime: Track 2 (gated) decays monotonically as the horizon extends and saturates at 0% in the calm zone ( T −3s), while Track 1 (ungated) is flat — the signature of scene-bias classification. Peak +8 .9pp gated–context advantage at T −0.5s. (b) XD-Violence (no retraining): Track 1 collapses to 2.2% (below 7-class chance of 14 .3% ) due to distribution shift, while gated Track 2 recovers to 38 –41% , demonstrating that the L1-surprise gate compensates for OOD scene bias. Peak gated–context advantage +4 .5pp at T −1.5s. 
+
+## 7 Triple-Track Lead-Time Protocol 
+
+For each of 561 untrimmed UCF-Crime test videos with annotated onset Tonset , we extract a 16-frame window ending at Tonset − ∆ for ∆ ∈ { 0, 0.5, 1.0, 1.5, 2.0, 3.0, 5.0} seconds and run each window through the PULS pipeline. Three tracks are evaluated: 
+
+Track 1 — Ungated anticipation. Evaluates the Anticipation Tensor [Zctx ; ˆZfuture ] via the ASP without L1-surprise gating, reporting raw 14-way majority-vote accuracy. 
+
+Track 2 — L1-surprise gated anticipation. Let L1(t) = ∥ˆZfuture (t) − Ztarget (t)∥1 be the V-JEPA 2 prediction error at t. Compute a calm-zone baseline (μc, σ c) from horizons ∆ ≥ 3.0s. Open a gate iff L1(Tonset − ∆) > μ c + zσ c with z = 2 .0. Track 2 reports accuracy on gate-open windows only. 
+
+Track 3 — Context-only control. Replace the Anticipation Tensor with [Zctx ; Zctx ] and apply the same ASP. This isolates scene bias. 
+
+Double dissociation. Table 4 reveals the signature double dissociation: Track 1 is flat (31 .9% –
+
+34 .4% across all horizons including the impossible T −5s), confirming that raw ungated accuracy reflects static scene priors. Track 2 decays monotonically as the anticipatory horizon extends 
+
+(37 .0% → 29 .3% ), saturating cleanly to 0% in the calm zone. The peak Track 2–Track 3 advantage of +8.9pp at T −0.5s is the paper’s central empirical claim. 
+
+Permutation test ( N =1000 ). To rule out confounding from class-imbalance selection by the surprise gate, we shuffle category labels across 561 videos 1000 times with surprise traces held fixed. Observed accuracies lie > 10 σ above the null at all active horizons ( p< 0.001 throughout). The label-permutation null distribution results are detailed in Table 5. Observed Track 2 accuracy is ∼ 4×
+
+9the null mean at all active horizons, proving that the gated anticipatory performance is statistically significant and cannot be explained by random selection or class-imbalance biases (where the random chance baseline is ≈ 1/14 ≈ 7.1% ). Table 5: Label-permutation null distribution (N =1000 , chance ≈ 1/14 ≈ 7.1% ). Observed Track 2 accuracy is ∼ 4× the null mean at all active horizons.                                   
+
+> Horizon Observed Null mean ±std pSig.
+> T037.0% 8.3% ±2.6% <0.001 ✓
+> T−1.035.8% 8.2% ±2.6% <0.001 ✓
+> T−2.029.3% 8.0% ±2.5% <0.001 ✓
+> T−3.00.0% 0.0% 1.0 (calm) —
+
+## 8 Discussion 
+
+8.1 The Latent Clarity Hypothesis 
+
+Table 1 quantifies a counter-intuitive inequality: for kinematic VQA, hallucinated-future reasoning is consistently more discriminative than observation of the same event at kinematic peak. This is a direct consequence of JEPA’s representational contract: V-JEPA 2 predicts only the latent-space 
+
+components that were predictable from context and discards the stochastic pixel-level residual (motion blur, occlusion, camera shake at impact) that observation encoding must unavoidably ingest. We formalise this as the Latent Clarity Hypothesis : JEPA-predicted futures are denoised projections of the physical trajectory and are therefore more separable on a text-aligned hypersphere than the noisy observed present. 
+
+8.2 Topological Sinks and Asymmetric Overshoot 
+
+The per-category degradation observed under the Cross-Manifold Probe (Table 3) provides strong empirical verification of the Asymmetric Geometric Overshoot mechanism. When the horizon-specific Anticipation ASP ( ∆) is applied to already-sharp Observation latents, the vectors are geometrically ejected from their valid semantic receptive fields, causing categories like Arrest, Arson, Explosion, and Fighting to collapse to absolute 0.0% accuracy. Crucially, the preservation or artificial inflation of specific categories (e.g., UCF-Crime Robbery at 66 .2% , XD-Violence Abuse at 100% ) does not indicate functional translation. Rather, because the ASP applies a uniform directional shift across the manifold, the ejected vectors pool into a clustered geometric “dead zone” within the S2047 hypersphere. Under a closed-set cosine similarity evaluation, the text anchors residing closest to this ejection zone act as topological sinks, absorbing the misclassified mass. The 100% CMP accuracy for XD-Violence Abuse is a stark manifestation of this sink effect acting upon a statistically microscopic sample size ( n = 12 ). Ultimately, the systematic destruction of the broader 14-class angular separation empirically proves the Anticipation and Observation manifolds occupy geometrically distinct subspaces. 
+
+8.3 Scene bias as the major confound in continuous VAD 
+
+The flatness of Track 1 across all horizons, including the physically-impossible T −5s, is a warning about naïve continuous VAD: static CCTV backgrounds (a grocery aisle, a petrol station, an ATM vestibule) carry strong class priors. The L1-surprise z-score gate operationalises a principled test against this failure. 
+
+8.4 Anticipation vs. Autoregressive Generation Latency & Alignment. VLMs decode token-by-token ( > 70 ms latency) and often refuse to classify violent footage due to RLHF alignment. PULS produces a 2048-d semantic latent state in a single forward pass with no decoder overhead, preserving kinematic severity end-to-end. A successful Y-Decoder (Readout Adapter) confirms the pipeline still supports optional autoregressive decoding when needed or surprise score escalates. 10 Generative Inefficiency & Incompatibility. We omit VLM token-generation baselines because the VL-JEPA literature already proves continuous embedding prediction yields a +108% captioning and 
+
++51% classification advantage over token-space VLMs at equal compute [ 8]. Our Y-Decoder thus acts solely as an on-demand semantic readout. Furthermore, PULS structurally rejects pixel-generation evaluations like PBench [ 28 ]. As formalized by the Latent Clarity Hypothesis, forcing pixel-level prediction of aleatoric noise introduces epistemic hallucination and severe latency bottlenecks. By operating strictly within the continuous S2047 manifold, our ASP bypasses both the autoregressive token and pixel reconstruction bottlenecks entirely. 
+
+Kinematic vs. Semantic gating. VL-JEPA’s semantic variance gating fails on static CCTV, collapsing to scene-bias priors (evidenced by our flat Track 1 accuracy). Our L1-surprise gate thresholds kinematic prediction error before the semantic bridge, gating strictly on Newtonian violations — the necessary adaptation for static-camera predictive anomaly anticipation. 
+
+8.5 Limitations 
+
+• Static-camera bias. KSD and ASP was distilled on static-CCTV UCF-Crime; XD-Violence ego-motion causes distillation bias (Section 6.2). Retraining on a mixed corpus is left for future work. • Temporal rollout. The T −2s result relies on a single pass. Multi-step autoregressive rollout for longer horizons is future work. • Encoder provenance. Upgrading to V-JEPA 2.1 requires re-distilling the KSD Bridge on the densified latent distribution. 
+
+## 9 Broader Impacts and Deployment 
+
+PULS’s sub-frame latency enables proactive anomaly anticipation on consumer GPUs. Operating entirely in continuous latent space (no image reconstruction) aligns with biometric privacy regulations (BIPA, GDPR). Furthermore, transmitting 2048-dimensional semantic states rather than raw optical feeds yields orders-of-magnitude reductions in edge-to-cloud bandwidth, enabling high-fidelity monitoring over constrained infrastructure. However, anticipatory kinematic profiling risks flagging lawful behaviour. We mandate human-in-the-loop review for alerts, aided by the Y-Decoder’s interpretable reasoning. Discriminatory or political surveillance is strictly unsanctioned. 
+
+## 10 Conclusion 
+
+In this work, we presented PULS, a framework that shifts the paradigm of video anomaly detection from reactive, pixel-level reconstruction to proactive, latent-space anticipation. By leveraging the self-supervised spatial-temporal representations of Joint Embedding Predictive Architectures (V-JEPA 2), we demonstrated that a physics-conditioned world model can anticipate critical incident severity and category directly within a Shared Semantic Hypersphere. Through the Kinematic Semantic Distillation (KSD) Bridge, we aligned these high-dimensional video latents with frozen text embeddings, achieving a chunk-level AUROC of 0.8994 on UCF-Crime and proving robust zero-shot out-of-distribution transfer to XD-Violence ( 0.8162 AUROC). The Anticipatory State Predictor (ASP) further enables proactive classification, yielding a +14 .0 pp predictive zero-shot VQA gain and a 
+
++8 .9 pp lead-time advantage at the critical pre-incident horizon. Crucially, our experiments validate the Latent Clarity Hypothesis : predicting future states within a self-supervised latent space behaves as a denoising projector. Rather than generating high-frequency pixel-level details (which suffer from epistemic blur and sensor noise), the predictive representation discards the stochastic residuals and isolates the underlying causal trajectory. Geometrically, our Cross-Manifold Probe and the resulting Asymmetric Geometric Overshoot confirm that the Observation and Anticipation manifolds occupy distinct, horizon-specific sub-manifolds. The systematic collapse of observation latents under the ASP operation proves that physical anticipation in joint-embedding spaces is a directional vector shift calibrated strictly for the future manifold, preventing topological overlap and semantic interference. Looking forward, this work opens several avenues for the development of real-world physical intelligence. The integration of L1-surprise gating provides a mathematically principled mechanism 11 to decouple static scene priors from dynamic kinematic anomalies, offering a blueprint for robust, continuous monitoring. By operating entirely in the latent space and transmitting low-bandwidth semantic coordinates instead of raw optical streams, the pipeline is highly suited for edge-device deployment, respecting both bandwidth constraints and user privacy. Future work will focus on retraining the model on a mixed corpus to explicitly mitigate the static-camera distillation bias caused by ego-motion. Furthermore, we aim to extend the single-step rollout to a multi-step autoregressive mechanism, evaluating the statistical drift of the projected latent state over extended horizons (up to 
+
+T −5.0 s) as cumulative epistemic blur degrades accuracy. 
+
+## Acknowledgments and Disclosure of Funding 
+
+We gratefully acknowledge the hardware support and compute resources provided by the Vision AI Labs at Sigmind.ai, including the single NVIDIA A40 GPU (48 GB) footprint used for training and inference. The UCF-Crime and XD-Violence datasets are publicly available for research. 
+
+## References 
+
+[1] Waqas Sultani, Chen Chen, and Mubarak Shah. Real-world anomaly detection in surveillance videos. In CVPR , 2018. [2] Yu Tian, Guansong Pang, Yuanhong Chen, Rajvinder Singh, Johan W Verjans, and Gustavo Carneiro. Weakly-supervised video anomaly detection with robust temporal feature magnitude learning. In ICCV , 2021. [3] Jie-Chao Wu et al. Self-supervised sparse representation for video anomaly detection. In ECCV ,2022. [4] Jie Yang et al. Distilled anomaly knowledge distillation for video anomaly detection. In CVPR ,2024. [5] Yann LeCun. A path towards autonomous machine intelligence. Open Review , 2022. [6] Mahmoud Assran, Quentin Duval, Ishan Misra, Piotr Bojanowski, Pascal Vincent, Michael Rabbat, Yann LeCun, and Nicolas Ballas. Self-supervised learning from images with a joint-embedding predictive architecture. In CVPR , 2023. [7] Mahmoud Assran, Adrien Bardes, David Fan, et al. V-JEPA 2: Self-supervised video models enable understanding, prediction and planning. arXiv preprint arXiv:2506.09985 , 2025. [8] Delong Chen et al. VL-JEPA: A joint embedding predictive architecture for vision-language understanding. arXiv preprint arXiv:2512.10942 , 2025. [9] Leland McInnes, John Healy, and James Melville. UMAP: Uniform manifold approximation and projection for dimension reduction. arXiv preprint arXiv:1802.03426 , 2018. [10] Qwen Team, Alibaba. Qwen3-VL-embedding and qwen3-VL-reranker: A unified framework for state-of-the-art multimodal retrieval and ranking. arXiv preprint arXiv:2601.04720 , 2025. [11] Yingxian Chen, Zhengzhe Liu, Baoheng Zhang, Wilton Fok, Xiaojuan Qi, and Yik-Chung Wu. Magnitude-contrastive glance-and-focus network for weakly-supervised video anomaly detection. In AAAI , 2023. [12] Hang Zhou, Junqing Yu, and Wei Yang. Dual memory units with uncertainty regulation for weakly supervised video anomaly detection. In AAAI , 2023. [13] Adrien Bardes, Quentin Garrido, Jean Ponce, Xinlei Chen, Michael Rabbat, Yann LeCun, Mahmoud Assran, and Nicolas Ballas. Revisiting feature prediction for learning visual repre-sentations from video. arXiv preprint arXiv:2404.08471 , 2024. [14] Kaiming He, Xinlei Chen, Saining Xie, Yanghao Li, Piotr Dollár, and Ross Girshick. Masked autoencoders are scalable vision learners. In CVPR , 2022. 12 [15] Lorenzo Mur-Labadia, Matthew Muckley, Amir Bar, Mido Assran, Koustuv Sinha, Mike Rabbat, Yann LeCun, Nicolas Ballas, and Adrien Bardes. V-JEPA 2.1: Unlocking dense features in video self-supervised learning. arXiv preprint arXiv:2603.14482 , 2026. [16] Xiang Li et al. Rethinking JEPA: Compute-efficient video SSL with frozen teachers. arXiv preprint arXiv:2509.24317 , 2025. [17] Adrien Bardes, Jean Ponce, and Yann LeCun. VICReg: Variance-invariance-covariance regular-ization for self-supervised learning. In ICLR , 2022. [18] Alec Radford, Jong Wook Kim, Chris Hallacy, et al. Learning transferable visual models from natural language supervision. In ICML , 2021. [19] Qwen Team, Alibaba. Qwen3-VL technical report. arXiv preprint arXiv:2511.21631 , 2025. [20] Abhimanyu Dubey et al. The Llama 3 herd of models. arXiv preprint arXiv:2407.21783 , 2024. [21] Jianlin Su, Yu Lu, Shengfeng Pan, Ahmed Murtadha, Bo Wen, and Yunfeng Liu. RoFormer: Enhanced transformer with rotary position embedding. arXiv preprint arXiv:2104.09864 , 2021. [22] Aäron van den Oord, Yazhe Li, and Oriol Vinyals. Representation learning with contrastive predictive coding. arXiv preprint arXiv:1807.03748 , 2018. [23] Mariana-Iuliana Georgescu, Antonio Barbalau, Radu Tudor Ionescu, Fahad Shahbaz Khan, Marius Popescu, and Mubarak Shah. Anomaly detection in video via self-supervised and multi-task learning. In CVPR , 2021. [24] Yingwei Li, Yi Li, and Nuno Vasconcelos. Resound: Towards action recognition without representation bias. In Proceedings of the European Conference on Computer Vision (ECCV) ,pages 513–528, 2018. [25] Abraham Savitzky and Marcel J. E. Golay. Smoothing and differentiation of data by simplified least squares procedures. Analytical Chemistry , 36(8):1627–1639, 1964. [26] Peng Wu, Jing Liu, Yujia Shi, Yujia Sun, Fangtao Shao, Zhaoyang Wu, and Zhiwei Yang. Not only look, but also listen: Learning multimodal violence detection under weak supervision. In 
+
+ECCV , 2020. [27] Du Tran, Lubomir Bourdev, Rob Fergus, Lorenzo Torresani, and Manohar Paluri. Learning spatiotemporal features with 3d convolutional networks. In ICCV , 2015. [28] Niket Agarwal, Arslan Ali, Maciej Bala, Yogesh Balaji, Erik Barker, Tiffany Cai, Prithvijit Chattopadhyay, Yongxin Chen, Yin Cui, Yifan Ding, et al. Cosmos world foundation model platform for physical ai. arXiv preprint arXiv:2501.03575 , 2025. 13 Appendix / Supplementary Material 
+
+## A Hyperparameters and Training Details 
+
+Table 6: Full hyperparameter table for KSD Bridge and ASP training. 
+
+Parameter KSD Bridge ASP 
+
+Backbone LLaMA-3.2-1B (last 8 layers) Residual MLP (from scratch) Architecture Transformer with bidir. attn. Linear → GELU → Linear + skip Input / hidden / out 1024 → 2048 → 2048 2048 → 4096 → 2048 
+
+Residual init N/A Output layer zero-init Trainable params 490M 16.8M Loss Symmetric InfoNCE ( τ =0 .05 ) Symmetric InfoNCE ( τ =0 .07 )Teacher signal Qwen3-VL text emb. (frozen) KSD( Zobs ) (frozen) Noise injection σ = 0 .01 (SALT) None Batch size 64 1024 Optimizer AdamW (wd 0.04 ) AdamW (wd 0.01 )Learning rate 5 × 10 −5 3 × 10 −4
+
+LR schedule Cosine, min 10 −6 Cosine, min 10 −6
+
+Warmup epochs 5 5Total epochs 100 300 Grad clip max-norm 1.0 max-norm 1.0
+
+Training chunks 7,819 (UCF-Crime) 7,819 (cached pairs) Hardware 1× NVIDIA A40 (48 GB) 1× NVIDIA A40 (48 GB) Attention Bidirectional (4D all-ones mask) N/A 
+
+## B Bidirectional Attention Override 
+
+HuggingFace LlamaModel.forward() applies a causal (lower-triangular) attention mask by default. For the KSD Bridge, token position in the sequence encodes which part of the clip (spatial-temporal patches 1–2048) and which part of the query (tokens 2049+), not temporal order. Causal masking would make every vision token blind to all later tokens and to the query — a catastrophic information bottleneck. Our fix: 
+
+# SALT_brigde/services/llama_predictor_service.py:171-184 attention_mask = torch.ones( (B, 1, seq_len, seq_len), dtype=torch.bool, device=device )outputs = llama_model( inputs_embeds=x, attention_mask=attention_mask, )
+
+The 4D boolean tensor broadcasts correctly across all 8 Llama layers without modifying the model weights. This is the only non-standard LLaMA usage in the pipeline. 14
