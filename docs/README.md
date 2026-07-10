@@ -6,41 +6,49 @@
 </div>
 
 ## 每次日报
-- 最新运行日期：2026-07-09
-- 运行时间：2026-07-09 21:31:44 UTC
+- 最新运行日期：2026-07-10
+- 运行时间：2026-07-10 20:42:24 UTC
 - 运行状态：成功
-- 本次总论文数：7
-- 精读区：4
+- 本次总论文数：9
+- 精读区：6
 - 速读区：3
 
 ### 今日简报（AI）
-今日聚焦世界模型与交互视频生成，精读两篇满分论文：WAM-TTT 利用人类游戏实时引导世界模型，Infinite Worlds 实现多变环境交互。值得关注 TACO 触觉世界模型对VLA训练的校正作用，以及Vidu S1实时交互视频生成潜力。建议优先阅读两篇精读论文，再速读TACO与Vidu S1了解前沿应用。
-- 详情：[/202607/09/README](/202607/09/README)
+今日精读世界动作模型与视频-动作泛化差距，速读覆盖自动驾驶、摄影语言理解及视频生成加速。  
+最值得看《EgoWAM》利用野外自我中心数据突破像素级动作建模，以及《Video-Action泛化差距》提出的时间比率缓解新方法。  
+建议优先深读《EgoWAM》的数据范式，并留意《WCog-VLA》为自动驾驶带来的双层级世界认知思路。
+- 详情：[/202607/10/README](/202607/10/README)
 
 ### 精读区论文标签
-1. [WAM-TTT: Steering World-Action Models by Watching Human Play at Test Time](/202607/09/2607.06988v1-wam-ttt-steering-world-action-models-by-watching-human-play-at-test-time)  
+1. [EgoWAM: World Action Models Beyond Pixels with In-the-Wild Egocentric Human Data](/202607/10/2607.08436v1-egowam-world-action-models-beyond-pixels-with-in-the-wild-egocentric-human-data)  
    标签：评分：10.0/10、query:video-wam
-   evidence：通过测试时训练在人类视频上引导世界动作模型
-2. [Infinite Worlds with Versatile Interactions](/202607/09/2607.07534v1-infinite-worlds-with-versatile-interactions)  
-   标签：评分：10.0/10、query:video-wam
-   evidence：具有多样化交互的无限世界——一种世界动作模型
-3. [Latent Clarity: Bridging World-Model Kinematics to Semantic Manifolds for Video Anomaly Anticipation](/202607/09/2607.03558v1-latent-clarity-bridging-world-model-kinematics-to-semantic-manifolds-for-video-anomaly-anticipation)  
+   evidence：直接提出EgoWAM世界动作模型用于人机迁移
+2. [Understanding and Mitigating the Video-Action Generalization Gap via Temporal Ratio](/202607/10/2607.08127v1-understanding-and-mitigating-the-video-action-generalization-gap-via-temporal-ratio)  
+   标签：评分：9.0/10、query:video-wam
+   evidence：直接研究世界动作模型和视频动作模型
+3. [Native Video-Action Pretraining for Generalizable Robot Control](/202607/10/2607.08639v1-native-video-action-pretraining-for-generalizable-robot-control)  
+   标签：评分：9.0/10、query:video-wam
+   evidence：原生视频-行动模型用于机器人控制
+4. [Gen4U: Unifying Video Generation and Understanding via Diffusion](/202607/10/2607.06856v1-gen4u-unifying-video-generation-and-understanding-via-diffusion)  
    标签：评分：8.0/10、query:video-wam
-   evidence：提出用于视频异常预测的连续语义世界模型管道
-4. [Scaling Mixture-of-Experts Video Pretraining for Embodied Intelligence](/202607/09/2607.07675v1-scaling-mixture-of-experts-video-pretraining-for-embodied-intelligence)  
+   evidence：用于理解任务的视频扩散表征，支持世界模型应用
+5. [Unlocking Temporal Generalization in Hamiltonian Video Dynamics Models](/202607/10/2607.07763v1-unlocking-temporal-generalization-in-hamiltonian-video-dynamics-models)  
    标签：评分：8.0/10、query:video-wam
-   evidence：面向具身智能的视频预训练范式，解决视频生成领域偏移
+   evidence：哈密顿视频世界模型中的时序泛化
+6. [LEEVLA: Seeing What Matters in Latent Environment Evolution for Vision-Language-Action](/202607/10/2607.08182v1-leevla-seeing-what-matters-in-latent-environment-evolution-for-vision-language-action)  
+   标签：评分：8.0/10、query:video-wam
+   evidence：具有潜在世界演化的世界动作模型
 
 ### 速读区论文标签
-1. [TACO: TActile World Model as a Self-COrrector forScalable VLA Post-Training](/202607/09/2607.02840v1-taco-tactile-world-model-as-a-self-corrector-forscalable-vla-post-training)  
+1. [WCog-VLA: A Dual-Level World-Cognitive Vision-Language-Action Model for End-to-End Autonomous Driving](/202607/10/2607.08375v1-wcog-vla-a-dual-level-world-cognitive-vision-language-action-model-for-end-to-end-autonomous-driving)  
+   标签：评分：8.0/10、query:video-wam
+   evidence：双层世界认知VLA，包含生成式世界演化
+2. [Natural Language Camera Movement Understanding](/202607/10/2607.03043v1-natural-language-camera-movement-understanding)  
    标签：评分：7.0/10、query:video-wam
-   evidence：触觉世界模型显式用于VLA后训练
-2. [Validate the Dream Before You Trust Its Verdict: Admissibility for World-Model Simulators](/202607/09/2607.07196v1-validate-the-dream-before-you-trust-its-verdict-admissibility-for-world-model-simulators)  
-   标签：评分：7.0/10、query:video-wam
-   evidence：面向机器人世界模型模拟器的可采纳性验证框架
-3. [Vidu S1: A Real-Time Interactive Video Generation Model](/202607/09/2607.03118v1-vidu-s1-a-real-time-interactive-video-generation-model)  
+   evidence：用于视频生成模型训练的相机运动理解
+3. [SAGA: Stable Acceleration Guidance for Autoregressive Video Generation](/202607/10/2607.08020v1-saga-stable-acceleration-guidance-for-autoregressive-video-generation)  
    标签：评分：6.0/10、query:video-wam
-   evidence：实时交互式视频生成模型
+   evidence：无需训练的稳定加速引导，适用于世界模型视频生成
 
 
 <div class="dpr-home-promo-card">

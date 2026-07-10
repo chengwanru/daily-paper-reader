@@ -1,0 +1,962 @@
+Title: Understanding and Mitigating the Video-Action Generalization Gap via Temporal Ratio
+
+URL Source: https://arxiv.org/pdf/2607.08127v1
+
+Published Time: Fri, 10 Jul 2026 00:28:48 GMT
+
+Number of Pages: 26
+
+Markdown Content:
+# Understanding and Mitigating the Video-Action Generalization Gap via Temporal Ratio 
+
+Utkarsh A. Mishra 1* , Yongxin Chen 1, Danfei Xu 1, Yang Liu 2, Xi Chen 2, Jiayuan Mao 2
+
+> 1
+
+Georgia Tech, 2Amazon FAR 
+
+> *
+
+Work done during an internship at Amazon FAR 
+
+Abstract: Generative video foundation models exhibit strong compositional pri-ors, yet world-action models (WAMs) and video-action models (VAMs) often lose these priors after finetuning on robotic action data. We refer to this discrepancy as the video-action generalization gap . In this paper, we systematically investigate this gap by evaluating a comprehensive design space of VAMs, demonstrating that standard design choices yield no emergent explanation pattern. To explain this be-havior, we introduce the Temporal Ratio (TR), an attention-based measure of how strongly the action head relies on future latent rollouts relative to the anchored current frame. TR has two key properties: first, a model’s structural reliance on future-predictive latents, measured via TR, acts as a predictor of its compositional generalization capacity; second, it natively fluctuates based on task phase, shifting attention to future frames during planning and reverting to the present frame for precise manipulation. Finally, based on these findings, we propose an inference-time adaptive guidance method, which exploits this intrinsic feature attention pat-tern to dynamically amplify compositional video conditioning signals precisely when the policy relies on future rollouts. Evaluated on the LIBERO benchmark and real-world tasks, our approach mitigates the OOD-ID compositional general-ization gap. More details: https://umishra.me/temporal-ratio/ 
+
+Keywords: Video-Action Models, Compositional Generalization 
+
+## 1 Introduction 
+
+Compositional generalization [1, 2, 3] is essential for autonomous manipulation: a robot should recombine seen objects, receptacles, and primitives into unseen task sequences. Existing policies often fail under such recompositions because they overfit to visual correlations such as object coor-dinates [4, 5, 6, 3]. For example, a policy trained on “put the cream cheese in the bowl” and “put the bowl on top of the cabinet” may still fail on “put the cream cheese on top of the cabinet,” despite involving only previously seen objects, receptacles, and primitives. An emerging direction is to use generative video foundation models (VFMs) [7, 8, 9] for action learning, leveraging video models trained on internet-scale video data with strong compositional generalization by capturing temporal coherence, object interactions, and physical plausibility. Consequently, the key challenge is how to transfer these pretrained video priors into robotic control. Current World-Action Models (WAMs) [10, 11] and Video-Action Models (VAMs) [12, 13, 14] typically either (1) predict future video [15, 16] (or corresponding latent features [12, 13]) and in-fer actions through inverse dynamics, or (2) jointly model video and action tokens within a unified transformer [10, 11, 17, 18, 19, 20]. However, despite strong in-domain performance, these meth-ods consistently fail to preserve the compositional generalization abilities of their underlying video backbones (Fig. 1, Top) after finetuning on action data [21]. We refer to this discrepancy as the 
+
+video-action generalization (VAG) gap . This motivates the following research question: what is the right interface between VFMs and action prediction that preserves compositional priors? arXiv:2607.08127v1 [cs.CV] 9 Jul 2026 𝜎 ! = 1.0                 
+
+> 𝜎 !=1.0
+> 𝜎 !=1.0𝜎 !=1.0
+> 𝜎 !=0.953
+> 𝜎 !=0.953
+> 𝜎 !=0.953
+> 𝜎 !=0.883
+> 𝜎 !=0.953
+> 𝜋 ".$
+> Cosmos -Policy
+> Fast -WAM
+> Dit4Dit
+> Cosmos -2B
+> (Qualitative)
+
+Figure 1: Interpretable metric to explain performance gap between ID and com-positional OOD. (Top) We study the de-sign space of VAMs over video feature-extraction noise level σv and other design choices, finding a fragmented ID-OOD performance gap without a clear consen-sus. (Bottom) We propose Temporal Ratio (TR) as a diagnostic tool to interpret OOD performance and eventually improve it. In this work, we examine a class of VAMs that use la-tent features from pre-trained video foundation models and learn a latent inverse-dynamics action head [12, 13, 14]. Such models preserve the video model’s gen-erative prior by feeding latent video features to an ac-tion head trained with flow matching [22]. To under-stand the properties of this interface, we systematically study its design space across backbone adaptation and video-latent feature extraction choices. This reveals a fragmented manifold of the in-distribution (ID) and out-of-distribution (OOD) performance gap (Fig. 1, Top), motivating a more mechanistic diagnostic. Our key observation is that compositional generaliza-tion depends on whether the action head actually uses the predicted future rollout. We introduce the Tem-poral Ratio (TR), the attention mass assigned by the action head to future latent frames relative to the an-chored current frame. Illustrated in Fig. 1 (Bottom): TR is strongly correlated with a model’s underlying generalization capacity. While success rates look like noise, TR acts as a direct predictor of the ID-OOD per-formance gap. This gives us an opportunity to close the ID-OOD performance gap by treating TR as a run-time signal to implement inference-time guidance. We also observe that TR varies with task phase: it rises during “planning phase” (e.g., what object to pick, where to place) and drops during precise local manip-ulation (e.g., grasping or placement). We exploit this intrinsic property via TR-Adaptive Guidance , which amplifies language and plan conditioning when the policy enters a planning regime and relaxes guidance during precise manipulation. We evaluate on LIBERO compositional tasks [23, 4] and real-world bimanual tasks, improving OOD success while preserving ID performance. 
+
+## 2 Design Space of Video-Action Models 
+
+We study a particular class of VAMs similar to the design of [12, 13]. As shown in Fig. 2, the architecture combines (1) video denoising via flow matching with partially denoised video feature extraction and (2) an action head that denoises actions from the video features from (1). We explore this design space to understand how a video backbone facilitates action generation. 
+
+2.1 Background Video foundation backbone. We use a flow-matching video backbone with velocity field vθ . Given clean video latents x0 and noise ε ∼ N(0, I), the noisy latent at video noise level σv ∈ [0, 1] is 
+
+xσv = ( 1 − σv)x0 + σvε. The video model predicts vθ (xσv , c, σv) ≈ ε − x0 under text condition c:
+
+Lvideo = Ex0,ε,σv
+
+∥vθ (xσv , c, σv) − (ε − x0)∥2. (1) At target video noise level σv during video denoising, we extract features from k-th block of the Cosmos-2.5 2B DiT backbone [7] (fixed at k = 20 out of 28 total blocks following [12]): 
+
+F(k) 
+
+> θ
+
+(xσv , c, σv) ∈ RT ×(H×W )×D, where t = 0 is the anchored clean observation (inpainted at every denoising step) and t > 0 are predicted future latent frames. 
+
+Action head integration. The action head πφ is a transformer policy (300M Gemma Trans-former [25, 24, 26]) that consumes flattened video tokens, a projected proprioceptive token, and noisy action tokens as illustrated in Fig. 2. For clean action sequence a0, action noise εa, and action 2Feature 
+
+> Projection
+
+𝜎 !
+
+> Partially Denoised
+> Latent Features
+> Proprio
+> State
+> Cosmos Predict 2.5 -2B
+> Flow Matching
+> Noisy Action Token
+> Denoised Action Tokens
+> Place bottle
+> into paper
+> bag
+> Gemma Action Head
+> Flow Matching
+
+Figure 2: Latent VAM architecture. We replace the VLM backbone in π0 [24] with Cosmos-Predict 2.5 Video DiT [7]. From the current image and language instruction, plausible future rollout is partially denoised; intermediate DiT features and the video noise level are projected into the action head, then concatenated with proprioception and noisy action tokens for action denoising. noise level σa, we define aσa = ( 1 − σa)a0 + σaεa and train 
+
+Laction = Ea0,εa,σa
+
+∥vφ (aσa , F(k) 
+
+> θ
+
+, s, σa) − (εa − a0)∥2. (2) The action head uses bidirectional attention over the video prefix and causal attention over action tokens [24, 26]. We provide training-inference pseudocode in App. A. 
+
+2.2 Design Axes 
+
+The design space is defined by two primary groups of axes: training-time configurations governing backbone adaptation, and inference-time parameters determining feature extraction behavior. 
+
+Training axes. (1) Finetuning strategy : We compare parameter-efficient adaptation via Low-Rank Adaptation [27] (training 2–6% of parameters at η = 10 −4) against full finetuning of the video DiT backbone ( η = 10 −6). (2) Training mode : We evaluate joint training , which optimizes the weighted objective Ltotal = Laction + λ Lvideo , enabling action gradients to directly reshape the DiT feature space. This is contrasted with two-stage training , where the backbone is first finetuned on Lvideo 
+
+and subsequently frozen during action head optimization on Laction .
+
+Inference axes. (1) Video noise level : We extract features at varying values of σv ∈ [0.0, 1.0] along the video denoising flow trajectory. Larger σv yields noisier, less defined future latents, whereas smaller σv produces highly denoised, semantically structured rollouts. (2) Prediction horizon : We vary the temporal extent of the predicted rollout, T .
+
+## 3 Systematic Analysis of the Video-Action Generalization Gap 
+
+We begin by asking: when does compositional generalization happen in VAMs? To answer this, we conduct a wide range of ablation studies over the design axes introduced above: backbone adap-tation, coupled/decoupled video-action training and video feature-extraction strategies. These axes determine how the action head uses a language-conditioned, partially denoised latent rollout with a clean anchor frame ( t = 0). Hence, we use the design sweep to identify choices that preserve ID control while enabling compositional behavior. Summarized in Fig. 3, we discuss three key findings. 
+
+Finetuning strategy changes ID and OOD success differently. Full finetuning [13] can aggres-sively fit the in-domain tasks by specializing the latent rollout distribution to demonstrated trajec-tories. LoRA [12] restricts the update and tends to preserve more pretrained temporal structure. Crucially, ID and OOD performance do not scale proportionally: Joint-LoRA yields the strongest OOD performance, while Two-Stage LoRA is more robust when averaged across σv and T .
+
+The best video noise level is neither fully noisy nor fully denoised. At high noise levels ( σv →
+
+1.0), future tokens lack coherent temporal structure, forcing the action head to anchor to the present state [12, 13]. At very low noise levels ( σv → 0.0), future tokens become highly structured, but the policy is more vulnerable to confident hallucinated trajectories [15]. Performance therefore peaks at an intermediate noise level. 3LoRA Full                        
+
+> Joint
+> Two-Stage
+> 47.6 43.4
+> 61.3 66.7
+> ID SR (%) avg over all T,σv
+> 0.00 0.25 0.50 0.75 1.00
+> 60
+> 70
+> 80
+> 90
+> 100
+> ID SR (%)
+> For Latent Generation horizon T= 5
+> 5924
+> 0
+> 20
+> 40
+> 60
+> 80
+> 100
+> ID SR (%)
+> At best σvper T
+> LoRA Full
+> Compositional SR (%) avg over all T,σv
+> Joint
+> Two-Stage
+> 28.8 12.8
+> 34.2 15.2
+> 0.00 0.25 0.50 0.75 1.00
+> Video feature noise level σv
+> 0
+> 20
+> 40
+> 60
+> Compositional SR (%)
+> 5924
+> Latent Generation horizon T
+> 0
+> 20
+> 40
+> 60
+> Compositional SR (%)
+> 0
+> 25
+> 50
+> 75
+> 100
+> 0
+> 25
+> 50
+> 75
+> 100
+> Joint + LoRA Joint + Full Two-Stage + LoRA Two-Stage + Full
+
+Figure 3: Systematic exploration of the design space of VAMs. (Left) We summarize the perfor-mance of finetuning strategy and coupled/decoupled video-action training. (Middle) We show the change of ID-OOD SR as the video noise level for feature extraction decreases. Performance peaks at an intermediate σv. (Right) We show the change of ID-OOD SR as the temporal horizon of videos increases. While longer temporal horizons better preserve object-goal relationships, this does not necessarily translate into higher SR. For each column, (Top) is ID SR and (Bottom) is OOD SR. put the white mug on the left plate and put the 
+
+> yellow and white mug on the right plate
+> Put the wine bottle in the bowl
+> In -distribution Compositional
+> Current
+> state
+> Video Model
+> Prediction
+> Action Rollout
+> State
+
+Figure 4: Video-action disagree-ment. (Top) The action head disagrees with an incorrect video prediction and executes correctly. (Bottom) The action head ignores a correct compositional prediction and executes incorrectly. 
+
+Longer video prediction improves video-level generaliza-tion, but does not necessarily improve action success. 
+
+Increasing the prediction horizon exposes more object-goal structure and can improve the video rollout’s compositional plan qualitatively. However, longer horizons also increase the chance of implausible artifacts and do not automatically make the action head follow the correct plan. As a result, better video-level generalization does not always translate into higher task success. More details are provided in App. C. 
+
+Motivating example: video-action disagreement. The frag-mented ablation landscape motivates a closer look at how the action head interprets latent video features. As shown in Fig. 4, the same video rollout can be used or ignored depending on the task regime. In an ID LIBERO-long task (Top), the video model may hallucinate a wrong future while the action head still executes a correct memorized behavior. In a composi-tional OOD task (Bottom), the video model may propose the correct plan, but the action head ignores it and follows an ID trajectory. This failure mode cannot be diagnosed from the video rollout alone: a correct imagined future is only useful if the action policy follows it. Since video-feature utilization emerges implicitly from underlying design choices rather than explicit architectural constraints, we require a metric to quantify exactly how much the action head relies on the imagined future rollout relative to the current-state anchor. 
+
+## 4 Understanding and Mitigating the VAG Gap via Temporal Ratio 
+
+The design sweep and disagreement examples show that VAM success depends not only on whether the video backbone predicts a plausible future, but also on whether the action head routes through that future during action denoising. We therefore introduce the Temporal Ratio (TR), an attention-based measure of the action head’s reliance on the predicted rollout. At each replan step, action tokens attend over video tokens containing the current frame and predicted future frames. Let Aℓ
+
+be the head-averaged attention map from action tokens to video tokens at action-head layer ℓ, after softmax. Partition video tokens into current-frame tokens V0 and future-frame tokens V+.41 2 3 4 5          
+
+> 12345
+> Put cream cheese on top of the cabinet
+> Initialization Reaching target object Grasping target object Reaching receptacle Placement
+
+Figure 5: Evolution of TR across episodes. We illustrate the evolution of TR for each training category, for varying video noise levels and at T = 5. Upper triangular markers denote TR values for successful episodes while lower triangular markers denote TR values for failed episodes. It is evident that: (1) successful episodes are consistently characterized by higher TR and (2) TR peaks during the planning phase and drops during precise grasping or placement, shown using a rollout example for the task “put cream cheese on top of the cabinet.” 
+
+Temporal Ratio: TR (ℓ) 
+
+> i
+
+= ∑q∈A ∑v∈V+ Aℓ(q, v)
+
+∑q∈A ∑v∈V0 Aℓ(q, v) = Attention over future frames Attention over current frame , (3) where A denotes the action tokens. TR is high when actions rely on predicted futures and low when they anchor to the current observation. TR has a direct physical interpretation in VAMs, emerging as an artifact of the video denoising formulation: the first frame is injected as a clean conditioning frame at every video denoising step and serves as a high-fidelity observation anchor. Future frames, in contrast, are denoised from noisy latent targets, have lower signal-to-noise ratio (SNR) than the anchor, and represent the model’s imagined scene evolution. TR is useful because it is available from the policy’s normal forward pass and can be tracked online across replan steps. It therefore provides a runtime view of when the policy enters a predictive mode, rather than a post-hoc score computed only after an episode terminates. 
+
+4.1 TR Analysis in Simulation: Key Findings 
+
+We measure TR on LIBERO across tasks, execution timesteps, design configurations, and success outcomes. This lets us diagnose whether the policy is using the clean anchor frame as a reactive controller or using future latents as a plan. 
+
+TR increases with video denoising before feature extraction. More video denoising improves the SNR and semantic structure of generated rollouts. As shown in Fig. 5, the action head reflects this change: high-noise level video features suppress TR because future tokens are too unstructured, while lower-noise level video features encourage attention to imagined futures. 
+
+TR separates reactive and predictive phases of execution. TR also changes within a rollout: (1) It rises during planning moments such as object or receptacle selection, where the policy must bind language, objects, and goals through the predicted future. (2) It drops during local manipulation, where grasping and placement require precise current-frame grounding. Thus, low TR is not always harmful; it is appropriate when the task phase demands reactive action generation. This motivates using TR to detect the policy’s execution phase at runtime and amplify compositional video conditioning primarily during predictive planning phases. 
+
+4.2 Adaptive TR Guidance 
+
+Motivated by previous findings, we propose a new inference-time adaptive guidance method based on TR. At each action denoising step, let vcond be the standard conditional velocity. We compute two counterfactual directions that isolate complementary sources of compositional behavior. 5Subset of In -distribution tasks 
+
+> Compositional generalization evaluation tasks
+
+Figure 6: Real-world setup. (Top) We train on a bimanual YAM multi-task dataset with dish place-ment, snack sorting, bottle pick-and-place, and cap unscrewing. (Bottom) We show 3 test scenes with multiple target-object and receptacle candidates to evaluate compositional generalization. 
+
+Language guidance: We drop the text instruction ( c = ∅) during video feature extraction and compute vuncond = vφ (aσa , F(k) 
+
+> ∅
+
+, s, σa) where F(k) 
+
+> ∅
+
+= F(k) 
+
+> θ
+
+(xσv , ∅, σv). A guidance direction in ac-tion flow-velocity can be formulated as ∆v 
+
+> lang
+
+= vcond − vuncond which isolates instruction-dependent action velocity and helps resolve ambiguous object-goal bindings. 
+
+Plan guidance: We query the video model with an extended horizon T ′ > T , truncate fea-tures back to the policy horizon T , and compute vplan = vφ (aσa , F(k)
+
+> plan
+
+, s, σa) where F(k) 
+
+> plan
+
+=
+
+F(k) 
+
+> θ
+
+(x(T ′) 
+
+> σv
+
+, c, σv) first T . A plan guidance direction can be formulated as ∆v 
+
+> plan
+
+= vplan − vcond which isolates long-horizon temporal structure while preserving the fixed action-head input horizon. The combined guided update becomes vguided = vcond + wlang ,i∆v 
+
+> lang
+
++ wplan ,i∆v
+
+> plan
+
+. Rather than using fixed weights throughout the episode, we scale the guidance strengths with the current TR. For w ∈ { wlang , wplan }, the weights can be dynamically updated as wi = wbase si where 
+
+si = clip 
+
+ TR i 
+
+> TR 0
+
+− 1, 0, smax 
+
+
+
+. Here, si (1) is zero when the current TR drops below the initial value TR 0, (2) grows as the policy shifts toward future-latent reliance, and (3) is capped by smax 
+
+to avoid over-guidance. This concentrates intervention during planning phases and relaxes it dur-ing present-anchored manipulation, allowing guidance to improve compositional reasoning without hurting local precision while grasping or placement. 
+
+## 5 Experimental Results 
+
+The previous sections identify the failure mechanism behind the VAG gap: a VAM succeeds com-positionally only when the video backbone predicts a useful future and the action head follows that future during planning. This section tests whether that diagnosis translates into measurable gains by evaluating: (1) the VAG gap in prior WAMs and VAMs, (2) whether our design choices reduce it, and (3) whether TR-Adaptive Guidance improves OOD success without hurting ID performance. 
+
+Datasets. We use the four standard LIBERO suites [23]: libero-spatial , libero-object ,
+
+libero-goal , and libero-long for simulation evaluation. Each suite contains 10 tasks, 50 demos per task. Following [10], the action head is trained on successful demos, while the video backbone finetuning uses the full unfiltered dataset. For real-world evaluation on bimanual YAM setup, we use 5600 episodes across 24 tasks from [28], including pick-and-place with dishes, snacks, bottles, and fruits; arranging objects on shelves; bimanual handover; t-shirt manipulation; and bottle-cap unscrewing. The multi-task dataset allows the policy to learn reusable object, receptacle, and ma-nipulation factors. Observations use three 224 ×168 RGB views (top, left wrist, right wrist) stacked horizontally, and the policy outputs a 14-dim bimanual action. More details are in App. E. 
+
+Baselines in simulation and real-world study. We compare against open-source VLAs ( π0 [24], 
+
+π0.5 [26]), WAMs (Cosmos-Policy [10], Fast-WAM [14]), and VAMs (Mimic-Video [12], DiT4DiT [13]). All WAM/VAM baselines use the same Cosmos-Predict 2.5-2B video backbone, 6Table 1: LIBERO success rate (%) across ID and OOD suites. Baseline ID numbers are from original papers where available; OOD results use released checkpoints with 50 episodes per task per suite and 3 seeds. ID success is saturated, while OOD success exposes the VAG gap.                                                                                     
+
+> In-Distribution Out-of-Distribution Category Method Spatial Object Goal Long Avg ID Spatial Object Goal Avg OOD
+> VLA π096.8 98.8 95.8 85.2 94.2 0.7 0.3 4.3 1.7
+> π0.598.8 98.2 98.0 92.4 96.9 36.7 2.3 41.7 26.8
+> WAM /VAM
+> Cosmos-Policy 98.1 100.0 98.2 97.6 98.5 30.7 0.3 0.7 10.5 Fast-WAM 98.2 100.0 97.0 95.2 97.6 12.7 0.0 15.7 9.4 Mimic-Video 94.2 96.8 90.6 ––––––DiT4DiT 98.4 99.6 98.6 97.6 98.6 9.0 0.0 10.3 6.4
+> Ours (best unguided) 97.3 98.0 97.6 84.3 94.3 50.3 40.0 77.3 55.7
+> Ours (best guided) 96.3 99.6 97.6 82.6 94.0 58.6 40.0 80.3 59.4
+
+and the π0-family VLA baselines are at a similar 3B VLM scale. This comparison separates generic VLA pretraining from explicit world-action modeling that modifies the video generative prior, and from latent video conditioning with a separate action head. For LIBERO, we evaluate released checkpoints on the OOD suites. For real-world tasks, we train π0, π0.5, and Cosmos-Policy on our bimanual YAM multi-task dataset with matched compute budgets: all equivalent to training for 1M steps on 32 NVIDIA® H200™ GPUs. More details are in App. E. 
+
+5.1 Compositional generalization evaluation testbed LIBERO. We use the compositional OOD setup from Li [4]. These tasks recombine familiar ob-jects, receptacles, layouts, and goals into unseen task sequences. The object and destination may each appear in training, but the connecting trajectory is novel, so success requires stitching sub-trajectories learned from disjoint ID tasks. libero-goal-ood and libero-spatial-ood test novel object-destination or layout-destination combinations while libero-object-ood requires semantic understanding of the object categories. More details are in App. B. 
+
+Bimanual YAM. We construct three OOD scenes with multiple target and receptacle candidates as shown in Fig. 6. Tasks 1–2 test unseen fruit-receptacle bindings and require selecting the correct receptacle. Tasks 3–6 require choosing between snacks/bottles and paper bag/bin, mixing seen and unseen pairings under a multi-receptacle shift. Tasks 7–8 test whether the policy overfits to the seen snack-shelf behavior when bin and shelf are both present. More details are in App. E. 
+
+5.2 Key Findings The VAG gap appears across baselines. Tab. 1 compares ID and OOD success 1. ID perfor-mance is saturated for most methods ( > 95%), but compositional OOD success collapses for prior WAMs/VAMs. Among baselines, π0.5 has the strongest OOD average, suggesting that strong VLA pretraining can reduce but not eliminate the gap. Our best unguided VAM extracts features at 
+
+σv = 0.883 with horizon T = 5 (17 frames at 10 fps), while the action head predicts 16 actions at 10 Hz. This adds marginal compute while improving avg. OOD to 55.7%. Adaptive guidance further raises avg. OOD to 59.4%, more than 5 × prior VAM performance. 
+
+TR-based adaptive guidance mitigates the gap when video futures are useful. Guidance pre-serves most ID performance but slightly hurts LIBERO-long, indicating that stronger video con-ditioning can be harmful when predicted futures are unreliable. On compositional OOD suites, however, guidance improves avg. OOD by ≈ 6%. This supports the central mechanism: action-level generalization requires both a useful video rollout and sufficient action-head reliance on that rollout. If video features generalize but TR is low, the action head ignores the compositional plan; if TR is high but the video future is wrong, guidance can amplify the wrong behavior. 
+
+TR-based adaptive guidance boosts real-world performance on bimanual YAM. We transfer the best LIBERO design, LoRA backbone adaptation with joint training, to YAM. Video features 
+
+> 1Mimic-Video [12] released checkpoints per ID task suite, making OOD comparison unfair.
+
+7Table 2: We compare the performance of baselines and our VAM with optimal design choices, with and without guidance, across 3 compositional evaluation scenes and 8 tasks. Tasks 1–2 are evaluated with 5 trials with 3 fruits (total 15 trials), and Tasks 3–8 are evaluated with 5 trials each. The tasks are designed such that a policy capable of precise manipulation but no generalization will have an avg. performance of 50%. Performance > 50% illustrates compositional generalization capabilities.                                                         
+
+> Method Scene 1 Scene 2 Scene 3 Avg Task 1 Task 2 Task 3 Task 4 Task 5 Task 6 Task 7 Task 8
+> π066.7 6.7 20.0 20.0 0.0 40.0 40.0 100.0 36.7
+> π0.580.0 20.0 100.0 40.0 20.0 20.0 100.0 80.0 55.0 Cosmos-Policy 8.3 8.3 15.0 10.0 10.0 15.0 25.0 25.0 12.5
+> Ours (unguided) 80.0 53.3 100.0 60.0 40.0 100.0 100.0 60.0 71.7
+> Ours (guided) 80.0 73.3 100.0 80.0 80.0 100.0 100.0 80.0 83.3
+
+are extracted at σv = 0.883 with horizon T = 5 (17 frames at 10 fps), while the action head predicts 50 actions at 30 Hz. Tab. 2 shows that our VAM outperforms baselines 2, and adaptive guidance further improves average success from 71.7% to 83.3%. Extracting features at the first denoising step ( σv = 1.0), as in prior VAMs [12, 13], fails on all YAM tasks, highlighting the importance of structured, partially denoised video latents in multi-task VAMs. 
+
+## 6 Related Work 
+
+Generative video foundation models as backbone for policy learning. Generative video mod-els [7, 8, 9] provide spatio-temporal priors absent from standard VLAs [29, 24, 26, 30, 31, 32, 33]. Robotics work transfers these priors through imagine-then-execute methods [34, 15, 35, 16, 36], WAMs that jointly model video and action [10, 11, 37, 17, 38, 39, 19, 20, 40, 41, 42, 43, 18], and latent VAMs that feed video features to an action head [44, 45, 12, 13]. Complementing Fast-WAM [14] and HarmoWAM [21], we study whether the action head actually uses future-predictive video features or retreats to present-state anchoring. 
+
+Studying compositional generalization for foundation-model-based policies. Compositional generalization [46, 47, 1, 2] is necessary because combinatorial demonstrations do not scale. Prior VLA studies identify spatial overfitting [4], modality imbalance [5], and brittle linguistic ground-ing [6, 3]; larger frontier systems reduce but do not remove the gap [30, 11]. We focus on video-conditioned policies, where the central question is whether generative temporal priors survive action finetuning and improve novel sequence compositions. 
+
+## 7 Conclusion 
+
+We study the VAG gap: when VAMs fail to inherit the compositional priors of their generative video backbones. Temporal Ratio (TR) reveals that successful compositional behavior appears when the action head shifts toward future-predictive latents during planning, then returns to present anchoring for local manipulation. TR also enables TR-Adaptive Guidance, an inference-time intervention that amplifies compositional video conditioning during planning phases. Across LIBERO and real-robot tasks, this framework clarifies VAM behavior and mitigates the OOD generalization gap. We will open-source our study codebase and trained models after double-blind review. 
+
+Limitations. Several limitations remain: (1) the presented study remains confined to a specific class of VAMs and is bottlenecked by the physical plausibility and compositional reach of the un-derlying video model, especially under distribution shifts where generated futures may become con-fident but infeasible. In the latter case, adaptive guidance will amplify incorrect guidance signals. (2) extra denoising steps and guidance add inference cost, reducing the inference frequency. More details are in App. E. 
+
+> 2Cosmos-Policy did not train well with the open-source codebase on our multi-task dataset despite sharing the same video backbone, suggesting that large multi-task WAM training remains an open problem.
+
+8References 
+
+[1] K. Farid, R. Sahay, Y. A. Alnaggar, S. Schrodi, V. Fischer, C. Schmid, and T. Brox. What drives compositional generalization in visual generative models? arXiv preprint arXiv:2510.03075 ,2025. [2] Y. Chen, Z. Chen, N. T. Chan, J. Chen, J. Yin, J. Shi, Y. Gao, Y.-L. Li, and J. Huo. Robo-himan: A hierarchical evaluation paradigm for compositional generalization in long-horizon manipulation. arXiv preprint arXiv:2510.13149 , 2025. [3] X. Zhou, Y. Xu, G. Tie, Y. Chen, G. Zhang, D. Chu, P. Zhou, and L. Sun. Libero-pro: To-wards robust and fair evaluation of vision-language-action models beyond memorization. arXiv preprint arXiv:2510.03827 , 2025. [4] Q. Li. Task reconstruction and extrapolation for π0 using text latent. arXiv preprint arXiv:2505.03500 , 2025. [5] Y. Fang, Y. Feng, D. Jing, J. Liu, Y. Yang, Z. Wei, D. Szafir, and M. Ding. When vision overrides language: Evaluating and mitigating counterfactual failures in vlas. arXiv preprint arXiv:2602.17659 , 2026. [6] S. Fei, S. Wang, J. Shi, Z. Dai, J. Cai, P. Qian, L. Ji, X. He, S. Zhang, Z. Fei, et al. Libero-plus: In-depth robustness analysis of vision-language-action models. arXiv preprint arXiv:2510.13626 , 2025. [7] A. Ali, J. Bai, M. Bala, Y. Balaji, A. Blakeman, T. Cai, J. Cao, T. Cao, E. Cha, Y.-W. Chao, et al. World simulation with video foundation models for physical ai. arXiv preprint arXiv:2511.00062 , 2025. [8] T. Wan, A. Wang, B. Ai, B. Wen, C. Mao, C.-W. Xie, D. Chen, F. Yu, H. Zhao, J. Yang, et al. Wan: Open and advanced large-scale video generative models. arXiv preprint arXiv:2503.20314 , 2025. [9] Google DeepMind Veo Team. Veo: a text-to-video generation system. Technical report, Google DeepMind, 2025. URL https://storage.googleapis.com/deepmind-media/ veo/Veo-3-Tech-Report.pdf .[10] M. J. Kim, Y. Gao, T.-Y. Lin, Y.-C. Lin, Y. Ge, G. Lam, P. Liang, S. Song, M.-Y. Liu, C. Finn, et al. Cosmos policy: Fine-tuning video models for visuomotor control and planning. arXiv preprint arXiv:2601.16163 , 2026. [11] S. Ye, Y. Ge, K. Zheng, S. Gao, S. Yu, G. Kurian, S. Indupuru, Y. L. Tan, C. Zhu, J. Xiang, et al. World action models are zero-shot policies. arXiv preprint arXiv:2602.15922 , 2026. [12] J. Pai, L. Achenbach, V. Montesinos, B. Forrai, O. Mees, and E. Nava. mimic-video: Video-action models for generalizable robot control beyond vlas. arXiv preprint arXiv:2512.15692 ,2025. [13] T. Ma, J. Zheng, Z. Wang, C. Jiang, A. Cui, J. Liang, and S. Yang. Dit4dit: Jointly modeling video dynamics and actions for generalizable robot control. arXiv preprint arXiv:2603.10448 ,2026. [14] T. Yuan, Z. Dong, Y. Liu, and H. Zhao. Fast-wam: Do world action models need test-time future imagination? arXiv preprint arXiv:2603.16666 , 2026. [15] H. Li, L. Sun, Y. Hu, D. Ta, J. Barry, G. Konidaris, and J. Fu. Novaflow: Zero-shot manipula-tion via actionable flow from generated videos. arXiv preprint arXiv:2510.08568 , 2025. [16] Y. Du, S. Yang, P. Florence, F. Xia, A. Wahid, P. Sermanet, T. Yu, P. Abbeel, J. B. Tenen-baum, L. Kaelbling, et al. Video language planning. In International Conference on Learning Representations , volume 2024, pages 31138–31155, 2024. 9[17] L. Li, Q. Zhang, Y. Luo, S. Yang, R. Wang, F. Han, M. Yu, Z. Gao, N. Xue, X. Zhu, et al. Causal world modeling for robot control. arXiv preprint arXiv:2601.21998 , 2026. [18] J. Liang, P. Tokmakov, R. Liu, S. Sudhakar, P. Shah, R. Ambrus, and C. Vondrick. Video generators are robot policies. arXiv preprint arXiv:2508.00795 , 2025. [19] S. Li, Y. Gao, D. Sadigh, and S. Song. Unified video action model. arXiv preprint arXiv:2503.00200 , 2025. [20] C. Zhu, R. Yu, S. Feng, B. Burchfiel, P. Shah, and A. Gupta. Unified world models: Cou-pling video and action diffusion for pretraining on large robotic datasets. arXiv preprint arXiv:2504.02792 , 2025. [21] Q. Feng, J. Yu, J. Liu, Y. Jia, Z. Wu, H. Chen, Z. Qian, S. Gu, P. Jia, S. Ma, et al. Harmowam: Harmonizing generalizable and precise manipulation via adaptive world action models. arXiv preprint arXiv:2605.10942 , 2026. [22] Y. Lipman, R. T. Chen, H. Ben-Hamu, M. Nickel, and M. Le. Flow matching for generative modeling. arXiv preprint arXiv:2210.02747 , 2022. [23] B. Liu, Y. Zhu, C. Gao, Y. Feng, Q. Liu, Y. Zhu, and P. Stone. Libero: Benchmark-ing knowledge transfer for lifelong robot learning. ArXiv , abs/2306.03310, 2023. URL 
+
+https://api.semanticscholar.org/CorpusID:259089508 .[24] K. Black, N. Brown, D. Driess, A. Esmail, M. Equi, C. Finn, N. Fusai, L. Groom, K. Hausman, B. Ichter, et al. π0: A vision-language-action flow model for general robot control. arXiv preprint arXiv:2410.24164 , 2024. [25] G. Team. Gemma 3 technical report. ArXiv , abs/2503.19786, 2025. URL https://api. semanticscholar.org/CorpusID:277313563 .[26] P. Intelligence, K. Black, N. Brown, J. Darpinian, K. Dhabalia, D. Driess, A. Esmail, M. Equi, C. Finn, N. Fusai, et al. π0.5: a vision-language-action model with open-world generalization. 
+
+arXiv preprint arXiv:2504.16054 , 2025. [27] E. J. Hu, Y. Shen, P. Wallis, Z. Allen-Zhu, Y. Li, S. Wang, L. Wang, W. Chen, et al. Lora: Low-rank adaptation of large language models. Iclr , 1(2):3, 2022. [28] A. Allshire, H. G. Singh, R. Singh, A. Rashid, H. Choi, D. McAllister, J. Yu, Y. Chen, H. Huang, P. Abbeel, X. Chen, R. Duan, P. Isola, J. Malik, F. Shentu, G. Shi, P. Wu, and A. Kanazawa. Scalable behavior cloning with open data, training, and evaluation. arXiv preprint , 2026. URL https://abc.bot/ .[29] M. J. Kim, K. Pertsch, S. Karamcheti, T. Xiao, A. Balakrishna, S. Nair, R. Rafailov, E. Foster, G. Lam, P. Sanketi, et al. Openvla: An open-source vision-language-action model. arXiv preprint arXiv:2406.09246 , 2024. [30] P. Intelligence, B. Ai, A. Amin, R. Aniceto, A. Balakrishna, G. Balke, K. Black, G. Bokin-sky, S. Cao, T. Charbonnier, et al. π0.7: a steerable generalist robotic foundation model with emergent capabilities. arXiv preprint arXiv:2604.15483 , 2026. [31] J. Bjorck, F. Casta˜ neda, N. Cherniadev, X. Da, R. Ding, L. Fan, Y. Fang, D. Fox, F. Hu, S. Huang, et al. Gr00t n1: An open foundation model for generalist humanoid robots. arXiv preprint arXiv:2503.14734 , 2025. [32] G. R. Team, S. Abeyruwan, J. Ainslie, J.-B. Alayrac, M. G. Arenas, T. Armstrong, A. Balakr-ishna, R. Baruch, M. Bauza, M. Blokzijl, et al. Gemini robotics: Bringing ai into the physical world. arXiv preprint arXiv:2503.20020 , 2025. 10 [33] H. Fang, J. Duan, D. Clay, S. Wang, S. Liu, W. Huang, X. Fan, W.-C. Tsai, S. Chen, Y. R. Wang, et al. Molmoact2: Action reasoning models for real-world deployment. arXiv preprint arXiv:2605.02881 , 2026. [34] J. Jang, S. Ye, Z. Lin, J. Xiang, J. Bjorck, Y. Fang, F. Hu, S. Huang, K. Kundalia, Y.-C. Lin, et al. Dreamgen: Unlocking generalization in robot learning through video world models. 
+
+arXiv preprint arXiv:2505.12705 , 2025. [35] Y. Du, S. Yang, B. Dai, H. Dai, O. Nachum, J. Tenenbaum, D. Schuurmans, and P. Abbeel. Learning universal policies via text-guided video generation. Advances in neural information processing systems , 36:9156–9172, 2023. [36] P.-C. Ko, J. Mao, Y. Du, S.-H. Sun, and J. B. Tenenbaum. Learning to act from actionless videos through dense correspondences. In International Conference on Learning Representa-tions , volume 2024, pages 40938–40958, 2024. [37] B. Chen, T. Zhang, H. Geng, C. Zhang, P. Li, K. Song, W. T. Freeman, J. Malik, P. Abbeel, R. Tedrake, et al. Large video planner enables generalizable robot control. arXiv preprint arXiv:2512.15840 , 2025. [38] C. Deng, D. Zhu, K. Li, C. Gou, F. Li, Z. Wang, S. Zhong, W. Yu, X. Nie, Z. Song, et al. Emerg-ing properties in unified multimodal pretraining. arXiv preprint arXiv:2505.14683 , 2025. [39] H. Wu, Y. Jing, C. Cheang, G. Chen, J. Xu, X. Li, M. Liu, H. Li, and T. Kong. Unleashing large-scale video generative pre-training for visual robot manipulation. In International Conference on Learning Representations , volume 2024, pages 10641–10662, 2024. [40] R. Zheng, J. Wang, S. Reed, J. Bjorck, Y. Fang, F. Hu, J. Jang, K. Kundalia, Z. Lin, L. Magne, et al. Flare: Robot learning with implicit world modeling. arXiv preprint arXiv:2505.15659 ,2025. [41] Q. Zhao, Y. Lu, M. J. Kim, Z. Fu, Z. Zhang, Y. Wu, Z. Li, Q. Ma, S. Han, C. Finn, et al. Cot-vla: Visual chain-of-thought reasoning for vision-language-action models. In Proceedings of the Computer Vision and Pattern Recognition Conference , pages 1702–1713, 2025. [42] B. Tharwat, Y. Nasser, A. Abouzeid, and I. Reid. Latent action pretraining through world modeling. arXiv preprint arXiv:2509.18428 , 2025. [43] Y. Hu, Y. Guo, P. Wang, X. Chen, Y.-J. Wang, J. Zhang, K. Sreenath, C. Lu, and J. Chen. Video prediction policy: A generalist robot policy with predictive visual representations. arXiv preprint arXiv:2412.14803 , 2024. [44] H. Qi, H. Yin, A. Zhu, Y. Du, and H. Yang. Inference-time enhancement of generative robot policies via predictive world modeling. IEEE Robotics and Automation Letters , 11(5):5534– 5541, 2026. doi:10.1109/LRA.2026.3673995. [45] Y. Luo and Y. Du. Grounding video models to actions through goal conditioned exploration. In International Conference on Learning Representations , volume 2025, pages 92200–92232, 2025. [46] M. Okawa, E. S. Lubana, R. P. Dick, and H. Tanaka. Compositional abilities emerge mul-tiplicatively: Exploring diffusion models on a synthetic task. ArXiv , abs/2310.09336, 2023. URL https://api.semanticscholar.org/CorpusID:264146105 .[47] T. Wiedemer, P. Mayilvahanan, M. Bethge, and W. Brendel. Compositional generalization from first principles. Advances in Neural Information Processing Systems , 36:6941–6960, 2023. [48] I2RT. YAM 6-DOF arm. https://i2rt.com/products/yam-6-dof-arm , 2025. Accessed 2026-06-03. 11 Contents 
+
+1 Introduction 12 Design Space of Video-Action Models 2
+
+2.1 Background . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 22.2 Design Axes . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 3
+
+3 Systematic Analysis of the Video-Action Generalization Gap 34 Understanding and Mitigating the VAG Gap via Temporal Ratio 4
+
+4.1 TR Analysis in Simulation: Key Findings . . . . . . . . . . . . . . . . . . . . . . 54.2 Adaptive TR Guidance . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 5
+
+5 Experimental Results 6
+
+5.1 Compositional generalization evaluation testbed . . . . . . . . . . . . . . . . . . . 75.2 Key Findings . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 7
+
+6 Related Work 87 Conclusion 8A Architecture and Algorithm Details 14 
+
+A.1 Latent VAM Architecture . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 14 A.2 Training and Inference Procedure . . . . . . . . . . . . . . . . . . . . . . . . . . . 14 A.3 TR-Adaptive Guidance Algorithm . . . . . . . . . . . . . . . . . . . . . . . . . . 16 
+
+B Simulation Task Setup 17 
+
+B.1 LIBERO In-Distribution Suites . . . . . . . . . . . . . . . . . . . . . . . . . . . . 17 B.2 LIBERO Compositional OOD Suites . . . . . . . . . . . . . . . . . . . . . . . . . 17 B.3 Relation to Other LIBERO Extensions . . . . . . . . . . . . . . . . . . . . . . . . 18 
+
+C Design-Space Analysis and Additional Results 18 
+
+C.1 Full Training, Noise-Level, and Horizon Sweep . . . . . . . . . . . . . . . . . . . 18 C.2 Per-Suite Breakdown . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 19 C.3 Video Feature Extraction Layer Ablation . . . . . . . . . . . . . . . . . . . . . . . 19 C.4 Gemma Layer selection for TR . . . . . . . . . . . . . . . . . . . . . . . . . . . . 19 
+
+D Implementation and Hyperparameter Details 20 
+
+D.1 Video Backbone Adaptation . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 20 D.2 Action Head Training . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 20 D.3 Feature Extraction . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 21 12 D.4 Guidance Hyperparameters . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 22 
+
+E Real-World Setup and Evaluation Details 23 
+
+E.1 Hardware Description . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 23 E.2 Bimanual YAM Platform . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 23 E.3 Real-World Training Dataset . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 24 E.4 Real-World Compositional Evaluation . . . . . . . . . . . . . . . . . . . . . . . . 24 E.5 Real-World Training Hyperparameters and Compute . . . . . . . . . . . . . . . . 25 E.6 Inference Cost . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 26 13 All videos are included in supplementary and https://umishra.me/temporal-ratio/ .
+
+## A Architecture and Algorithm Details 
+
+A.1 Latent VAM Architecture Video backbone. We instantiate Fθ as the 28-block Cosmos-Predict2.5-2B DiT [7] ( ∼2.1B pa-rameters). Inputs are VAE-encoded video latents from the Cosmos-Tokenizer (4 × temporal and 8× spatial compression), patchified by a Rearrange + Linear embedder with patch size 1 ×2×2, and position-encoded with 3D rotary embeddings. Each block contains self-attention over video tokens, cross-attention to text, a linear module (2048 →8192 →2048), and Adaptive LayerNorm (shift/scale/gate) conditioned on the diffusion timestep. Self-attention is 2048-dim with 16 heads; cross-attention queries from video (2048) and projects keys/values from text (1024 →2048). Text is encoded by Cosmos-Reason1-7B (Qwen2.5-VL-7B), giving task prompt embeddings of shape 
+
+(B, 512 , 100352 ) that are projected once through a shared linear layer (100352 →1024 ) and reused as the same cross-attention embedding in all 28 blocks (no per-block text modulation). 
+
+Action head. The action head πφ is the 18-layer Gemma expert from π0 [24, 26, 25] ( ∼300M parameters, hidden dim 1024). Attention is multi-query: 8 query heads and 1 shared key/value head with head dimension 256. Each transformer layer uses a GeGLU MLP and Adaptive RMSNorm whose dense projection R1024 →R3072 produces a shift/scale/gate triple conditioned on the action diffusion timestep σa, with the gate modulating the residual contribution of each sublayer. The token sequence concatenates flattened video tokens (per latent frame), a single state token, and action horizon AH (= 17 for sim and = 50 fo real) noisy action tokens; attention follows a prefix-LM mask [24]: bidirectional within the video prefix, causal at the state and first-action boundaries, and bidirectional among the remaining action tokens. 
+
+Video-feature interface. At inference, we extract F(k) 
+
+> θ
+
+(xσv , c, σv) ∈ RT ×(H×W )×D with k=20, 
+
+D=2048, and (H,W )=( 14 , 28 ) from the 448 ×224 observation (primary + wrist camera, concate-nated horizontally). Each spatial 1 ×2×2 neighborhood (4 tokens, 4 ×2048 =8192 features) is pro-jected to the action-head dimension (1024) by a linear layer, yielding 98 video tokens per latent frame. The video noise level σv is encoded with a Fourier feature MLP and applied once through a video-only Adaptive layer norm (shift+scale, no gate) before the tokens enter the Gemma trans-former, so that each video token carries an explicit “noise level” tag. Proprioception (8-dim) is padded to 32 following π−models [24] and then embedded to 1024 via state proj ; noisy action chunks ( AH steps × AD dims, internally padded to dimension 32, where AD = 7 for sim and = 14 for real) are likewise embedded as well, and then finally decoded into original dimensions to get the flow velocity output. The language instruction is consumed only by the video backbone via cross-attention; the action head sees video features, state, and the action timestep alone. 
+
+A.2 Training and Inference Procedure Video denoising. The video backbone is trained with the rectified-flow loss of Eq. 1 under 
+
+σv ∼ Tv = U[0, 1], predicting velocity εv − x0 from xσv = ( 1−σv)x0 + σvεv. At inference we dis-cretize the flow integral x0 = x1 + R 01 vθ (xσ ′ 
+
+> v
+
+, c, σ ′
+
+> v
+
+) dσ ′ 
+
+> v
+
+with a multistep predictor-corrector solver (FlowUniPC, shift 5 .0) using 6 steps; the shift concentrates the schedule near σv=1 so that the model spends most of its iterations on the high-noise regime. Features are exposed at one chosen step on this 6-point grid, and we sweep that index over {0, 1, 2, 4, 5}, corresponding to 
+
+σv ∈ { 1.000 , 0.953 , 0.883 , 0.562 , 0.024 }.
+
+Action denoising. The action head is trained with the flow-matching loss Laction =
+
+Ea0,εa,σa
+
+∥vφ (aσa , F(k) 
+
+> θ
+
+, s, σa) − (εa − a0)∥2 under σa ∼ Ta, where Ta is the beta-distribution Beta (1.5, 1.0) · 0.999 + 0.001 (following [24]); this favours high action noise during training, match-ing the inference initial state aσa=1 ∼ N(0, I). The target is the constant-conditional velocity εa − a0.14 At inference we integrate vφ from σa=1 to 0 with 10 Euler steps on a single fixed action chunk of length AH . The video features F(k) 
+
+> θ
+
+(xσv , c, σv) are precomputed once per replan and reused across all 10 Euler steps, so the cost is dominated by the single video pass. 
+
+Algorithm 1 Joint Training of Fθ and vφ
+
+Require: Extraction layer k, flow-time distributions Tv, Ta, video loss weight λ 
+
+> 1:
+
+repeat  
+
+> 2:
+
+Sample (x0, a0, s, c) ∼ D ▷ video latent, action chunk, state, instruction  
+
+> 3:
+
+σv ∼ Tv; σa ∼ Ta 
+
+> 4:
+
+εv, εa ∼ N(0, I) 
+
+> 5:
+
+xσv ← (1 − σv) x0 + σv εv ▷ t=0 frame re-injected as clean  
+
+> 6:
+
+aσa ← (1 − σa) a0 + σa εa 
+
+> 7:
+
+F(k) ← F(k) 
+
+> θ
+
+(xσv , c, σv) ▷ forward video DiT up to block k 
+
+> 8:
+
+Lvideo ← ∥ vθ (xσv , c, σv) − (εv − x0)∥2 
+
+> 9:
+
+Laction ← ∥ vφ (aσa , F(k), s, σa) − (εa − a0)∥2 
+
+> 10:
+
+Take gradient step on Laction + λ Lvideo w.r.t. θ , φ 
+
+> 11:
+
+until converged Our training procedure is similar to [12, 13]. In two-stage training we instantiate Algorithm 1 twice with disjoint trainable parameters. Stage 1 trains only the video backbone by optimising Lvideo alone (lines 7–8) with φ ignored; Stage 2 freezes θ , caches F(k) at randomly sampled σv, and trains φ on 
+
+Laction alone. Joint training keeps both losses active, with λ =1.0 used throughout. 
+
+Algorithm 2 Action Sampling at replan step i
+
+Require: Extraction layer k, target video flow-time σ ⋆ 
+
+> v
+
+, action denoising steps Na 
+
+> 1:
+
+Input: observation ot , proprioceptive state s, language instruction c 
+
+> 2:
+
+xσv=1 ∼ N(0, I); aσa=1 ∼ N(0, I) ▷ anchor t=0 in x replaced by clean ot 
+
+> 3:
+
+xσ ⋆ 
+
+> v
+
+← xσv=1 +  
+
+> Zσ⋆
+> v
+> 1
+
+vθ (xσ ′ 
+
+> v
+
+, c, σ ′
+
+> v
+
+) dσ ′ 
+
+> v
+
+▷ ≈ 6-step FlowUniPC, truncated at σ ⋆ 
+
+> v
+> 4:
+
+F(k) ← F(k) 
+
+> θ
+
+(xσ ⋆ 
+
+> v
+
+, c, σ ⋆ 
+
+> v
+
+) ▷ partial denoising avoids full pixel reconstruction  
+
+> 5:
+
+a0 ← aσa=1 + 
+
+> Z01
+
+vφ (aσa , F(k), s, σa) dσa ▷ Na=10 Euler steps  
+
+> 6:
+
+return action chunk a0
+
+First-frame anchor mechanism during video denoising. The t=0 latent encodes the cur-rent image observation ot and is held exactly clean throughout video denoising. The Cosmos-Predict2.5 backbone ( https://github.com/nvidia-cosmos/cosmos-predict2.5 ) uses three coordinated operations. (i) Anchor channel: A binary mask M ∈ { 0, 1}B×1×T ×H×W with M[:, :, 0]= 1and zeros elsewhere is concatenated as an extra channel to the 16-channel VAE latent, so the DiT receives a 17-channel input that marks which positions are anchors. (ii) Pre-network latent replace-ment: Before every solver call, the noisy latent is overwritten at the anchor positions with the clean observation latent x(t=0) 
+
+> 0
+
+: xσv ← M ⊙ x(t=0) 
+
+> 0
+
++ ( 1−M) ⊙ xσv . The DiT therefore never sees a noised current frame at any σv. (iii) Post-network velocity replacement: After the DiT predicts vθ , the pre-dicted velocity at anchor positions is overwritten with the analytic “clean” velocity εv − x(t=0) 
+
+> 0
+
+, so the subsequent Euler/UniPC update lands back on the clean anchor. When configured, the per-position timestep embedding at anchor positions is also replaced with a near-zero constant ( σv=10 −4), which feeds the “clean” signal into the adaptive LayerNorm conditioning. 
+
+Significance for Temporal-Ratio. The above described asymmetry is what makes TR informative. First frame tokens ( V0) carry a high-SNR, language-independent observation; future frame tokens (V+) carry the model’s noisy imagined rollout, whose SNR is set by σv. The attention the action head puts on V0 versus V+ is therefore a routing decision between reacting to the current image and following the imagined future. The monotonic increase of TR as σv drops, which we report in Sec. 4.1, follows directly from holding the anchor clean. 15 A.3 TR-Adaptive Guidance Algorithm Algorithm 3 TR-Adaptive Velocity-Space Guidance at replan step i
+
+Require: Observation ot , proprioceptive state s, language instruction c, target video flow-time σ ⋆ 
+
+> v
+
+,action denoising steps Na
+
+Require: Base weights wbase lang , wbase plan , schedule ∈ { flat , adaptive }, cap smax 
+
+Require: Plan horizon T ′ > T , TR layer ℓ∗, persistent episode baseline TR 0 (initialised at the first replan, i=0) 
+
+1: // Video feature branches (each: 6-step FlowUniPC truncated at σ ⋆ 
+
+> v
+
+)
+
+2: F(k) ← F(k) 
+
+> θ
+
+(xσ ⋆ 
+
+> v
+
+, c, σ ⋆ 
+
+> v
+
+) ▷ conditional 
+
+3: if wbase lang > 0 then 
+
+4: F(k) 
+
+> ∅
+
+← F(k) 
+
+> θ
+
+(xσ ⋆ 
+
+> v
+
+, ∅, σ ⋆ 
+
+> v
+
+) ▷ null-text 
+
+5: end if 
+
+6: if wbase plan > 0 then 
+
+7: F(k) 
+
+> plan
+
+← F(k) 
+
+> θ
+
+(xT ′  
+
+> σ⋆
+> v
+
+, c, σ ⋆ 
+
+> v
+
+) first T ▷ extended-horizon, truncated to T
+
+8: end if 
+
+9: 10: // Read TR once per replan and update adaptive scale 
+
+11: TR i ← TR at layer ℓ∗ of vφ (·, F(k), s, σa=1) ▷ from action-head attention; Eq. 3 
+
+12: if i = 0 then TR 0 ← TR i ▷ episode baseline; reset on episode reset 
+
+13: end if 
+
+14: if schedule = flat then 
+
+15: wlang ,i ← wbase lang , wplan ,i ← wbase plan 
+
+16: else ▷ TR-adaptive 
+
+17: si ← clip (TR i/TR 0 − 1, 0, smax )
+
+18: wlang ,i ← wbase lang · si, wplan ,i ← wbase plan · si
+
+19: end if 
+
+20: 21: // Velocity-space CFG inside the action Euler loop 
+
+22: aσa=1 ∼ N(0, I)
+
+23: for Euler step n = 1, . . . , Na with σa : 1 → 0 do 
+
+24: vcond ← vφ (aσa , F(k), s, σa)
+
+25: if wlang ,i > 0 then 
+
+26: ∆v 
+
+> lang
+
+← vcond − vφ (aσa , F(k) 
+
+> ∅
+
+, s, σa)
+
+27: else 
+
+28: ∆v 
+
+> lang
+
+← 0
+
+29: end if 
+
+30: if wplan ,i > 0 then 
+
+31: ∆v 
+
+> plan
+
+← vφ (aσa , F(k)
+
+> plan
+
+, s, σa) − vcond 
+
+32: else 
+
+33: ∆v 
+
+> plan
+
+← 0
+
+34: end if 
+
+35: vguided ← vcond + wlang ,i ∆v 
+
+> lang
+
++ wplan ,i ∆v
+
+> plan
+
+36: Euler-update aσa using vguided 
+
+37: end for 
+
+38: return action chunk a0
+
+TR-adaptive guidance (Algorithm 3) reuses the same forward pass as the standard denoising: the conditional velocity vφ (·, F(k) 
+
+> θ
+
+, s, σa) at the first Euler step is logged through the action head’s at-tention, the TR is read off at layer ℓ∗, and the per-step weights wlang , wplan are rescaled before the remaining Euler steps. Because aσa=1 is freshly sampled each replan, the TR baseline TR 0 is reset at i=0 of every episode, not every replan. 16 B Simulation Task Setup 
+
+B.1 LIBERO In-Distribution Suites Suite definitions. We use the four standard LIBERO [23] suites: libero spatial ,
+
+libero object , libero goal , and libero 10 (also libero long , for long-horizon tasks). Each suite has 10 tasks. The action space is 7-dim end-effector pose (6 pose deltas +1 gripper) and the observation is two 224 × 224 RGB cameras ( agentview and eye in hand ) with an 8-dim proprio-ception. 
+
+Training demonstrations. Each task ships with 50 human demonstrations (500 per suite). We use the filtered demonstrations from https://huggingface.co/datasets/ physical-intelligence/libero without any modifications and concatenate the two cameras into the 448 × 224 input the video backbone expects. The same set trains every paradigm (joint, two-stage, LoRA, full FT). 
+
+Evaluation protocol. We use two evaluation budgets. The headline baseline comparison (Table 1) runs 50 rollouts per task across 3 trial seeds: 1 ,500 per suite, 10 ,500 total. The design-space grid sweep (Sec. 4.2) drops to 10 rollouts per task at 3 trial seeds to keep the 60-cell sweep tractable, giving 700 rollouts per configuration. Trial seeds hash deterministically over (task, episode-index, seed-id), so reruns reproduce the initial states. The policy runs at 10Hz (App. A.2). Max episode length is 220, 280, 300, 520 steps on spatial , object , goal , libero 10 , and 1 .5× those on the OOD counterparts (330, 420, 450). Table 3: LIBERO evaluation suites. Budget shown is for the headline baseline comparison; the grid sweep uses 10 rollouts per task at 3 trial seeds. Suite Dist. Tasks Ep./task Seeds Total ep. Spatial ID 10 50 3 1500 Object ID 10 50 3 1500 Goal ID 10 50 3 1500 Long ID 10 50 3 1500 Spatial-OOD OOD 10 50 3 1500 Object-OOD OOD 10 50 3 1500 Goal-OOD OOD 10 50 3 1500 Total per config. 70 – 3 10500 
+
+B.2 LIBERO Compositional OOD Suites 
+
+The three OOD suites are from Li [4] https://github.com/QuanyiLi/pi0-text-latent .They modify the LIBERO BDDL files along one controlled axis at a time. Camera, simulator, robot, and scene match the corresponding ID suite; only the language–object–goal binding moves. 
+
+Spatial-OOD (object axis). Four tasks use new pick targets ( butter , chocolate pudding ,
+
+milk , orange juice ) with the familiar plate . Six use the familiar black bowl placed via spatial relations not seen in the ID set ( on cookie box , next to plate , at table center , each onto 
+
+stove or cabinet ). The predicate vocabulary ( on , next to , between ) is the same as in training. 
+
+Object-OOD (identity axis). Task names, scene, object positions, and goal predicates match libero object ; the BDDL only swaps which type is bound to each named in-stance. For example, pick up the butter and place it in the basket.bddl declares 
+
+butter 1 - chocolate pudding and chocolate pudding 1 - butter , and the goal binds 
+
+chocolate pudding 1 (the instance that visually looks like butter). A policy that memorised position-to-name fails; only one that grounds language in the current scene succeeds. The swap covers all ten classes. 17 Goal-OOD (composition axis). The object inventory matches libero goal , but each task pairs an object with a destination it never reaches in ID. The ten pairings include wine bottle 
+
+→ { stove , plate , bowl }, cream cheese → { basket , plate , stove , top-of-cabinet },
+
+orange juice → stove , bbq sauce → plate , and tomato sauce → top-of-cabinet . Both sub-skills exist in ID tasks; the binding does not. Success requires stitching trajectories from disjoint ID tasks. 
+
+B.3 Relation to Other LIBERO Extensions 
+
+Two recent LIBERO extensions overlap with the suites we use. LIBERO-Plus [6] adds 10 ,030 tasks across seven perturbation dimensions: camera viewpoint, robot pose, lighting, textures, sen-sor noise, distractors, and paraphrased instructions. LIBERO-PRO [3] adds five: object appear-ance/colour/scale, position, paraphrase, task-logic edits, and environment swaps. Both report strong baselines dropping from ∼0.95 ID success to <0.3 under their perturbations. LIBERO-PRO’s task-logic dimension is the closest analogue of goal-OOD: both replace the goal predicate with a binding absent from training. The benchmarks are complementary. LIBERO-Plus and LIBERO-PRO sweep many dimensions in one benchmark, mixing perceptual and compositional shifts while LIBERO-OOD’s three suites all sit on the language–object–goal binding axis. The Temporal Ratio analysis of Sec. 4.1 probes that axis, which is why we use LIBERO-OOD here. 
+
+## C Design-Space Analysis and Additional Results 
+
+C.1 Full Training, Noise-Level, and Horizon Sweep Finetuning strategy. LoRA dominates Full FT on OOD across every cell of the sweep. Joint +
+
+LoRA peaks at 55 .7% OOD (Spatial peak σv=0.883, T =5); Two-Stage + LoRA peaks at 51 .0% OOD. Full FT show competitive ID performance (Two-Stage + Full reaches 95 .2% ID at σv=0.883, 
+
+T =5) but lacks OOD generalization (33 .0% OOD SR). The pattern is consistent with full-DiT up-dates destroying the pretrained video prior that supports OOD recomposition. 
+
+Video noise level. For Joint + LoRA at T =5, both ID and OOD peak at the same intermediate noise level σv=0.883 (94 .3% ID, 55 .7% OOD); pure noise ( σv=1.0) costs 16 pp on ID and 15 pp on OOD, and the near-clean extraction ( σv=0.024) costs another 12 pp on ID. The non-monotonic pattern repeats for the other paradigms: every T =5 row hits its joint ID/OOD optimum at σv ∈{0.883 , 0.953 }. Two-Stage models are more robust to noise level and maintain performance at low video noise levels ( σv=0.024). 
+
+Prediction horizon. The horizon ablation only changes how far the video DiT rolls out at evalua-tion time. Training is always done with a T =5 latent-frame prediction target , and at evaluation we always pass the first 5 latent frames of the video rollout to the action head, irrespective of weight video denoising happens for 5, 9, or 24 latent frames frames. Increasing the imagined rollout horizon therefore only changes the quality of the first 5 latent frames (longer video horizon allows the video model to maintain object-goal relationships), not the number of frames seen by the action head. With that setup, T =5 at evaluation matches the training distribution and dominates every paradigm at every σv. Stretching the evaluation rollout to T =9 costs 20–40 pp on most cells; T =24 collapses Joint variants almost entirely. Similar to video-noise level study, Two-Stage models do not hurt the video prior at all and helps in maintaining imagined rollout’s physical plausibility. The asym-metric collapse mirrors the failure mode in Sec. 4.2: while longer rollouts preserve the object-goal relationship, they incorporate more hallucinations like frame jumping and implausible transitions. 18 Table 4: Baseline SR (%) by training paradigm, denoising target step, and horizon on LIBERO. LoRA rows use r=32.                                                                                                                                                         
+
+> σ≈1.0σ≈0.953 σ≈0.883 σ≈0.562 σ≈0.024 Paradigm Horizon ID OOD ID OOD ID OOD ID OOD ID OOD Joint + LoRA
+> T=578.0 41.0 88.0 53.7 94.3 55.7 83.5 49.7 82.5 45.3
+> T=969.5 34.3 56.2 40.3 49.2 32.0 49.5 28.3 43.2 25.0
+> T=24 13.8 11.3 5.8 9.7 0.0 2.7 0.2 2.3 0.0 1.0 Joint + Full
+> T=572.0 23.0 88.5 29.3 93.7 33.0 88.2 24.7 82.5 18.7
+> T=942.0 8.3 47.0 11.3 42.0 14.0 45.0 11.3 33.8 6.7
+> T=24 3.0 0.3 7.5 5.3 3.5 3.7 1.2 1.3 1.0 1.0 Two-Stage + LoRA
+> T=588.0 38.7 95.0 51.0 96.5 46.0 95.8 40.7 92.2 42.3
+> T=961.8 22.0 71.2 37.0 69.0 39.7 71.2 37.3 71.5 41.3
+> T=24 13.5 10.0 28.2 26.7 22.0 25.7 22.8 26.3 21.0 28.7 Two-Stage + Full
+> T=590.0 11.3 92.5 22.0 95.2 29.7 94.2 29.0 93.0 29.7
+> T=978.0 4.7 78.2 10.3 74.8 13.3 64.2 17.0 58.5 15.0
+> T=24 63.5 1.7 48.5 7.0 33.5 11.7 20.2 12.7 16.2 12.7
+
+Table 5: Per-suite ID SR (%) for the unguided baseline, flat guidance, and TR-adaptive guidance. Combined guidance uses wlang =0.1, wplan =0.3, plan horizon T ′=24. Configuration Setting Spatial Object Goal Long Avg ID Ours (unguided) σv=0.883, T =5 97 .3 98 .0 97 .6 84 .3 94 .3Ours (flat guided) combined, flat schedule 85 .6 90 .6 88 .3 72 .3 84 .3Ours (adaptive guided) combined, TR-adaptive 96 .3 99 .6 97 .6 82 .6 94 .0
+
+C.2 Per-Suite Breakdown Flat versus TR-adaptive scheduling. Both schedules use the same combined guidance signal (wlang =0.1, wplan =0.3); they differ only in how the per-step weight is set. Flat applies the base weight at every action Euler step; TR-adaptive multiplies it by si = clip (TR i/TR 0 − 1, 0, smax ), so the guidance weight increases only when TR rises above its episode baseline (Alg. 3). While both schedules help in improving OOD success by employing more compositional video guidance from the backbone, flat guidance applies guidance even during the precise manipulation phases. This makes grasping inaccurate and flat-guidance leads to a significant loss in ID performance. The TR analysis of Sec. 4.1 predicts this split: planning-heavy phases of an episode have high TR and benefit from amplified video conditioning, while precise-manipulation phases have low TR and need to react to the current frame. TR-adaptive scheduling concentrates the guidance into the planning phases without interfering with the precise manipulation phases. 
+
+C.3 Video Feature Extraction Layer Ablation DiT block selection. We sweep the extraction layer over k ∈ { 3, 6, 16 , 20 , 28 } (28-block DiT, 1-indexed) under two noise levels: a high-noise extraction (inf =1, σv≈0.99) and a low-noise ex-traction (inf =4, σv≈0.562). Each cell is averaged across the four training paradigms (Joint ×
+
+LoRA/Full, Two-Stage × LoRA/Full) at latent horizon T =5. Results are summarised in Table 7 and per-suite breakdown is provided in Fig. 7. k=20 is the joint optimum across ID and OOD and aligns with the findings of [12, 13]; layers shallower than k=16 are clearly suboptimal under both noise levels. 
+
+C.4 Gemma Layer selection for TR 
+
+We choose Gemma layer ℓ∗ = 15 for all reported TR values. The choice depends on how much each layer’s attention split between the current frame and the predicted future frames moves as the 19 Table 6: Per-suite OOD SR (%) for the unguided baseline, flat guidance, and TR-adaptive guidance Configuration Setting Spatial Object Goal Avg OOD Ours (unguided) σv=0.883, T =5 50 .3 40 .0 77 .3 55 .7Ours (flat guided) combined, flat schedule 53 .6 40 .0 78 .3 57 .3Ours (adaptive guided) combined, TR-adaptive 58 .6 40 .0 80 .3 59 .4Table 7: Effect of DiT extraction layer k on Avg ID / Avg OOD SR (%). Averaged across the four training paradigms at latent horizon T =5. inf =1 corresponds to the high-noise regime ( σv≈0.99), inf =4 to the low-noise regime ( σv≈0.562).                                   
+
+> k=3k=6k=16 k=20 k=28 Noise level ID OOD ID OOD ID OOD ID OOD ID OOD inf =1 ( σv≈0.99) 55 .50.058 .50.087 .82.394 .37.090 .07.7inf =4 ( σv≈0.562) 77 .52.081 .36.382 .820 .384 .521 .081 .319 .7
+
+extraction noise level σv changes. Fig. 8 plots TR against σv at five layers spanning the 18-block Gemma expert. Early layers ( ℓ=1, 5) sit near a fixed value (TR ≈ 4 and ≈ 3.2 respectively) across the entire σv range indicating equal importance to all frames (1 current vs 4 future frames). For deep layers ( ℓ=15 , 18): at low σv (clean futures) TR is high, and as σv rises (noisier futures) TR collapses toward 1 or below, because the action head reroutes its attention onto the clean current-frame anchor. The mid-layer ℓ=10 shows the same pattern with a smaller range, so the routing decision sharpens with depth. 
+
+## D Implementation and Hyperparameter Details 
+
+D.1 Video Backbone Adaptation LoRA adaptation. We adapt the DiT backbone (App. A.1) with Low-Rank Adaptation [27] at ranks r ∈ { 16 , 32 , 64 } and α = r. LoRA is inserted into every attention and MLP projection in all 28 blocks, which trains 2–6% of the backbone parameters ( ∼40M at r=16, ∼180M at r=64); the rest of the DiT is frozen. 
+
+Full finetuning. We also evaluate updating all 2 .1B DiT parameters. Optimizer settings match the LoRA configuration except for the learning rate, which is lowered from 10 −4 to 10 −5 to avoid destabilising the pretrained features. 
+
+Joint and two-stage training. Joint training (Alg. 1) runs for 50k steps with video loss weight 
+
+λ = 1.0. Two-stage training runs Stage 1 (video only) for 25k steps and Stage 2 (action head only, video features cached) for 50k steps. Both modes share the optimizer, batch size, and noise schedule below. 
+
+D.2 Action Head Training Action flow matching. The action flow-matching loss and Euler-step inference procedure are de-fined in App. A.2. The empirical setting we use is σa ∼ Beta (1.5, 1.0) · 0.999 + 0.001 [26], which biases the training schedule toward high noise and matches the σa=1 initialisation at inference. 
+
+Action chunking. Action chunks are 17 steps and the policy replans every 10 environment steps (App. A.2). The action vector has 7 dimensions per arm on LIBERO (six joint deltas plus a binary gripper) and is padded to internal dimension 32, so the same network serves bimanual setups without architecture changes. 20 0                       
+
+> 25
+> 50
+> 75
+> 100
+> Success rate (%)
+> Spatial (ID) Object (ID) Goal (ID) Long (ID)
+> 3616 20 28
+> DiT extraction layer k
+> 0
+> 25
+> 50
+> 75
+> 100
+> Success rate (%)
+> LIBERO-90
+> 3616 20 28
+> DiT extraction layer k
+> Spatial-OOD (OOD)
+> 3616 20 28
+> DiT extraction layer k
+> Object-OOD (OOD)
+> 3616 20 28
+> DiT extraction layer k
+> Goal-OOD (OOD)
+
+DiT extraction-layer ablation, per LIBERO suite          
+
+> averaged across all training paradigms, latent horizon T= 5
+> inf = 1 (v0.99, high noise) inf = 4 (v0.56, low noise)
+
+Figure 7: DiT extraction layer ablation across the seven LIBERO suites plus LIBERO-90, averaged across the four training paradigms at T =5. The two noise levels probe the same layer grid: inf =1(σv≈0.99, high noise) and inf =4 ( σv≈0.562, low noise). k=20 is the joint optimum used throughout the rest of the paper. 0.0 0.2 0.4 0.6 0.8 1.0       
+
+> Video noise level v
+> 0
+> 1
+> 2
+> 3
+> 4
+> 5
+> 6
+> Temporal Ratio (TR)
+> Temporal Ratio versus noise level across action-head layers
+> Gemma layer = 1
+> Gemma layer = 5
+> Gemma layer = 10
+> Gemma layer = 15
+> Gemma layer = 18
+
+Figure 8: Temporal Ratio as a function of video noise level σv at five layers of the 18-layer Gemma action head (1-indexed). Shallow layers are insensitive to σv; deep layers (and especially ℓ=15 , 18) carry the routing decision between the clean current frame and the noisy predicted futures. We pick 
+
+ℓ∗ = 15 as the canonical TR layer for adaptive guidance and reported TR values. 
+
+D.3 Feature Extraction Extraction layer and video noise level. We read intermediate features from block k = 20 of 28 in the DiT, matching the choice of [12]. The token shape, patchify scheme, and projection into the action head are described in App. A.1. The 6-step FlowUniPC schedule (App. A.2) gives a grid of six σv values. We sweep the extraction noise level across all values covering pure noise, near-noise, the mid-noise regime, and the near-clean regime. 
+
+Prediction horizon. Three temporal extents are evaluated at inference: T ∈ { 5, 9, 24 } latent frames, corresponding to 17, 33, and 93 video frames at the 4 × temporal compression. Training is always done with a T =5 target. The horizon parameter only controls how many latent frames the video DiT rolls out during evaluation; the action head always receives the first 5 latent frames of the rollout regardless of T , so a larger T changes the quality of those first 5 frames (joint denoising over 21 Table 8: Video model finetuning hyperparameters. Hyperparameter LoRA Full FT Learning rate 1 × 10 −4 1 × 10 −5
+
+LoRA rank r 32 –LoRA α α = r –LoRA targets all Q/K/V /O and MLP projections, 28 blocks –Trainable params 2–6% of 2 .1B ∼2.1B (100%) Optimizer AdamW ( β1=0.9, β2=0.95 , ε=10 −8) same Weight decay 1 × 10 −8 1 × 10 −8
+
+Gradient clip (norm) 1.0 1.0Training steps 50k joint, 25k Stage 1 50k joint Batch size 8 per GPU × 16 GPUs = 128 same LR schedule cosine decay to 5 × 10 −7 same EMA decay 0.999 (constant) 0.999 Video noise schedule σv ∼ U[0, 1] σv ∼ U[0, 1]
+
+Joint loss weight λ 1.0 1.0Table 9: Action head training hyperparameters. Hyperparameter Value Architecture Gemma expert (App. A.1; 18 layers, ∼300M) Action prediction flow matching (single-step training, 10-step Euler inference) Action chunk size 17 steps Action dim 7 per arm (LIBERO); padded to internal dim 32 Proprioceptive dim 8, padded to internal dim 32 Action noise schedule σa ∼ Beta (1.5, 1.0) · 0.999 + 0.001 Learning rate 1 × 10 −4
+
+Training steps (joint and two-stage) 50k Optimizer AdamW ( β1=0.9, β2=0.95 , ε=10 −8)Weight decay 1 × 10 −8
+
+Gradient clip (norm) 1.0a longer chunk) rather than the number of frames the action head sees. T = 5 at inference matches training; T = 24 amounts to roughly 9 seconds of imagined future at 10Hz control. Plan guidance (App. D.4) selects T ′ from this same set. Table 10: Feature extraction configurations. Parameter Values Extraction layer k 20 (of 28 DiT blocks) Latent temporal frames T {5, 9, 24 } (= 17 , 33 , 93 video frames) Spatial latent resolution W × H 28 × 14 (from 448 × 224 input) Feature dim D 2048 Video tokens per latent frame 98 (after 1 × 2 × 2 patchify) Video tokens fed to action head 98 T
+
+σv values (inf step → σv) 0:1 .000 , 1:0 .953 , 2:0 .883 , 4:0 .562 , 5:0 .024 Video solver steps 6 (FlowUniPC, shift 5 .0) Action Euler steps 10 
+
+D.4 Guidance Hyperparameters Language guidance. We compute the null-text branch by replacing the text conditioning c
+
+with the zero embedding before the video forward pass. The resulting velocity difference 22 vcond − vuncond is scaled by wlang ,i at each action Euler step (Algorithm 3). The sweep covers 
+
+wbase lang ∈ { 0.04 , 0.06 , 0.1, 0.2, 0.3, 0.5, 1.0}; the canonical setting in the main results is wbase lang = 0.1. 
+
+Plan guidance. The plan branch queries the video model with the extended horizon T ′ = 24 latent frames (93 video frames at 10Hz, roughly 9 seconds of imagined future) and truncates the resulting features back to the policy horizon T before passing them to the action head. The velocity difference 
+
+vplan − vcond is scaled by wplan ,i. The sweep covers wbase plan ∈ { 0.04 , 0.06 , 0.1, 0.2, 0.3, 0.5, 1.0} with canonical wbase plan = 0.3. 
+
+TR-adaptive schedule. Adaptive scaling reads TR i from layer ℓ∗ = 15 of the action head’s atten-tion. The episode baseline TR 0 is set at the first replan of each episode and held until the episode terminates. The scale si = clip (TR i/TR 0 − 1, 0, smax ) uses smax = 2.0. Table 11: Guidance hyperparameters. Hyperparameter Values 
+
+wbase lang 0.1
+
+wbase plan 0.3Planning horizon T ′ {24 } latent frames Adaptive cap smax 2.0TR extraction layer ℓ∗ 15 Schedules flat, TR-adaptive 
+
+## E Real-World Setup and Evaluation Details 
+
+E.1 Hardware Description 
+
+Figure 9: Bimanual real-world testbed. Two I2RT YAM 6-DOF arms [48] and three Intel Re-alSense D405: one mounted top-down on the workspace and two more mounted on the wrists. The two arms together expose 12 joint DoF plus 2 gripper channels, which maps to the 14-dim ac-tion used by the policy (7 per arm). We use the RGB stream from three cameras where the native 1280 × 720 output is downsampled to 224 × 168 before being concatenated into the policy input. 
+
+E.2 Bimanual YAM Platform Observation space. The policy reads three RGB cameras per timestep: a top-mounted workspace view, a left-wrist camera, and a right-wrist camera. Each camera produces a 224 × 168 frame; the three are concatenated horizontally into a single 672 × 168 image before input to the video backbone 23 (the same flat-image convention used for LIBERO; see App. B.1). Cameras run at 30Hz; the policy applies a frame-skip of 3, so the 17 video frames it sees per replan span 51 source frames and form a 10Hz 1 .7-second window. After the Cosmos-Tokenizer 4 × temporal compression these 17 video frames yield T = 5 latent frames, matching the simulation configuration. In addition we also use the absolute joint angles for each inference step. 
+
+Action space. The action is 14-dim absolute joint angle targets, organised as 7 dimensions per arm. The flow-matching head from simulation (App. D.2) is reused without architectural change; only the action width and proprioceptive width differ. Internally the 14-dim action is zero-padded to the action head’s internal width of 32. Each replan produces a chunk of 50 actions at 30Hz (a 1 .67-second open-loop horizon); the first 30 actions (1 second) are executed and the rest are discarded before the next replan. 
+
+Latent token count. The 672 × 168 stacked image, after 8 × spatial compression by Cosmos-Tokenizer-CV4x8x8, yields an 84 × 21 latent grid per frame. The DiT 1 × 2 × 2 patchifies, pads and groups spatial neighbours into 42 × 11 = 462 DiT tokens per latent frame, so the full T = 5 video prefix presented to the action head contains 5 × 462 = 2310 tokens. For reference, the corresponding LIBERO numbers are 98 tokens per latent frame and 5 × 98 = 490 total tokens at T = 5. 
+
+E.3 Real-World Training Dataset Dataset. Real-world training uses a multi-task bimanual YAM dataset consisting of 24 tasks (a selected subset from [28]). Overall, the selected dataset contains 5 ,600 episodes for a total of 9 .98M raw camera frames at 30 fps. ( ∼3.3M after frame-skipping at 10 fps). The natural-language instruc-tions are paraphrased per episode: the dataset has 1 ,036 unique prompt strings spread across the 24 task categories, so the policy sees a wider distribution of instruction wordings. 
+
+Task families. The 24 tasks fall into four skill categories: folding (1 task), garment manipulation 
+
+(2 tasks; removing shirts and t-shirts from hangers), high-precision assembly (1 task), and pick-and-place (20 tasks: bussing tables, loading and unloading dish racks, placing snacks and beverages on shelves, throwing items into bins, handoffs, mug-orientation correction, and a relative-placement task). Per-task episode counts are listed in Table 12. 
+
+Sampling weights. During training the action head sees a ConcatDataset of all 24 task reposi-tories with a WeightedRandomSampler that assigns equal weight to each of the 24 tasks. 
+
+E.4 Real-World Compositional Evaluation Evaluation scenes. All training scenarios had only one target receptacle and multiple instances of the same target object. We construct three OOD scenes to evaluate compositional generalisation. Each scene contains multiple target candidates and multiple receptacle candidates. Scene 1 places a paper bag and a bin together with fruits, testing whether the policy can bind the named target object to the correct receptacle. Scene 2 mixes snacks and bottles against the bag and bin, testing the same binding under a multi-object multi-receptacle shift. Scene 3 presents snacks together with a bin and a shelf, testing whether the policy overfits to the snack-on-shelf behaviour seen frequently during training. 
+
+Task definitions and trials. Each scene contains a fixed set of language instructions. The eight evaluation tasks are listed in Table 13. Tasks 1 and 2 are evaluated for 15 trials each (5 trials with 3 fruits each); tasks 3 through 8 are evaluated for 5 trials each. Total budget per method: 60 trials. A trial succeeds when the robot approaches and picks up the named target object first and reaches the named receptacle. 24 Table 12: Multi-task dataset task list, organised by skill family. Episode counts sum to 5 ,600. 
+
+Skill family Task Episodes folding Fold a pile of t-shirts and stack them 200 garment manipulation Remove the shirt from the hanger 200 Remove the t-shirt from the hanger 200 high-precision assembly Unscrew bottle caps 200 pick-and-place Place mixed dishes and glasses into a plastic bin 200 Place plates into a plastic bin 200 Bimanual object handoff 200 Load bowls into a tabletop dish rack 200 Load cups into a tabletop dish rack 200 Load mixed dishes into a tabletop dish rack 200 Load plates into a tabletop dish rack 200 Place and organize beverages on a shelf 200 Place and organize canned foods on a counter 200 Place and organize chip bags on a shelf 200 Place fake fruits into a fruit bowl 200 Place snacks into a paper bag 200 Place an object at a specified relative position 1000 Take snacks out of a paper bag 200 Throw plastic bottles into a bin 200 Turn a mug right-side up 200 Unload bowls from a tabletop dish rack 200 Unload cups from a tabletop dish rack 200 Unload mixed dishes from a tabletop dish rack 200 Unload plates from a tabletop dish rack 200 
+
+Table 13: Real-world evaluation tasks, organised by scene. 
+
+Task Instruction Scene Trials 1 Throw away the fruits into the bin 1 15 2 Place the fruits into the paper bag 1 15 3 Place snacks into the paper bag 2 54 Throw away the snacks into the bin 2 55 Place plastic bottle into the paper bag 2 56 Throw away the plastic bottle into the bin 2 57 Place snacks into the bin 3 58 Arrange snacks on the shelf 3 5Total trials per method 60 
+
+E.5 Real-World Training Hyperparameters and Compute Optimisation. We deploy joint LoRA training only in the real-world and use the same optimiser configuration as the simulation runs (App. D.1, App. D.2). The video DiT is adapted with LoRA at 
+
+r = 32, α = 32, learning rate 1 × 10 −4. The action head trains at peak learning rate 5 × 10 −4 with 500 warmup steps and cosine decay to 5 × 10 −5 over 10 ,000 steps. EMA decay is 0 .999, weight decay 1 × 10 −8, gradient clip 1 .0. Precision is bfloat16. 
+
+Baselines. We compare against π0 [24], π0.5 [26], and Cosmos-Policy [10], all retrained on the same dataset. All WAM and VAM baselines use the same Cosmos-Predict 2.5-2B video backbone as our model; the π-family baselines are at a comparable 3B PaliGemma VLM scale. 
+
+Compute budget. Each method is trained for 1M optimiser steps on an equivalent of 32 NVIDIA H200 80GB GPUs at matched effective batch size and bfloat16 precision. 25 Table 14: Real-world training compute and key hyperparameters. Parameter Value GPU type NVIDIA H200 80GB Number of GPUs 32 Effective batch size 512 Training steps 1M Precision bfloat16 LoRA rank r / α 32 / 32 LoRA learning rate 1 × 10 −4
+
+Action-head peak LR 5 × 10 −4
+
+EMA decay 0.999 
+
+E.6 Inference Cost Forward-pass cost. The unguided policy runs one video forward pass and one action-head 10-step Euler integration per replan. Language guidance adds a null-text video pass, plan guidance adds an extended-horizon video pass, and combined guidance adds both. The video forward-pass count per replan is therefore 1 for unguided, 2 for language-only or plan-only guidance, and 3 for combined guidance; the action-head cost is unchanged across all four configurations. All videos are included in supplementary and https://umishra.me/temporal-ratio/ .26

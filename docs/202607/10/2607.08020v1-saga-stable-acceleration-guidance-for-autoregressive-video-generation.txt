@@ -1,0 +1,383 @@
+Title: SAGA: Stable Acceleration Guidance for Autoregressive Video Generation
+
+URL Source: https://arxiv.org/pdf/2607.08020v1
+
+Published Time: Fri, 10 Jul 2026 00:19:52 GMT
+
+Number of Pages: 16
+
+Markdown Content:
+# SAGA: Stable Acceleration Guidance for Autoregressive Video Generation 
+
+Thanh-Nhan Vo 1,2, Trong-Thuan Nguyen 1,2,Trung-Hoang Le 1,2, Tam V. Nguyen 3, and Minh-Triet Tran 1,2 
+
+> 1
+
+University of Science, VNU-HCM, Vietnam  
+
+> 2
+
+Vietnam National University, Ho Chi Minh City, Vietnam  
+
+> 3
+
+University of Dayton, U.S.A. 
+
+{vtnhan,ntthuan}@selab.hcmus.edu.vn, lthoang@fit.hcmus.edu.vn ,
+
+tnguyen1@udayton.edu , tmtriet@fit.hcmus.edu.vn 
+
+Abstract. Autoregressive video diffusion enables efficient streaming and long-horizon video generation, but repeatedly reusing generated latents as causal context can amplify temporal errors, resulting in flickering, mo-tion jitter, and structural drift. In this paper, we investigate this failure mode from a spectral kinematic perspective and identify discrete latent acceleration as an effective signal for revealing unstable high-frequency temporal perturbations. To this end, we propose SAGA, a training-free 
+
+stable acceleration g uidance approach for autoregressive video genera-tion. SAGA integrates an acceleration domain spectral guidance objec-tive based on finite-window Slepian projections with a structured autore-gressive noise initialization strategy that suppresses short-range temporal correlations while preserving long-range motion structure. Without re-training or modifying the backbone, SAGA can be directly applied to existing chunk-wise autoregressive diffusion models, which is the preva-lent setting for high-quality generation. Extensive experiments show that SAGA consistently improves temporal quality across multiple autoregres-sive diffusion models. On Self-Forcing, SAGA improves Temporal Quality from 97.30 to 97.91 and Image Quality from 69.60 to 70.51. Moreover, spectral analysis and human preference studies demonstrate that SAGA reduces temporal instability while maintaining visual fidelity. 
+
+Keywords: Video Generation · Slepian Transform · Video Diffusion Models · Autoregressive Generative Models · Generative AI 
+
+## 1 Introduction 
+
+Recent advances in video diffusion models [4, 22, 24, 26] have substantially im-proved the visual quality and temporal realism of generated videos. However, many high-quality diffusion models rely on full-sequence or bidirectional de-noising, making them computationally expensive for streaming and long-horizon generation [10,24,27]. To address this limitation, hybrid autoregressive-diffusion models generate videos sequentially while retaining the strong visual quality of diffusion-based denoising [3, 10, 27, 29]. In addition, recent approaches such as Diffusion Forcing [3], CausVid [27], and Self-Forcing [10] further demonstrate arXiv:2607.08020v1 [cs.CV] 9 Jul 2026 2 Thanh-Nhan Vo et al. 
+
+that causal rollout enables efficient video generation with competitive quality. Despite these advances, autoregressive rollout introduces a distinct failure mode in which generated latent states are recursively reused as causal context [10,23]. This recursive reuse can accumulate small temporal errors over time, leading to flickering, motion jitter, background drift, and transient structural artifacts [23]. Existing methods improve video consistency through architectural design, training-time alignment, motion planning, or global smoothness regularization [8, 15, 25]. However, they do not explicitly explain why small temporal perturba-tions become unstable during autoregressive-diffusion rollout. Therefore, we hy-pothesize that autoregressive video diffusion exhibits a previously underexplored spectral instability in which high-frequency temporal perturbations are amplified in the acceleration domain . Since discrete acceleration acts as a second-order temporal operator, it attenuates low-frequency motion while strongly amplify-ing high-frequency variations. This property makes acceleration-frequency space a principled domain for exposing and analyzing unstable temporal artifacts. In this paper, we propose SAGA, a novel training-free approach for stable 
+
+acceleration g uidance in autoregressive video generation. SAGA suppresses un-stable high-frequency kinematic energy during denoising while preserving low-frequency semantic motion. Since autoregressive rollout exposes only short tem-poral windows, direct spectral truncation is susceptible to leakage [21]. Therefore, SAGA projects latent acceleration onto a band-limited Slepian basis to achieve principled spectral concentration under finite temporal support [20, 21]. Addi-tionally, SAGA introduces a structured stochastic initialization that combines variance-preserving autoregressive noise streams with opposite temporal corre-lations, thereby neutralizing short-range correlations while preserving longer-range motion structure. Moreover, SAGA operates entirely at inference time and requires no retraining, architectural modification, or additional supervision ,enabling direct application to multiple autoregressive-diffusion backbones. Ex-tensive evaluations with VBench [11] and human preference studies demonstrate consistent improvements in temporal quality while preserving visual fidelity. In particular, on Self-Forcing [10], SAGA improves Temporal Quality from 97.30 to 97.91 and Image Quality from 69.60 to 70.51. Furthermore, spectral analysis re-veals reduced latent acceleration energy and high-frequency acceleration power, providing empirical support for the proposed acceleration-domain interpretation. Our main contributions are summarized as follows: 
+
+– We identify an underexplored spectral instability in autoregressive video diffusion and show that discrete latent acceleration amplifies high-frequency temporal perturbations, enabling principled instability analysis. 
+
+– We derive a novel training-free, acceleration-domain kinematic guidance frame-work, termed SAGA, to suppress unstable temporal modes. Within this framework, we adopt Slepian projections as a mathematically principled im-plementation to mitigate spectral leakage over short temporal windows. 
+
+– We introduce a novel structured stochastic initialization that neutralizes short-range temporal correlations while preserving longer-range motion struc-ture, improving autoregressive rollout stability without retraining. SAGA: Stable Acceleration Guidance for Autoregressive Video Generation 3
+
+– Extensive experiments across multiple autoregressive-diffusion backbones, together with spectral analysis and human preference studies, demonstrate consistent improvements in temporal quality while preserving visual fidelity. 
+
+## 2 Related Work 
+
+2.1 Autoregressive Diffusion Models for Video Generation 
+
+The rapid advancements in both diffusion-based and autoregressive (AR) video generation have highlighted the distinct strengths and inherent limitations of each paradigm. Specifically, the emergence of AR-Diffusion hybrid models has presented a promising unified approach [17, 24]. These hybrid frameworks ef-fectively synthesize the computationally efficient streaming capabilities of AR models with the high spatial fidelity and short-term temporal consistency char-acteristic of diffusion processes [10, 27, 29]. To maximally leverage the respective advantages of both schools of thought, several recent notable architectures have been proposed. For instance, NOVA [6] employs a frame-to-frame formulation to strictly preserve AR causality. By replacing the discrete tokenization of tra-ditional AR models with continuous diffusion processes, NOVA achieves gener-ation quality that surpasses pure diffusion models, despite utilizing a substan-tially smaller parameter footprint. Furthermore, Diffusion-Forcing [3] introduces a novel training paradigm wherein the model learns to denoise sequences using independent noise levels per token, diverging from the uniform noise scheduling typical of full-sequence diffusion. This independent noise formulation enables sta-ble video generation that extrapolates well beyond the training horizon, while also demonstrating significant performance gains in downstream decision-making tasks. In parallel, CausVid [27] and Self-Forcing [10] focus on distilling multi-step bidirectional diffusion models into few-step AR models, specifically tailored for real-time streaming generation. Within this context, Self-Forcing places a particular emphasis on mitigating the exposure bias (the inherent discrepancy between the training and inference phases typically observed in AR generation). 
+
+2.2 Temporal Consistency in Video Generation 
+
+Maintaining temporal consistency remains a fundamental challenge in video gen-eration [28], particularly for AR models, where errors accumulate over lengthy generation steps. To address this problem, early studies tried to guarantee smooth transitions with mechanisms such as optical flow warping or temporal atten-tion. However, these methods typically require model retraining or architectural changes. Recently, VLIPP [25] employed a Vision-Language Model (VLM) as a motion planner to generate coarse trajectories that are refined with a video diffusion model. However, this two-stage design is computationally heavy and not easily adaptable for streaming AR video generation. Additionally, Physics in 2-Steps [8] showed that generating video in just two denoising steps is more physically plausible than using 50 steps, and frequency domain analysis indicated that natural motion is dominated by low-frequency components. These results led to the development of the Motion-Aware Video Generative Model [15], which directly manipulates the frequency spectrum of latent trajectories to improve physical plausibility while not compromising the quality of individual frames. 4 Thanh-Nhan Vo et al. 
+
+Despite these advances, current methods still present two critical limitations when directly applied to autoregressive diffusion video generation. First, the ma-jority of the methods above are mainly designed for pure diffusion models. As such, they do not deal with the problem of error accumulation in the autore-gressive rollout of hybrid models [13, 23]. Second, these methods do not directly apply to streaming rollouts. Short streaming windows make spectral separa-tion sensitive to leakage, especially when estimating high-frequency acceleration components, which remain a plausible and underexplored source of instability in AR-diffusion models. 
+
+2.3 Inference-Time Guidance for Diffusion Models 
+
+Inference-time guidance is widely used to steer diffusion sampling without re-training the full generative model. Classifier guidance and classifier-free guidance modify the sampling trajectory through external classifier gradients or combined conditional and unconditional predictions [7,9], while general guidance methods use auxiliary objectives or measurement-consistency losses for conditional gen-eration and inverse problems [1,5]. These approaches show that pretrained diffu-sion models can often be controlled during sampling while keeping the backbone fixed. However, existing guidance objectives target semantic alignment, class con-ditioning, spatial structure, or measurement consistency. They do not directly address temporal instability in autoregressive video diffusion [10,27], where gen-erated latents are repeatedly reused as causal context and small perturbations may accumulate into flickering, motion jitter, or structural drift. Moreover, such guidance is usually defined in image, text-conditioning, or measurement space, rather than in the temporal dynamics of the latent video trajectory. Structured spectral priors offer a complementary way to regularize generative trajectories by separating smooth low-frequency components from unstable high-frequency variations [21]. Yet short autoregressive windows make direct Fourier separation sensitive to spectral leakage. Discrete Prolate Spheroidal Sequences, or Slepian sequences [20], provide a principled basis for energy concentration under finite temporal support, making them suitable for short-window spectral analysis. SAGA addresses this gap by introducing an acceleration-domain kine-matic prior for autoregressive video diffusion. Instead of using semantic classi-fiers, external measurements, or generic smoothness losses, SAGA projects latent acceleration onto a band-limited Slepian basis and suppresses unstable high-frequency acceleration modes during denoising. This provides a training-free stabilization mechanism tailored to causal autoregressive rollout, where tempo-ral context is short and rollout errors can accumulate across generation steps. 
+
+## 3 Problem Formulation 
+
+Given a text prompt y, we aim to synthesize a temporally coherent video x1: T =
+
+{xt}Tt=1 . Following latent video diffusion models, we represent the video as a latent trajectory z1: T = {zt}Tt=1 in the latent space of a pretrained video au-toencoder. In autoregressive video diffusion, generation proceeds sequentially. At rollout step b, a frozen denoising network predicts the clean latent of the cur-rent frame or chunk from a noisy latent zb,τ at diffusion timestep τ , conditioned SAGA: Stable Acceleration Guidance for Autoregressive Video Generation 5
+
+on the prompt and the previously generated causal context as defined in Eqn. 1. 
+
+ˆzb, 0 = Dθ (zb,τ , τ, y, z<b ), (1) where Dθ is the pretrained autoregressive denoiser, z<b is the generated past context, and ˆzb, 0 is the predicted clean latent. Although causal rollout enables efficient streaming and long-horizon generation, it is vulnerable to temporal error accumulation. A small perturbation in the generated context can be reused by later denoising steps, leading to flickering, motion jitter, or structural drift. We study this instability from a second-order temporal perspective. Let zb 
+
+> 1: N
+
+=[z<b ; ˆ zb, 0] be the concatenated local latent trajectory spanning the historical context and the current prediction over an available temporal window of length 
+
+N , where each element is indexed as zbi for i ∈ [1 , N ]. Formally, we define the discrete latent acceleration at frame t by the central finite difference in Eqn. (2). 
+
+at = ∆2zbt = zbt+1 − 2zbt + zbt−1 (2) where t ∈ [2 , N − 1] . This acceleration signal isolates abrupt, non-inertial tem-poral deviations in the latent trajectory. Consequently, we characterize unstable autoregressive rollout as high-frequency fluctuations in latent acceleration. Our goal is to stabilize autoregressive video diffusion at inference time while keeping Dθ strictly frozen. We seek to suppress unstable high-frequency acceler-ation modes while preserving the low-frequency motion dynamics induced by the pretrained model. Therefore, SAGA applies lightweight guidance directly to ˆzb, 0,enabling training-free stabilization without modifying the pretrained backbone. 
+
+## 4 Proposed Method       
+
+> Fig. 1: End-to-end SAGA workflow for autoregressive text-to-video generation. A frozen causal DiT rolls out latent chunks using SG (Spectral Guidance 4.3) and SAN (Structured AR Noise 4.2), then decodes the generated trajectory z1: Tinto the video. Detailed modules are shown in Fig. 2.
+
+We present SAGA, an inference-time framework for autoregressive video generation, illustrated in Fig. 1 and Fig. 2. Sec. 4.1 analyzes the high-frequency amplification of discrete ac-celeration, motivating stabilization in acceleration spectrum. Given a text prompt, structured AR noise initial-ization (Sec. 4.2) constructs a struc-tured latent trajectory, while the 
+
+acceleration-domain spectral guidance 
+
+(Sec. 4.3) suppresses high-frequency dynamics during rollout. The result-ing latent trajectory is decoded into a temporally coherent video, without modifying the pretrained generator. 
+
+4.1 High-Frequency Amplification of Discrete Acceleration 
+
+To identify a suitable domain for stabilizing autoregressive rollout, we analyze temporal variations under discrete acceleration. We hypothesize that temporal 6 Thanh-Nhan Vo et al.         
+
+> Fig. 2: Overview of our proposed approach, termed SAGA, a novel training-free ap-proach for stable acceleration guidance in autoregressive video generation. Our ap-proach stabilizes autoregressive video diffusion rollout through two complementary components: (Top) a structured frequency-aware initialization that establishes a kine-matically neutral motion prior, and (Bottom) a training-free spectral guidance mecha-nism that suppresses non-physical high-frequency acceleration dynamics during denois-ing. By regularizing motion in acceleration-frequency space, SAGA reduces temporal instability and preserves coherent long-range motion without fine-tuning the model.
+
+instability arises from high-frequency acceleration components that accumulate during rollout, producing flickering and motion jitter. Natural motion follows inertial dynamics, yielding smooth acceleration concentrated in low-frequency spectral components. We therefore introduce a physics-informed kinematic prior that regularizes motion by penalizing high-frequency energy in the acceleration spectrum, which is formally defined in Eqn. 3. 
+
+Ekin (z) = 
+
+Z 
+
+> |f|>f c
+
+|F{ a}(f )|2df  (3) where a denotes discrete acceleration and F the spectral transform. In addition, we examine the frequency response of discrete acceleration to characterize temporal instability in acceleration space. Using central finite dif-ferences, at = zt+1 − 2zt + zt−1. For a harmonic trajectory zt = eiωt , ω ∈ [0 , π ],the resulting squared amplification factor is formally defined in Eqn. 4. 
+
+A(ω) = |at|2
+
+|zt|2 = 4(1 − cos ω)2 (4) where A(ω) → 0 as ω → 0, while A(π) = 16 , indicating that discrete acceler-ation attenuates low-frequency motion and amplifies high-frequency variations. Compared with velocity, whose spectral gain is 2(1 − cos ω), acceleration has a sharper squared response, 4(1 − cos ω)2. This makes the acceleration domain better suited for temporal regularization: it strongly emphasizes high-frequency jitter and flickering while preserving inertial motion, since uniform linear motion has non-zero velocity but zero acceleration. SAGA: Stable Acceleration Guidance for Autoregressive Video Generation 7
+
+4.2 Structured Autoregressive Noise Initialization 
+
+Motivated by the amplification analysis in Sec. 4.1, we stabilize autoregressive generation at initialization by controlling short-range correlations in the noise trajectory. Since generated latents are recursively reused as causal context, such correlations can propagate and amplify temporal instability. We therefore con-struct the initial trajectory as a superposition of two independent, variance-preserving AR(1) processes with opposite temporal dynamics, suppressing adjacent-frame correlations while preserving longer-range dependencies (Eqn. 5a and 5b). 
+
+zt = cos θ zlf  
+
+> t
+
++ sin θ zhf  
+
+> t
+
+, (5a) 
+
+ztype  
+
+> t
+
+= ρtype ztype  
+
+> t−1
+
++
+
+q
+
+1 − ρ2type ϵtype  
+
+> t
+
+(5b) where the innovation terms are mutually independent standard Gaussian noise. The temporal autocorrelation is R(k) = cos 2 θ ρ k 
+
+> lf
+
++ sin 2 θ ρ k 
+
+> hf
+
+. Setting θ = π 
+
+> 4
+
+and 
+
+ρlf = −ρhf = ρ gives R(1) = 0 and R(2) = ρ2, decorrelating adjacent noise frames while preserving longer-range dependencies. Crucially, yielding R(1) = 0 
+
+does not imply high-frequency-dominated initialization. Spectrally, this decorre-lation balances energy across low and high frequencies, forming a kinematically neutral prior. By removing short-range temporal bias, SAN prevents the diffu-sion model from inheriting spurious local dependencies, providing an unbiased starting point for subsequent guidance. Since each autoregressive stream has unit variance, the initialization remains standard Gaussian and preserves the per-frame noise statistics expected by the pretrained diffusion model. 
+
+4.3 Acceleration-Domain Spectral Guidance 
+
+Although SAN (Sec. 4.2) does not explicitly enforce motion smoothness at ini-tialization, it provides a kinematically neutral baseline that mitigates short-term bias. However, as the denoising process proceeds, non-physical high-frequency perturbations may still accumulate naturally during the generative autoregres-sive rollout. Building on Sec. 4.1, we therefore introduce training-free guidance that regularizes the acceleration dynamics of predicted clean latents. To re-duce spectral leakage over short temporal windows, we employ Discrete Prolate Spheroidal Sequences (DPSS), which maximize in-band energy concentration as in Eqn. 6. 
+
+max 
+
+> v
+
+R W 
+
+> −W
+
+|V (f )|2df 
+
+R 1/2 
+
+> −1/2
+
+|V (f )|2df  (6) where V (f ) is the Fourier transform of v and W the target half-bandwidth. DPSS improves spectral localization over short temporal windows, reducing leakage in acceleration-energy estimation. We therefore project a onto the DPSS basis {vk}
+
+as βk = v⊤ 
+
+> k
+
+a and formally define the kinematic energy in Eqn. 7. 
+
+Ekin (ˆ z0) =  
+
+> N−1
+
+X
+
+> k=Kc
+
+∥βk∥2, (7) 8 Thanh-Nhan Vo et al. 
+
+where Kc denotes the cutoff index separating low- and high-frequency compo-nents. Rather than modifying model weights, we incorporate the kinematic prior through inference-time guidance directly on the latent factors defined in Eqn. 8. 
+
+˜z0 = ˆ z0 − η∇ˆz0 Ekin (ˆ z0), (8) where η controls the guidance strength. By operating in acceleration-frequency space, SAGA suppresses high-frequency temporal instability while preserving low-frequency motion dynamics and the pretrained generative prior. 
+
+## 5 Experimental Results 
+
+5.1 Experimental Setup Datasets. We evaluate SAGA on VBench [11] across multiple autoregressive-diffusion backbones, using prompt suites that assess subject consistency, back-ground consistency, temporal flickering, motion smoothness, aesthetic quality, and imaging quality. In particular, the evaluation comprises 326 prompts: 72 
+
+subject-centric, 86 scene-centric, 75 temporal-flickering, and 93 general prompts. For each configuration, we use identical prompts, random seeds, and sampling schedules for each baseline and its SAGA-enhanced counterpart. For ablation studies and human evaluation, we use a fixed subset of 100 prompts from MovieGen Bench [18], shared across all variants. This yields 100 videos per configuration and 100 matched pairs for the pairwise preference study comparing Self-Forcing with Self-Forcing+SAGA. 
+
+Evaluation Metrics. Since SAGA primarily targets temporal instability, we focus on four temporal dimensions from VBench. Subject Consistency (SC) measures cross-frame DINO [2] feature similarity, reflecting preservation of sub-ject identity and appearance. Background Consistency (BC) uses cross-frame CLIP [19] feature similarity to assess scene and background stability. Temporal Flickering (TF) quantifies short-term appearance fluctuations via frame-wise absolute differences after excluding naturally dynamic videos, with higher scores indicating fewer abrupt inter-frame changes. Motion Smoothness (MS) leverages the motion prior of a pretrained video frame-interpolation model [14] to eval-uate the smoothness of local motion transitions. For compact comparison, we define the aggregate temporal quality score as TQ = 14 (SC + BC + TF + MS) .
+
+All temporal metrics are reported on a 0–100 scale, where higher values indicate better temporal quality. We also report Aesthetic Quality (AQ), measured by the LAION aesthetic predictor, and Imaging Quality (IQ), measured by MUSIQ [12], to verify that temporal stabilization preserves per-frame visual quality. 
+
+Backbones. We evaluate SAGA on three 1.3B-parameter Wan2.1 autoregressive-diffusion backbones: CausVid [27], Self-Forcing [10], and Causal-Forcing [29]. All models use chunk-wise autoregressive rollout with three latent frames per block. SAGA is applied solely during inference, without updating backbone parameters. 
+
+Inference Configuration. We generate 81 RGB frames at 480 × 832 resolution (∼5s at 16 FPS) using four denoising steps and a classifier-free guidance scale of 
+
+3.0. For paired comparisons, each baseline and its SAGA-enhanced counterpart SAGA: Stable Acceleration Guidance for Autoregressive Video Generation 9                                                                                  
+
+> Table 1: Comparison of diffusion-based and autoregressive-diffusion video generation models on the VBench benchmark [11]. SC, BC, TF, MS, TQ, AQ, and IQ corre-spond to Subject Consistency, Background Consistency, Temporal Flickering, Motion Smoothness, Temporal Quality, Aesthetic Quality, and Image Quality, respectively. Best results are shown in bold , and second-best results are underlined.
+> Model Para. SC BC TF MS TQ AQ IQ
+> Diffusion Models
+> VideoCrafter-1.0 [4] 1.7B 95.10 98.04 98.93 95.67 96.94 62.67 65.46 CogVideoX [26] (ICLR 2025) 5.0B 96.45 96.71 98.97 97.20 97.33 61.88 63.33 Sora [16] -96.23 96.35 98.87 98.74 97.55 63.46 68.28 Wan2.1 [22] 1.3B 94.24 98.05 99.25 98.15 97.64 62.43 66.51
+> Autoregressive-Diffusion Hybrid Models
+> CausVid [27] (CVPR 2025) 1.3B 95.91 96.46 99.02 97.81 97.30 64.18 67.23 Self-Forcing [10] (NeurIPS 2025) 1.3B 95.60 96.20 99.00 98.38 97.30 66.33 69.60 Causal-Forcing [29] (ICML 2026) 1.3B 95.43 96.15 97.97 97.52 96.77 66.82 70.11
+> Our approaches
+> CausVid +SAGA 1.3B 96.71 96.59 98.96 98.04 97.58 64.39 67.46
+> Self-Forcing + SAGA 1.3B 96.63 96.95 99.19 98.85 97.91 66.48 70.51
+> Causal-Forcing + SAGA 1.3B 96.13 96.57 98.63 97.97 97.33 66.66 69.83
+
+use identical prompts, seeds, and sampling schedules. In particular, we adopt a single global configuration across all prompts and backbones: guidance strength 
+
+η = 3 , AR coefficient ρ = 0 .9, and DPSS time-bandwidth product N W = 1 .5.Since approximately 2N W DPSS modes are well concentrated in [−W, W ] [21], we set Kc = 3 as the cutoff between low-frequency concentrated modes and high-frequency acceleration modes. All experiments run on 1 × 80GB NVIDIA A100 GPU. 
+
+5.2 Quantitative Results Comparison with State-of-the-Art Methods. Table 1 compares SAGA with diffusion-based and autoregressive-diffusion video generation methods on VBench. Across CausVid, Self-Forcing, and Causal-Forcing, SAGA consistently improves Temporal Quality and Subject Consistency, indicating that its bene-fits generalize across different autoregressive backbones. These gains are consis-tent with the design in Secs. 4.2 and 4.3: the structured initialization controls short-range temporal correlations before rollout, while the acceleration-domain guidance suppresses unstable high-frequency dynamics during denoising. The strongest gains are obtained with Self-Forcing, where SAGA improves Subject Consistency from 95 .60 to 96 .63 , Background Consistency from 96 .20 
+
+to 96 .95 , Motion Smoothness from 98 .38 to 98 .85 , and Temporal Quality from 
+
+97 .30 to 97 .91 . Importantly, Image Quality also increases from 69 .60 to 70 .51 .This suggests that the band-limited regularization in Sec. 4.3 improves tempo-ral stability without indiscriminately smoothing the latent trajectory, thereby preserving low-frequency motion structure and per-frame visual fidelity. 
+
+Acceleration-Spectrum Analysis. To directly examine the mechanism under-lying our proposed approach, we analyze the latent acceleration spectra of 100 10 Thanh-Nhan Vo et al. 0.0 0.1 0.2 0.3 0.4 0.5        
+
+> Temporal frequency (cycles / latent step)
+> 10 1
+> 10 0
+> Absolute acceleration power
+> (a) Global spectrum
+> Self-Forcing
+> Self-Forcing + SAGA
+> HF: f > 0.375
+> 0.0 0.1 0.2 0.3 0.4 0.5
+> Temporal frequency (cycles / latent step)
+> 10 1
+> 10 0
+> Absolute acceleration power
+> (b) Local spectrum (window = 7)
+> Self-Forcing
+> Self-Forcing + SAGA
+> HF: f > 0.375
+> Accel.
+> RMS
+> Total
+> power
+> Global HF
+> power
+> Local HF
+> power
+> 0
+> 10
+> 20
+> 30
+> 40
+> Reduction after SAGA (%)
+> 16.7%
+> 30.2%
+> 25.7%
+> 28.4%
+> (c) Paired summary
+
+Fig. 3: Global and local acceleration spectra over 100 matched videos, together with paired reductions in acceleration RMS, total acceleration power, global high-frequency power, and local high-frequency power. The high-frequency band is defined as f > 
+
+0.375 , and error bars denote paired-bootstrap 95% confidence intervals. 
+
+matched videos generated by Self-Forcing and Self-Forcing+SAGA. As shown in Fig. 3, SAGA reduces acceleration RMS by 16 .7% and total acceleration power by 30 .2% , indicating fewer abrupt second-order temporal variations. More importantly, the reduction is pronounced in the high-frequency range predicted by the amplification analysis in Sec. 4.1. For f > 0.375 , SAGA reduces global and local high-frequency acceleration power by 25 .7% and 28 .4% , respec-tively. This spectral response aligns with the guidance objective in Sec. 4.3 and supports our hypothesis that autoregressive rollout instability is associated with high-frequency acceleration components and that suppressing these components improves temporal stability . The consistent global and local reductions further suggest that our proposed approach attenuates unstable dynamics throughout the rollout rather than only in isolated temporal segments. Since all comparisons use matched prompts and random seeds, the observed spectral changes can be attributed to the proposed guidance rather than prompt-level variation. 
+
+Human Preference Study. To assess whether the temporal improvements of SAGA are perceptually noticeable, we conduct a blind pairwise study on 100 
+
+prompts sampled from MovieGenBench [18]. In addition, ten participants com-pare randomized and anonymized video pairs generated by Self-Forcing [10] and Self-Forcing+SAGA. In particular, each participant evaluates 50 pairs, yielding 
+
+500 judgments in total, with each prompt assessed by at least three partici-pants. Evaluators select the video with better temporal consistency and overall perceptual quality or mark a tie when neither is clearly preferred. As shown in Fig. 4, SAGA receives 200 votes, compared with 142 for Self-Forcing and 158 ties. After prompt-level majority aggregation, SAGA wins on 0% 25% 50% 75% 100%   
+
+> Video-level
+> Per-vote
+> 58.0% (n=58)
+> 40.0% (n=200)
+> 8.0%
+> 31.6% (n=158)
+> 34.0% (n=34)
+> 28.4% (n=142)
+> All pairwise outcomes, including ties
+> SAGA Tie Self-Forcing
+
+Fig. 4: Human preference study with tie judgments. Pairwise comparisons between Self-Forcing and Self-Forcing+SAGA are reported at both the individual-vote and video-level majority aggregation levels, with ties retained as a separate outcome. SAGA: Stable Acceleration Guidance for Autoregressive Video Generation 11   
+
+> Fig. 5: Qualitative comparison between Self-Forcing and Self-Forcing+SAGA using uniformly sampled video frames. Red dashed boxes highlight temporal artifacts in the Self-Forcing baseline, including structural drift, background inconsistency, and local appearance flickering. Best viewed in color and zoomed in.
+
+58 videos versus 34 , with only 8 ties. Excluding ties, SAGA achieves 58 .5% of vote-level and 63 .0% of video-level preferences. The larger margin after aggrega-tion suggests that the improvements are consistent across prompts rather than driven by isolated judgments. Although the number of ties indicates that many comparisons remain perceptually close, the overall preference for SAGA comple-ments the automatic metrics and shows that improved rollout stability translates into perceptibly better temporal coherence and fewer temporal artifacts. 
+
+5.3 Qualitative Results 
+
+Fig. 5 qualitatively compares Self-Forcing with and without SAGA on repre-sentative text-to-video prompts. Although the baseline often produces plausi-ble motion, it exhibits localized rollout instability, including structural drift, abrupt background variation, and transient distortions around moving or high-detail regions. In contrast, SAGA yields more coherent frame-to-frame evolution while preserving prompt semantics and visual content. This behavior is con-sistent with the complementary designs in Secs. 4.2 and 4.3, where structured initialization controls short-range temporal correlations and acceleration-domain guidance suppresses unstable high-frequency dynamics during denoising. Across the examples, our approach better preserves greenhouse geometry and plant structure, maintains more consistent scene boundaries and distant build-ings under camera motion, and reduces local appearance fluctuations around the human subject and surrounding crowd. These observations suggest that SAGA mitigates localized temporal perturbations before they propagate into visible structural drift over autoregressive rollout. The qualitative trends are consistent with the gains in Subject Consistency, Background Consistency, Motion Smooth-12 Thanh-Nhan Vo et al.                                           
+
+> Table 2: Ablation study of SAGA’s components, evaluating the contributions of struc-tured autoregressive noise initialization (SAN) and spectral guidance (SG). Best results are shown in bold , and second-best results are underlined.
+> SAN SG SC BC TF MS TQ AQ IQ
+> ✗✗95.60 96.20 99.00 98.38 97.30 66.33 69.60
+> ✗✓96.09 96.53 99.07 98.62 97.58 66.15 68.82
+> ✓✗95.87 96.41 99.19 98.53 97.50 66.59 70.03
+> ✓✓96.63 96.95 99.19 98.85 97.91 66.48 70.51
+
+ness, and Temporal Quality in Table 1, further supporting the acceleration-domain motivation in Sec. 4.1 that suppressing unstable high-frequency compo-nents improves temporal coherence without degrading per-frame visual fidelity. 
+
+## 6 Ablation Study 
+
+6.1 Effect of Key Components 
+
+To isolate the contribution of each component of our proposed approach, we ablate structured autoregressive noise initialization (SAN) from Sec. 4.2 and acceleration-domain spectral guidance (SG) from Sec. 4.3 on Self-Forcing. As shown in Table 2, SG alone improves Temporal Quality from 97 .30 to 97 .58 ,with consistent gains in Subject Consistency, Background Consistency, Tempo-ral Flickering, and Motion Smoothness. Specifically, this trend aligns with the acceleration-spectrum analysis in Fig. 3 and supports the motivation in Sec. 4.1 that suppressing high-frequency acceleration dynamics improves rollout stabil-ity. However, the lower Aesthetic and Image Quality scores indicate a fidelity trade-off when SG is applied without a structured temporal prior. SAN alone improves Temporal Quality to 97 .50 and Image Quality to 70 .03 ,suggesting that controlling short-range temporal correlations yields a better-conditioned initialization while preserving visual fidelity. Combining SAN and SG achieves the strongest performance, increasing Temporal Quality to 97 .91 
+
+and Image Quality to 70 .51 , consistent with Table 1 and the reduced temporal artifacts in Fig. 5. These results show the complementary roles of the two com-ponents. SAN stabilizes the initial temporal trajectory, whereas SG suppresses residual high-frequency dynamics during denoising. Thus, they improve temporal coherence while mitigating the fidelity degradation observed with SG alone. 
+
+6.2 Effect of Spectral Decomposition Basis 
+
+We study the spectral basis used by the acceleration-domain guidance in Sec. 4.3. The main challenge is to separate low-frequency motion structure from the high-frequency acceleration components identified in Sec. 4.1 over short autoregres-sive windows. Although FFT provides a direct frequency decomposition, finite-window estimation suffers from spectral leakage and inadvertently penalizes valid low-frequency motion. Thus, we compare FFT- and Slepian-based guidance using the same backbones, prompts, random seeds, and sampling configurations. As shown in Table 3, both variants substantially outperform Self-Forcing, increasing SAGA: Stable Acceleration Guidance for Autoregressive Video Generation 13                                   
+
+> Table 3: Ablation on the spectral decomposition basis used in acceleration-domain guidance. We compare the Fourier basis (FFT) with the Slepian basis constructed from DPSS. Best results are shown in bold , and second-best results are underlined.
+> Model Basis SC BC TF MS TQ AQ IQ
+> Self-Forcing –95.60 96.20 99.00 98.38 97.30 66.33 69.60
+> Self-Forcing + SAGA FFT 96.60 96.91 99.19 98.85 97.89 66.50 70.49
+> Self-Forcing + SAGA Slepian 96.63 96.95 99.19 98.85 97.91 66.48 70.51
+
+Temporal Quality from 97 .30 to 97 .89 with FFT and 97 .91 with Slepian. This result complements the acceleration-spectrum analysis in Fig. 3 and indicates that the primary gain arises from suppressing high-frequency acceleration dy-namics rather than from a specific spectral basis. Nevertheless, Slepian achieves the best Subject Consistency, Background Consistency, and Image Quality while matching FFT in Temporal Flickering and Motion Smoothness. While the quan-titative gap between FFT and Slepian is marginal, the fact that both variants consistently outperform the baseline empirically confirms that the core novelty of SAGA lies in the acceleration-domain guidance framework itself, rather than the specific spectral basis. Nonetheless, strictly from a mathematical perspective, standard Fourier truncation is known to suffer from broader spectral leakage on small window sizes compared to Slepian sequences. Therefore, rather than claiming DPSS as the primary theoretical contribution, we retain Slepian as our default, mathematically principled implementation choice, as it provides a rigor-ously bounded spectral concentration without adding computational overhead. 
+
+6.3 Effect of Autoregressive Rollout Granularity 
+
+We study the effect of autoregressive rollout granularity on SAGA using Causal-Forcing as backbone. Since the structured initialization in Sec. 4.2 models inter-frame dependencies, and the spectral guidance in Sec. 4.3 estimates acceleration dynamics over short temporal windows, we compare chunk-wise and frame-wise rollout to assess how temporal support affects kinematic regularization. As shown in Table 4, SAGA consistently improves chunk-wise rollout, in-creasing Subject Consistency from 95 .43 to 96 .13 , Background Consistency from 
+
+96 .15 to 96 .57 , Temporal Flickering from 97 .97 to 98 .63 , Motion Smoothness from 
+
+97 .52 to 97 .97 , and Temporal Quality from 96 .77 to 97 .33 . By contrast, frame-wise rollout shows only marginal changes, with Temporal Quality decreasing slightly from 94 .12 to 94 .05 . This behavior is expected, as strict frame-wise roll-out lacks sufficient temporal support for reliable acceleration estimation. SAGA is therefore better suited to practical chunk-wise rollout, where multiple frames are jointly available for kinematic guidance. However, this limitation does not hinder SAGA’s generalizability, as it is specifically designed for, and highly ef-fective in, the prevalent chunk-wise setting. Specifically, this contrast indicates that SAGA benefits from multi-frame temporal support, which enables more reliable estimation and suppression of the high-frequency acceleration dynamics identified in Sec. 4.1. This finding is also consistent with the spectral analysis in Fig. 3, suggesting that acceleration-domain regularization is most effective when local temporal structure is explicitly available within each autoregressive block. 14 Thanh-Nhan Vo et al. 
+
+Table 4: Evaluation of SAGA under two autoregressive rollouts: chunkwise and frame-wise generation. Performance is measured using VBench metrics [11], including Subject Consistency (SC), Background Consistency (BC), Temporal Flickering (TF), Motion Smoothness (MS), Temporal Quality (TQ), Aesthetic Quality (AQ), and Image Qual-ity (IQ). Best results are shown in bold , and second-best results are underlined.                                    
+
+> Model SC BC TF MS TQ AQ IQ
+> Chunkwise AutoRegressive
+> Causal-Forcing 95.43 96.15 97.97 97.52 96.77 66.82 70.11
+> Causal-Forcing + SAGA 96.13 96.57 98.63 97.97 97.33 66.66 69.83
+> Framewise AutoRegressive
+> Causal-Forcing 91.49 93.12 94.64 97.23 94.12 65.97 69.59
+> Causal-Forcing + SAGA 91.23 93.12 94.66 97.20 94.05 65.85 69.64
+
+6.4 Long-Horizon Video Generation 5 10 30 
+
+> Video Length (s)
+> 94.5
+> 95.0
+> 95.5
+> 96.0
+> 96.5
+> 97.0
+> Temporal Quality Score
+> Baseline (Self-forcing)
+> Ours
+
+Fig. 6: Long-horizon evalua-tion of Self-Forcing and Self-Forcing+SAGA at different video durations. 
+
+Autoregressive video generation becomes increasingly challenging over long rollout horizons, as local temporal perturbations can propagate through recursively generated causal context. To assess SAGA under ex-tended rollout, we compare Self-Forcing [10] and Self-Forcing+SAGA at durations of 5, 10 ,and 30 seconds using VBench Temporal Qual-ity [11]. As shown in Fig. 6, Temporal Quality decreases for both methods as the rollout horizon grows, indicating accumulated tempo-ral errors over longer sequences. Nevertheless, SAGA consistently outperforms Self-Forcing at all durations, with the advan-tage persisting at 30 seconds. This trend extends the short-horizon gains in Table 1 and aligns with the spectral evidence in Fig. 3. Specifically, the struc-tured initialization in Sec. 4.2 improves the initial temporal trajectory, while the guidance in Sec. 4.3 suppresses the high-frequency acceleration dynamics identi-fied in Sec. 4.1. The persistent advantage suggests that SAGA mitigates, though does not eliminate, temporal instability propagation across autoregressive steps. 
+
+## 7 Conclusion & Future Work 
+
+In this work, we have presented SAGA, a training-free framework for stabiliz-ing autoregressive video diffusion through acceleration-domain spectral guidance and structured stochastic initialization. By targeting high-frequency perturba-tions amplified in latent acceleration space, SAGA improves rollout stability while preserving low-frequency motion structure and the pretrained generative prior. Experiments across multiple backbones demonstrate consistent tempo-ral gains without retraining or architectural changes, while ablations, spectral analysis, and human evaluation validate the complementary design and percep-tual benefits. Our findings highlight latent acceleration dynamics as an effective target for stabilizing autoregressive video generation. Future work will explore adaptive spectral regularization and its extension to longer-horizon generation. SAGA: Stable Acceleration Guidance for Autoregressive Video Generation 15 
+
+## References 
+
+1. Bansal, A., Chu, H.M., Schwarzschild, A., Sengupta, R., Goldblum, M., Geiping, J., Goldstein, T.: Universal guidance for diffusion models. In: International Conference on Learning Representations. vol. 2024, pp. 51304–51323 (2024) 4 2. Caron, M., Touvron, H., Misra, I., Jégou, H., Mairal, J., Bojanowski, P., Joulin, A.: Emerging properties in self-supervised vision transformers. In: Proceedings of the IEEE/CVF international conference on computer vision. pp. 9650–9660 (2021) 83. Chen, B., Martí Monsó, D., Du, Y., Simchowitz, M., Tedrake, R., Sitzmann, V.: Diffusion forcing: Next-token prediction meets full-sequence diffusion. Advances in Neural Information Processing Systems 37 , 24081–24125 (2025) 1, 3 4. Chen, H., Xia, M., He, Y., Zhang, Y., Cun, X., Yang, S., Xing, J., Liu, Y., Chen, Q., Wang, X., Weng, C., Shan, Y.: Videocrafter1: Open diffusion models for high-quality video generation (2023) 1, 9 5. Chung, H., Kim, J., Mccann, M.T., Klasky, M.L., Ye, J.C.: Diffusion posterior sam-pling for general noisy inverse problems. In: The Eleventh International Conference on Learning Representations (2023) 4 6. Deng, H., Pan, T., Diao, H., Luo, Z., Cui, Y., Lu, H., Shan, S., Qi, Y., Wang, X.: Autoregressive video generation without vector quantization. In: International Conference on Learning Representations. vol. 2025, pp. 44730–44745 (2025) 3 7. Dhariwal, P., Nichol, A.: Diffusion models beat gans on image synthesis. Advances in neural information processing systems 34 , 8780–8794 (2021) 4 8. Han, W., Kang, S., Jun, Y., Chen, M.H., Yang, F.E., Hwang, S.J.: Physics in 2-steps: Locking motion priors before visual refinement erases them. In: ICML 2026 Workshop on Foundations of Deep Generative Models: Understanding Memoriza-tion, Generalization, and Reasoning (2026) 2, 3 9. Ho, J., Salimans, T.: Classifier-free diffusion guidance (2022) 4 10. Huang, X., Li, Z., He, G., Zhou, M., Shechtman, E.: Self forcing: Bridging the train-test gap in autoregressive video diffusion. Advances in Neural Information Processing Systems 38 , 167283–167308 (2026) 1, 2, 3, 4, 8, 9, 10, 14 11. Huang, Z., He, Y., Yu, J., Zhang, F., Si, C., Jiang, Y., Zhang, Y., Wu, T., Jin, Q., Chanpaisit, N., Wang, Y., Chen, X., Wang, L., Lin, D., Qiao, Y., Liu, Z.: VBench: Comprehensive benchmark suite for video generative models. In: Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (2024) 2, 8, 9, 14 12. Ke, J., Wang, Q., Wang, Y., Milanfar, P., Yang, F.: Musiq: Multi-scale image quality transformer. In: Proceedings of the IEEE/CVF international conference on computer vision. pp. 5148–5157 (2021) 8 13. Li, J., Fu, X., Peng, X., Chen, W., Zheng, Y., Zhao, T., Wang, J., Chen, F., Wang, X., So, H.K.H.: Train short, inference long: Training-free horizon extension for autoregressive video generation. arXiv preprint arXiv:2602.14027 (2026) 4 14. Li, Z., Zhu, Z.L., Han, L.H., Hou, Q., Guo, C.L., Cheng, M.M.: Amt: All-pairs multi-field transforms for efficient frame interpolation. In: Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition. pp. 9801– 9810 (2023) 8 15. Liang, J., Fan, Y., Zhang, K., Timofte, R., Van Gool, L., Ranjan, R.: Movideo: Motion-aware video generation with diffusion model. In: European conference on computer vision. pp. 56–74. Springer (2024) 2, 3 16 Thanh-Nhan Vo et al. 16. Liu, Y., Zhang, K., Li, Y., Yan, Z., Gao, C., Chen, R., Yuan, Z., Huang, Y., Sun, H., Gao, J., et al.: Sora: A review on background, technology, limitations, and opportunities of large vision models. arXiv preprint arXiv:2402.17177 (2024) 9 17. Ma, Y., Feng, K., Hu, Z., Wang, X., Wang, Y., Zheng, M., Wang, B., Wang, Q., He, X., Wang, H., et al.: Controllable video generation: A survey. arXiv preprint arXiv:2507.16869 (2025) 3 18. Polyak, A., Zohar, A., Brown, A., Tjandra, A., Sinha, A., Lee, A., Vyas, A., Shi, B., Ma, C.Y., Chuang, C.Y., et al.: Movie gen: A cast of media foundation models. arXiv preprint arXiv:2410.13720 (2024) 8, 10 19. Radford, A., Kim, J.W., Hallacy, C., Ramesh, A., Goh, G., Agarwal, S., Sastry, G., Askell, A., Mishkin, P., Clark, J., et al.: Learning transferable visual models from natural language supervision. In: International conference on machine learning. pp. 8748–8763. PmLR (2021) 8 20. Slepian, D.: Prolate spheroidal wave functions, fourier analysis, and uncer-tainty—v: The discrete case. Bell System Technical Journal 57 (5), 1371–1430 (1978) 2, 4 21. Thomson, D.J.: Spectrum estimation and harmonic analysis. Proceedings of the IEEE 70 (9), 1055–1096 (1982) 2, 4, 9 22. Wan, T., Wang, A., Ai, B., Wen, B., Mao, C., Xie, C.W., Chen, D., Yu, F., Zhao, H., Yang, J., Zeng, J., Wang, J., Zhang, J., Zhou, J., Wang, J., Chen, J., Zhu, K., Zhao, K., Yan, K., Huang, L., Feng, M., Zhang, N., Li, P., Wu, P., Chu, R., Feng, R., Zhang, S., Sun, S., Fang, T., Wang, T., Gui, T., Weng, T., Shen, T., Lin, W., Wang, W., Wang, W., Zhou, W., Wang, W., Shen, W., Yu, W., Shi, X., Huang, X., Xu, X., Kou, Y., Lv, Y., Li, Y., Liu, Y., Wang, Y., Zhang, Y., Huang, Y., Li, Y., Wu, Y., Liu, Y., Pan, Y., Zheng, Y., Hong, Y., Shi, Y., Feng, Y., Jiang, Z., Han, Z., Wu, Z.F., Liu, Z.: Wan: Open and advanced large-scale video generative models. arXiv preprint arXiv:2503.20314 (2025) 1, 9 23. Wang, J., Zhang, F., Li, X., Tan, V.Y., Pang, T., Du, C., Sun, A., Yang, Z.: Er-ror analyses of auto-regressive video diffusion models: A unified framework. arXiv preprint arXiv:2503.10704 (2025) 2, 4 24. Xing, Z., Feng, Q., Chen, H., Dai, Q., Hu, H., Xu, H., Wu, Z., Jiang, Y.G.: A survey on video diffusion models. ACM Computing Surveys 57 (2), 1–42 (2024) 1, 325. Yang, X., Li, B., Zhang, Y., Yin, Z., Bai, L., Ma, L., Wang, Z., Cai, J., Wong, T.T., Lu, H., et al.: Vlipp: Towards physically plausible video generation with vision and language informed physical prior. In: Proceedings of the IEEE/CVF International Conference on Computer Vision. pp. 12360–12370 (2025) 2, 3 26. Yang, Z., Teng, J., Zheng, W., Ding, M., Huang, S., Xu, J., Yang, Y., Hong, W., Zhang, X., Feng, G., et al.: Cogvideox: Text-to-video diffusion models with an expert transformer. In: International Conference on Learning Representations. vol. 2025, pp. 83048–83077 (2025) 1, 9 27. Yin, T., Zhang, Q., Zhang, R., Freeman, W.T., Durand, F., Shechtman, E., Huang, X.: From slow bidirectional to fast autoregressive video diffusion models. In: CVPR (2025) 1, 3, 4, 8, 9 28. Yin, Z., Chen, K., Bai, X., Jiang, R., Li, J., Li, H., Liu, J., Xiang, Y., Yu, J., Zhang, M.: A survey: spatiotemporal consistency in video generation. ACM Computing Surveys 58 (12), 1–41 (2026) 3 29. Zhu, H., Zhao, M., He, G., Su, H., Li, C., Zhu, J.: Causal forcing: Autoregressive diffusion distillation done right for high-quality real-time interactive video genera-tion. arXiv preprint arXiv:2602.02214 (2026) 1, 3, 8, 9
