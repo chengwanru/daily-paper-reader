@@ -1,0 +1,39 @@
+{
+  "label": "2026-07-11",
+  "date": "2026-07-11",
+  "generated_at": "2026-07-11T21:08:13",
+  "count": 2,
+  "papers": [
+    {
+      "paper_id": "202607/11/2607.08770v1-longe2v-long-horizon-event-based-video-reconstruction-prediction-and-frame-interpolation-with-video-diffusion-models",
+      "section": "quick",
+      "title_en": "LongE2V: Long-Horizon Event-based Video Reconstruction, Prediction, and Frame Interpolation with Video Diffusion Models",
+      "authors": "Cheng-De Fan, Chun-Wei Tuan Mu, Chen-Wei Chang, Chin-Yang Lin, Kun-Ru Wu, Yu-Chee Tseng, Yu-Lun Liu",
+      "date": "2026-07-09",
+      "pdf": "https://arxiv.org/pdf/2607.08770v1",
+      "score": "7.0",
+      "evidence": "视频扩散先验用于预测和插帧，支持类似世界模型的视频预测",
+      "tldr": "从稀疏事件流恢复高质量视频是当前挑战，回归方法模糊纹理，生成模型长时稳定性差。LongE2V通过微调预训练视频扩散模型，联合处理重建、预测和帧插值。引入自回归展开与自适应上下文切换抑制长时间漂移，重编码对齐与交叉残差校正确保双向一致性，事件体素密度增强提升鲁棒性。在真实基准上极大超越现有方法，实现优异的时间相干性与零样本泛化。",
+      "tags": "query:video-wam",
+      "abstract_en": "Recovering high-quality video from sparse event streams is a challenging task. Regression methods often blur textures, while existing generative models struggle with long-term stability. We propose LongE2V, a novel approach that leverages pre-trained video diffusion priors to jointly handle event-based video reconstruction, prediction, and frame interpolation. By fine-tuning a foundational video model, our approach achieves high data efficiency and superior perceptual quality. We introduce Autoregressive Unrolling and Adaptive Context Switching to mitigate temporal drift in extremely long sequences. We also propose Reencoding Alignment with Cross Residual Correction to ensure precise bidirectional consistency during frame interpolation. Furthermore, Event Voxel Density Augmentation ensures robustness across varying sensor resolutions. Extensive experiments on real-world benchmarks demonstrate that LongE2V outperforms state-of-the-art methods across all three tasks, exhibiting exceptional temporal coherence and zero-shot generalization. Project page: https://cdfan0627.github.io/LongE2V-page/",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "paper_id": "202607/11/2607.04816v1-cac-vla-context-gated-action-conditioning-for-vision-language-action-models",
+      "section": "quick",
+      "title_en": "CAC-VLA: Context-Gated Action Conditioning for Vision-Language-Action Models",
+      "authors": "Yifu Xiong, Wenhao Yu, Jiaxuan Lin, Bojun Zou, Jiahao Li, Lu Zhang, Yanyong Zhang, Jianmin Ji",
+      "date": "2026-07-06",
+      "pdf": "https://arxiv.org/pdf/2607.04816v1",
+      "score": "6.0",
+      "evidence": "上下文门控动作条件化用于VLA，改进机器人动作生成",
+      "tldr": "视觉-语言-动作模型在机器人操作中表现优异，但其视觉语言表征未针对动作条件优化，导致动作专家需自行弥合多模态理解与精确控制的差距。为此，本文提出CAC-VLA框架，通过轻量级潜在动作接口直接在VLM内部预测由粗到细的潜在动作，并利用上下文门控自适应调节其对动作专家的影响。在LIBERO和LIBERO-Plus上分别取得98.3%和89.5%的平均成功率。该方法实现了VLM原生的动作条件化，为连续专家控制提供了有效接口。",
+      "tags": "query:video-wam",
+      "abstract_en": "Vision-Language-Action (VLA) models have become a promising paradigm for generalist robot manipulation, where visual-language representations are used to condition continuous action generation. However, these representations are not explicitly optimized for action conditioning, leaving the action expert to bridge the gap between multimodal understanding and precise motor control. Recent action-reasoning methods introduce additional modules to generate explicit action plans or action-space reasoning signals, demonstrating the benefit of action-level guidance but often requiring separate action-generation frameworks. We propose CAC-VLA, a Context-Gated Action Conditioning framework that learns a lightweight latent-action interface directly within the VLM. Instead of generating executable trajectories, CAC-VLA trains the VLM to predict coarse-to-fine latent actions, which are structured representations encoded from future action segments, and adaptively leverages them to condition the action expert via a context gate. This enables VLM-native action conditioning while calibrating the influence of latent-action guidance on expert action generation. Experiments on LIBERO and LIBERO-Plus demonstrate the effectiveness of CAC-VLA, achieving 98.3% average success rate on LIBERO and 89.5% LIBERO-Plus, suggesting that context-gated latent-action conditioning is an effective interface for continuous expert control.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    }
+  ],
+  "errors": []
+}
