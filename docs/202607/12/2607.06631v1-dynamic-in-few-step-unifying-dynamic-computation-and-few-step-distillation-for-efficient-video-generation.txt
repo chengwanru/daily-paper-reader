@@ -1,0 +1,709 @@
+Title: Dynamic-in-Few-Step: Unifying Dynamic Computation and Few-Step Distillation for Efficient Video Generation
+
+URL Source: https://arxiv.org/pdf/2607.06631v1
+
+Published Time: Thu, 09 Jul 2026 00:05:09 GMT
+
+Number of Pages: 19
+
+Markdown Content:
+# Dynamic-in-Few-Step: Unifying Dynamic Computation and Few-Step Distillation for Efficient Video Generation 
+
+Yu Cheng 1,2,3 Siyue Yao 3,4 Zhongang Qi 3,† Shanyan Guan 3 Wei Li 3 Fajie Yuan 2,†
+
+> 1
+
+Zhejiang University 2Westlake University 3BlueImage, vivo 4Xian Jiaotong-Liverpool University 
+
+chengyu@westlake.edu.cn, qizhongang@vivo.com, yuanfajie@westlake.edu.cn 
+
+> †
+
+Corresponding authors. 
+
+Abstract 
+
+Video Diffusion Models (VDMs) have demonstrated superior generation quality but suffer from prohibitive computational costs. While recent few-step distilla-tion techniques significantly accelerate inference, they typically enforce a static model architecture across all denoising stages, ignoring the varying computational demands inherent to different noise levels. In this work, we propose a novel post-training acceleration framework that exploits this redundancy by integrating dynamic structural sparsification directly into the distillation process. Unlike con-ventional post-hoc compression applied to a fixed diffusion pipeline, our approach jointly optimizes the denoising steps and structured model sparsity, transforming a pre-trained VDM into a compact, step-specific Mixture-of-Models (MoM). To address the training instability arising from this joint optimization, we introduce a Progressive Training Strategy coupled with an Output Rollout Mechanism, which ensures the coherent learning of structural decisions across timesteps. Furthermore, we develop a specialized inference engine to deploy the resulting MoM efficiently. Our method is orthogonal to existing acceleration techniques and highly effective: On Wan-14B, it removes 24% of the per-step FLOPs on top of 4-step distillation, adding a 1.2 × wall-clock gain and reaching a 30 × speedup over the 50-step teacher while preserving competitive generation quality. 
+
+Keywords: Video Generation Speedup · Dynamic Network · Efficient Diffusion 
+
+1 Introduction 
+
+Video Diffusion Models (VDMs) [ 30 , 10 , 25 , 17 ] have revolutionized video creation, enabling breakthroughs in simulation, advertising, and film production. However, their practical deployment is severely constrained by high inference latency and substantial computational resource requirements. Recent advancements in post-training acceleration have been significant, focusing on step reduction [43 , 27 , 19 ], attention optimization [ 40 , 37 ], quantization [ 15 ], token compression [ 2], and streamlined generation [ 36 , 13 ]. Despite notable progress, these methods share a common limitation: they treat the denoising network as a static architecture, applying the same heavy computation uniformly across all timesteps. However, the diffusion process is inherently heterogeneous. Existing works [ 6 , 41 ]observe that generation proceeds in a coarse-to-fine manner, where the model first constructs global structures and later refines high-frequency details. This suggests that distinct denoising stages require varying computational capacities, raising a pivotal question: Can we exploit this heterogeneity to dynamically allocate computation across timesteps, removing step-specific redundancy to accelerate VDMs? 
+
+> Preprint. arXiv:2607.06631v1 [cs.CV] 7 Jul 2026
+
+While prior works [ 41 , 42 ] have explored dynamic computation, they are typically trained under standard denoising objectives and often become unstable or ineffective when adapted to few-step distillation [ 41 ]. Given that few-step distillation has become the de facto paradigm for efficient VDMs, this incompatibility severely restricts their utility. Moreover, straightforward decoupled pipelines—either “prune-then-distill” or “distill-then-prune”—are insufficient to resolve this mis-match. Specifically, pruning before distillation limits the model capacity required to learn the complex few-step mapping, while pruning after distillation disrupts the carefully aligned generation trajectory, leading to severe error accumulation, see Section 5.4. To translate dynamic computation into practical efficiency, we formulate dynamic pruning and few-step distillation as a unified optimization problem. Leveraging distribution matching—a robust objective validated in 3D generation [ 32 ] and attention optimization [ 13 , 39 ]—we distill a dynamic structure specifically tailored to the compressed generation trajectory. This results in a step-aware Mixture-of-Models (MoM) framework capable of high-quality 4-step inference, where the network architecture is adaptively pruned at each step, inherently bypassing the incompatibility worries associated with post-hoc distillation. Achieving this joint objective is non-trivial, as simultaneously optimizing for parameter sparsity and step reduction leads to gradient conflicts and training instability. To overcome this, we introduce a Progressive Training Strategy augmented with an Output Rollout mechanism. Our core insight is that diffusion is a sequential process where the ultimate objective is the perceptual quality of the final output. Guided by this, we adopt a reverse-order curriculum: this strategy first stabilizes the generation quality of the later denoising stages before progressively sparsifying the earlier, noisier stages. Furthermore, we leverage the output rollout strategy in Distribution Matching Distillation (DMD) [ 34 , 35 ], enabling supervision based on the final output distribution. These designs ensure the stable training of highly efficient models. Finally, to translate theoretical sparsity into practical acceleration, we implement a specialized inference engine that effectively leverages this dynamic mixture of models. Our contributions are summarized as follows: 1. We propose an end-to-end framework that jointly optimizes few-step distillation and dy-namic structural sparsification, yielding a step-aware Mixture-of-Models that removes both temporal and parametric redundancy. 2. We introduce a progressive training plan combined with an output rollout strategy. This design effectively coordinates the co-optimization and ensures convergence to a high-quality solution. 3. Equipped with a specialized inference engine for the MoM architecture, our method removes 24% of per-step FLOPs on Wan-14B and adds a 1.2 × speedup over 4-step distillation, giving a 30 × speedup over the 50-step teacher with competitive VBench scores. 
+
+2 Related Work 
+
+2.1 Efficient Video Diffusion Generation 
+
+Acceleration techniques for pretrained Video Diffusion Models can be broadly categorized into training-free optimization [ 21 , 3 , 5 , 22 ] and post-training frameworks. We focus on the latter category in this work. Existing post-training approaches explore multiple dimensions of optimization. Step distillation methods [ 43 , 24 , 6 , 27 ] compress the long sampling trajectory into a few-step regime (e.g., 4–8 steps), substantially reducing inference latency. Attention optimization techniques [ 39 , 37 , 14 ]alleviate quadratic complexity through linearization or sparsification. Token reduction strategies [ 2]employ fine-tuning to adapt high-compression VAEs, effectively shortening spatial-temporal tokens. Causal distillation methods [ 13 , 36 ] convert slow bidirectional generation into efficient streaming generation. Quantization-aware training techniques [ 15 ] utilize low-bit parameterization to reduce inference overhead. These approaches typically treat the denoising network as a static architecture, applying uniform computation across all timesteps. Our approach offers an orthogonal optimization perspective by targeting the structural redundancy inherent in the multi-step diffusion process, introducing step-dependent dynamic optimization. 22.2 Structural Pruning and Dynamic Networks 
+
+Structural pruning removes redundant higher-level units (e.g., channels, filters, and blocks) to reduce parameters and FLOPs while preserving accuracy. Classical structural pruning identifies unimportant units based on magnitude [ 12 , 9], importance scoring [ 23 ], or gradient-sensitive criteria [ 28 ], and derives a compact static architecture for deployment. Dynamic networks extend this paradigm by introducing conditional computation, representative methods like [ 18 , 11 ] dynamically adjust network depth or width based on input tokens. A prominent example is Mixture-of-Experts (MoE) [ 7, 26 ], which activates subsets of parameters—typically in feed-forward layers—through learned routing mechanisms. While effective for scaling model capacity, these token-dependent dynamic structures impose strict requirements on routing strategies and system-level implementation to achieve practical wall-clock acceleration [7, 4]. In diffusion models, the varying noise levels across timesteps introduce a unique dimension of heterogeneity. DyDiT series [ 41 , 42 ] explores this by proposing time-dependent pruning, learning a specific network structure for each timestep. As the routing depends only on the diffusion step, efficient batched inference is friendly supported without complex routing implementations. However, DyDiT is trained under standard multi-step denoising objectives, lacking the mechanism to co-optimize with step reduction. As demonstrated in their original paper [ 41 ], combining it with step distillation leads to model collapse or ineffective training. This incompatibility with modern few-step distillation frameworks severely restricts its practical utility. We address this issue by designing a 
+
+joint optimization method. 
+
+2.3 Step-Aware Mixture-of-Models 
+
+Our method transforms a pretrained VDM into a step-aware Mixture-of-Models (MoM), where networks are pruned distinctly for different denoising stages. Several large-scale generative models, such as ERNIE-ViLG 2.0 [ 8] and Wan2.2 [ 29 ], also adopt MoM designs by training separate denoisers for different noise intervals. Their objective is to expand model capacity during pre-training to improve generation quality. Similarly, PhasedDMD [ 6] introduces a MoM structure within step distillation primarily for increased model expressiveness. Conversely, we employ MoM as a post-training acceleration mechanism. We exploit the structural heterogeneity across noise levels to compress a pre-trained model, aiming for efficiency rather than capacity expansion. 
+
+3 Preliminaries 
+
+We perform step distillation based on the Distribution Matching Distillation method with specific mod-ifications. Additionally, we apply the tri-level pruning scheme from [ 33 ] for structural sparsification. We briefly introduce these methods in this section. 
+
+3.1 Modified Distribution Matching Distillation 
+
+We employ Decoupled Distribution Matching Distillation (D-DMD) [ 20 ] to distill a multi-step diffusion model into a T -step student generator Gθ (we set T = 4 ). The student operates on a discrete set of timesteps T = {t1, t 2, . . . , t T }, where t1 denotes the initial highest noise level and 
+
+tT denotes the final lowest noise level prior to the clean data. The objective is to minimize the Kullback-Leibler (KL) divergence DKL (pθ ∥preal ) between the student distribution pθ and the real data distribution preal . Since direct optimization of this divergence is intractable, DMD-based methods approximate the gradient ∇θ DKL with respect to the student parameters θ using score estimation (refer to [ 34 ] for details). Specifically, D-DMD re-formulates the gradient by explicitly expanding the teacher’s Classifier-Free Guidance (CFG) term and rearranging the components, resulting the following decoupled form: 3∇θ DKL ≈ Et∈T ,τ DM ,τ CA                   
+
+> −
+> (sreal (xτDM , c )−sfake (xτDM , c ))
+> |{z }
+> Distribution Matching: ∆DM
+> + ( α−1)  sreal (xτCA , c )−sreal (xτCA ,∅)|{z }
+> CFG Augmentation: ∆CA
+> 
+> ∂G θ(zt)
+> ∂θ
+> ,
+
+(1) where zt denotes the latent input at few-step noise level t ∈ T , and xτ represents the generator output re-noised to a continuous noise level τ (τ = 0 for pure noise, τ = 1 for clean data). The terms c and 
+
+∅ denote the text condition and the null condition, respectively. sreal estimates the score of the real data distribution using the frozen pre-trained teacher network, and sfake approximates the student’s score via a fake network trained concurrently with a denoising objective on Gθ ’s generated samples. The gradient comprises two components: ∆CA encapsulates the CFG pattern ( α is the CFG guidance scale), acting as the distillation engine that injects knowledge of teacher model to the student. ∆DM 
+
+serves as a regularizer, prevents the training process from diverging and ensures the quality of the final output. Following D-DMD, we apply decoupled re-noising schedules: τCA ∼ U [t, 1] focuses on refining fine-grained details in later denoising stages, whereas τDM ∼ U [0 , 1] provides global regularization across all noise levels. Moreover, we remove the ODE trajectory initialization in standard DMD as we found it causes generation instability. We incorporate the GAN loss suggested in DMD2 [ 35 ] to enhance video quality. Consequently, our modified distillation objective is formulated as LDMD = DKL + LGAN .
+
+3.2 Step-Aware Tri-level Structural Pruning 
+
+The Video Diffusion Model employed in our work is built upon the Diffusion Transformer (DiT) architecture. Following previous practices [ 33 ], we adopt a tri-level pruning mechanism operating at the block, attention-head, and channel levels. We formulate the pruning scheme using discrete binary gates g ∈ { 0, 1}, where 0 indicates a pruned component and 1 indicates a retained one. To accommodate the sequential nature of few-step inference, we extend this static pruning into a step-aware dynamic structure. Specifically, for each discrete inference step ti ∈ T , we maintain a specific pruning scheme gti . Consequently, the gate tensors for the block, head, and feed-forward network (FFN) levels are defined with shapes [T, N block ], [T, N head ], and [T, N channel ], where Nblock ,
+
+Nhead , and Nchannel denote the total number of transformer blocks, multi-head attention heads, and FFN hidden channels, respectively. During training, these discrete gates are applied to the intermediate feature representations via element-wise multiplication to mask out redundant computations (see Fig. 1(a)). Formally, for a specific architectural component F at inference step ti, the gated output is computed as: 
+
+xout = gti ⊙ F (xin ), (2) where ⊙ denotes broadcasted element-wise multiplication. Once the gates are fully optimized, the resulting sparse architecture can be exported into a dense format. As each inference step possesses a distinct structural configuration, the final exported model effectively constitutes a compact Mixture-of-Models (MoM), translating the theoretical sparsity of gates into actual computational speedup during inference. 
+
+4 Method 
+
+In this section, we introduce our unified framework. Our goal is to learn a step-adaptive architecture that maximizes computational efficiency while preserving the high-fidelity generation capability of few-step distillation. As illustrated in Fig. 1, our framework consists of three key components: (1) a joint optimization objective that unifies few-step distillation with dynamic structural pruning; (2) a progressive training strategy augmented with output rollout to stabilize the co-optimization process; and (3) a specialized inference engine designed to fully leverage the acceleration potential of the dynamic-in-few-step MoM architecture. 4Tri-level   
+
+> 010
+
+… … 00   
+
+> DiT block mask
+> attention head mask
+> 001
+
+… … 01  
+
+> 101
+
+… … 00
+
+> feed forward mask
+
+… … 
+
+> DiT block
+> attention head
+
+… …
+
+… …     
+
+> feed forward hidden channel
+> Step-aware  t1 t2 t3 t4
+> 𝐀 𝐀𪰀𝐀
+> real score 𝐀 real
+> fake score 𝐀 𝐀𗰀𝐀𖠀
+
+Student Generator 𝐀 𝐀 
+
+… … 
+
+> DiT  block
+> DiT  block
+> DiT  block
+> +
+> renoise
+> Input 𝐀 𝐀
+
+(a) Student Generator Training 
+
+(b) Output Rollout  
+
+> t2 t3
+
+//            
+
+> stop gradient
+> t4
+> model weight activated at t1
+> model weight activated at t2
+> U
+> 1476235
+> 1476235
+> index table
+> 𝐀 𝐀 𝐀 1,4 𝐀 𝐀 𝐀 2,4,6,7
+
+(c) Specialized Inference Engine    
+
+> 42 76
+> dense model
+> inferenced at t2
+> select
+> 4276
+> super model 𝐀 𝐀𵠀𝐀𳰀𵠀
+> 1
+> predicted
+> clean data
+> 𝐀 𝐀
+
+𝐀 𝐀 
+
+> model
+> prediction
+
+𝐀 𝐀 
+
+> model prediction
+> at t1
+
+𝐀 𝐀 𝐀 𝐀 𝐀 
+
+> 𝐀 𳰀𴀀𴀀𳰀𝐀𝐀
+> Student
+> Generator
+> Student
+> Generator
+> Student
+> Generator
+> Student
+> Generator
+> t1
+
+Fake Score 
+
+Network 
+
+Pre-trained 
+
+Teacher Figure 1: (a) Unified training framework. We jointly optimize few-step distribution matching and dynamic structural sparsification, learning step-adaptive architectures via mask-based gating. A single re-noising level τ is shown for simplicity. (b) Output rollout mechanism. Illustrated using t1
+
+as an example: starting from the intermediate noisy state at t1, the student model is applied iteratively with detached gradients across all subsequent steps to produce the final rollout output xrollout  
+
+> 1
+
+, which is used to train the fake score network. (c) Specialized inference engine. Shown with T =2 steps and a model of 7 parameters for clarity. A unified super-model θunion is constructed from the union of all active parameters, while step-specific index tables dynamically gather the required subsets during inference without redundant weight reloading. 
+
+4.1 Unifying Step Reduction and Dynamic Sparsification 
+
+To exploit the temporal redundancy inherent in diffusion generation, we propose learning a dynamic pruning policy that adapts to the specific structural requirements of each denoising step. Our strategy is to update the pruning gates directly via the few-step distillation objective. However, the discrete binary gates gti defined in Section 3.2 are non-differentiable, preventing standard gradient-based updates. To resolve this, we introduce continuous learnable structural masks mti for each inference step ti ∈ T to enable optimization within the distillation framework. The mapping from the continuous soft masks mti to the discrete hard gates gti is tailored to each pruning granularity: • Block-level: the gate is directly determined by an indicator function gti = I(mti > 0) .• Attention-head level: for each head with a feature dimension of Dhead , the entire head is retained ( gti = 1 ) if the mean of its corresponding Dhead mask parameters is positive. • FFN channel level: We group the hidden channels into sequential chunks of size C; a single scalar mask controls an entire chunk, yielding a block-wise gate vector gti = I(mti >
+
+0) · 1C .We employ the Straight-Through Estimator (STE) to integrate the hard gates into the computational graph of the distillation task. Specifically, we construct a differentiable surrogate ˜gti for the forward pass: 
+
+˜gti = gti + mti − stop_grad (mti ). (3) During training, we substitute the discrete gt with ˜gt in Eq. (2). This formulation ensures that the forward pass utilizes the exact discrete gates to mask the corresponding components, while the backward pass routes the distillation task gradients directly to the continuous masks mti .5Furthermore, we introduce a sparsity penalty Lsparse to encourage structural sparsity and control the overall model capacity. When optimizing for step ti, the global retention rate for component k
+
+combines the differentiable surrogate ˜gk,t i and the frozen hard gates gk,t j of other steps tj̸ = ti:
+
+Lsparse (˜ gti ) = X 
+
+> k∈{ b,h,f }
+
+ReLU 
+
+ 1
+
+T
+
+μ(˜ gk,t i ) + X 
+
+> tj̸=ti
+
+μ(gk,t j )
+
+ − ηk
+
+ , (4) where μ(·) calculates the spatial mean of the gate tensor for component k (block, head, or FFN), and 
+
+ηk is the corresponding target sparsity ratio. The overall training objective combines the distribution matching loss with the sparsity penalty: 
+
+Ltotal = Et∼T [LDMD (θ, ˜gt) + λLsparse (˜ gt)] . (5) By jointly optimizing the model parameters θ and the structural masks m, our framework simultane-ously uncovers both step and parameter redundancies. This co-optimization enables the model to learn specific structural demands across different timestep levels, leading to intriguing architectural findings discussed in Section 6. 
+
+4.2 Progressive Training with Output Rollout 
+
+Directly optimizing the joint objective Ltotal results in unsatisfactory outcomes. We attribute this to the imbalanced distillation gradient norms across different noise levels. As the sparsity penalty is applied uniformly, stages with smaller distillation gradients are disproportionately dominated by the sparsity loss, leading to arbitrary over-pruning rather than learning genuinely step-adaptive structures. To resolve this, we propose a progressive training strategy augmented with an output rollout mecha-nism. Our core insight is that diffusion is a sequential process where intermediate errors accumulate, yet the ultimate objective is solely the perceptual quality of the final output. Therefore, we anchor our co-optimization to the final generation distribution. First, we adopt a reverse-order curriculum to stabilize the structural search. We prioritize establishing a robust generation foundation at the later denoising stages (i.e., lower noise levels) before progressively sparsifying the earlier, noisier stages. We initially optimize the distill loss and sparsity penalty exclusively for t4 (the lowest noise level). Subsequently, we progressively incorporate earlier steps (t3 → t2 → t1) into the training pipeline, and apply the sparsity penalty only to the newly introduced step. Formally, for the T -step model, the training proceeds backwards across T progressive stages. In Stage k (k ∈ { 1, . . . , T }), the active training subset is Tk = {tT , t T −1, . . . , t T −k+1 }. The newly introduced step is tnew = tT −k+1 . The objective for Stage k is formulated as: 
+
+LStage-k = Et∼T k [LDMD (θ, ˜gt)] + λLsparse (˜ gtnew ). (6) After the T progressive training stages, a final stage then jointly trains all T steps using the full objective Ltotal . This curriculum ensures the model secures its output quality before aggressively pruning the highly-noised input stages. Furthermore, we align the training of the fake score network sfake with this final-output-centric philosophy via an output rollout strategy. In standard distillation practices, sfake is typically trained on the single-step predicted clean data ˆx1 (computed from the model prediction vt) derived directly from an intermediate noisy state. While effective for static architectures, this intermediate supervision exhibits reduced stability when dynamic structural pruning is introduced. Therefore, we choose to model the true multi-step generation outcome for a more reliable constraint. Specifically, we employ an output rollout mechanism: when the student denoiser operates at an intermediate high-noise step (e.g., t1), we iteratively apply the student model—with gradients detached—to sequentially denoise the sample all the way to the final step tT (see Fig. 1(b)). This final output xrollout  
+
+> 1
+
+is then utilized as the training sample to update sfake . By training the fake model to capture the final generation distribution, we inject a more robust regularization signal, ensuring the stable co-optimization of our dynamic MoM architecture. 
+
+4.3 Specialized Inference Engine for MoM 
+
+To translate the learned theoretical sparsity into tangible wall-clock acceleration, we design a special-ized inference engine. After training, we construct a single unified super-model containing the union of all active parameters across all steps: θunion = S 
+
+> t∈T
+
+{θi | mt,i > 0}.6Alongside this super-model, we maintain a lightweight index table It for each step t ∈ T , explicitly pointing to the specific subset of θunion required for that stage. During inference, the engine efficiently gathers the active dense parameters via It. This dynamic routing eliminates the latency overhead of reloading different weights and significantly reduces memory consumption compared to storing T
+
+separate models (see Fig. 1(c)). 
+
+5 Experiments 
+
+5.1 Implementation Details Model Architecture and Initialization. We evaluate our method on Wan2.1-14B as the main model. We also use the smaller Wan2.1-1.3B for baseline comparison, ablation, and architectural analysis, where extensive training sweeps are tractable. Both models are trained for text-to-video generation at 
+
+480 × 832 , generating 5-second videos at 16 frames per second (fps). The teacher and fake-score network are initialized from the full pre-trained checkpoint. The student generator adopts the same initialization but is augmented with our learnable structural masks (initialized to 1.0) to enable dynamic pruning. 
+
+Training Configurations. Our training subset comprises 50,000 high-quality videos curated from the Koala-36M dataset [ 31 ]. We implement the discriminator architecture and GAN loss formulation following [ 1]. The Classifier-Free Guidance scale is randomly sampled from [3 , 5] during training. We optimize the models using AdamW across 16 Kunlun P800 XPUs with a total batch size of 16. The learning rates are set to 1 × 10 −6 for the student model and fake score network, and 5 × 10 −7
+
+for the GAN discriminator. The learning rate for the structural masks warms up from 1 × 10 −3 to a peak of 1 × 10 −2. The total training process spans 2,000 steps. For sparsity loss, the coefficient λ is adaptively determined at each stage by monotonically mapping the corresponding gradient norm to the interval (0 , 1) . Additional implementation details are provided in the Appendix Section A. 
+
+Progressive Pruning Schedule. We implement the reverse-order curriculum described in Section 4.2 using a FLOPs-driven stage transition criterion. Specifically, we advance the training to incorporate the next noisier step (e.g., transitioning from t4 to t3) whenever the newly introduced step’s FLOPs are reduced by 5% . We stop training once the average FLOPs across all steps t ∈ T drop to 75% of the original dense model. 
+
+5.2 Evaluation Metrics 
+
+We evaluate our method along two dimensions: generation quality and computational efficiency. For generation quality, we adopt VBench [ 16 ] and report its eight primary dimensions, covering frame-wise quality (Imaging Quality, Aesthetic Quality), temporal quality (Motion Smoothness, Dynamic Degree, Background Consistency, Subject Consistency, Scene Consistency), and text alignment (Overall Consistency), following [ 14 ]. The complete 16 metrics and additional qualitative results are provided in the Appendix Section B. We employ augmented prompts provided in VBench and generate five videos per prompt. For efficiency, we report inference latency (seconds per video) measured on a single Kunlun P800 XPU. The reported runtime corresponds exclusively to the DiT backbone inference, excluding VAE decoding. 
+
+5.3 Baselines 
+
+Our method exposes a new acceleration axis—per-step computation redundancy. Accordingly, our comparisons serve two purposes: first, to test whether this step-wise pruning can be obtained by a two-stage pipeline; second, to place our method in the context of existing acceleration frameworks. 
+
+Two-Stage Optimization Baselines. These baselines separate step distillation and structural pruning. They use the same 4-step distillation recipe as our method, but apply pruning either before or after distillation. For each setting, we sweep the pruning ratio and report the highest value that does not lead to visual collapse: 
+
+Category 1: Prune-then-Distill. The model is first pruned and then distilled into a 4-step generator. 7Ours (joint)   
+
+> Ours(Joint)  LightX2V  Wan  (14B)
+> A close -up shot captures a steaming hot pot brimming with vegetables and dumplings, set on a rustic wooden table. The camera foc uses on the bubbling
+> broth as a woman, dressed in a light, patterned blouse, reaches in with chopsticks to lift a tender leaf of cabbage from the sim mering mixture. Steam rises
+> around her as she leans back slightly, her warm smile reflecting satisfaction and joy. Her movements are smooth and deliberat e, showcasing her comfort and
+> familiarity with the dining process. The background includes a small bowl of dipping sauce and a clay pot, adding to the cozy , c ommunal dining atmosphere.
+> Speed
+> up
+
+1x 
+
+48x 
+
+30x Figure 2: Qualitative comparisons on Wan-14B. We present our method with the 50-step Wan-14B teacher [30] and the LightX2V acceleration framework [3]. (1) Static → Distillation: We apply classical magnitude-based static pruning [ 12 ] to the FFN layers (attention head pruning is omitted as we observe it may trigger generation collapse). The sparsity ratio is capped at 10% .(2) Dynamic → Distillation: Following DyDiT [ 41 ], we train step-conditioned masks under the standard denoising objective with a sparsity loss. The noise schedule is divided into four intervals to match the later 4-step distillation. 
+
+Category 2: Distill-then-Prune. The model is first distilled into 4 steps and then pruned. (3) Distillation → Static: The reverse pipeline of (1), where magnitude-based pruning is applied to a frozen distilled model. (4) Distillation → Dynamic: We freeze the pre-distilled model weights and optimize only the dynamic masks using the same training pipeline described in Section 4. 
+
+Distillation Baseline and Teacher. Ours (Distill) is the 4-step DMD-distilled model without pruning, trained with the same data and recipe as Ours (Joint) . It is the direct baseline for measuring the extra benefit of our dynamic pruning. We also report the 50-step Wan model [ 30 ] as the teacher and quality reference. 
+
+SOTA Acceleration Frameworks. We report two representative open-source acceleration frame-works: TurboDiff [ 38 ] (we evaluate the TurboWan2.1-T2V-1.3B checkpoint) and LightX2V [ 3] (the Wan2.1-T2V-14B-StepDistill-CfgDistill checkpoint). These methods combine step distillation with other optimizations, such as sparse attention, quantization, and inference-system acceleration. Their reported speedups (marked with ∗ in Table 1) serve as a holistic reference for the overall acceleration landscape, but they are not direct comparison of our method: we study hidden-channel pruning, while these frameworks optimize other complementary dimensions. Because we cannot reproduce their full hardware and deployment environment, we cite their official latency gains; all VBench scores are measured under our own unified evaluation protocol. 
+
+5.4 Main Results 
+
+Table 1 reports the results. We decompose each method’s speedup into the step-reduction factor (relative to the 50-step teacher) and the additional pruning factor on top of 4-step distillation (“ ∆
+
+vs. Distill”). Step distillation alone already gives a ∼25 × saving; any further gain must come from making each remaining step cheaper, which the ∆ column directly measures. 
+
+Speedup on Wan-14B. On Wan-14B, Ours (Joint) reduces per-step FLOPs by 24% and cuts latency from 1222.16 s (50-step teacher) to 40.72 s. This represents a 30.01 × end-to-end speedup over the teacher. Crucially, while step distillation contributes a 25.00 × reduction, our dynamic pruning provides an additional 1.20 × wall-clock acceleration. Despite this substantial capacity compression, our method maintains highly competitive VBench scores, confirming that the pruned capacity is genuinely redundant for the few-step trajectory. 8Table 1: Quantitative comparison on VBench. Latency is measured on a single Kunlun P800 XPU; the speedup ratio is computed against the 50-step teacher within the same model scale . “ ∆ vs. Distill” isolates the pruning contribution on top of 4-step distillation. Speedups marked with ∗ are taken from the original publications as system-level references, rather than direct baselines. VBench scores for all methods are measured under our unified protocol. Best and second-best results within each scale are bold /underlined. Method Latency (s) ↓                                                                                                                                                   
+
+> Speedup vs. 50-step ↑
+> ∆vs. Distill ↑
+> Imaging Quality ↑
+> Aesthetic Quality ↑
+> Motion Smooth. ↑
+> Dynamic Degree ↑
+> Backgrnd. Consist. ↑
+> Subject Consist. ↑
+> Scene Consist. ↑
+> Overall Consist. ↑
+> Wan-1.3B (5 s, 16 fps, 480 ×832 )
+> Wan (50 step) 325.84 1.00 ×–67.01 65.46 98.52 65.19 97.93 97.56 45.06 25.57 TurboDiffusion –93.00 ×∗3.72 ×∗69.47 64.62 97.80 86.11 94.21 94.34 43.31 25.46 Static →Distill 12.92 25.22 ×1.01 ×69.05 66.49 98.72 56.94 95.92 97.19 45.06 25.57 Distill →Static 12.90 25.26 ×1.01 ×58.21 63.48 98.39 26.39 95.11 94.58 39.10 24.88 Dynamic →Distill 12.14 26.84 ×1.07 ×67.57 64.37 98.74 65.28 95.68 95.31 40.84 25.24 Distill →Dynamic 12.48 26.11 ×1.04 ×68.23 55.66 98.32 11.11 92.59 93.43 32.85 22.40 Ours (Distill) 12.93 25.20 ×1.00 ×70.67 67.81 98.61 68.06 96.26 96.35 44.11 25.88 Ours (Joint) 11.78 27.66 ×1.09 ×71.36 66.45 98.17 80.56 95.63 95.80 43.68 25.86
+> Wan-14B (5 s, 16 fps, 480 ×832 )
+> Wan-14B (50 step) 1222.16 1.00 ×–69.43 66.07 98.30 65.46 98.09 97.52 45.75 25.91 LightX2V –47.50 ×∗1.90 ×∗71.15 68.60 98.45 58.80 96.70 96.26 47.31 26.17 Ours (Joint) 40.72 30.01 ×1.20 ×69.31 69.36 98.90 62.17 96.98 97.15 45.57 26.12
+
+Decoupled pipelines fail to exploit per-step redundancy. As shown in Table 1, decoupling pruning and distillation fails to deliver a favorable speed-quality trade-off. First, Static →Distill 
+
+and Distill →Static are limited by the static pruning pattern, yielding a negligible 1.01 × marginal speedup. Second, two-stage dynamic pipelines similarly falter due to sequential optimization conflicts. Applying pruning after distillation ( Distill →Dynamic ) severely disrupts the delicately aligned few-step generation trajectory, resulting in a precipitous degradation in temporal dynamics, most notably Dynamic Degree. Conversely, applying pruning prior to distillation ( Dynamic →Distill ) restricts the representational capacity essential for effectively learning the highly compressed 4-step mapping. Consequently, it suffers from noticeable performance drops in metrics like Imaging Quality and Dynamic Degree. Beyond quantitative metrics, our supplementary videos reveal that this variant generates visually inferior texture details and exhibits diminished motion amplitude. In contrast, our unified framework resolves these capacity bottlenecks by jointly optimizing step reduction and dynamic pruning. This co-design achieves superior acceleration while preserving high-fidelity spatial details and rich, coherent temporal dynamics (further analysis in AppendixSection D confirms the high dynamic degree is free from artifact-driven flickering). 
+
+Comparison with SOTA frameworks. We position our method alongside integrated open-source acceleration frameworks, TurboDiffusion and LightX2V, to contextualize its performance. As demonstrated in Table 1, our method preserves competitive generation quality across VBench dimensions. It is important to emphasize that our approach is not designed to directly compete with these holistic, system-level pipelines, which bundle distillation with sparse attention, quantization, and infrastructure-level engineering. Instead, our contribution uncovers an orthogonal algorithmic acceleration axis: the per-step parametric redundancy along the hidden-channel dimension, driven by the coarse-to-fine dynamics of diffusion. Because our MoM exports standard dense architectures for each step, it is structurally compatible with these broader optimizations. We therefore position our method as complementary to, rather than competing with, such pipelines, with the potential to be combined for further gains. 
+
+5.5 Ablation Study 
+
+To validate the efficacy of our proposed training techniques, we conduct a comprehensive ablation study. Qualitative results are illustrated in Fig. 3, with the corresponding quantitative bounds detailed in Appendix Section C. Our experiments include: 
+
+Step-Specific vs. Shared Mask. We ablate the step-aware dynamic structure by enforcing a shared mask across all inference steps. 9OursShared Mask                                                                 
+
+> Progressive
+> Training
+> NoNo Rollout
+> Alonefigurebattlesablindingsnowstorm,wrappedinafur-linedcoat,woolenscarf,andgogglesobscuredbysnow.Theycarryalargeblackbackpack,
+> trudgingforwardwithdeterminedsteps.Thechaotic,swirlingsnowblursthelandscape,heighteningasenseofurgencyandisolation.Close-upscapturetheir
+> grittyresolve,whilewideshotsemphasizethevast,frozenwilderness.Snowflakesdancewildly,addingdepthandmovementtoeveryframe.
+> 7.1
+> 2.3
+> 8.4
+> 1.9
+> 6.8
+> Sparsity
+> Ratio(%)
+> 20.1
+> 1.2
+
+Figure 3: Qualitative ablation of our training techniques. The top row shows the stable generation of our full Ours (Joint) framework. The subsequent three groups represent the ablated settings. For each ablation, we display two states: the generation quality at its maximum viable sparsity (Upper), and the catastrophic collapse when pushed beyond this threshold (Lower). The sparsity ratio (calculated as pruned parameters over total parameters, averaged across 4 steps for step-aware models) is denoted on the right. 
+
+Effect of Progressive Training. We remove the reverse-order curriculum, directly optimizing all steps jointly from the very beginning (i.e., exclusively using the Final Stage setup). 
+
+Effect of Output Rollout. We replace our output rollout mechanism and use the standard intermediate prediction ˆx1 for the fake score network training. It can be observed that the step-specific configuration demonstrates superiority over the shared mask, as it generally achieves higher sparsity ratios and preserves basic structural fidelity. Furthermore, a consistent observation across all ablated settings is the existence of a strict sparsity wall. Without our tailored techniques, the models fail to reach high sparsity levels; forcing the optimization further leads to a cliff-like drop in structural integrity and a rapid collapse in generation quality. While the ablated models max out at a stable sparsity of only around 2.3%, our full framework stably achieves a 20.1% sparsity without visual degradation, highlighting the absolute indispensability of our training strategy for stabilizing the dynamic MoM co-optimization. 
+
+6 Exploration and Findings 
+
+By jointly optimizing the structural masks and the distillation objective, our framework automatically discovers how to allocate computation across denoising steps. Beyond the efficiency gains, the learned policy reveals interpretable structure in how redundancy is distributed both temporally (across steps) and spatially (across components and depth), as visualized in Fig. 4 for the Wan-1.3B model. The Wan-14B model follows a similar pattern. 
+
+U-Shaped Computational Allocation. Temporally, the learned architecture exhibits a distinct “U-shaped” capacity demand. The model retains the highest computational footprint at the two ends of the generation trajectory (88.4% and 89.1% FLOPs retention at t1 and t4, respectively) while 10 t1 t2 t3 t4
+
+> 0
+> 2
+> 4
+> 6
+> 8
+> 10
+> 12
+> 14
+> 16
+> 18
+> 20
+> 22
+> 24
+> 26
+> 28
+> Transformer Block Depth
+
+Self-Attention    
+
+> t1t2t3t4
+
+Cross-Attention    
+
+> t1t2t3t4
+
+FFN 
+
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> Active Ratio
+> Inference Step: t1 (High Noise)-> t2 -> t3 -> t4 (Low Noise)
+
+Figure 4: Heatmap of the learned dynamic pruning policy. We visualize the retention ratios of different architectural components (Self-Attention, Cross-Attention, and FFN) across different network depths and inference phases. aggressively pruning the intermediate steps (78.5% and 77.1% at t2 and t3). We further verified (Fig. 8(e)–(h)) that the U-shape emerges progressively during training and persists across a broad range of sparsity levels. The pattern mirrors the physics of diffusion generation: the initial phase needs ample capacity to construct the global layout from pure noise, the final phase to render high-frequency visual details, while intermediate phases mostly transition the established semantics and can be heavily compressed. 
+
+Semantic Freezing in Deep Layers. Spatially, we observe that deeper layers are pruned much more aggressively than shallower layers, especially within the Self/Cross-Attention modules during t2
+
+and t3. In Transformer-based diffusion models, deeper layers typically process high-level semantic representations, while shallower layers handle low-level textures. This pruning pattern suggests a semantic freezing phenomenon: high-level semantics are rapidly decided and frozen in the very early stages of inference. Consequently, the network automatically learns to shut down the deep-layer semantic updates in subsequent steps, allocating its limited computational budget to the shallow layers for fine-grained texture refinement. 
+
+7 Conclusion 
+
+We presented an end-to-end framework that unifies few-step distillation and dynamic structural pruning for accelerating Video Diffusion Models. By treating step reduction and parameter spar-sification as a single joint optimization, we derive a step-aware Mixture-of-Models that allocates computation across denoising stages, and we keep this optimization stable with a reverse-order progressive curriculum and an output-rollout fake-score objective. On Wan-14B, our method achieves an 30 × speedup while maintaining satisfied visual quality and temporal dynamics. We believe our unified framework and architectural findings will pave the way for designing fundamentally more efficient generative models in the future. 
+
+References 
+
+[1] Clement Chadebec, Onur Tasar, Eyal Benaroche, and Benjamin Aubin. Flash diffusion: Accel-erating any conditional diffusion model for few steps image generation. In Proceedings of the AAAI Conference on Artificial Intelligence , volume 39, pages 15686–15695, 2025. [2] Junyu Chen, Wenkun He, Yuchao Gu, Yuyang Zhao, Jincheng Yu, Junsong Chen, Dongyun Zou, Yujun Lin, Zhekai Zhang, Muyang Li, et al. Dc-videogen: Efficient video generation with deep compression video autoencoder. arXiv preprint arXiv:2509.25182 , 2025. 11 [3] LightX2V Contributors. Lightx2v: Light video generation inference framework. https: //github.com/ModelTC/lightx2v , 2025. [4] Damai Dai, Chengqi Deng, Chenggang Zhao, RX Xu, Huazuo Gao, Deli Chen, Jiashi Li, Wangding Zeng, Xingkai Yu, Yu Wu, et al. Deepseekmoe: Towards ultimate expert specializa-tion in mixture-of-experts language models. In Proceedings of the 62nd Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers) , pages 1280–1297, 2024. [5] Tri Dao, Daniel Y. Fu, Stefano Ermon, Atri Rudra, and Christopher Ré. FlashAttention: Fast and memory-efficient exact attention with IO-awareness. In Advances in Neural Information Processing Systems (NeurIPS) , 2022. [6] Xiangyu Fan, Zesong Qiu, Zhuguanyu Wu, Fanzhou Wang, Zhiqian Lin, Tianxiang Ren, Dahua Lin, Ruihao Gong, and Lei Yang. Phased dmd: Few-step distribution matching distillation via score matching within subintervals. arXiv preprint arXiv:2510.27684 , 2025. [7] William Fedus, Barret Zoph, and Noam Shazeer. Switch transformers: Scaling to trillion parameter models with simple and efficient sparsity. Journal of Machine Learning Research , 23 (120):1–39, 2022. [8] Zhida Feng, Zhenyu Zhang, Xintong Yu, Yewei Fang, Lanxin Li, Xuyi Chen, Yuxiang Lu, Jiaxiang Liu, Weichong Yin, Shikun Feng, et al. Ernie-vilg 2.0: Improving text-to-image diffusion model with knowledge-enhanced mixture-of-denoising-experts. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 10135–10145, 2023. [9] Determine Filters’Importance. Pruning filters for efficient convnets. arXiv preprint arXiv:1608.08710 , 3, 2016. [10] Yu Gao, Haoyuan Guo, Tuyen Hoang, Weilin Huang, Lu Jiang, Fangyuan Kong, Huixia Li, Jiashi Li, Liang Li, Xiaojie Li, et al. Seedance 1.0: Exploring the boundaries of video generation models. arXiv preprint arXiv:2506.09113 , 2025. [11] Yizeng Han, Zeyu Liu, Zhihang Yuan, Yifan Pu, Chaofei Wang, Shiji Song, and Gao Huang. Latency-aware unified dynamic networks for efficient image recognition. IEEE Transactions on Pattern Analysis and Machine Intelligence , 46(12):7760–7774, 2024. [12] Yihui He, Xiangyu Zhang, and Jian Sun. Channel pruning for accelerating very deep neural networks. In Proceedings of the IEEE international conference on computer vision , pages 1389–1397, 2017. [13] Xun Huang, Zhengqi Li, Guande He, Mingyuan Zhou, and Eli Shechtman. Self forcing: Bridging the train-test gap in autoregressive video diffusion. arXiv preprint arXiv:2506.08009 ,2025. [14] Yushi Huang, Xingtong Ge, Ruihao Gong, Chengtao Lv, and Jun Zhang. Linvideo: A post-training framework towards o (n) attention in efficient video generation. arXiv preprint arXiv:2510.08318 , 2025. [15] Yushi Huang, Ruihao Gong, Jing Liu, Yifu Ding, Chengtao Lv, Haotong Qin, and Jun Zhang. Qv-gen: Pushing the limit of quantized video generative models. arXiv preprint arXiv:2505.11497 ,2025. [16] Ziqi Huang, Yinan He, Jiashuo Yu, Fan Zhang, Chenyang Si, Yuming Jiang, Yuanhan Zhang, Tianxing Wu, Qingyang Jin, Nattapol Chanpaisit, et al. Vbench: Comprehensive benchmark suite for video generative models. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 21807–21818, 2024. [17] Weijie Kong, Qi Tian, Zijian Zhang, Rox Min, Zuozhuo Dai, Jin Zhou, Jiangfeng Xiong, Xin Li, Bo Wu, Jianwei Zhang, et al. Hunyuanvideo: A systematic framework for large video generative models. arXiv preprint arXiv:2412.03603 , 2024. [18] Tim Lawson and Laurence Aitchison. Learning to skip the middle layers of transformers. arXiv preprint arXiv:2506.21103 , 2025. 12 [19] Shanchuan Lin, Xin Xia, Yuxi Ren, Ceyuan Yang, Xuefeng Xiao, and Lu Jiang. Diffusion adversarial post-training for one-step video generation. arXiv preprint arXiv:2501.08316 , 2025. [20] Dongyang Liu, Peng Gao, David Liu, Ruoyi Du, Zhen Li, Qilong Wu, Xin Jin, Sihan Cao, Shifeng Zhang, Hongsheng Li, et al. Decoupled dmd: Cfg augmentation as the spear, distribution matching as the shield. arXiv preprint arXiv:2511.22677 , 2025. [21] Feng Liu, Shiwei Zhang, Xiaofeng Wang, Yujie Wei, Haonan Qiu, Yuzhong Zhao, Yingya Zhang, Qixiang Ye, and Fang Wan. Timestep embedding tells: It’s time to cache for video diffusion model. arXiv preprint arXiv:2411.19108 , 2024. [22] Cheng Lu, Yuhao Zhou, Fan Bao, Jianfei Chen, Chongxuan Li, and Jun Zhu. Dpm-solver: A fast ode solver for diffusion probabilistic model sampling in around 10 steps. Advances in Neural Information Processing Systems , 35:5775–5787, 2022. [23] Pavlo Molchanov, Stephen Tyree, Tero Karras, Timo Aila, and Jan Kautz. Pruning convolutional neural networks for resource efficient inference. arXiv preprint arXiv:1611.06440 , 2016. [24] Weili Nie, Julius Berner, Nanye Ma, Chao Liu, Saining Xie, and Arash Vahdat. Transition matching distillation for fast video generation. arXiv preprint arXiv:2601.09881 , 2026. [25] OpenAI. Sora, 2024. URL https://openai.com/index/sora/ . Accessed: [2024]. [26] Noam Shazeer, Azalia Mirhoseini, Krzysztof Maziarz, Andy Davis, Quoc Le, Geoffrey Hinton, and Jeff Dean. Outrageously large neural networks: The sparsely-gated mixture-of-experts layer. arXiv preprint arXiv:1701.06538 , 2017. [27] Yanxiao Sun, Jiafu Wu, Yun Cao, Chengming Xu, Yabiao Wang, Weijian Cao, Donghao Luo, Chengjie Wang, and Yanwei Fu. Swiftvideo: A unified framework for few-step video generation through trajectory-distribution alignment. arXiv preprint arXiv:2508.06082 , 2025. [28] Lucas Theis, Iryna Korshunova, Alykhan Tejani, and Ferenc Huszár. Faster gaze prediction with dense networks and fisher pruning. arXiv preprint arXiv:1801.05787 , 2018. [29] Team Wan, Ang Wang, Baole Ai, Bin Wen, Chaojie Mao, Chen-Wei Xie, Di Chen, Feiwu Yu, Haiming Zhao, Jianxiao Yang, Jianyuan Zeng, Jiayu Wang, Jingfeng Zhang, Jingren Zhou, Jinkai Wang, Jixuan Chen, Kai Zhu, Kang Zhao, Keyu Yan, Lianghua Huang, Mengyang Feng, Ningyi Zhang, Pandeng Li, Pingyu Wu, Ruihang Chu, Ruili Feng, Shiwei Zhang, Siyang Sun, Tao Fang, Tianxing Wang, Tianyi Gui, Tingyu Weng, Tong Shen, Wei Lin, Wei Wang, Wei Wang, Wenmeng Zhou, Wente Wang, Wenting Shen, Wenyuan Yu, Xianzhong Shi, Xiaoming Huang, Xin Xu, Yan Kou, Yangyu Lv, Yifei Li, Yijing Liu, Yiming Wang, Yingya Zhang, Yitong Huang, Yong Li, You Wu, Yu Liu, Yulin Pan, Yun Zheng, Yuntao Hong, Yupeng Shi, Yutong Feng, Zeyinzi Jiang, Zhen Han, Zhi-Fan Wu, and Ziyu Liu. Wan: Open and advanced large-scale video generative models. arXiv preprint arXiv:2503.20314 , 2025. [30] Team Wan, Ang Wang, Baole Ai, Bin Wen, Chaojie Mao, Chen-Wei Xie, Di Chen, Feiwu Yu, Haiming Zhao, Jianxiao Yang, et al. Wan: Open and advanced large-scale video generative models. arXiv preprint arXiv:2503.20314 , 2025. [31] Qiuheng Wang, Yukai Shi, Jiarong Ou, Rui Chen, Ke Lin, Jiahao Wang, Boyuan Jiang, Haotian Yang, Mingwu Zheng, Xin Tao, et al. Koala-36m: A large-scale video dataset improving consistency between fine-grained conditions and video content. In Proceedings of the Computer Vision and Pattern Recognition Conference , pages 8428–8437, 2025. [32] Zhengyi Wang, Cheng Lu, Yikai Wang, Fan Bao, Chongxuan Li, Hang Su, and Jun Zhu. Pro-lificdreamer: High-fidelity and diverse text-to-3d generation with variational score distillation. 
+
+Advances in neural information processing systems , 36:8406–8441, 2023. [33] Yushu Wu, Yanyu Li, Anil Kag, Ivan Skorokhodov, Willi Menapace, Ke Ma, Arpit Sahni, Ju Hu, Aliaksandr Siarohin, Dhritiman Sagar, et al. Taming diffusion transformer for efficient mobile video generation in seconds. arXiv preprint arXiv:2507.13343 , 2025. 13 [34] Tianwei Yin, Michaël Gharbi, Richard Zhang, Eli Shechtman, Fredo Durand, William T Freeman, and Taesung Park. One-step diffusion with distribution matching distillation. arXiv preprint arXiv:2311.18828 , 2023. [35] Tianwei Yin, Michaël Gharbi, Taesung Park, Richard Zhang, Eli Shechtman, Fredo Durand, and William T Freeman. Improved distribution matching distillation for fast image synthesis. 
+
+arXiv preprint arXiv:2405.14867 , 2024. [36] Tianwei Yin, Qiang Zhang, Richard Zhang, William T Freeman, Fredo Durand, Eli Shechtman, and Xun Huang. From slow bidirectional to fast autoregressive video diffusion models. In 
+
+Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 22963–22974, 2025. [37] Jintao Zhang, Haoxu Wang, Kai Jiang, Shuo Yang, Kaiwen Zheng, Haocheng Xi, Ziteng Wang, Hongzhou Zhu, Min Zhao, Ion Stoica, et al. Sla: Beyond sparsity in diffusion transformers via fine-tunable sparse-linear attention. arXiv preprint arXiv:2509.24006 , 2025. [38] Jintao Zhang, Kaiwen Zheng, Kai Jiang, Haoxu Wang, Ion Stoica, Joseph E Gonzalez, Jianfei Chen, and Jun Zhu. Turbodiffusion: Accelerating video diffusion models by 100-200 times. 
+
+arXiv preprint arXiv:2512.16093 , 2025. [39] Peiyuan Zhang, Yongqi Chen, Haofeng Huang, Will Lin, Zhengzhong Liu, Ion Stoica, Eric Xing, and Hao Zhang. Vsa: Faster video diffusion with trainable sparse attention. arXiv preprint arXiv:2505.13389 , 2025. [40] Peiyuan Zhang, Yongqi Chen, Runlong Su, Hangliang Ding, Ion Stoica, Zhengzhong Liu, and Hao Zhang. Fast video generation with sliding tile attention. arXiv preprint arXiv:2502.04507 ,2025. [41] Wangbo Zhao, Yizeng Han, Jiasheng Tang, Kai Wang, Yibing Song, Gao Huang, Fan Wang, and Yang You. Dynamic diffusion transformer. arXiv preprint arXiv:2410.03456 , 2024. [42] Wangbo Zhao, Yizeng Han, Jiasheng Tang, Kai Wang, Hao Luo, Yibing Song, Gao Huang, Fan Wang, and Yang You. Dydit++: Diffusion transformers with timestep and spatial dynamics for efficient visual generation. IEEE Transactions on Pattern Analysis and Machine Intelligence ,2026. [43] Kaiwen Zheng, Yuji Wang, Qianli Ma, Huayu Chen, Jintao Zhang, Yogesh Balaji, Jianfei Chen, Ming-Yu Liu, Jun Zhu, and Qinsheng Zhang. Large scale diffusion distillation via score-regularized continuous-time consistency. arXiv preprint arXiv:2510.08431 , 2025. 14 Appendix 
+
+This supplementary material provides further details and comprehensive results to support the main paper. It is organised as follows: • Section A details the extended implementation hyperparameters and training configurations. • Section B presents the complete set of VBench evaluation metrics alongside additional qualitative visualisations. • Section C provides the quantitative results for our ablation studies. • Section D illustrates the training dynamics, the continuous quality-vs.-sparsity trade-off, and an in-depth analysis of our final model architecture. Static-
+
+> >Distill
+> Distill->Static Dyna.->Distill Distill->Dyna. Ours (Distill) Ours (Joint)
+> A cuddly teddy bear with soft fur and a cheerful smile, floating gracefully in the crystal-clear ocean waters. The bear's arms are outstretched as if paddling,
+> creating tiny waves with each movement. It is surrounded by playful sea creatures such as colorful fish darting past, seaweed gently swaying around it. The
+> water is a deep shade of turquoise, with gentle ripples and sunlight filtering through, casting a warm golden glow. The bear's face is serene, reflecting a sense
+> of contentment and joy in its aquatic adventure. The scene captures the essence of innocence and playfulness, with a touch of whimsy. Soft lighting from
+> above highlights the bear's soft texture and the vibrant marine life. The background features a vast, peaceful ocean landscape with distant islands and a clear
+> blue horizon. The overall atmosphere is calm and inviting, perfect for a calming and soothing video. Wide shot of the ocean with the teddy bear swimming
+> mid-water, medium shot of the bear with various sea creatures around it, and close-up shots of the bear's face and tail fin.
+
+Figure 5: Qualitative comparison with baselines. Visual results demonstrating the generation quality of our proposed method compared against various baseline configurations. More example videos for these baselines are provided in the supplementary video material. 
+
+A Extended Implementation Details 
+
+Due to space constraints in the main text, we provide the complete hyperparameter settings and training configurations here. 
+
+Dynamic Sparsity Penalty Weighting. As briefly discussed in the main text, we dynamically adjust the sparsity penalty weight λ for each denoising step to balance the distillation and pruning objectives. Specifically, we maintain an Exponential Moving Average (EMA) of the task gradient norm, denoted as nt, for each step t. To prevent the sparsity penalty from being overshadowed by large distillation gradients, we map this EMA value to a monotonically increasing scalar in the range (0 , 1) using the following smooth normalization function: 
+
+λt = nt + ϵnt + ϵ + 1 , (7) where ϵ = 10 −6 is a small constant added for numerical stability. 15 FFN Reordering and Chunking. For the FFN channel-level pruning, we set the chunk size to 
+
+C = 8 . We perform a pre-processing step before chunking: we reorder the FFN hidden channels of the pre-trained base model according to the L2 norm of their corresponding weights. This norm-based sorting maximizes the intra-chunk homogeneity, allowing the single scalar mask to effectively control the entire chunk without sacrificing representational capacity. 
+
+Memory Optimization and Hardware. The model is trained using Fully Sharded Data Parallel (FSDP) combined with mixed-precision training (e.g., bfloat16). Additionally, we utilize gradient checkpointing to trade computation for memory, ensuring the joint optimization fits within the GPU memory limits. The training is conducted on 16 Kunlun P800 (96GB) XPUs. Table 2: Remaining VBench metrics on Wan 1.3 B. The best and second-best results are highlighted in bold and underlined, respectively. Visual comparisons are shown in Figure 5. Baseline Latency (s) ↓                                                                                                 
+
+> Speedup ratio ↑
+> Object Class ↑
+> Multiple Objects ↑Color ↑Spatial Relation. ↑
+> Temporal Style ↑
+> Human Action ↑
+> Temporal Flicker. ↑
+> Appearance Style ↑
+> Total Score ↑
+> Wan (50 step) 325.84 1.00 ×88.81 74.83 89.20 73.04 23.13 94.00 99.55 21.81 83.31 Static →Distill 12.92 25.22 ×87.97 80.26 88.19 79.29 24.51 95.00 99.07 19.62 82.96 Distill →Static 12.90 25.26 ×80.70 69.89 76.44 75.67 23.58 93.00 98.52 21.49 77.65 Dynamic →Distill 12.14 26.84 ×88.29 72.56 82.46 72.28 24.26 94.00 98.85 19.27 82.01 Distill →Dynamic 12.48 26.11 ×81.33 59.83 86.97 69.75 22.22 89.00 98.16 20.57 75.57
+> Ours (Distill) 12.93 25.20 ×87.90 80.56 82.14 74.89 25.25 96.00 98.85 19.39 83.64 Ours (Joint) 11.78 27.66 ×82.67 76.52 85.07 75.87 24.83 96.00 98.24 19.77 83.62
+
+B Full Evaluation Metrics and Additional Visualizations 
+
+The VBench suite comprehensively evaluates video generation models across multiple dimensions, including temporal quality (Subject Consistency, Background Consistency, Temporal Flickering, Motion Smoothness, Dynamic Degree), frame-wise quality (Imaging Quality, Aesthetic Quality), semantic consistency (Object Class, Multiple Objects, Human Action, Color, Spatial Relationship, Scene), style consistency (Appearance Style, Temporal Style), and text alignment (Overall Consis-tency). In the main paper, we reported 8 core dimensions from the VBench suite. Here, we present the remaining 8 VBench metrics in Table 2, along with the Total Score that reflects the comprehensive generation quality aggregated across all 16 dimensions. As shown in Table 2, consistent with the findings in the main text, our joint optimization method (Ours (Joint) ) achieves a highly competitive Total Score of 83.62, closely matching our dense distillation baseline ( Ours (Distill) , 83.64) while reaching a 27.66 × end-to-end speedup over the 50-step teacher on Wan-1.3B. Additional qualitative results of Ours (Joint) are provided in Figure 6 and Figure 7. 
+
+C Quantitative Ablation 
+
+Ablated variants of our dynamic MoM framework experience rapid generation collapse before reaching meaningful sparsity ratios. Table 3 provides the quantitative metrics of these failures on Wan-1.3B. The results clearly demonstrate that without our proposed progressive training and output rollout mechanisms, the optimization hits a rigid “sparsity wall” at roughly 2.0%–2.5%. Pushing beyond this threshold results in collapsed models that suffer severe degradation across core metrics, particularly in Imaging Quality, Aesthetic Quality, and Dynamic Degree. While our main experiments demonstrate that joint training is the key to unlocking dynamic acceleration, the ablation study reveals that such co-optimization is highly non-trivial. It highlights the absolute indispensability of our progressive curriculum and rollout strategies for stabilizing the dynamic MoM co-optimization. 16 CG game concept digital art, a vibrant green bird with iridescent feathers and wings spread wide. It perches atop a slender branch in a dense forest filled with lush 
+
+foliage and vibrant flowers. The bird has bright yellow eyes and a curved beak. Its feathers shimmer in greens, blues, and purples, creating a mesmerizing display. The 
+
+forest floor below is covered in fallen leaves and small mushrooms. A gentle breeze rustles through the trees. The bird stands tall, looking alert and curious, with its 
+
+tail fanning out slightly. The overall scene is set against a twilight sky with soft, warm hues. Low-angle, medium-shot view from the bird's perspective. 
+
+A sleek black cat wearing stylish brown cat-eye sunglasses lounges gracefully in the shallow end of a sparkling blue pool. The cat's fur is glossy and soft, with intricate 
+
+patterns of silver and gold. It tilts its head to the side, eyes reflecting the playful sunlight as it gazes into the camera. The pool water is crystal clear, revealing pebbles and 
+
+small bubbles. Surrounding the cat are vibrant green lily pads floating on the surface. A gentle breeze rustles the nearby palm trees, casting dappled shadows across the pool. 
+
+Soft, warm lighting casts a cozy glow, capturing every detail of the cat's serene expression. The background features a lush tropical garden with blooming flowers and a 
+
+wooden gazebo in the distance. Warm, nostalgic atmosphere. Wide shot from above, focusing on the cat's relaxed posture. 
+
+A sleek black sports car weaving through a narrow mountain road, gracefully turning a tight corner. The car's headlights illuminate the winding path as it zooms forward. The 
+
+driver, a stylish woman with short blonde hair and piercing green eyes, sits confidently behind the wheel, hands poised on the steering wheel. The landscape outside the 
+
+window showcases rugged cliffs and lush greenery. The background is a blurred mountain range with misty clouds. The scene captures the essence of an adrenaline-pumping 
+
+race through nature, with dynamic camera angles capturing the car's movement and the driver's determined expression. Medium shot focusing on the car and driver, with a 
+
+low-angle shot emphasizing the car's speed and agility. 
+
+CG game concept digital art, a soldier clad in a sturdy armor, wielding a sword, marching confidently across a rugged battlefield. The soldier has sharp features, 
+
+tanned skin, and intense eyes focused on the horizon. His armor is intricately detailed with golden accents, and he carries a heavy backpack. The battlefield is vast, 
+
+with scattered ruins and lush greenery in the distance. The soldier moves with purpose, each step deliberate and powerful. Behind him, smoke rises from distant 
+
+explosions, adding to the chaotic yet majestic atmosphere. The sky is a mix of gray clouds and a hint of orange from the setting sun. Low-angle, medium-shot view. Figure 6: Additional qualitative results of Ours (Joint). The text prompts are randomly sampled from the VBench evaluation suite, showcasing the model’s robustness across diverse scenarios without cherry-picking. Table 3: Quantitative ablation on Wan-1.3B. These are the collapsed results beyond the ∼2.3% stability wall. Variant Sparsity Img. Q. ↑
+
+Aes. Q. ↑
+
+Mot. Sm. ↑
+
+Dyn. Deg. ↑
+
+Bg. Cons. ↑
+
+Subj. Cons. ↑
+
+Scene Cons. ↑
+
+Over. Cons. ↑
+
+Ours (Joint) 20.1% 71.36 66.45 98.17 80.56 95.63 95.80 43.68 25.86 (A) Shared Mask 7.1% 56.19 49.96 97.43 56.67 91.55 84.71 27.19 23.27 (B) w/o Progressive Training 8.4% 52.41 47.83 97.18 36.94 90.27 80.49 24.66 22.75 (C) w/o Output Rollout 6.8% 54.88 49.12 97.36 41.22 91.04 82.36 25.31 23.04 17 A close-up shot captures a steaming hot pot brimming with vegetables and dumplings, set on a rustic wooden table. The camera focuses on the bubbling broth as a
+
+woman, dressed in a light, patterned blouse, reaches in with chopsticks to lift a tender leaf of cabbage from the simmering mixture. Steam rises around her as she
+
+leans back slightly, her warm smile reflecting satisfaction and joy. Her movements are smooth and deliberate, showcasing her comfort and familiarity with the dining
+
+process. The background includes a small bowl of dipping sauce and a clay pot, adding to the cozy, communal dining atmosphere.
+
+CG game concept digital art, a vibrant green bird with iridescent feathers and wings spread wide. It perches atop a slender branch in a dense forest filled with lush
+
+foliage and vibrant flowers. The bird has bright yellow eyes and a curved beak. Its feathers shimmer in greens, blues, and purples, creating a mesmerizing display.
+
+The forest floor below is covered in fallen leaves and small mushrooms. A gentle breeze rustles through the trees. The bird stands tall, looking alert and curious, with
+
+its tail fanning out slightly. The overall scene is set against a twilight sky with soft, warm hues. Low-angle, medium-shot view from the bird's perspective.
+
+A sleek black cat wearing stylish brown cat-eye sunglasses lounges gracefully in the shallow end of a sparkling blue pool. The cat's fur is glossy and soft, with
+
+intricate patterns of silver and gold. It tilts its head to the side, eyes reflecting the playful sunlight as it gazes into the camera. The pool water is crystal clear,
+
+revealing pebbles and small bubbles. Surrounding the cat are vibrant green lily pads floating on the surface. A gentle breeze rustles the nearby palm trees, casting
+
+dappled shadows across the pool. Soft, warm lighting casts a cozy glow, capturing every detail of the cat's serene expression. The background features a lush tropical
+
+garden with blooming flowers and a wooden gazebo in the distance. Warm, nostalgic atmosphere. Wide shot from above, focusing on the cat's relaxed posture.
+
+Wan
+
+50 steps
+
+Ours
+
+Wan
+
+50 steps
+
+Ours
+
+Wan
+
+50 steps
+
+Ours
+
+Wan
+
+50 steps
+
+Ours
+
+1222.16s 
+
+40. 72s 
+
+A cardboard sign held in front of the camera with clear printed text: "HELLO AI". The camera moves forward slowly from medium shot to close-up; the text stays
+
+crisp and stable across frames with consistent kerning and no distortion.
+
+1222.16s 
+
+40. 72s 
+
+1222.16s 
+
+40. 72s 
+
+1222.16s 
+
+40. 72s Figure 7: Qualitative results on Wan 14B. Visualisations demonstrate that our method maintains high generation quality with significant inference speedup on large-scale VDMs. Inference is conducted on a single P800 XPU using BF16 precision. 
+
+D Extended Findings 
+
+We track the evolution of the model’s structural sparsity and its corresponding generation quality throughout the training process, as visualized in Figure 8 (on Wan 1.3B). 
+
+Training Dynamics and the Sparsity-Quality Trade-off. We record the training dynamics starting from the Final State training. As the training progresses, the structural sparsity continuously increases across all denoising steps (Figure 8(e)-(h)), leading to a steady decline in the global computation cost (Figure 8(d)). However, thanks to our joint distillation strategy, the generation metrics do not degrade monotonically alongside the parameter reduction. Instead, the model maintains a highly competitive generation capability, with key metrics such as Imaging Quality and Dynamic Degree exhibiting stable fluctuations and even reaching peak performance at specific intermediate stages (Figure 8(a)-(c)). 
+
+Identifying a Favorable Sparsity-Quality Trade-off. Through this trajectory, we observe a practical capacity threshold that yields a highly favorable balance between computational efficiency and generation quality. The model demonstrates excellent performance when the average FLOPs ratio is reduced to approximately 83%. At this specific operating point, the model attains a high Dynamic Degree and robust Imaging Quality. Pushing the sparsity beyond this threshold (e.g., dropping FLOPs 18 Training Progress                 
+
+> 69
+> 70
+> 71
+> 72
+> Score
+> (a) Evolution of Imaging Quality
+> Training Progress
+> 50
+> 55
+> 60
+> 65
+> 70
+> 75
+> 80
+> Score
+> (b) Evolution of Dynamic Degree
+> Training Progress
+> 25.4
+> 25.6
+> 25.8
+> 26.0
+> Score
+> (c) Evolution of Overall Consistency
+> Training Progress
+> 0.80
+> 0.83
+> 0.86
+> 0.89
+> 0.92
+> 0.95
+> FLOPs Ratio  Optimal
+> (~83%)
+> (d) Evolution of Computation
+> Training Progress
+> 0.04
+> 0.06
+> 0.08
+> 0.10
+> Sparsity Ratio
+> (e) Sparsity Distribution at t1
+> Training Progress
+> 0.04
+> 0.06
+> 0.08
+> 0.10
+> 0.12
+> 0.14
+> Sparsity Ratio
+> (f) Sparsity Distribution at t2
+> Training Progress
+> 0.04
+> 0.06
+> 0.08
+> 0.10
+> 0.12
+> 0.14
+> Sparsity Ratio
+> (g) Sparsity Distribution at t3
+> Training Progress
+> 0.02
+> 0.04
+> 0.06
+> 0.08
+> 0.10
+> Sparsity Ratio
+> (h) Sparsity Distribution at t4
+> t1t2t3t4
+> 65
+> 70
+> 75
+> 80
+> 85
+> 90
+> 95
+> 100
+> Retention Rate (%)
+> (i) Self-Attention Retention Rate
+> t1t2t3t4
+> 40
+> 50
+> 60
+> 70
+> 80
+> 90
+> 100
+> Retention Rate (%)
+> (j) Cross-Attention Retention Rate
+> t1t2t3t4
+> 80
+> 85
+> 90
+> 95
+> 100
+> 105
+> Retention Rate (%)
+> (k) FFN Retention Rate
+> t1t2t3t4
+> 0.0
+> 2.5
+> 5.0
+> 7.5
+> 10.0
+> 12.5
+> 15.0
+> Pruned Parameters (%)
+> (l) Pruned Parameters by Component
+> Self-Attn
+> Cross-Attn
+> FFN
+
+Figure 8: Evolution of training dynamics and structural analysis. (a)-(d) show the fluctuation of key generation metrics and the steady decrease in computational cost over training steps. (e)-(h) illustrate the increasing sparsity across four different denoising steps, t1 presents the highest noise level. (i)-(l) provide a detailed component-level breakdown of the retained structures in our final selected model. below 81%) results in a noticeable degradation, as excessively aggressive pruning begins to impair the representational capacity required for complex few-step generation. Consequently, we select the checkpoint at the ∼83% FLOPs ratio as our final model, as it represents a well-balanced empirical sweet spot. 
+
+Dynamic Degree Analysis on Wan 1.3B. Regarding the Dynamic Degree score of 80.56, which exceeds the teacher’s 65.19, it is important to note two contextual factors. First, Dynamic Degree is an inherently high-variance metric. As shown in panels (a)–(c), it naturally fluctuates over [51 .4, 80 .6] 
+
+across viable training checkpoints. Second, While standard DMD degrades dynamics, our pipeline mitigates this via GAN training and extra real-video data: Ours (Distill) alone already reaches 68.06( > teacher’s 65.19). TurboDiffusion reaches 86.11, showing that a student exceeding its teacher on this metric is not anomalous. Crucially, our method maintains an exceptionally high Motion Smoothness (98.17), which directly contradicts the possibility of temporal flickering or artefact-driven motion. Instead, we hypothe-size that the structured stochastic perturbations introduced by our step-conditioned mask updates counteract distillation’s mode-seeking tendency, yielding genuinely richer motion dynamics. This is corroborated by our supplementary videos, which exhibit larger, coherent motion rather than jitter. 
+
+In-depth Structural Analysis. To further understand the resulting architecture of our joint opti-mization, we conduct a detailed component-level analysis, as shown in Fig. 8(i)-(l). The retention rates of Self-Attention, Cross-Attention, and Feed-Forward Network (FFN) modules exhibit distinct patterns across the denoising steps. As observed in Fig. 8(l), the sparsification of Self/Cross-Attention components constitutes a substantial portion of the total parameter reduction. The network learns to aggressively compress these Attention components particularly during the intermediate steps ( t2
+
+and t3), while maintaining a relatively higher retention rate for FFN modules. This fine-grained breakdown empirically illustrates how the joint optimization automatically distributes structural redundancy across different architectural components and inference stages. 19

@@ -1,0 +1,324 @@
+{
+  "mode": "standard",
+  "generated_at": "2026-07-12T21:03:09.965429+00:00",
+  "stats": {
+    "mode": "standard",
+    "tag_count": 1,
+    "deep_divecandidates": 2,
+    "deep_cap": 6,
+    "deep_selected": 2,
+    "quick_candidates": 5,
+    "quick_skim_target": 11,
+    "quick_selected": 5
+  },
+  "deep_dive": [
+    {
+      "id": "2607.04988v1",
+      "source": "arxiv",
+      "title": "InternVLA-A1.5: Unifying Understanding, Latent Foresight, and Action for Compositional Generalization",
+      "abstract": "Unified models for robot manipulation aim to equip one policy with both the semantic priors of pretrained VLMs and the physical dynamics learned through future prediction. In practice, existing designs tend to erode the semantics of the pretrained backbone, suffer interference among heterogeneous objectives, and learn future prediction from scratch in pixel space, leaving the dynamics priors of pretrained video generators unexploited. We present InternVLA-A1.5, which builds the policy on a native VLM backbone that keeps training on VQA and subtask prediction, and attaches a lightweight unified expert for continuous action generation. Future prediction is recast as a latent-querying problem, where a small set of learnable foresight tokens condenses the task-relevant future into a compact latent code under the supervision of a frozen pretrained video generation model, so the policy inherits world-model dynamics priors without ever learning pixel-level generation. The video branch is discarded at inference, keeping real-time control. Pretrained on 1.2M robot episodes and 3M multimodal samples, InternVLA-A1.5 achieves the best overall results on all six simulation benchmarks. In the real world, the preserved semantics deliver the strongest compositional generalization on held-out instruction bindings, and the two designs together sustain long-horizon execution.",
+      "authors": [
+        "Haoxiang Ma",
+        "Junhao Cai",
+        "Xiaoxu Xu",
+        "Hao Li",
+        "Yuyin Yang",
+        "Yang Tian",
+        "Jiafei Cao",
+        "Hongrui Zhu",
+        "Zherui Qiu",
+        "Zhaxizhuoma",
+        "Yuqiang Yang",
+        "Jiaqi Peng",
+        "Xueyuan Wei",
+        "Yangkun Zhu",
+        "Jiahao Jiang",
+        "Xing Gao",
+        "Hanqing Wang",
+        "Feng Yuan",
+        "Kailin Li",
+        "Xueyue Zhu",
+        "Tai Wang",
+        "Yan Ding",
+        "Jiangmiao Pang",
+        "Jia Zeng",
+        "Jingjing Zhang",
+        "Bowen Zhou",
+        "Yao Mu",
+        "Chunhua Shen",
+        "Weinan Zhang"
+      ],
+      "primary_category": "cs.RO",
+      "categories": [
+        "cs.RO"
+      ],
+      "published": "2026-07-06T12:25:30+00:00",
+      "link": "https://arxiv.org/pdf/2607.04988v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 9.0,
+      "llm_evidence_en": "InternVLA-A1.5 unifies understanding, latent foresight, and action, matching world action model concept",
+      "llm_evidence_cn": "InternVLA-A1.5统一了理解、潜在前景和动作，与世界动作模型概念匹配",
+      "llm_evidence": "InternVLA-A1.5统一了理解、潜在前景和动作，与世界动作模型概念匹配",
+      "canonical_evidence": "InternVLA-A1.5统一了理解、潜在前景和动作，与世界动作模型概念匹配",
+      "llm_tldr_en": "InternVLA-A1.5 integrates latent future prediction with action generation on a VLM backbone, directly embodying the world action model idea.",
+      "llm_tldr_cn": "该论文针对机器人操作中统一策略的挑战，提出InternVLA-A1.5，在VLM骨干上附加轻量级动作专家，并将未来预测转换为潜在查询问题。该方法充分利用预训练视频生成器的动态先验，避免了从零学习像素级预测。实验表明模型在组合泛化任务上表现优异，体现了世界动作模型的核心思想——通过未来预测指导动作生成。",
+      "llm_tldr": "该论文针对机器人操作中统一策略的挑战，提出InternVLA-A1.5，在VLM骨干上附加轻量级动作专家，并将未来预测转换为潜在查询问题。该方法充分利用预训练视频生成器的动态先验，避免了从零学习像素级预测。实验表明模型在组合泛化任务上表现优异，体现了世界动作模型的核心思想——通过未来预测指导动作生成。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "world action model",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2607.08312v1",
+      "source": "arxiv",
+      "title": "Write-Protected Discrete Bottlenecks for Language-Grounded World Models: A Structural Limitation and Sufficient Fix",
+      "abstract": "How should language interface with a world model's discrete symbol system? The dominant paradigm -- end-to-end injection of LLM/VLM features into robot world models (RT-2, Octo, PaLM-E) -- implicitly assumes that language gradients can directly shape physical symbol representations. We ask whether this assumption is safe, find that it is not, and characterize the minimal architectural constraint that prevents the failure. Any language gradient entering a Gumbel-softmax-based discrete symbol bottleneck forces a structural trade-off: the vanilla estimator collapses to 2.2/64 symbols (4/5 seeds), while five anti-collapse strategies maintain diversity but fail to learn semantic labels (all <= 9.2% accuracy). No tested GumbelBottleneck variant achieves both objectives simultaneously. Within this family of discrete bottlenecks, the failure is structural rather than a matter of optimization. We characterize a sufficient set of three constraints that prevent the failure: (1) cut the gradient chain (z.detach()), preventing language signals from reaching the symbol bottleneck; (2) provide a gradient-free semantic channel -- a non-parametric Memory Table (Dict[symbol -> Counter[label]], zero parameters, zero gradients) where co-occurrence counting replaces gradient-based binding; (3) handle symbol collisions via DP-Means streaming clustering for automatic sub-cluster splitting. All three layers together achieve 97.2% grounding accuracy vs. 22.2% without Layer 3. Across two experiments spanning 74 independent runs, we demonstrate zero symbol collapse in all 32 seeds, with the blackboard achieving 79-100% semantic binding across three encoder architectures (CNN, V-JEPA 300M, CLIP ViT-L), two environments, and three texture conditions. The fix trains fewer than 2M parameters and requires no LLM fine-tuning.",
+      "authors": [
+        "Jiayi Fang"
+      ],
+      "primary_category": "cs.LG",
+      "categories": [
+        "cs.LG"
+      ],
+      "published": "2026-07-09T09:55:17+00:00",
+      "link": "https://arxiv.org/pdf/2607.08312v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 8.0,
+      "llm_evidence_en": "world model language grounding and discrete bottleneck analysis",
+      "llm_evidence_cn": "世界模型语言接地与离散瓶颈分析",
+      "llm_evidence": "世界模型语言接地与离散瓶颈分析",
+      "canonical_evidence": "世界模型语言接地与离散瓶颈分析",
+      "llm_tldr_en": "Identifies a structural limitation in language-grounded world models with discrete symbol bottlenecks and proposes a sufficient architectural fix.",
+      "llm_tldr_cn": "该论文发现语言注入离散符号瓶颈的世界模型存在结构性缺陷：标准估计器导致符号坍缩，而抗坍缩策略无法学习语义标签。论文表征了最小架构约束来防止此失败，为语言与世界模型接口设计提供了重要指导。",
+      "llm_tldr": "该论文发现语言注入离散符号瓶颈的世界模型存在结构性缺陷：标准估计器导致符号坍缩，而抗坍缩策略无法学习语义标签。论文表征了最小架构约束来防止此失败，为语言与世界模型接口设计提供了重要指导。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "world model",
+      "matched_requirement_id": "req-2",
+      "selection_source": "fresh_fetch"
+    }
+  ],
+  "quick_skim": [
+    {
+      "id": "2607.06370v1",
+      "source": "arxiv",
+      "title": "Training-Free Acceleration for Vision-Language-Action Models with Action Caching and Refinement",
+      "abstract": "Vision-Language-Action (VLA) models have emerged as a promising approach for generalizable robotic manipulations. In particular, flow matching-based VLA models have shown remarkable success due to their capability to generate precise and smooth action sequences and capture multimodal distributions. However, the iterative denoising process in the action head acts as a major computational bottleneck, posing a critical challenge for real-time deployment. To address this challenge, we propose ActionCache, a plug-and-play external cache that opportunistically reuses past intermediate actions to warm-start generations from the vicinity of target actions, thereby drastically reducing the inference latency. Specifically, ActionCache stores the intermediate actions with compact multimodal keys, which enables retrieval from similar past contexts across different episodes or even different tasks. Experimental results in simulation and real-world environments demonstrate that ActionCache maintains high task success rates in a low-latency regime, achieving inference acceleration of up to $11.75\\times$ and $34.43\\times$ for representative flow-based VLA models, $π_{0.5}$ and GR00T-N1.6, respectively.",
+      "authors": [
+        "Ryuji Oi",
+        "Hikari Otsuka",
+        "Kosuke Matsushima",
+        "Yuki Ichikawa",
+        "Masato Motomura",
+        "Tatsuya Kaneko",
+        "Daichi Fujiki"
+      ],
+      "primary_category": "cs.RO",
+      "categories": [
+        "cs.RO",
+        "cs.CV",
+        "cs.LG"
+      ],
+      "published": "2026-07-07T15:10:15+00:00",
+      "link": "https://arxiv.org/pdf/2607.06370v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "Vision-Language-Action model with action caching for efficiency",
+      "llm_evidence_cn": "视觉-语言-动作模型的行动缓存加速",
+      "llm_evidence": "视觉-语言-动作模型的行动缓存加速",
+      "canonical_evidence": "视觉-语言-动作模型的行动缓存加速",
+      "llm_tldr_en": "Proposes ActionCache, a plug-and-play cache for VLA models to reuse past action intermediates, drastically reducing inference latency.",
+      "llm_tldr_cn": "流匹配VLA模型的动作头迭代去噪计算瓶颈高。论文提出ActionCache，通过缓存复用过往中间动作加速生成，同时使用残差修正保证质量，为世界动作模型的高效推理提供即插即用方案。",
+      "llm_tldr": "流匹配VLA模型的动作头迭代去噪计算瓶颈高。论文提出ActionCache，通过缓存复用过往中间动作加速生成，同时使用残差修正保证质量，为世界动作模型的高效推理提供即插即用方案。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "world action model",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    },
+    {
+      "id": "2607.06481v1",
+      "source": "arxiv",
+      "title": "Prompt-Adapter Context Routing for Parameter-Efficient Multi-Shot Long Video Extrapolation",
+      "abstract": "We present PACR-Video, a parameter-efficient framework for multi-shot long video extrapolation that preserves recurring entities, scene structure, visual style, and causal progression without full generator fine-tuning. PACR-Video keeps a text-to-video diffusion transformer frozen and augments it with low-rank temporal adapters conditioned by learned shot-role prompt tokens. To maintain long-horizon coherence, it builds a recursive prompt bank that stores compact entity, location, action, and style prompts from previous shots, then routes them through adapter gates according to predicted narrative dependencies. A Shot-Local/Story-Global tuning objective combines next-shot reconstruction, cross-shot identity contrast, and prompt sparsity regularization, while an adapter composition schedule balances early-shot visual consistency with later-shot event progression and viewpoint change. Across six multi-shot and long-video benchmarks, PACR-Video outperforms text-to-video, tuning-based, memory-augmented, streaming, and recursive-context baselines on distributional quality, semantic alignment, identity consistency, temporal smoothness, motion stability, transition coherence, and human preference. These results show that compact prompt routing and lightweight temporal adaptation provide sufficient controllable capacity for stable long video extrapolation.",
+      "authors": [
+        "Anna Córdoba",
+        "Adam Puente Tercero",
+        "Nerea Angulo Hijo",
+        "Mar Linares Tercero",
+        "Julia Barrientos",
+        "Ainhoa Miranda",
+        "Jesús Olivera"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV",
+        "cs.AI"
+      ],
+      "published": "2026-07-07T16:41:25+00:00",
+      "link": "https://arxiv.org/pdf/2607.06481v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "long video extrapolation with entity and causal progression preservation",
+      "llm_evidence_cn": "长视频外推保持实体和因果进程",
+      "llm_evidence": "长视频外推保持实体和因果进程",
+      "canonical_evidence": "长视频外推保持实体和因果进程",
+      "llm_tldr_en": "Parameter-efficient framework for multi-shot long video extrapolation preserving entities, style, and causality using frozen diffusion transformer and low-rank adapters.",
+      "llm_tldr_cn": "长视频生成难以保持跨镜头实体、风格和因果关系。论文提出PACR-Video，冻结文本到视频扩散Transformer，添加低秩时序适配器，通过递归提示库和适配器门控维持长程连贯性，为视频世界模型中的连续预测提供方法支持。",
+      "llm_tldr": "长视频生成难以保持跨镜头实体、风格和因果关系。论文提出PACR-Video，冻结文本到视频扩散Transformer，添加低秩时序适配器，通过递归提示库和适配器门控维持长程连贯性，为视频世界模型中的连续预测提供方法支持。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "research on video generation for world models",
+      "matched_requirement_id": "req-8",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    },
+    {
+      "id": "2607.06631v1",
+      "source": "arxiv",
+      "title": "Dynamic-in-Few-Step: Unifying Dynamic Computation and Few-Step Distillation for Efficient Video Generation",
+      "abstract": "Video Diffusion Models (VDMs) have demonstrated superior generation quality but suffer from prohibitive computational costs. While recent few-step distillation techniques significantly accelerate inference, they typically enforce a static model architecture across all denoising stages, ignoring the varying computational demands inherent to different noise levels. In this work, we propose a novel post-training acceleration framework that exploits this redundancy by integrating dynamic structural sparsification directly into the distillation process. Unlike conventional post-hoc compression applied to a fixed diffusion pipeline, our approach jointly optimizes the denoising steps and structured model sparsity, transforming a pre-trained VDM into a compact, step-specific Mixture-of-Models (MoM). To address the training instability arising from this joint optimization, we introduce a Progressive Training Strategy coupled with an Output Rollout Mechanism, which ensures the coherent learning of structural decisions across timesteps. Furthermore, we develop a specialized inference engine to deploy the resulting MoM efficiently. Our method is orthogonal to existing acceleration techniques and highly effective: On Wan-14B, it removes 24% of the per-step FLOPs on top of 4-step distillation, adding a 1.2x wall-clock gain and reaching a 30x speedup over the 50-step teacher while preserving competitive generation quality.",
+      "authors": [
+        "Yu Cheng",
+        "Siyue Yao",
+        "Zhongang Qi",
+        "Shanyan Guan",
+        "Wei Li",
+        "Fajie Yuan"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV",
+        "cs.AI",
+        "cs.LG"
+      ],
+      "published": "2026-07-07T13:14:33+00:00",
+      "link": "https://arxiv.org/pdf/2607.06631v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "efficient video generation method enabling world model applications",
+      "llm_evidence_cn": "高效视频生成方法可应用于世界模型",
+      "llm_evidence": "高效视频生成方法可应用于世界模型",
+      "canonical_evidence": "高效视频生成方法可应用于世界模型",
+      "llm_tldr_en": "Dynamic-in-Few-Step integrates dynamic sparsification into few-step distillation for efficient video generation, potentially accelerating world model inference.",
+      "llm_tldr_cn": "视频扩散模型计算成本高昂，现有少步蒸馏忽略了不同噪声级的计算需求差异。Dynamic-in-Few-Step将动态结构稀疏化直接融入蒸馏过程，联合优化去噪步数与模型稀疏性，在保持质量的同时显著加速视频生成。该方法可推广至视频生成世界模型的推理加速。",
+      "llm_tldr": "视频扩散模型计算成本高昂，现有少步蒸馏忽略了不同噪声级的计算需求差异。Dynamic-in-Few-Step将动态结构稀疏化直接融入蒸馏过程，联合优化去噪步数与模型稀疏性，在保持质量的同时显著加速视频生成。该方法可推广至视频生成世界模型的推理加速。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "research on video generation for world models",
+      "matched_requirement_id": "req-8",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    },
+    {
+      "id": "2607.08763v1",
+      "source": "arxiv",
+      "title": "OpenCoF: Learning to Reason Through Video Generation",
+      "abstract": "Reasoning has become a core capability for large models, especially when reliable decisions require understanding logical consequences. Recent video generation models offer a reasoning path distinct from previous Chain-of-Thought (CoT): reasoning can unfold through temporally connected frames, known as Chain-of-Frame (CoF) reasoning. However, existing video generators are primarily trained on general video corpora, still lacking diverse supervision and dedicated designs for CoF reasoning. To address this gap, we introduce OpenCoF, a framework comprising the OpenCoF-17K dataset, a reasoning video dataset spanning 11 task families, and Wan-CoF, a fine-tuned video model for studying whether diverse temporal supervision improves CoF behavior. Across four video reasoning benchmarks, Wan-CoF achieves considerable gains over the Wan2.2-I2V-A14B baseline. Building on this, we empirically explore more advanced designs for CoF capabilities, i.e., equipping the model with visual and textual reasoning tokens. This mechanism respectively captures low-level visual cues and high-level semantic priors for spatial and temporal reasoning. Through performance comparisons and attention analysis, we examine how these tokens contribute across model depth, denoising steps, space, and time. Our results suggest that stronger video reasoning requires both broad temporal supervision and explicit mechanisms for organizing intermediate reasoning state. We open-source the dataset, model, and code to facilitate future research on reasoning-oriented video generation.",
+      "authors": [
+        "Xinyan Chen",
+        "Ziyu Guo",
+        "Renrui Zhang",
+        "Dongzhi Jiang",
+        "Hongsheng Li"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV",
+        "cs.AI"
+      ],
+      "published": "2026-07-09T17:58:29+00:00",
+      "link": "https://arxiv.org/pdf/2607.08763v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "video generation for reasoning related to world model chain of frame",
+      "llm_evidence_cn": "视频生成用于推理，与世界模型中的时序推理相关",
+      "llm_evidence": "视频生成用于推理，与世界模型中的时序推理相关",
+      "canonical_evidence": "视频生成用于推理，与世界模型中的时序推理相关",
+      "llm_tldr_en": "Proposes OpenCoF framework using video generation for Chain-of-Frame reasoning, contributing a dataset and fine-tuned model.",
+      "llm_tldr_cn": "现有视频生成模型缺乏面向时序推理的监督。论文提出OpenCoF框架，包含OpenCoF-17K推理视频数据集和微调模型Wan-CoF，通过多样化时序监督提升视频推理行为，为世界模型中的推理提供新路径。",
+      "llm_tldr": "现有视频生成模型缺乏面向时序推理的监督。论文提出OpenCoF框架，包含OpenCoF-17K推理视频数据集和微调模型Wan-CoF，通过多样化时序监督提升视频推理行为，为世界模型中的推理提供新路径。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "research on video generation for world models",
+      "matched_requirement_id": "req-8",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    },
+    {
+      "id": "2607.08766v1",
+      "source": "arxiv",
+      "title": "OPSD-V: On-Policy Self-Distillation for Post-Training Few-Step Autoregressive Video Generators",
+      "abstract": "We propose OPSD-V, an on-policy self-distillation paradigm for post-training few-step autoregressive (AR) video diffusion models. Existing few-step AR video generators can produce long videos with low latency, but still suffer from error accumulation and weakened motion dynamics during long autoregressive rollout. OPSD-V reduces long-horizon degradation while preserving the original few-step inference path. The key idea is to introduce real long-video data as temporal context during training and use it to provide dense trajectory-level supervision. Specifically, the student follows the exact inference-time rollout, generating each chunk conditioned on its own previously generated KV cache. In parallel, the teacher is evaluated at the same student-visited denoising states, but uses a cleaner AR-consistent temporal cache in which older history can be replaced by real-video context. This provides dense denoising-level corrective targets under on-policy AR cache dynamics, without changing the sampler, number of denoising steps, or inference-time cache mechanism. We apply OPSD-V to representative few-step AR video models, including Self-Forcing and LongLive. Experiments show consistent improvements in visual quality, motion dynamics, and VBenchLong scores. A user study with 10 participants comparing 20 video pairs shows that OPSD-V is preferred over the base models in 66.0% of overall-preference judgments (82.5% excluding ties).",
+      "authors": [
+        "Hongyu Liu",
+        "Chun Wang",
+        "Feng Gao",
+        "Xuanhua He",
+        "Yue Ma",
+        "Ziyu Wan",
+        "Yong Zhang",
+        "Xiaoming Wei",
+        "Qifeng Chen"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV"
+      ],
+      "published": "2026-07-09T17:59:11+00:00",
+      "link": "https://arxiv.org/pdf/2607.08766v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "improves long-video generation for autoregressive video models, applicable to world models",
+      "llm_evidence_cn": "改进了自回归视频模型的长视频生成，可应用于世界模型",
+      "llm_evidence": "改进了自回归视频模型的长视频生成，可应用于世界模型",
+      "canonical_evidence": "改进了自回归视频模型的长视频生成，可应用于世界模型",
+      "llm_tldr_en": "Proposes an on-policy self-distillation method to reduce error accumulation in few-step autoregressive video generation, enabling longer coherent video output.",
+      "llm_tldr_cn": "针对少步自回归视频生成器长程生成中误差累积和运动弱化的问题，提出OPSD-V在线策略自蒸馏方法。通过引入真实长视频作为时间上下文，提供密集轨迹级监督，显著改善了长视频的一致性和运动动态，同时保持少步推理效率。该方法为视频生成用于世界模型提供了基础技术。",
+      "llm_tldr": "针对少步自回归视频生成器长程生成中误差累积和运动弱化的问题，提出OPSD-V在线策略自蒸馏方法。通过引入真实长视频作为时间上下文，提供密集轨迹级监督，显著改善了长视频的一致性和运动动态，同时保持少步推理效率。该方法为视频生成用于世界模型提供了基础技术。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "research on video generation for world models",
+      "matched_requirement_id": "req-8",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    }
+  ]
+}

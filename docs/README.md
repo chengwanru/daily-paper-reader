@@ -6,29 +6,43 @@
 </div>
 
 ## 每次日报
-- 最新运行日期：2026-07-11
-- 运行时间：2026-07-11 21:08:04 UTC
+- 最新运行日期：2026-07-12
+- 运行时间：2026-07-12 21:06:59 UTC
 - 运行状态：成功
-- 本次总论文数：2
-- 精读区：0
-- 速读区：2
+- 本次总论文数：7
+- 精读区：2
+- 速读区：5
 
 ### 今日简报（AI）
-1) 今日速读两篇论文，聚焦事件相机视频重建与视觉-语言-动作模型优化。
-2) 最值得关注：视频扩散模型实现长时域事件相机帧重建（7.0分）；上下文门控机制提升VLA模型动作条件性能（6.0分）。
-3) 建议读者后续关注这两项技术在实际场景（如机器人控制、高速视频处理）中的效率与泛化实验。
-- 详情：[/202607/11/README](/202607/11/README)
+今日重点关注了面向组合泛化的统一理解-潜在预判-动作框架和语言基世界模型的结构缺陷修复。
+最值得精读的是InternVLA-A1.5（9分）在机器人组合泛化上的突破，以及采用写保护离散瓶颈解决世界模型结构局限的成果。
+建议优先阅读这两篇高分论文，尤其适合对多模态理解与动作生成结合方向感兴趣的读者。
+- 详情：[/202607/12/README](/202607/12/README)
 
 ### 精读区论文标签
-- 本次无精读推荐。
+1. [InternVLA-A1.5: Unifying Understanding, Latent Foresight, and Action for Compositional Generalization](/202607/12/2607.04988v1-internvla-a15-unifying-understanding-latent-foresight-and-action-for-compositional-generalization)  
+   标签：评分：9.0/10、query:video-wam
+   evidence：InternVLA-A1.5统一了理解、潜在前景和动作，与世界动作模型概念匹配
+2. [Write-Protected Discrete Bottlenecks for Language-Grounded World Models: A Structural Limitation and Sufficient Fix](/202607/12/2607.08312v1-write-protected-discrete-bottlenecks-for-language-grounded-world-models-a-structural-limitation-and-sufficient-fix)  
+   标签：评分：8.0/10、query:video-wam
+   evidence：世界模型语言接地与离散瓶颈分析
 
 ### 速读区论文标签
-1. [LongE2V: Long-Horizon Event-based Video Reconstruction, Prediction, and Frame Interpolation with Video Diffusion Models](/202607/11/2607.08770v1-longe2v-long-horizon-event-based-video-reconstruction-prediction-and-frame-interpolation-with-video-diffusion-models)  
-   标签：评分：7.0/10、query:video-wam
-   evidence：视频扩散先验用于预测和插帧，支持类似世界模型的视频预测
-2. [CAC-VLA: Context-Gated Action Conditioning for Vision-Language-Action Models](/202607/11/2607.04816v1-cac-vla-context-gated-action-conditioning-for-vision-language-action-models)  
+1. [Training-Free Acceleration for Vision-Language-Action Models with Action Caching and Refinement](/202607/12/2607.06370v1-training-free-acceleration-for-vision-language-action-models-with-action-caching-and-refinement)  
    标签：评分：6.0/10、query:video-wam
-   evidence：上下文门控动作条件化用于VLA，改进机器人动作生成
+   evidence：视觉-语言-动作模型的行动缓存加速
+2. [Prompt-Adapter Context Routing for Parameter-Efficient Multi-Shot Long Video Extrapolation](/202607/12/2607.06481v1-prompt-adapter-context-routing-for-parameter-efficient-multi-shot-long-video-extrapolation)  
+   标签：评分：6.0/10、query:video-wam
+   evidence：长视频外推保持实体和因果进程
+3. [Dynamic-in-Few-Step: Unifying Dynamic Computation and Few-Step Distillation for Efficient Video Generation](/202607/12/2607.06631v1-dynamic-in-few-step-unifying-dynamic-computation-and-few-step-distillation-for-efficient-video-generation)  
+   标签：评分：6.0/10、query:video-wam
+   evidence：高效视频生成方法可应用于世界模型
+4. [OpenCoF: Learning to Reason Through Video Generation](/202607/12/2607.08763v1-opencof-learning-to-reason-through-video-generation)  
+   标签：评分：6.0/10、query:video-wam
+   evidence：视频生成用于推理，与世界模型中的时序推理相关
+5. [OPSD-V: On-Policy Self-Distillation for Post-Training Few-Step Autoregressive Video Generators](/202607/12/2607.08766v1-opsd-v-on-policy-self-distillation-for-post-training-few-step-autoregressive-video-generators)  
+   标签：评分：6.0/10、query:video-wam
+   evidence：改进了自回归视频模型的长视频生成，可应用于世界模型
 
 
 <div class="dpr-home-promo-card">
