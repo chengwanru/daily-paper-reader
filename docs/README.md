@@ -6,43 +6,56 @@
 </div>
 
 ## 每次日报
-- 最新运行日期：2026-07-13
-- 运行时间：2026-07-13 20:59:13 UTC
+- 最新运行日期：2026-07-14
+- 运行时间：2026-07-14 21:41:24 UTC
 - 运行状态：成功
-- 本次总论文数：7
-- 精读区：4
-- 速读区：3
+- 本次总论文数：12
+- 精读区：6
+- 速读区：6
 
 ### 今日简报（AI）
-1) 今日推荐7篇论文，精读4篇、速读3篇，聚焦全景生成与世界模型方向。  
-2) 最值得看的是满分作品《PanoWorld: Real-World Panoramic Generation》与高分《WAM-TTT: Steering World-Action Models by Watching Human Play at Test Time》，分别在自动生成真实全景与人类行为引导世界模型方面取得突破。  
-3) 建议重点关注全景生成技术在虚拟现实和自动驾驶场景的应用潜力，同时关注利用人类观察数据提升智能体决策能力的新范式。
-- 详情：[/202607/13/README](/202607/13/README)
+今日精读6篇速读6篇，焦点是10分神作《From World Action Models to Embodied Brains》与9分《SyncSpace》。前者提出从世界模型到具身大脑的开放世界物理智能路线图，后者展示布局条件3D高斯泼溅实现混合现实空间重绘。建议普通读者先读这两篇，再跟进小米机器人系列的世界基础模型工作。
+- 详情：[/202607/14/README](/202607/14/README)
 
 ### 精读区论文标签
-1. [PanoWorld: Real-World Panoramic Generation](/202607/13/2607.09661v1-panoworld-real-world-panoramic-generation)  
+1. [From World Action Models to Embodied Brains: A Roadmap for Open-World Physical Intelligence](/202607/14/2607.11689v1-from-world-action-models-to-embodied-brains-a-roadmap-for-open-world-physical-intelligence)  
    标签：评分：10.0/10、query:video-wam
-   evidence：具有视频生成的全景世界模型
-2. [WAM-TTT: Steering World-Action Models by Watching Human Play at Test Time](/202607/13/2607.06988v2-wam-ttt-steering-world-action-models-by-watching-human-play-at-test-time)  
+   evidence：世界动作模型路线图,直接针对该概念
+2. [SyncSpace: Layout-Conditioned 3D Gaussian Splatting for Space Reskinning in Mixed Reality](/202607/14/2607.10050v1-syncspace-layout-conditioned-3d-gaussian-splatting-for-space-reskinning-in-mixed-reality)  
    标签：评分：9.0/10、query:video-wam
-   evidence：在测试时使用人类视频引导世界动作模型
-3. [Causally Debiased Latent Action Model for Embodied Action Conditioned World Models](/202607/13/2607.09185v1-causally-debiased-latent-action-model-for-embodied-action-conditioned-world-models)  
+   evidence：论文明确使用生成世界模型
+3. [Cycle-World: Mitigating Error Accumulation in Long-term Video World Models via Reverse-Prediction Cycle Consistency](/202607/14/2607.11836v1-cycle-world-mitigating-error-accumulation-in-long-term-video-world-models-via-reverse-prediction-cycle-consistency)  
    标签：评分：9.0/10、query:video-wam
-   evidence：为动作条件世界模型提出潜在动作模型
-4. [GenVid2Robot: From Video Generation to Robot Manipulation via Rigid-Geometric Consistency](/202607/13/2607.09191v1-genvid2robot-from-video-generation-to-robot-manipulation-via-rigid-geometric-consistency)  
-   标签：评分：9.0/10、query:video-wam
-   evidence：从视频生成到机器人操作，使用视频生成的世界动作模型
+   evidence：长周期视频世界模型,利用循环一致性缓解错误积累
+4. [Causally Debiased Latent Action Model for Embodied Action Conditioned World Models](/202607/14/2607.09185v1-causally-debiased-latent-action-model-for-embodied-action-conditioned-world-models)  
+   标签：评分：8.0/10、query:video-wam
+   evidence：提出因果去偏的潜动作模型用于动作条件世界模型
+5. [PanoWorld: Real-World Panoramic Generation](/202607/14/2607.09661v1-panoworld-real-world-panoramic-generation)  
+   标签：评分：8.0/10、query:video-wam
+   evidence：全景世界模型与长程记忆
+6. [Is Energy Guidance All You Need? Training-Free Norm Injection for Driving World Models](/202607/14/2607.10781v1-is-energy-guidance-all-you-need-training-free-norm-injection-for-driving-world-models)  
+   标签：评分：8.0/10、query:video-wam
+   evidence：驾驶世界模型与能量引导的可控性
 
 ### 速读区论文标签
-1. [MobileWan: Closing the Quality Gap for Mobile Video Diffusion](/202607/13/2607.06173v1-mobilewan-closing-the-quality-gap-for-mobile-video-diffusion)  
+1. [Towards Predictive, Aligned, and Scalable Robot Learning](/202607/14/2607.11270v1-towards-predictive-aligned-and-scalable-robot-learning)  
+   标签：评分：8.0/10、query:video-wam
+   evidence：提出了Lumo-2，一种潜在世界动作模型，在潜在空间推理世界动态以生成动作
+2. [Xiaomi-Robotics-U0: Unified Embodied Synthesis with World Foundation Model](/202607/14/2607.11643v1-xiaomi-robotics-u0-unified-embodied-synthesis-with-world-foundation-model)  
+   标签：评分：8.0/10、query:video-wam
+   evidence：论文提出世界基础模型，用于统一具身合成，包括视频生成
+3. [ABot-3DWorld 0: A Universal World Model to Explore Any 3D Space](/202607/14/2607.11673v1-abot-3dworld-0-a-universal-world-model-to-explore-any-3d-space)  
+   标签：评分：8.0/10、query:video-wam
+   evidence：探索任意3D空间的通用世界模型
+4. [A Control Theory of Predictability in Latent World Models](/202607/14/2607.10362v1-a-control-theory-of-predictability-in-latent-world-models)  
    标签：评分：7.0/10、query:video-wam
-   evidence：面向移动端部署的视频扩散模型，实现高效视频生成
-2. [GATS: Graph-Augmented Tree Search with Layered World Models for Efficient Agent Planning](/202607/13/2607.08894v1-gats-graph-augmented-tree-search-with-layered-world-models-for-efficient-agent-planning)  
+   evidence：潜在世界模型可预测性的理论分析
+5. [WALA Learning Executable Latent Actions from Action-Labeled Demonstrations and Action-Free Videos](/202607/14/2607.11397v1-wala-learning-executable-latent-actions-from-action-labeled-demonstrations-and-action-free-videos)  
    标签：评分：7.0/10、query:video-wam
-   evidence：使用分层世界模型进行规划
-3. [Video Generation Models are General-Purpose Vision Learners](/202607/13/2607.09024v1-video-generation-models-are-general-purpose-vision-learners)  
+   evidence：从视频学习可执行潜在动作
+6. [World Models as Adversaries: Multi-Agent Self-Play Fine-Tuning for Robust Motion Planning](/202607/14/2607.10630v1-world-models-as-adversaries-multi-agent-self-play-fine-tuning-for-robust-motion-planning)  
    标签：评分：6.0/10、query:video-wam
-   evidence：视频生成模型作为通用视觉学习者，与视频生成用于世界模型相关
+   evidence：世界模型作为对抗者用于鲁棒运动规划
 
 
 <div class="dpr-home-promo-card">

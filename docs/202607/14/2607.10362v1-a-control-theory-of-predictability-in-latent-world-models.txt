@@ -1,0 +1,2135 @@
+Title: A Control Theory of Predictability in Latent World Models
+
+URL Source: https://arxiv.org/pdf/2607.10362v1
+
+Published Time: Tue, 14 Jul 2026 00:50:02 GMT
+
+Number of Pages: 33
+
+Markdown Content:
+# A C ONTROL THEORY OF PREDICTABILITY IN LATENT WORLD MODELS 
+
+A P REPRINT 
+
+Hanzhe You 1, Yonggang Zhang 2, Maohao Ran 3, Zhiqin Yang 2, Zhenyuan Zhang 2, Wei Xue 2
+
+Jun Song 3,* , Xinmei Tian 1,* , Yike Guo 2,* 
+
+> 1
+
+University of Science and Technology of China 
+
+> 2
+
+The Hong Kong University of Science and Technology, HKGAI 
+
+> 3
+
+Hong Kong Baptist University July 14, 2026 
+
+# ABSTRACT 
+
+Latent world models are trained to predict future states in a learned representation and are then deployed inside a planner that selects actions by simulating them forward. Current practice adopts the prediction error, the single- or multi-step rollout loss on held-out data, as the training and model-selection objective, on the assumption that a lower prediction error yields better control. We show that this assumption is unreliable for a structural reason: a planner does not query the model on the training distribution but on the states that its candidate actions reach, which generally leave the data manifold, so an error averaged over the data cannot by itself govern control. We therefore reframe the objective as the discrepancy between the predicted and the true plan-cost at the plan the planner commits to, and prove that the planner’s suboptimality is bounded by twice this discrepancy, whereas the data-averaged prediction error neither bounds nor tracks it. Under a linear-control premise the discrepancy separates into two terms. The first is a small on-manifold residual, on which the predicted and true dynamics agree and which a spectral tax prices through the non-normality of the latent transition operator. The second is an off-manifold divergence, on which an action carries the state off the manifold and the two dynamics diverge; this divergence is the binding term and is bounded by no data-averaged error. Synthetic operators confirm the pricing formulas, and latent model-predictive control experiments confirm the decoupling: across seeds, the single-step validation error is essentially uncorrelated with control success, whereas a fidelity score on the planner-reachable measure tracks it. 
+
+Keywords World Models, Joint-Embedding Prediction, Koopman Operators, Pseudospectra, Model-Predictive Control 
+
+# 1 Introduction 
+
+A latent world model supports planning by predicting the future of a compact latent state, which allows an agent to act without modeling every detail of its observations. This places two competing requirements on the representation: it must retain enough of the signal to be useful, and it must remain predictable from its own past by a simple predictor acting in the latent space. Joint-Embedding Predictive Architectures [Assran et al., 2023, LeCun et al., 2022] make this trade-off the explicit training objective, mapping observations to a latent space with a shared encoder and operating a predictor inside that space rather than reconstructing the input. Once trained, the latent model is deployed inside a planner, such as model-predictive control or trajectory optimization in latent space [Hafner et al., 2020, Garcia and Ross, 2013, Assran et al., 2025], that rolls candidate action sequences forward and executes the one of lowest predicted cost.  
+
+> *
+
+Corresponding authors. arXiv:2607.10362v1 [cs.LG] 11 Jul 2026 A Control Theory of Predictability in Latent World Models A P REPRINT 
+
+A world model is evaluated not by its prediction error but by the quality of the actions it induces, and here common practice rests on an assumption that we argue is unsound: that lowering the prediction error, the single- or multi-step rollout loss on held-out data, is the correct objective for control. A planner does not query the model on the training distribution. It queries it on the states that candidate actions reach, and those states generally leave the data manifold, where the model extrapolates. The prediction loss is an average over the data distribution, whereas control success is a functional of the states the planner visits; the two need not move together, and we show that they need not. This paper develops a control theory for latent world models organized around this objective. We prove in Section 3 that the planner’s suboptimality is controlled by a single scalar, the largest discrepancy between the model’s predicted 
+
+plan-cost and the true plan-cost over the plans the planner considers, so that the target for control is to make the predicted cost track the true cost rather than to lower the averaged prediction error. We then establish why the averaged error is the wrong instrument. It cannot bound this discrepancy once the query leaves the data support, which is the decoupling; the harmful part of the discrepancy is one-sided, arising from a hole on which the predicted cost underestimates the true; and the discrepancy is seeded only when the predictor carries realizable nonlinearity. To make the objective quantitative, Section 4 prices the predicted-versus-true gap. Under a linear-control premise it separates into a small on-manifold residual, on which the predicted and true dynamics agree, and an off-manifold divergence, on which an action carries the state off the data manifold and the two dynamics diverge. The off-manifold divergence is the binding term and the object of our main claim; it is priced by a rollout tax that compounds the residual along the action-selected trajectory and is bounded by no data-average. The on-manifold residual is priced by a spectral tax set by the non-normality of the latent transition operator, whose closed-form frontier vanishes on the self-adjoint, Gaussian boundary where prior identifiability guarantees live and thereby places those guarantees at the zero-cost corner of a broader surface; it does not by itself govern control. 
+
+Contributions. (1) The correct control objective, and one core theorem (Section 3). We prove that a latent planner’s subopti-mality is bounded by twice the supremum gap between predicted and true plan-cost over the candidate set. The control objective is therefore to make predicted cost track true cost at the committed plan; we then prove three supporting lemmas showing why the data-averaged prediction error cannot serve this objective: it fails to bound the gap once the query leaves the data support, it is two-sided where the gap is one-sided, and it is blind to the realizable nonlinearity that seeds the gap. 
+
+(2) Pricing the gap, with the off-manifold divergence as the binding term (Section 4). Under a linear-control premise the gap separates into an on-manifold residual and an off-manifold divergence. We price the divergence—an off-manifold rollout tax that no data-average bounds—and combine it with the residual into a single control-error theorem with an optimal exploration width. The on-manifold residual is priced by a spectral tax that vanishes on the self-adjoint boundary of prior work but, as the experiments show, does not by itself govern control. 
+
+(3) A theory-guided method and empirical validation (Section 5). The analysis prescribes a minimal inter-vention, a linear state readout, together with three falsifiable predictions. Latent model-predictive control experiments confirm the decoupling, in that the single-step validation error does not separate a fourteen-point spread in success across seeds, and identify the off-manifold amplification as an informative training signal; synthetic-operator experiments corroborate the spectral-tax pricing formulas and the off-manifold suboptimality bound. Full derivations and proofs of every result, together with the numerical-verification protocols, are collected in the appendices. 
+
+# 2 Related Work 
+
+Self-supervised representation and JEPA. Joint-embedding methods learn representations by predicting one view from another in latent space [Assran et al., 2023, LeCun et al., 2022], with anti-collapse regularizers preventing trivial solutions [Bardes et al., 2024, Tian et al., 2021, Balestriero and LeCun, 2022]. Recent theory characterizes the ideal case: LeJEPA shows that isotropic Gaussian embeddings minimize downstream worst-case risk [Balestriero and LeCun, 2025], and that in an Ornstein–Uhlenbeck environment the same distribution yields linear identifiability of the latent factors [Klindt et al., 2026]. These guarantees rest on an idealized latent transition—self-adjoint, reversible, Gaussian. We take that ideal case as the zero-cost boundary of a broader cost surface and price the non-normal regime outside it. 
+
+World models and latent planning. Latent world models roll a learned dynamics forward and plan by trajectory optimization or model-predictive control [Hafner et al., 2020, Garcia and Ross, 2013], a paradigm now scaled to video 2A Control Theory of Predictability in Latent World Models A P REPRINT 
+
+[Assran et al., 2025]. Our analysis concerns exactly this deployment: the planner’s query measure, not the data measure, governs success, and it is the discrepancy between predicted and true reachable dynamics—not the training loss—that prices control quality. 
+
+Koopman operators and spectral estimation. Casting nonlinear dynamics through the linear Koopman operator underlies a large body of data-driven modeling [Brunton et al., 2016, Mezi´ c, 2005, Lusch et al., 2018, Mardt et al., 2018, Noé and Nüske, 2013, Otto and Rowley, 2019], with recent attention to rigorous spectral computation [Colbrook et al., 2023, Colbrook and Townsend, 2024]. We use the operator’s pseudospectrum, rather than its spectrum, as the pricing object, following the non-normal-matrix viewpoint of Trefethen and Embree [2020]. 
+
+Rollout, exposure bias, and slow features. The mismatch between teacher-forced training and self-fed inference— exposure bias—is classically addressed by scheduled sampling and related schemes [Bengio et al., 2015, Venkatraman et al., 2015]. We show this fix is orthogonal to the off-manifold holes that govern control. Slow-feature analysis treats slowness as a proxy for predictive usefulness [Wiskott and Sejnowski, 2002, Sprekeler, 2011]; a refinement of this view under multi-step rollout (high-content slow features are the most rollout-fragile) is developed in Appendix F. 
+
+# 3 A Control Theory for Latent-Space Planning 
+
+Standard practice measures a world model by its prediction error and treats that error as a proxy for control quality. We open with the setup that separates the two quantities, then state the one theorem that identifies the correct control objective, and finally prove three lemmas that explain why the prediction error cannot serve it. 
+
+3.1 Setup 
+
+Let {Xt} be a stationary, ergodic, first-order Markov process with transition (Koopman) operator P on L2(μ); restricting to the mean-zero subspace H0 = 1⊥ gives P0 = P |H0 , real with ∥P0∥ ≤ 1. A whitened encoder corresponds to an isometry V : Rd → H0; the content it retains is C = ∥P0V ∥2HS and the single-step gap is δ2 = ∥(I − Π) P0V ∥2 with 
+
+Π = V V ∗. For control we take the deployed latent dynamics to be the learned linear model 
+
+zt+1 = ˆAz t + ˆBu t + εt, (1) with ( ˆA, ˆB) the least-squares fit and residual ε. Let M = supp μ be the data manifold, r(z) = dist( z, M) the off-manifold distance, and assume the residual grows linearly off the manifold, ∥ε(z, u )∥ ≤ δ0 + L r (z), with δ0 the on-manifold residual and L a nonlinearity scale ( L = 0 for a genuinely linear system). A planner ranks candidate action sequences u ∈ U by a predicted terminal cost and executes the best. Write the predicted and true terminal costs to a goal zg as 
+
+ˆD(u) = ∥ˆzH (u) − zg ∥, D(u) = ∥zH (u) − zg ∥, (2) where ˆzH (u) is the rollout of (1) under u and zH (u) the true terminal state. The planner selects ˆu = arg min u ˆD(u),while the true optimum is u⋆ = arg min u D(u). Because candidate actions reach states off M, the planner queries the predictor on a reachable measure ν its candidates generate, generally with supp ν ⊋ supp μ. Reading the same residual under the two measures gives the training gap δ2 
+
+> μ
+
+= Eμ∥ε∥2 (the monitored MSE) and the deployment gap 
+
+δ2 
+
+> ν
+
+= Eν ∥ε∥2 (what success rests on). 
+
+3.2 The control objective: predicted cost must track true cost 
+
+Everything the planner does is choose ˆu to minimize ˆD. Its regret is therefore controlled by how faithfully ˆD ranks candidates against D—nothing else. This is the content of the core theorem. 
+
+Theorem 1 (Control objective: suboptimality is priced by the predicted-versus-true gap) . For a planner that executes 
+
+ˆu = arg min u∈U ˆD(u),
+
+D(ˆ u) − D(u⋆) ≤ 2 sup 
+
+> u∈U
+
+ˆD(u) − D(u) . (3) 
+
+Consequently the sole objective for control is to make the predicted plan-cost ˆD agree with the true plan-cost D on the candidate set—in particular at the plan ˆu the planner commits to. Lowering the data-averaged prediction error is neither necessary nor sufficient. 
+
+3A Control Theory of Predictability in Latent World Models A P REPRINT 
+
+Proof. Let g = sup u | ˆD(u) − D(u)|. Since ˆu minimizes ˆD, ˆD(ˆ u) ≤ ˆD(u⋆), so D(ˆ u) ≤ ˆD(ˆ u) + g ≤ ˆD(u⋆) + g ≤
+
+D(u⋆) + 2 g, which is (3) . The bound is attained, so no smaller quantity governs regret; and g is a supremum over the candidate set, which by construction contains off-manifold plans, whereas the monitored error is an average over 
+
+M—the two are compared next. The gap g = sup u | ˆD − D| is the control tax : the price the planner pays for predicting a plan-cost that differs from the truth at the plan it most wants to believe. The three lemmas that follow establish that the monitored prediction error is structurally unable to bound g, along three independent axes—distribution, sign, and nonlinearity. 
+
+Lemma 1 (Decoupling: the averaged error does not bound the gap) . If ν ≪ μ with density w = dν/dμ , then 
+
+δ2 
+
+> ν
+
+≤ ∥ w∥∞ δ2
+
+> μ
+
+. But if ν places any mass off supp μ, then δμ gives no upper bound on δν : there is a residual with 
+
+δμ = 0 and δν —and hence the gap g of Theorem 1—arbitrarily large. Since control success is monotone in δν , every in-manifold quantity ( δμ and hence the monitored MSE, the content frontier, and the spectral tax of Section 4) places no bound on success once actions carry the query off support, and 
+
+ρ MSE , success  −→ 0. (4) 
+
+Proof sketch. In-support this is change of measure, R ∥ε∥2dν = R ∥ε∥2w dμ ≤ ∥ w∥∞δ2
+
+> μ
+
+. Off-support the density is infinite and the two integrals are independent: set ε ≡ 0 on supp μ (so δμ = 0 ) and free elsewhere. With δμ
+
+unable to control δν and success a function of δν , no functional relation ties δμ to success. Full proof: Appendix C, Theorems C.2.1–C.2.2. 
+
+Lemma 2 (The consequential part of the gap is one-sided (holes)) . With signed error ∆D = ˆD − D, a hole is a candidate that looks best in prediction yet is truly bad, of depth Hole = sup u(−∆D)+. The suboptimality obeys 
+
+D(ˆ u) − D(u⋆) ≤ ∆D(u⋆) + Hole , (5) 
+
+and the rollout MSE—a two-sided, in-manifold average—cannot bound the hole depth, a one-sided, off-manifold supremum. Only underestimates—assigning a low predicted cost to a truly high-cost action—affect the suboptimality, which is why in-manifold fixes such as autoregressive rollout training, which reduce exposure bias on the support, leave success unchanged. Proof sketch. Since ˆu minimizes ˆD, D(ˆ u) = ˆD(ˆ u) − ∆D(ˆ u) ≤ ˆD(u⋆) − ∆D(ˆ u) = D(u⋆) + ∆ D(u⋆) − ∆D(ˆ u)
+
+with −∆D(ˆ u) ≤ Hole . A model exact on μ (MSE = 0 ) can still assign a low predicted cost to a μ-null counterfactual whose true cost is high, making the hole depth unbounded; MSE and hole depth differ in distribution, aggregation (mean vs. supremum), and sign. Appendix C, Theorems C.3.1–C.3.3. 
+
+Lemma 3 (The gap is seeded only by realizable nonlinearity) . A deployed MLP predictor g has a best linear fit 
+
+g = A∗z + B∗u + n, and the gap splits orthogonally as δ2 
+
+> μ
+
+= ι2 + ∥n∥2 
+
+> L2(μ)
+
+into an insufficiency term ι and a realizable-nonlinearity term ∥n∥. If ∥n∥ = 0 the predictor is globally linear, the predicted cost is a single quadratic bowl, and no hole exists. Realizable nonlinearity is thus necessary for a hole; we do not claim the hole depth is monotone in ∥n∥, and Section 5 finds that reducing it is not the operative lever in practice. Proof sketch. mz = E[mx | zt] is an orthogonal projection of the full-state conditional mean, giving the Pythagorean split; if n ≡ 0 then g is affine and ∥A∗z + B∗u − zg ∥2 has a unique minimizer without folding. Deployment failure therefore materializes only when the representation genuinely carries nonlinear content. Appendix C, Theorems C.4.1– C.4.2. 
+
+Geometry of the gap. The bound isolates a specific failure geometry. On supp μ the predicted and true costs agree up to the monitored residual, so the ranking induced by ˆD is reliable there. A candidate action can map the latent state outside supp μ, where ˆD is an extrapolation of a predictor fitted on μ; when such an extrapolation underestimates the true cost it realizes the configuration termed a hole in Lemma 2, a candidate of low predicted cost whose true terminal state is distant from the goal. Since the planner selects ˆu = arg min u ˆD, an underestimate at ˆu enters the suboptimality while an overestimate does not, which is the one-sidedness of Lemma 2. The three lemmas describe this object along three axes: it is not detectable by a μ-average because its support is disjoint from μ (Lemma 1), it contributes only through underestimates (Lemma 2), and it does not arise for a globally affine predictor, for which ˆD
+
+is a single quadratic with a unique minimizer (Lemma 3). Reducing it therefore requires either observations in the affected region (counterfactual data) or a penalty that raises ˆD off the manifold ( ˆD + λˆr), rather than a lower average residual on supp μ.4A Control Theory of Predictability in Latent World Models A P REPRINT 
+
+Reading. Theorem 1 names the target—predicted cost tracking true cost at the committed plan—and the three lemmas locate why the monitored loss misses it: the gap lives off the data manifold (Lemma 1), it is one-sided in the consequential direction (Lemma 2), and it is nonlinear-seeded (Lemma 3). The operative levers are therefore to fill holes by manifold-aware pessimism ( ˆD + λˆr) or to shrink the gap’s nonlinear component—not to lower MSE. To turn the objective into computable quantities we now price the gap. 
+
+# 4 Pricing the Predicted-versus-True Gap 
+
+Under the linear-control premise—the deployed latent dynamics are the learned linear model (1) —the gap sup u | ˆD − D|
+
+separates by where it is generated. On the data manifold the predicted and true dynamics agree up to a small residual δ0;away from it, an action drives the state off M and the two diverge . This off-manifold divergence, not the on-manifold residual, is the binding term and the object of our main claim—the experiments confirm that the on-manifold prediction error does not govern control while the off-manifold divergence does (Section 5). We therefore price the off-manifold divergence first (Section 4.1), record the on-manifold residual second (Section 4.2), and assemble them into the control-error bound (Section 4.3). Both are driven by the non-normality of P0: only when P0 is non-normal—it does not commute with its adjoint, the self-adjoint reversible case being the normal prototype—do its singular values separate from its spectrum. 
+
+4.1 The off-manifold divergence: the rollout tax 
+
+Actions couple the model to the world, and this is where the predicted and true dynamics part: an action drives the state off M, where the residual grows and compounds along the rollout. This is the term the experiments identify as binding (Section 5), and the one no data-averaged error can bound. 
+
+Theorem 2 (Action excitation and telescoping drift) . Random actions of width σu push the predicted state off the manifold with energy set by an off-manifold reachability Gramian, E r(ˆ zH )2 ≤ 2ρ2 
+
+> M
+
++ 2 σ2 
+
+> u
+
+tr W ⊥ 
+
+> H
+
+, which is zero exactly when M is invariant under ˆA and ˆB is tangent. Along any trajectory the single-step residual telescopes, 
+
+∥eH ∥ ≤ GH (δ0 + L r max ), GH = P 
+
+> i<H
+
+∥ ˆAi∥, (6) 
+
+with δ0 the on-manifold residual priced in Section 4.2. Proof sketch. The excursion follows from r(ˆ zH ) = ∥P ⊥ ˆzH ∥, independence of the whitened actions, and tr W ⊥ 
+
+> H
+
+=
+
+P 
+
+> j
+
+∥P ⊥ ˆAj ˆB∥2 
+
+> F
+
+; the drift is the discrete Duhamel expansion of ek+1 = ˆAe k + εk (the control terms cancel), and GH
+
+is the drift-amplification factor, ≤ H in the near-normal regime. Appendix F, Theorems F.5.1–F.6.1. 
+
+Accumulation under rollout. The single-step residual εk is the quantity training reduces, whereas the planner scores an H-step rollout rather than a single transition. Unrolling the error recursion ek+1 = ˆAe k + εk (a discrete Duhamel expansion) propagates each residual by powers of ˆA and sums them, so the horizon-H error is amplified by GH = P 
+
+> i<H
+
+∥ ˆAi∥. For a near-normal ˆA this factor satisfies GH ≲ H; under non-normality ∥ ˆAi∥ can be large over the transient regime and GH grows faster than the horizon. This is why the linear state readout of Section 5.1, by propagating the goal-relevant error through the near-normal Aφ in place of ˆA, reduces GH to GφH ≤ H.
+
+4.2 The on-manifold residual: the spectral tax 
+
+On the data manifold the predicted and true dynamics agree up to the residual δ0, the value the gap inherits before any action is taken. We price it here for completeness, and because it locates the prior-work regime; it is not the binding term, and the experiments show it is driven small by training and does not by itself separate control outcomes (the decoupling of Section 5.2). Let Cd(ε) be the largest content a d-dimensional encoder can carry while its single-step error stays at most ε; the spectral tax is Πd(ε) = P 
+
+> i≤d
+
+σ2 
+
+> i
+
+− Cd(ε).
+
+Theorem 3 (Spectral pricing and its zero-cost boundary) . For d = 1 , with real-section pseudospectral radius 
+
+ρR(δ) = sup {| θ| : θ ∈ R, d (θ) ≤ δ},
+
+Π1(ε) = σ21 − ρR(√ε)2 − ε + O(√ε). (7) 
+
+Non-normality raises the leading singular value above the spectral radius, σ1 > ρ (P0), which widens the tax; for a defective (Jordan) block of size m it climbs as a slow fractional power Π1(ε) = 1 − Θ( ε1/m ), and the d ≥ 2 frontier obeys the staircase law Cd(ε) − (d − 1) ≍ εd/m . When P0 is self-adjoint the tax vanishes identically, Πd(ε) = 0 ,recovering the regime of Balestriero and LeCun [2025], Klindt et al. [2026]. 
+
+5A Control Theory of Predictability in Latent World Models A P REPRINT 
+
+Proof sketch. The frontier is bracketed by feasibility of a real pseudo-eigenvector at radius ρR(√ε) and the singular-value ceiling σ21 ; a complex-conjugate pair sets the starting threshold ε∗(1) = r2 (a purely spectral effect that disappears at d = 2 ), while non-normality both lowers that threshold and raises the ceiling. Self-adjointness collapses σ1 → ρ and recovers the prior-work regime. Appendix D, Theorem D.3.4; Appendix E for d ≥ 2.
+
+Role of non-normality. For a normal operator the singular values equal the moduli of the eigenvalues, so the content attainable at a given predictability is determined by the spectrum and Πd(ε) = 0 ; this is the self-adjoint configuration underlying the identifiability results of Balestriero and LeCun [2025], Klindt et al. [2026]. When P0 is non-normal its eigenvectors are non-orthogonal and its leading singular value exceeds its spectral radius, σ1 > ρ (P0), the difference measuring the transient amplification that precedes asymptotic decay. The ε-pseudospectrum—the set of eigenvalues of order-ε perturbations of P0—extends into the complex plane by a corresponding amount, and the frontier is governed by its real section ρR(δ) rather than by the spectrum. The same non-normality enlarges the rollout amplification GH of Section 4.1, so the on-manifold residual and its off-manifold accumulation share a single source. 
+
+4.3 The control-error theorem: assembling the two taxes 
+
+Combining the on-manifold residual δ0 (priced by the spectral tax) and the off-manifold excursion (priced by the rollout tax) turns the abstract gap of Theorem 1 into a computable bound. 
+
+Theorem 4 (Control suboptimality and the off-manifold tax) . A model-predictive planner ranking candidates by predicted terminal cost incurs 
+
+D(ˆ u) − D(u⋆) ≤ 2 GH
+
+  δ0
+
+|{z} 
+
+> metric (on-manifold) tax
+
++ Lρ M + Lσ u
+
+q
+
+tr W ⊥
+
+> H
+
+| {z }
+
+> extrapolation (off-manifold) tax
+
+. (8) 
+
+The excursion term Πoff = 2 GH L
+
+q
+
+tr W ⊥ 
+
+> H
+
+is the price actions pay for leaving the manifold; it is zero iff L = 0 or the reachability is tangent, and it admits a unique optimal exploration width σ⋆u.Proof sketch. Bounding the gap of Theorem 1 by sup u ∥eH (u)∥ via the reverse triangle inequality, and substituting the telescoping drift (6) and the excursion bound of Theorem 2, gives (8) ; balancing marginal reach against marginal excursion gives σ⋆u. Appendix F, Theorem F.6.2 and Corollary F.6.3. Equation (8) is the quantitative form of the core theorem. The gap sup u | ˆD − D| splits into a metric tax , the on-manifold residual δ0 that a more Koopman-linearizable representation lowers, and an extrapolation tax , the off-manifold term 
+
+Lσ u
+
+q
+
+tr W ⊥ 
+
+> H
+
+that no data-average bounds and that is reduced only by distribution change (counterfactual data or tangent control); the amplification GH multiplies both. The extrapolation tax is the binding term: it is the divergence between the predicted and true dynamics off the manifold, and the experiments show it is what tracks control success while the metric tax δ0 is driven small and decouples from it. This yields three falsifiable predictions, tested in Section 5: (i) across checkpoints of equal training loss, control success varies and is uncorrelated with MSE once exploration pushes off support; (ii) an off-manifold amplification signal, not the single-step error, tracks the binding constraint; and (iii) on synthetic systems, suboptimality is zero under safe (tangent) control and grows only in proportion to L
+
+q
+
+tr W ⊥ 
+
+> H
+
+,with the bound of (6) holding throughout. 
+
+# 5 A Theory-Guided Method and Experiments 
+
+The pricing of Section 4 names the levers, and we first read off the minimal intervention it prescribes before testing the predictions. 
+
+5.1 A theory-guided intervention: linear state readout 
+
+To the latent prediction objective we add an auxiliary term that decodes the predicted latent to the observed state through a linear readout W and penalizes its error, 
+
+Lsr = E W ˆzt+1 − st+1 
+
+> 2
+
+, (9) where st+1 is the true low-dimensional observation and W is constrained to be linear; this linearity is the operative property, as explained below. By Lemma 3 the gap splits as δ2 
+
+> μ
+
+= ι2 + ∥n∥2; since Lsr is a data-measure ( μ) loss it acts 6A Control Theory of Predictability in Latent World Models A P REPRINT 
+
+on the insufficiency ι, not on the off-manifold growth L—by the decoupling (Lemma 1) no μ-loss can lower L pointwise. The one channel through which an in-manifold objective still reaches off-manifold behavior is the readout’s linearity :structural constraints extrapolate globally by algebra even though loss values do not cross the manifold boundary. If training pins the intertwining W ˆA = AφW on the data-spanned subspace, where Aφ is the slow, near-normal state dynamics, then it holds as a matrix identity everywhere, so the goal-relevant content of the rollout error propagates by 
+
+Aφ rather than ˆA:
+
+W e H = X
+
+> j
+
+A H−1−jφ (W ε j ), ∥W e H ∥ ≤ GφH max  
+
+> j
+
+∥W ε j ∥, GφH = P 
+
+> i
+
+∥Aiφ∥ ≤ H. (10) Replacing the amplification GH (which can bump under non-normality) by GφH ≤ H on the goal-relevant subspace tightens the off-manifold contribution to the control suboptimality of Theorem 4—by reducing the amplification of the off-manifold residual rather than the residual itself. The effect is therefore conditioned on non-normality (there is no amplification to reduce when ˆA is near-normal), it is orthogonal to the reachability term Lσ u
+
+q
+
+tr W ⊥ 
+
+> H
+
+(which is addressed by counterfactual training or tangent control), and it neither creates nor removes holes. A diagnostic that separates the content channel ( ι, G φH ) from the off-manifold residual L identifies which mechanism accounts for a measured gain. 
+
+5.2 Control experiments on latent world models 
+
+The primary evidence for the theory is a set of latent-world-model control experiments; the synthetic studies of Section 5.4 corroborate the closed-form pricing separately. 
+
+Setup. We train latent world models—a ViT-tiny encoder with an autoregressive latent predictor and SIGReg regularization—on two control tasks, TWOROOM (navigation) and PUSHT (contact-rich pushing), and deploy them in a cross-entropy-method (CEM) model-predictive planner (planning horizon 5, receding horizon 5, 300 samples, 50 elite trajectories). Two training objectives are compared under a matched six-step data window across three seeds, isolating the objective as the only difference: a single-step loss ( ONE _STEP ) and a multi-step rollout loss ( ROLLOUT _FULL ). The monitored prediction loss is evaluated on the expert distribution μ (teacher-forced rollouts of held-out trajectories), whereas the planner queries the model on the reachable measure ν generated by its candidate actions, which the CEM rolls forward through the predicted latent. During validation we additionally log an off-manifold probe: the single-step error δ1 and a Jacobian-based amplification bL, which measures the predictor’s sensitivity to a context perturbation leaving supp μ and serves as a proxy for the growth constant L.
+
+Prediction error and control success are uncorrelated. The monitored loss does not order models by success. On 
+
+> PUSHT
+
+, the three ONE _STEP seeds attain validation prediction losses within ±8% (0.0089 , 0.0101 , 0.0103 ) while their success rates span 78 –92% (Table 1). Across all runs the rank correlation between the validation prediction loss and success is 0.024 , whereas a rollout-fidelity score evaluated on the reachable measure ν—the coefficient of determination of the predicted rollout against the realized trajectory on the planner-reachable set—attains rank correlation 0.62 
+
+with success. The μ-side quantity is uninformative for success and the ν-side quantity is informative, as Lemma 1 predicts. The same separation is present within a single training run: the checkpoint of lowest validation loss (epoch 
+
+10 , 90% success) is not the checkpoint of highest success (epoch 9, 98% ), so model selection by loss forgoes the better-controlling checkpoint.                                                  
+
+> Task Loss per-seed success mean ±std δ1/bL(ep3)
+> TWOROOM ONE _STEP 90 ,86 ,88 88 .0±2.00.012 /10 .7
+> TWOROOM ROLLOUT _FULL 86 ,90 ,90 88 .7±2.30.013 /9.8
+> PUSHT ONE _STEP 84 ,78 ,92 84 .7±7.00.010 /11 .4
+> PUSHT ROLLOUT _FULL 92 ,90 ,92 91 .3±1.20.010 /10 .6
+
+Table 1: Latent-MPC success (%) on two tasks, three seeds, matched six-step training window. On PUSHT the 
+
+> ONE
+
+_STEP seeds share a validation prediction loss to within ±8% while their success spans 78 –92% . Both objectives reduce the single-step error δ1 to ≈ 0.01 , whereas the off-manifold amplification bL rises to ≈ 10 –11 and does not decrease. 
+
+The off-manifold amplification is the informative diagnostic. Both objectives reduce the single-step error δ1 to 
+
+≈ 0.01 , while the amplification bL increases to ≈ 10 –11 and does not decrease, since no μ-supported loss constrains the 7A Control Theory of Predictability in Latent World Models A P REPRINT 1 2 3 4 5 6                                    
+
+> 20
+> 40
+> 60
+> 80
+> 100
+> Control success (%)
+> +7.8 pp
+> Cube
+> 12345678910
+> 20
+> 40
+> 60
+> 80
+> 100
+> +5.0 pp
+> TwoRoom
+> 12345678910
+> Training epoch
+> 20
+> 40
+> 60
+> 80
+> 100
+> Control success (%)
+> +2.8 pp
+> PushT
+> 12345678910
+> Training epoch
+> 20
+> 40
+> 60
+> 80
+> 100
+> +1.2 pp
+> Reacher
+> 65 70 75 80 85 90
+> Base success at convergence (%)
+> 0
+> 2
+> 4
+> 6
+> 8
+> SR gain (pp)
+> Cube
+> TwoRoom
+> PushT
+> Reacher
+> Pearson r=0.91
+> Gain tracks headroom
+> base state readout (SR)
+
+Figure 1: Linear state readout (SR) versus the base objective on four control tasks. Left: control success against training epoch (mean over seeds; shaded band spans the seed range); the annotation gives the convergence gain, averaged over the last three epochs. Right: the convergence gain against the base success at convergence, with a least-squares fit. The readout does not lower the asymptotic ceiling, and its gain increases as the base objective moves away from saturation (Pearson r = −0.91 ), consistent with an intervention acting on the on-manifold metric tax δ0.predictor off support. This is the δ0 ⊥ L separation of Section 3 observed during training: the μ-average that training minimizes saturates, while the off-manifold quantity that governs success continues to vary. The rollout objective’s consistent structural effect is a lower multi-step compounding of bL. On PUSHT , where the off-manifold term is binding, this coincides with a higher and more stable success rate ( 91 .3 ± 1.2 vs. 84 .7 ± 7.0); on TWOROOM , where success is saturated, the two objectives lie within one standard deviation. The probe thus functions as a mechanism diagnostic rather than a per-seed predictor, and its reading is consistent with an offline decomposition in which the latent cost is faithful near the manifold while the binding error lies in the off-manifold dynamics. 
+
+Scope. The comparison uses three seeds, and part of the PUSHT difference is attributable to one weak ONE _STEP seed (78% ), so the direction is consistent but a five-seed replication is required to establish significance. The probe reports a Jacobian proxy bL rather than the off-manifold residual L, whose direct measurement would require simulator-supplied counterfactual states. A model-selection rule based on the ν-side fidelity score did not outperform selection by success on these runs, which we report as a negative result. We therefore read these experiments as establishing the decoupling and identifying the off-manifold amplification as an informative training signal, not as a validated safety certificate. 
+
+5.3 Cross-task validation of the state readout 
+
+We evaluate the linear state readout of Section 5.1 against the base objective on four control tasks— CUBE , TWOROOM ,
+
+> PUSHT
+
+, and REACHER —under a common encoder, planner, and data window, adding only the auxiliary term Lsr with weight λ = 3 . Control success is measured every epoch with 100 evaluation episodes and averaged over seeds. Figure 1 reports the per-task success trajectories and the convergence gain of the readout over the base objective. The readout does not lower the asymptotic ceiling on any task, and its convergence gain varies with the base performance. The gain is largest where the base objective is least saturated ( CUBE , +7 .8 pp at a base level of 65% ) and decreases as the base approaches saturation ( TWOROOM +5 .0, PUSHT +2 .8, REACHER +1 .2), the gain and the base convergence level correlating at r = −0.91 . This matches the account of Section 5.1: the readout is a μ-side objective acting on the on-manifold metric tax δ0, so its effect scales with the residual on-manifold headroom and is within seed noise once that headroom is exhausted ( REACHER ). The comparison uses two to four seeds per task; a five-seed replication is required to establish the significance of the smaller gains. 8A Control Theory of Predictability in Latent World Models A P REPRINT 
+
+5.4 Numerical corroboration on synthetic operators 
+
+Two synthetic studies verify the closed-form pricing of Section 4 in isolation from estimation error. 
+
+Spectral-tax frontier. On constructed operators the pricing formulas of Section 4.2 are recovered (Appendix G). For a three-state non-normal baseline the spectral prediction of the activation threshold is b2 = 0 .0175 and the non-normal floor is min( p2, q 2) = 0 .00646 , in agreement with a grid search; non-normality lowers the activation threshold and raises the completion cost. The Jordan scaling Π1 = 1 − Θ( ε1/m ) is recovered as slopes 0.500 , 0.337 , 0.256 for m = 2 , 3, 4
+
+against the predicted 1/m , and the d ≥ 2 staircase exponent d/m is recovered for (m, d ) = (4 , 2) , (6 , 2) , (6 , 3) , with prefactor approaching 1 (Table 2).                         
+
+> Operator (m, d )Predicted exponent Fitted slope
+> J2(2 ,1) 0.500 0.500
+> J3(3 ,1) 0.333 0.337
+> J4(4 ,1) 0.250 0.256 (4 ,2) 0.500 0.505 (6 ,2) 0.333 0.346 (6 ,3) 0.500 0.510
+
+Table 2: Spectral-tax frontier exponents recovered by fitting the content frontier as a power of the budget; the prefactor 
+
+Cd(ε)/ε d/m → 1 in every case (Theorem 3). 
+
+Off-manifold suboptimality bound. Latent control systems are constructed while varying whether the data manifold is invariant under ˆA (ALIGNED ) or not ( OFF ) and the nonlinearity scale κ that sets L. Table 3 reports the mean MPC suboptimality against the bound of Eq. (6) . Under safe control—an invariant manifold ( tr W ⊥ 
+
+> H
+
+≈ 0) or a linear plant ( L ≈ 0)—the suboptimality is zero despite non-trivial reachability. When both off-manifold reachability and nonlinearity are present it grows with L, from 0.61 at κ = 0 .5 to 11 .9 at κ = 1 .5, and the bound holds in every row. The prediction quality δ0 is small throughout, so the suboptimality is governed by the off-manifold term L
+
+q
+
+tr W ⊥ 
+
+> H
+
+, in agreement with Theorem 4.                                            
+
+> Regime κδ0bLtr W⊥
+> Hsuboptimality (bound)
+> ALIGNED 0.00000.00 (0)
+> ALIGNED 0.50.21 0.50 1.5×10 −40.00 (2.4)
+> ALIGNED 1.50.63 1.49 1.3×10 −30.00 (7.2)
+> OFF 0.0003.91 0.00 (0)
+> OFF 0.50.21 0.50 3.84 0.61 (20 .5)
+> OFF 1.50.64 1.51 4.11 11 .9(564 )
+
+Table 3: Synthetic latent-MPC suboptimality vs. the bound of Eq. (6) . Suboptimality is zero whenever control is safe ( tr W ⊥ 
+
+> H
+
+≈ 0) or the system is linear ( L ≈ 0), and grows with L only when both off-manifold reachability and nonlinearity are present; the bound holds in every row. Taken together, the two studies verify the two terms of Theorem 4 in isolation—the on-manifold residual priced by non-normality and the off-manifold suboptimality priced by L
+
+q
+
+tr W ⊥ 
+
+> H
+
+—while the control experiments of Section 5.2 exhibit the same decomposition in a trained, pixel-based system. 
+
+# 6 Discussion and Outlook 
+
+What the theory prescribes. The control objective is a single scalar—the gap between predicted and true plan-cost at the committed plan (Theorem 1)—and the pricing of Theorem 4 splits it into a metric tax and an extrapolation tax that respond to disjoint interventions. The metric tax δ0 is an on-manifold, μ-side quantity: it is lowered by any objective that makes the latent more Koopman-linearizable, including the linear state readout of Section 5.1, which also shrinks the amplification GH on the goal-relevant subspace. The extrapolation tax Lσ u
+
+q
+
+tr W ⊥ 
+
+> H
+
+is an off-manifold, ν-side quantity that no data-averaged loss bounds; it is reduced only under distribution change—counterfactual training that shrinks L by expanding supp μ, or manifold-aware pessimism ( ˆD + λˆr) that fills holes on the measure side—or by 9A Control Theory of Predictability in Latent World Models A P REPRINT 
+
+keeping control tangent to the manifold. Once the planner leaves the data manifold, lowering prediction error does not reduce the extrapolation tax; the interventions that do are hole-filling and nonlinearity reduction. The two are orthogonal, and which one binds is read from tr W ⊥ 
+
+> H
+
+and L.
+
+Scope and limitations. The pricing of Section 4 is stated under a linear-control premise: the deployed dynamics are the learned linear model (1) , and the constants in Theorem 4(iii) depend on the plant geometry (for a curved M
+
+the normal projection is local, with constants set by the second fundamental form). The control experiments use three seeds and a Jacobian amplification proxy rather than simulator-supplied counterfactual ground truth, so they establish the decoupling and identify the off-manifold signal but do not yet validate it as a safety monitor. The spectral-tax and off-manifold-bound experiments are on synthetic operators with known closed forms, isolating the mathematics of the theorems from estimation error. 
+
+Outlook. Three directions follow directly. First, establishing sharp constants for the extrapolation tax—in particular the RKHS/second-order characterization relating L to the realizable nonlinearity ∥n∥—would turn Theorem 4 into a computable safety certificate. Second, validating the off-manifold amplification bL as an online monitor with simulator-supplied counterfactuals, and replicating the PUSHT decoupling at five seeds, would upgrade the empirical claims from consistent to demonstrated. Third, the linear state readout and counterfactual training address the two taxes separately; measuring where a combined objective lands relative to the metric-tax/extrapolation-tax boundary is the natural test of the two-region structure. 
+
+# 7 Conclusion 
+
+We recast the objective of a latent world model deployed for planning. Its regret is bounded by a single quantity—the gap between predicted and true plan-cost at the plan the planner commits to—so the correct control objective is to make predicted cost track true cost, not to lower data-averaged prediction error, which we prove neither bounds nor tracks that gap once actions carry the query off the data manifold. Pricing the gap under a linear-control premise separates a small on-manifold residual, where predicted and true dynamics agree, from an off-manifold divergence, where an action carries the state off the data manifold and the two part; the divergence is the binding term, bounded by no data-average, and the on-manifold residual—priced by a spectral tax that vanishes on the self-adjoint boundary of prior work—does not by itself govern control. Latent-MPC experiments establish exactly this: the decoupling of on-manifold prediction error from success, and the off-manifold divergence as the quantity that tracks it; synthetic operators corroborate the pricing formulas and the off-manifold suboptimality bound. The implication is that, once the planner leaves the data manifold, suboptimality is reduced by filling holes and shrinking the representation’s nonlinear component rather than by lowering prediction error. 10 A Control Theory of Predictability in Latent World Models A P REPRINT 
+
+# References 
+
+Mahmoud Assran, Quentin Duval, Ishan Misra, Piotr Bojanowski, Pascal Vincent, Michael Rabbat, Yann LeCun, and Nicolas Ballas. Self-supervised learning from images with a joint-embedding predictive architecture. In Proceedings of the IEEE/CVF conference on computer vision and pattern recognition , pages 15619–15629, 2023. Yann LeCun et al. A path towards autonomous machine intelligence version 0.9. 2, 2022-06-27. Open Review , 62(1): 1–62, 2022. Danijar Hafner, Timothy Lillicrap, Jimmy Ba, and Mohammad Norouzi. Dream to control: Learning behaviors by latent imagination. In International Conference on Learning Representations , 2020. Stephan Ramon Garcia and William T Ross. Model spaces: a survey. arXiv preprint arXiv:1312.5018 , 2013. Mahmoud Assran, Adrien Bardes, David Fan, Quentin Garrido, Russell Howes, Mojtaba Komeili, Matthew Muckley, Ammar Rizvi, Claire Roberts, Koustuv Sinha, Artem Zholus, Sergio Arnaud, Abha Gejji, Ada Martin, Francois Robert Hogan, Daniel Dugas, Piotr Bojanowski, Vasil Khalidov, Patrick Labatut, Francisco Massa, Marc Szafraniec, Kapil Krishnakumar, Yong Li, Xiaodong Ma, Sarath Chandar, Franziska Meier, Yann LeCun, Michael Rabbat, and Nicolas Ballas. V-JEPA 2: Self-supervised video models enable understanding, prediction and planning. arXiv preprint arXiv:2506.09985 , 2025. Adrien Bardes, Quentin Garrido, Jean Ponce, Xinlei Chen, Michael Rabbat, Yann LeCun, Mahmoud Assran, and Nicolas Ballas. Revisiting feature prediction for learning visual representations from video. arXiv preprint arXiv:2404.08471 ,2024. Yuandong Tian, Xinlei Chen, and Surya Ganguli. Understanding self-supervised learning dynamics without contrastive pairs. In International Conference on Machine Learning , pages 10268–10278. PMLR, 2021. Randall Balestriero and Yann LeCun. Contrastive and non-contrastive self-supervised learning recover global and local spectral embedding methods. Advances in Neural Information Processing Systems , 35:26671–26685, 2022. Randall Balestriero and Yann LeCun. Lejepa: Provable and scalable self-supervised learning without the heuristics. 
+
+arXiv preprint arXiv:2511.08544 , 2025. David Klindt, Yann LeCun, and Randall Balestriero. When does lejepa learn a world model? arXiv preprint arXiv:2605.26379 , 2026. Steven L Brunton, Bingni W Brunton, Joshua L Proctor, and J Nathan Kutz. Koopman invariant subspaces and finite linear representations of nonlinear dynamical systems for control. PloS one , 11(2):e0150171, 2016. Igor Mezi´ c. Spectral properties of dynamical systems, model reduction and decompositions. Nonlinear Dynamics , 41 (1):309–325, 2005. Bethany Lusch, J Nathan Kutz, and Steven L Brunton. Deep learning for universal linear embeddings of nonlinear dynamics. Nature communications , 9(1):4950, 2018. Andreas Mardt, Luca Pasquali, Hao Wu, and Frank Noé. Vampnets for deep learning of molecular kinetics. Nature communications , 9(1):5, 2018. Frank Noé and Feliks Nüske. A variational approach to modeling slow processes in stochastic dynamical systems. 
+
+Multiscale Modeling & Simulation , 11(2):635–655, 2013. Samuel E Otto and Clarence W Rowley. Linearly recurrent autoencoder networks for learning dynamics. SIAM Journal on Applied Dynamical Systems , 18(1):558–593, 2019. Matthew J Colbrook, Lorna J Ayton, and Máté Sz˝ oke. Residual dynamic mode decomposition: robust and verified koopmanism. Journal of Fluid Mechanics , 955:A21, 2023. Matthew J Colbrook and Alex Townsend. Rigorous data-driven computation of spectral properties of koopman operators for dynamical systems. Communications on Pure and Applied Mathematics , 77(1):221–283, 2024. Lloyd N Trefethen and Mark Embree. Spectra and pseudospectra: the behavior of nonnormal matrices and operators. 2020. Samy Bengio, Oriol Vinyals, Navdeep Jaitly, and Noam Shazeer. Scheduled sampling for sequence prediction with recurrent neural networks. In Advances in Neural Information Processing Systems , volume 28, 2015. Arun Venkatraman, Martial Hebert, and J Andrew Bagnell. Improving multi-step prediction of learned time series models. In Proceedings of the AAAI Conference on Artificial Intelligence , volume 29, 2015. Laurenz Wiskott and Terrence J Sejnowski. Slow feature analysis: Unsupervised learning of invariances. Neural computation , 14(4):715–770, 2002. 11 A Control Theory of Predictability in Latent World Models A P REPRINT 
+
+Henning Sprekeler. On the relation of slow feature analysis and laplacian eigenmaps. Neural computation , 23(12): 3287–3302, 2011. Mahendra Ganpatrao Nadkarni et al. Spectral theory of dynamical systems . Springer, 1998. Eli Glasner. Ergodic theory via joinings . Number 101. American Mathematical Soc., 2003. Hao Wu and Frank Noé. Variational approach for learning markov processes from time series data. Journal of Nonlinear Science , 30(1):23–66, 2020. John Garnett. Bounded analytic functions , volume 236. Springer Science & Business Media, 2006. Stephan Ramon Garcia, Javad Mashreghi, and William T Ross. Introduction to model spaces and their operators ,volume 148. Cambridge University Press, 2016. Douglas N Clark. One dimensional perturbations of restricted shifts. Journal d’Analyse Mathématique , 25(1):169–191, 1972. Donald Sarason. Algebraic properties of truncated toeplitz operators. Oper. Matrices , 1(4):491–526, 2007. Oleg Szehr and Rachid Zarouf. Maximum of the resolvent over matrices with given spectrum. Journal of Functional Analysis , 272(2):819–847, 2017. Rachid Zarouf. Toeplitz condition numbers as an h∞ interpolation problem. arXiv preprint arXiv:1103.5016 , 2011. Kelly Bickel and Pamela Gorkin. Blaschke products, level sets, and crouzeix’s conjecture. Journal d’Analyse Mathématique , 152(1):217–254, 2024. Gilbert W Stewart. Error and perturbation bounds for subspaces associated with certain eigenvalue problems. SIAM review , 15(4):727–764, 1973. Ya B Pesin. Characteristic lyapunov exponents and smooth ergodic theory. Russian mathematical surveys , 32(4): 55–114, 1977. Marcelo Viana and Krerley Oliveira. Foundations of ergodic theory . Number 151. Cambridge University Press, 2016. 12 A Control Theory of Predictability in Latent World Models A P REPRINT 
+
+Appendix overview. These appendices supply the definitions and full proofs behind the main text, in the same order. Appendix A fixes the setup and decomposes the predicted-versus-true gap that governs control; Appendix B records the preliminary lemmas and the self-adjoint reference boundary; Appendix C proves the control objective together with the decoupling, hole, and nonlinearity results (Theorem 1 and Lemmas 1–3); Appendices D and E price the on-manifold residual (Theorem 3 at d = 1 and d ≥ 2); Appendix F proves the rollout-drift and control-suboptimality bounds (Theorems 2 and 4); and Appendix G records the numerical-verification protocols. 
+
+# A Setup: the true and predicted plan-costs and their gap 
+
+The two plan-costs and the object of the theory. A latent world model is deployed inside a planner. For a goal latent zg and a candidate action sequence u ∈ U , the planner rolls the learned latent dynamics zt+1 = ˆAz t + ˆBu t + εt
+
+forward and ranks u by the predicted terminal cost ˆD(u) = ∥ˆzH (u) − zg ∥, executing ˆu = arg min u ˆD(u); the realized outcome is the true terminal cost D(u) = ∥zH (u) − zg ∥, minimized by u⋆ = arg min u D(u). Control quality is governed by the discrepancy between these two functions over the candidate set, 
+
+g(U) := sup 
+
+> u∈U
+
+ˆD(u) − D(u) , (11) which bounds the planner’s suboptimality through D(ˆ u) − D(u⋆) ≤ 2 g(U) (Theorem 1). The appendix is organized around bounding g(U).
+
+Two measures. The model is trained on the data measure μ but, at deployment, is queried on the states its candidate actions reach—the reachable measure ν, generically with supp ν ⊋ supp μ. Reading a single residual function ε
+
+under the two measures yields the monitored training error δ2 
+
+> μ
+
+= Eμ∥ε∥2 and the deployment error δ2 
+
+> ν
+
+= Eν ∥ε∥2; their separation is the source of the decoupling (Appendix C). 
+
+Decomposition of the gap. Along a rolled trajectory the terminal error eH = ˆzH − zH obeys the recursion 
+
+ek+1 = ˆAe k + εk, so g(U) is controlled by the single-step residual ε amplified over the horizon (Appendix F). The residual splits into an on-manifold part—its value δ0 on supp μ, determined by how well a d-dimensional latent can be linearly predicted and priced in Appendices D–E—and an off-manifold part governed by the distance r(z) = dist( z, M)
+
+to the data manifold M = supp μ,
+
+∥ε(z, u )∥ ≤ δ0 + L r (z), (12) with L a nonlinearity scale ( L = 0 for a globally linear system). Equations (11) and (12) are the two decompositions that the remaining appendices make quantitative. 
+
+Process and transition operator. Let {Xt} be a stationary ergodic process satisfying a first-order Markov assumption 
+
+(M) . Non-Markovian streams such as raw video are brought into this setting by state augmentation. Let P be the transition (Koopman) operator on L2(μ). Restricting to the mean-zero subspace H0 = 1⊥ ⊂ L2(μ) removes the constant direction; we write P0 = P |H0 for the restricted operator, which is real and satisfies ∥P0∥ ≤ 1. The Hilbert– Schmidt (compactness) assumption is used only where stated. A whitened encoder ϕ corresponds to an isometry 
+
+V : Rd → H0; under whitening the optimal predictor bias vanishes, b ≡ 0 (Lemma D.2). 
+
+On-manifold pricing objects. The on-manifold residual δ0 is analyzed through the transition operator and the encoder. The content of an encoder is C(ϕ) = ∥P0V ∥2HS and its single-step gap is δ(ϕ)2 = ∥(I − V V ∗)P0V ∥2HS , with optimal within-class predictor A∗ = V ∗P0V . The largest content attainable at gap at most ε is the content frontier Cd(ε) = sup {C (ϕ) : δ(ϕ)2 ≤ ε}; its shortfall from the unconstrained optimum is the spectral tax Πd(ε) = P 
+
+> i≤d
+
+σ2 
+
+> i
+
+− Cd(ε),with activation threshold ε∗(d) = inf ϕ δ(ϕ)2. Two further constants enter the off-manifold analysis: the memory horizon τ = P 
+
+> j
+
+∥P j 
+
+> 0
+
+∥, the cumulative non-normal transient, and a regularity budget B = log( LΛ) with domain-local version Bdom ≤ B . These objects price δ0 and its amplification; they are the machinery of the bound, not the control objective itself. 
+
+Three-term decomposition of the single-step residual. The single-step prediction loss decomposes orthogonally as single-step loss = (I) innovation 
+
+| {z } 
+
+> conditioned on Xt
+
++ (II) sufficiency gap 
+
+| {z } 
+
+> I(Z′;X)−I(Z′)deficit
+
++ (III) realizability error 
+
+| {z }
+
+> within-class predictor approximation
+
+, (13) with systematic predictable part G∗ = (II) + (III) . Appendix C (Theorem C.4.1) identifies the realizability term (III) as the realizable nonlinearity that seeds holes; term (II) is the encoder’s insufficiency. 13 A Control Theory of Predictability in Latent World Models A P REPRINT 
+
+Normal and non-normal transitions. We call P0 normal when it commutes with its adjoint, equivalently when it is unitarily diagonalizable; the self-adjoint case P0 = P ∗ 
+
+> 0
+
+is the prototype, realized by reversible dynamics such as the Ornstein–Uhlenbeck process. We call P0 non-normal otherwise. The two cases that drive the on-manifold results are defective (non-diagonalizable) operators and finite-memory nilpotent operators; for these the singular values separate from the spectrum, and this separation prices the on-manifold residual. 
+
+The self-adjoint reference boundary. The objects above are calibrated against one reference point. When P0 is self-adjoint the spectral tax vanishes, Πd(ε) = 0 , and the construction reduces to the regime analyzed by LeJEPA [Balestriero and LeCun, 2025, Klindt et al., 2026]: the loss admits a closed form through the Ky Fan maximum principle, and the linear identifiability of that work is recovered (Corollary B, which matches their Theorem 1). What matters here is the location of this optimum: it places the LeJEPA guarantees on the normal, self-adjoint boundary of the frontier, the reference against which every positive cost in the sequel is measured. 
+
+# B Preliminaries and the self-adjoint boundary 
+
+The following five preliminary theorems provide complete statements alongside their inline proofs. 
+
+P1 (Saturation ⇐⇒ Invariance; The Gap Identity). Let ϕ be a whitened encoder corresponding to the isometry V ,and let S = ran V . The single-step gap within the linear predictor class satisfies G∗(ϕ) = δ(S)2 = ∥(I − ΠS )P0ΠS ∥2 
+
+> F
+
+.In particular, G∗ = 0 ⇐⇒ span {1, ϕ } is a P -invariant subspace. 
+
+Proof. Under the whitening constraint, the Gram matrix is exactly the identity I, and the normal equations yield the optimal within-class coefficient A∗ = V ⊤P0V . The optimal prediction residual evaluates to ∥P0V − V A ∗∥2 
+
+> F
+
+=
+
+∥(I − ΠS )P0V ∥2 
+
+> F
+
+= δ2. Setting this residual to zero is equivalent to requiring P0S ⊆ S; incorporating the constant direction 1 yields the stated subspace invariance. 
+
+Remark. Folded variants of this invariance equivalence can be found in Brunton et al. [2016], Otto and Rowley [2019], and Lusch et al. [2018]. The contribution of this work lies not in the equivalence itself, but in establishing the quantitative cost frontiers once the system departs from the invariant subspace, formalized in modules F/M. 
+
+P2 (The Self-Adjoint Solvable Regime). Assume P0 is self-adjoint (corresponding to the VAC/SFA setting; see [Noé and Nüske, 2013, Wiskott and Sejnowski, 2002]). The top-d eigenspace is P0-invariant, which by Theorem B yields a zero prediction gap ( G∗ = 0 ) and retains a total content of P 
+
+> i≤d
+
+λ2 
+
+> i
+
+, which is strictly optimal within the class of zero-gap encoders. Two critical corrections are applied: a strict spectral gap |λ1| < 1 requires the dynamics to be aperiodic, and the extraction of eigenvectors at degenerate eigenvalues must be performed via a strict orthogonal selection. 
+
+Proof. The spectral theorem combined with Theorem B guarantees both subspace invariance and the exact content formulation. For optimality, any invariant subspace corresponds to a spectral subspace with content P λi(S)2. The Poincaré separation theorem (a direct corollary of Cauchy interlacing) guarantees that the top eigenspace maximizes this sum. 
+
+Corollary P2.1 (LeJEPA’s Gaussian/OU World as the Self-Adjoint, Zero-Tax Boundary; Recovery of Their Theorem 1). Consider the Gaussian/Ornstein-Uhlenbeck (OU) setup driving the linear identifiability guarantees of LeJEPA [Klindt et al., 2026]: let z ∼ N (0 , I n) and z′ = ρz + p1 − ρ2 η, where η ∼ N (0 , I n) and ρ ∈ (0 , 1) .The transition operator (T ψ )( z) = E[ψ(z′) | z] is self-adjoint with respect to the stationary, reversible OU measure 
+
+μ = N (0 , I n). Thus, P0 = T |H0 is self-adjoint with ∥P0∥ = ρ. Its eigenfunctions are the classical Hermite polynomials, and the degree-d eigenvalues scale as ρd (via Mehler’s formula). Consequently, the top eigenspace corresponding to the n-fold degenerate eigenvalue ρ is spanned exactly by the linear functions span {z1, . . . , z n}. Under a whitened representation ( Cov( h) = In, meaning the isometry satisfies V : Rn →
+
+H0 with V e i = hi), LeJEPA’s alignment loss expands as L(h) = 2 n − 2 P 
+
+> i
+
+E[hi(z′)hi(z)] = 2 n − 2 tr( V ∗P0V ).Applying Theorem B for d = n, we obtain: 
+
+(i) The top eigenspace is P0-invariant, yielding a zero prediction gap δ = 0 (G∗ = 0 ) and capturing a maximum content of Cn(0) = nρ 2 = P 
+
+> i≤n
+
+σi(P0)2. Consequently, the spectral tax vanishes identically : Πn(ε) ≡ 0
+
+(aligning with module Theorem E.3, where self-adjointness implies Ψn = 0 , and Corollary D.3.1, where the activation threshold satisfies ε∗(d) = 0 ). 14 A Control Theory of Predictability in Latent World Models A P REPRINT 
+
+(ii) The Ky Fan / Poincaré separation theorem implies max V tr( V ∗P0V ) = nρ , where equality holds if and only if ran V = span {zi}, which forces the linear representation h(z) = Qz for some Q ∈ O (n), achieving the minimum alignment loss min L = 2(1 − ρ)n. This exactly recovers Theorem 1 of Klindt et al. [2026]. Proof. To see that T is self-adjoint, note that the stationary OU process is time-reversible, inducing a symmetric joint distribution over (z, z ′) with Cov( z, z ′) = ρI ; hence ⟨ψ, T χ ⟩ = ⟨T ψ, χ ⟩. The identity ⟨hi, P 0hi⟩ = ( V ∗P0V )ii 
+
+yields the trace form of the loss L. Property (i) follows from the invariance of the top eigenspace and the self-adjoint identity σi(P0) = |λi| = ρ. Property (ii) is a direct consequence of the Poincaré separation theorem, where the trace maximization for a self-adjoint operator yields the sum of the top n eigenvalues nρ , achieved uniquely at the spectral subspace. 
+
+Interpretation. LeJEPA’s linear identifiability constitutes the exact self-adjoint, zero-tax boundary of our cost theory. The activation threshold ε∗, the compression deficit Ψd, the kernel tax, the Jordan chains, and the multi-step rollout drift are all identically zero at this boundary, activating only when P0 departs from normality—that is, when moving outside the Gaussian/OU framework required for their linear identifiability (their identifiability holds if-and-only-if Gaussian; see Theorems 1 and 2 in Klindt et al. [2026]). This work explicitly maps the cost surface unfolding 
+
+outside this boundary. Technically, Corollary B is an immediate consequence of the Ky Fan variational principle and Poincaré separation; its value lies entirely in its positioning —establishing a mathematically precise seam where our cost surface intersects and recovers LeJEPA’s optimal point—rather than in its proof complexity. 
+
+P3 (Pathology of Deterministic Weak Mixing: Ill-Posedness vs. Impossibility). Let T be a weakly mixing transformation and let U denote its associated Koopman operator. 
+
+(a) There exists no non-trivial finite-dimensional invariant subspace on 1⊥; hence, exact saturation is impossible. 
+
+(b) In the time-reversible (invertible) case, the single-step gap satisfies inf dim S=d δ(S)2 = 0 for all dimensions 
+
+d ≥ 1, including odd dimensions. 
+
+Proof. (a) A transformation is weakly mixing if and only if U |1⊥ possesses no eigenvalues. Any finite-dimensional invariant subspace must contain at least one eigenvector upon complexification, yielding a contradiction. (b) Since U is unitary, its spectral measure E is purely continuous (atomless). 
+
+Even Dimensions: We choose d/ 2 pairs of disjoint, conjugate arc pairs {Ij , ¯Ij } on the unit circle. The continuity of the spectral measure guarantees that these arcs can be selected to capture non-zero spectral mass. Let fj = E(Ij )gj be normalized vectors. By forming real combinations using {Re , Im } pairings, we construct an orthogonal set of size d
+
+satisfying δ(S) ≤ max j |Ij | → 0.
+
+Odd Dimensions: We require an additional one-dimensional real direction, which must be supported on a symmetric arc 
+
+I0 = ¯I0 containing the point θ = 1 (or −1). Its feasibility is guaranteed because a weakly mixing system is necessarily aperiodic, and the maximal spectral type of any aperiodic measure-preserving system has full support over the entire unit circle (constructed via approximate eigenfunctions on Rokhlin towers; citation level: [Nadkarni et al., 1998]). Consequently, any arbitrary neighborhood of 1 contains non-zero spectral mass. Choosing a real g0 ensures that 
+
+f0 = E(I0)g0 is strictly real (since I0 is symmetric and U is a real operator, making E(I0) commute with complex conjugation) and orthogonal to all prior conjugate pairs, satisfying ∥(U − 1) f0∥ ≤ | I0|.
+
+Remark. For the continuous spectrum landscape, see Mezi´ c [2005]; the entropy/Pinsker structure that rules out zero-entropy factor evasion is standard ergodic theory [Glasner, 2003]. Contrast with Theorem E.2: The topological barrier ε∗(d) > 0 for a finite-dimensional complex spectrum in odd dimensions is completely dissolved under an infinite-dimensional weakly mixing structure because the spectral support is forced to contain ±1. The vanishing of the odd-dimensional threshold is a pathology unique to infinite dimensions. 
+
+P4 (Decoupled vs. Shared Encoders; Quantifying the Trilemma). In a decoupled (dual-encoder) setup, the optimal single-step content equals P 
+
+> i≤d
+
+σi(P0)2, which represents the universal VAMP-2 upper bound [Wu and Noé, 2020, Mardt et al., 2018]. Under the shared encoder constraint ψ = ϕ, the optimal content is bounded by the Cd(ε) frontier. The frontier is thus the quantitative form of the content–predictability–dimensionality trade-off under the shared-encoder constraint. 
+
+Proof. The decoupled optimization objective expands as max U,V isometric ∥U ⊤P0V ∥2 
+
+> F
+
+. The singular value decomposi-tion (Schmidt/Eckart–Young theorem) proves that this maximum is achieved by the sum of the top d singular triplets. Restricting the system to a shared encoder U = V recovers the shared-encoder configuration of Appendix A. 15 A Control Theory of Predictability in Latent World Models A P REPRINT 
+
+P5 (The Single-Sided Certificate; The Population Identity). We introduce the dual-predictor certificate formulated on the raw input side: 
+
+ˆδ2cert := min  
+
+> g∈L2
+
+E ϕ(Xt+1 ) − g(Xt) 2 − min  
+
+> h∈L2
+
+E ϕ(Xt+1 ) − h(ϕ(Xt)) 2
+
+= E E[ϕ(Xt+1 ) | Xt] − E[ϕ(Xt+1 ) | ϕ(Xt)] 2 (14) This identity isolates the sufficiency gap (II) mapped onto the ϕ-target space. It is strictly non-negative and vanishes if and only if ϕ(Xt) is a sufficient statistic for predicting ϕ(Xt+1 ).
+
+Proof. The optimal predictors within both L2 spaces correspond to their respective conditional expectations by the tower property. The subspace inclusion σ(ϕ(Xt)) ⊆ σ(Xt) combined with the L2 Pythagorean theorem yields the squared norm of the difference. 
+
+# C The predicted-versus-true gap: decoupling, holes, and realizable nonlinearity 
+
+This section proves the control objective of Section 3 and the three results that follow from it. A planner (MPC or CEM in latent space; Garcia and Ross, 2013, Hafner et al., 2020) acts on the manifold it predicts it can reach, and its suboptimality is charged by the gap g(U) = sup u | ˆD(u) − D(u)| between the predicted and true plan-cost at the plans it considers (Theorem 1). We show that the data-averaged prediction error—an average over the stationary measure 
+
+μ—does not bound this gap once candidate actions carry the query to the reachable measure ν (the decoupling); that the part of the gap that affects suboptimality is one-sided (holes); and that holes arise only when the predictor carries realizable nonlinearity, by the linear–MLP bridge of Section C.4. The on-manifold residual δ0 that these results take as an input is priced separately in Appendices D and E. 
+
+C.1 Setup: query measure, deployment gap, and holes Query (deployment) measure. A planner ranks candidate action sequences by rolling them in latent space and executing the one of lowest predicted cost. The queried states follow the reachable measure ν, and generically 
+
+supp ν ⊋ supp μ: actions are the mechanism that generates the query measure ν from the data measure μ.
+
+The two faces of the gap. The same residual function ε read under two measures gives δ2 
+
+> μ
+
+:= Eμ∥ε∥2 (the training gap δ, monitored as MSE) and δ2 
+
+> ν
+
+:= Eν ∥ε∥2 (the deployment gap on which success actually rests). The residual is unchanged; only the averaging measure differs. 
+
+Predicted cost, true cost, and holes. With predicted cost ˆJ(u) = ∥ˆzH (u) − zg ∥2, true cost J(u) = ∥zH (u) − zg ∥2,and signed error ∆J(u) := ˆJ(u) − J(u), a hole is a candidate u0 that looks best in prediction, ˆJ(u0) < ˆJ(u⋆), yet is truly bad, J(u0) ≫ J(u⋆): a deceptive low valley in the predicted cost landscape. The hole depth is Hole( U) := sup u(−∆J(u)) +.
+
+C.2 Measure mismatch and the decoupling of prediction error from success C.2.1 Theorem H1 (Bounded Density vs. Off-Support Blow-Up) 
+
+(a) in-support (ν ≪ μ, w = dν/dμ ) : δ2 
+
+> ν
+
+= Eμ
+
+w∥ε∥2 ≤ ∥ w∥∞ δ2
+
+> μ
+
+; (15) (b) off-support (ν(Rd \ supp μ) > 0) : ∥w∥∞ = ∞, and δμ gives no upper bound on δν . (16) In case (b) there exists a residual with δμ = 0 yet δν arbitrarily large. 
+
+Proof. (a) is the change-of-measure identity R f dν = R f w dμ with w ≤ ∥ w∥∞. (b): off supp μ the density w is infinite; let ε ≡ 0 on supp μ (so δμ = 0 ) but take arbitrary values on a ν-positive, μ-null set—the two integrals are independent. 
+
+C.2.2 Theorem H2 (Decoupling: Training Error ⊥ Control Success) 
+
+By Theorem C.2.1(b), every μ-quantity ( δμ, the frontier Cd, the spectral tax Πd) places zero constraint on δν once ν
+
+carries off-support mass. Since control success is monotone in δν , the correlation obeys ρ(δμ, success ) → 0.16 A Control Theory of Predictability in Latent World Models A P REPRINT 
+
+Proof. Immediate from Theorem C.2.1(b): if δμ does not even control δν , and success is determined by δν , then no functional relation ties δμ to success. No off-manifold-distance or ranking machinery is needed—decoupling is a direct corollary of change of measure. 
+
+Interpretation. The measured MSE is a μ-quantity, whereas success rests on a ν-quantity, with a measure mismatch between them. This states, inside the cost-theory language, the empirical observation that single-step prediction error and downstream control success are nearly uncorrelated. 
+
+C.3 Holes as false minima of the predicted cost C.3.1 Theorem H3 (Suboptimality as Signed Hole Depth) 
+
+J(ˆ u) − J(u⋆) ≤ ∆J(u⋆)
+
+| {z }
+
+> overestimate of the true optimum
+
++ Hole( U)
+
+| {z }
+
+> depth at the selected action
+
+. (17) 
+
+Proof. J(ˆ u) = ˆJ(ˆ u) − ∆J(ˆ u) ≤ ˆJ(u⋆) − ∆J(ˆ u) = J(u⋆) + ∆ J(u⋆) − ∆J(ˆ u), using that ˆu minimizes ˆJ; and 
+
+−∆J(ˆ u) is the underestimate at the selected action, bounded by the hole depth. 
+
+Interpretation. This refines Theorem F.6.2(i) from the two-sided ∥eH ∥ to a one-sided quantity: only underestimates— calling a bad action good—are fatal, while overestimates merely make the planner conservative. MSE, a two-sided square-mean, dilutes exactly this one-sided worst case; this is a second layer of the decoupling. 
+
+C.3.2 Theorem H4 (MSE Does Not Control Hole Depth) 
+
+The rollout MSE Eμ∥eH ∥2 (an in-manifold, two-sided mean) provides no upper bound on the hole depth sup ν (−∆J)+
+
+(an off-manifold, one-sided worst case). 
+
+Proof. Isomorphic to Theorem C.2.1(b): a model exact on μ (MSE = 0 ) can hallucinate arrival at the goal on a μ-null counterfactual candidate ( ˆJ = 0 ) with arbitrarily large true cost, giving an arbitrarily deep hole at zero MSE. The three decoupling sources are distribution (in vs. out of support), aggregation (mean vs. worst case), and sign (two-sided vs. one-sided). 
+
+C.3.3 Theorem H5 (Exposure Bias Is Orthogonal to Holes) 
+
+Relative to teacher forcing, autoregressive rollout training reduces only the in-manifold exposure-bias error e∥; it leaves the off-manifold hole error e⊥ untouched. Consequently the rollout MSE decreases while control success is unchanged. 
+
+Proof. Exposure bias is the self-fed versus ground-truth-fed shift on in-support trajectories [Bengio et al., 2015, Venkatraman et al., 2015]; autoregressive training aligns the two, reducing e∥. The off-support states that seed holes are absent from both the teacher-forcing and the autoregressive training distributions, so e⊥ and the hole depth do not move; by Theorem C.3.1 success is governed by the hole depth and is therefore unchanged. 
+
+Interpretation. The teacher-forcing → autoregressive → diffusion-forcing line all lives inside the manifold, fixing generation quality (exposure bias); it is orthogonal to the off-manifold holes that cause planning to fail. Multi-step rollout training thus optimizes the right metric but the wrong objective. 
+
+C.3.4 Proposition H6 (Pessimism Fills Holes) 
+
+Let an off-manifold indicator h(u) ≥ 0 satisfy λ0h(u) ≥ (J − ˆJ)+ on the reachable set (e.g. h ∝ ˆr(u), since the hole depth is ≲ the Theorem F.6.2 bound, of order Lr ). Then the pessimistic cost ˆJpess = ˆJ + λh with λ ≥ λ0
+
+satisfies ˆJpess ≥ J, so no false minimum lies below the true optimum. An optimal λ⋆ trades hole-filling against over-conservatism, dual to σ⋆u of Corollary F.6.3. 
+
+Interpretation. The prescription is to fill holes , not to lower MSE: either a training-free manifold-aware / pessimistic planner ( ˆJ + λˆr), or counterfactual training that shrinks L by expanding supp μ.
+
+17 A Control Theory of Predictability in Latent World Models A P REPRINT 
+
+C.4 The linear–MLP bridge: the origin of holes 
+
+The framework is stated for the linear Koopman operator A∗, while deployed predictors are MLPs. The next two results show the two are the same object: the MLP’s “extra nonlinearity” is exactly the realizability term (III) of the three-term decomposition of Section A, and holes grow from it. 
+
+C.4.1 Theorem H7 (Sufficiency Decomposition of the Gap) 
+
+An MLP g learns mz := E[zt+1 | zt]; its μ-best linear fit writes g = A∗z + B∗u + n with n the MLP nonlinearity. With the full-state conditional mean mx := E[zt+1 | xt] (the action of P0), 
+
+δ2 
+
+> μ
+
+= E∥mx − mz ∥2
+
+| {z } 
+
+> ι2:insufficiency =(II)
+
++ ∥n∥2
+
+> L2(μ)
+
+| {z }
+
+> realizable nonlinearity =(III)
+
+, ∥n∥μ ≤ δμ, (18) with equality iff the latent is sufficient ( mx is a function of zt, ι = 0 ). 
+
+Proof. The original gap is δ2 
+
+> μ
+
+= min A E∥mx − Az t∥2. Since mz = E[mx | zt] is the projection of mx onto σ(zt), for any linear Az t one has mx − mz ⊥ σ(zt), so by Pythagoras E∥mx − Az t∥2 = ι2 + E∥mz − Az t∥2; minimizing over 
+
+A sends the second term to ∥n∥2
+
+> μ
+
+. This is precisely the population certificate P5 and the three-term split δ2 
+
+> μ
+
+= (II) + (III) of Section A. 
+
+Interpretation. The “linear theory versus MLP practice” gap is the framework’s own object. Insufficiency ι (term II) is information the encoder discarded—no zt-predictor, linear or MLP, can recover it; it is a representation problem. Realizable nonlinearity ∥n∥μ (term III) is nonlinearity the MLP carries within the predictable range, and it is what seeds holes. The identity ∥n∥μ = δμ holds only when the latent is (near-)sufficient. 
+
+C.4.2 Theorem H8 (Holes Grow from Realizable Nonlinearity) 
+
+Let the MLP fit the data exactly, so ε = Φ − g vanishes on μ. Then 
+
+∥n∥μ = 0 ⇒ n ≡ 0 ⇒ g globally linear ⇒ a single quadratic bowl, with no false minimum. (19) 
+
+Proof. By Theorem C.4.1, ∥n∥μ = 0 forces n = 0 , so g is affine and ∥A∗z + B∗u − zg ∥2 has a unique minimum with no folding. 
+
+Interpretation. Realizable nonlinearity ∥n∥μ is necessary for a hole: a globally linear predictor folds no space and has none, whereas insufficiency ι merely raises the noise floor. We do not assert the converse quantitative direction, that a larger ∥n∥μ produces a deeper hole; the control experiments of Section 5 find that an off-manifold nonlinearity proxy does not decrease with control success, so lowering ∥n∥μ is not the operative lever in practice. What the readout gain tracks empirically is target fidelity, not the reduction of ∥n∥μ.
+
+C.5 One closure defect, several faces Corollary (Zero-Tax Boundary: All Faces Vanish Together) . On the self-adjoint / OU boundary of Corollary B (the LeJEPA world), δμ = 0 forces ι = 0 and ∥n∥μ = 0 , so the MLP degenerates to linear and the spectral tax, the hole tax, and the gap vanish simultaneously.                                       
+
+> Face Object Locus Set by
+> Spectral tax ΠdA∗non-normal in-manifold, spectral geometry σ1(A∗)≫ρ(A∗)
+> Gap δμlinear closure residual, split ι2+∥n∥2
+> μin-manifold, μ-mean ∥(I−Π) P0V∥
+> ,→insufficiency ιencoder information loss in-manifold, floor ∥mx−mz∥
+> ,→nonlinearity ∥n∥μMLP nonlinearity (necessary for holes) in →off-manifold pδ2
+> μ−ι2
+
+Table 4: One Koopman closure defect—a finite latent coordinate is not a global Koopman-invariant coordinate—shows several faces, all tied together by δμ and A∗. All taxes vanish jointly on the self-adjoint boundary (Corollary C.5). 
+
+Rigor status. Theorems C.2.1, C.2.2, C.3.1, C.3.2, C.4.1 and Theorem C.4.2 are exact; Theorem C.3.3 and Proposi-tion C.3.4 are mechanistically exact with constants that depend on the plant geometry. We make no quantitative claim relating the off-manifold growth L to the realizable nonlinearity ∥n∥μ: the control experiments of Section 5 find that an off-manifold nonlinearity proxy tracks control success in the opposite direction, so such a bound would be empirically unsupported. 18 A Control Theory of Predictability in Latent World Models A P REPRINT 
+
+# D Pricing the on-manifold residual: the d = 1 spectral frontier 
+
+This section prices the on-manifold residual at d = 1 through a real-section pseudospectral characterization of the content–predictability frontier. The pricing formula (Theorem D.3.4) is the d = 1 anchor extended to d ≥ 2 in Appendix E and taken as an input by the deployment analysis of Appendix F and the gap analysis of Appendix C. The underlying machinery draws on classical Hardy- and Clark-space operator theory [Garnett, 2006, Garcia et al., 2016, Clark, 1972, Sarason, 2007] and on sharp resolvent and pseudospectral bounds for Hilbert-space contractions [Szehr and Zarouf, 2017, Zarouf, 2011, Bickel and Gorkin, 2024]. 
+
+D.1 Notation and conventions 
+
+• We assume a stationary ergodic process {Xt} satisfying the first-order Markov assumption (M) . Let P denote the transition operator, satisfying P 1 = 1 and ∥P ∥ ≤ 1.• Let H0 = 1⊥ ⊂ L2(μ) be a real Hilbert space. By stationarity, E[P f ] = E[f ], implying P preserves H0. We denote the restricted operator as P0 = P |H0 , which satisfies ∥P0∥ ≤ 1 and is a real operator (preserving real-valued functions). • A whitened encoder ϕ = ( ϕ1, . . . , ϕ d) corresponds bijectively to an isometry V : Rd → H0, where V c =P ciϕi.• Content is defined as C(ϕ) = ∥P0V ∥2HS . The predictability gap expands as δ(ϕ)2 = min A ∥P0V −V A ∥2HS =
+
+∥(I − V V ∗)P0V ∥2HS , yielding the within-class optimal predictor A∗ = V ∗P0V (via Theorem B and the optimal bias identity b ≡ 0 from Lemma D.2). • The frontier is defined as Cd(ε) = sup {C (ϕ) : δ(ϕ)2 ≤ ε}, the cost as Πd(ε) = P 
+
+> i≤d
+
+σ2 
+
+> i
+
+− Cd(ε), and the activation threshold as ε∗(d) = inf ϕ δ(ϕ)2.• Hilbert-Schmidt (compactness) assumptions are invoked exclusively where explicitly annotated. The complex-ification of the core space is denoted as HC 
+
+> 0
+
+, and all spectra refer to the complexified spectrum. 
+
+D.2 Preliminary lemmas Lemma (Subspace Reduction and Contractivity) . C and δ depend strictly on the subspace S = span ϕ. Furthermore, 
+
+A∗ is unitarily conjugate under orthogonal basis transformations, and satisfies the contractivity bound ∥A∗∥2 ≤ 1.Proof. For the first two assertions, the mapping V 7 → V Q for an orthogonal matrix Q yields ∥P0V Q ∥HS = ∥P0V ∥HS ,
+
+(V Q )( V Q )∗ = V V ∗, and transforms the optimal predictor via A∗ 7 → Q⊤A∗Q. Contractivity follows from ∥A∗c∥ =
+
+∥V ∗P0V c ∥ ≤ ∥ P0V c ∥ ≤ ∥ V c ∥ = ∥c∥.
+
+Lemma (Real Witness) . For the real operator P0 and any θ ∈ R,
+
+d(θ) := inf    
+
+> u∈H0real ,∥u∥=1
+
+∥(P0 − θ)u∥ = inf   
+
+> v∈HC
+> 0,∥v∥=1
+
+∥(P0 − θ)v∥. (20) 
+
+Thus, restricting to the real subspace incurs no loss of generality, and d(θ) matches exactly the inverse of the complexified resolvent norm (i.e., d(θ) = ∥(P0 − θ)−1∥−1 when θ / ∈ σ). Proof. Decomposing v = a + ib where a, b are real elements of H0, the operator (P0 − θ) preserves the real and imaginary components. Hence, ∥(P0 − θ)v∥2 = ∥(P0 − θ)a∥2 + ∥(P0 − θ)b∥2 ≥ dR(θ)2(∥a∥2 + ∥b∥2). The reverse inclusion is trivial. 
+
+Lemma (The d = 1 Structural Identity) . For any real unit vector u, the scalar θ(u) := ⟨u, P 0u⟩ is the unique minimizer of min θ∈R ∥(P0 − θ)u∥, satisfying: 
+
+δ(u) = ∥(P0 − θ(u)) u∥ = min  
+
+> θ∈R
+
+∥(P0 − θ)u∥, C(u) = θ(u)2 + δ(u)2. (21) 
+
+Proof. The objective ∥P0u − θu ∥2 = ∥P0u∥2 − 2θ⟨u, P 0u⟩ + θ2 is strictly quadratic in θ. Minimization yields the optimal coordinate θ(u) and the corresponding minimum value ∥P0u∥2 − θ(u)2.
+
+Lemma (Regularity and Witness Reachability) . (i) The distance function d(θ) is 1-Lipschitz continuous on R. (ii) If P0
+
+is compact, θ̸ = 0 , and d(θ) < |θ|, there exists a real unit vector u such that ∥(P0 − θ)u∥ = d(θ).
+
+19 A Control Theory of Predictability in Latent World Models A P REPRINT 
+
+Proof. (i) The mapping θ 7 → ∥ (P0 − θ)u∥ is 1-Lipschitz for any fixed u, and the pointwise infimum preserves this Lipschitz constant. (ii) The operator G = ( P0 − θ)∗(P0 − θ) is real self-adjoint. Since G − | θ|2 is compact, the essential spectrum satisfies σess (G) = {| θ|2}. The infimum inf σ(G) = d(θ)2 < |θ|2 is therefore an isolated eigenvalue. The corresponding eigenspace is invariant under complex conjugation, allowing the selection of a real eigenvector. 
+
+D.3 The d = 1 real pseudospectral characterization 
+
+We define the real-section pseudospectral radius for a given gap δ as ρR(δ) := sup {| θ| : θ ∈ R, d (θ) ≤ δ} when the underlying set is non-empty (which is closed by Lemma D.2(i)). 
+
+D.3.1 Theorem F1 (Threshold Identity) 
+
+ε∗(1) = inf  
+
+> θ∈R
+
+d(θ)2, or equivalently, pε∗(1) = inf {δ ≥ 0 : σδ (P0) ∩ R̸ = ∅}. (22) 
+
+Proof. Expanding via Lemma D.2, we have ε∗(1) = inf u δ(u)2 B3 
+
+= inf u inf θ ∥(P0 −θ)u∥2 = inf θ inf u ∥(P0 −θ)u∥2 =inf θ d(θ)2, where the two infima commute freely. The second identity follows immediately from the definition of the pseudospectrum combined with Lemma D.2. 
+
+Corollary (Self-Adjoint Regimes) . If P0 is self-adjoint, then σ(P0) ⊂ R is non-empty, implying inf θ d(θ) = 0 and consequently ε∗(1) = 0 .
+
+Corollary (Normal Regimes) . If P0 is normal, the spectral theorem and Lemma D.2 yield d(θ) = dist( θ, σ (P0)) .Consequently, the threshold reduces to a purely spectral-geometric quantity: ε∗(1) = dist( R, σ (P0)) 2.
+
+Corollary (2 × 2 Closed Form; The Non-Normal Subsidy Theorem) . Let P0 be restricted to a two-dimensional invariant subspace, represented in real Schur form as M =
+
+a pq a
+
+
+
+with pq = −b2 < 0 (corresponding to the complex conjugate pair a ± bi ). Then, the threshold for this block evaluates exactly to: 
+
+ε∗(1) = min( p2, q 2), minimized at θ = a, (23) 
+
+which satisfies the inequality min( p2, q 2) ≤ | pq | = b2 = dist( R, σ )2, holding with equality if and only if |p| = |q| (i.e., the block is normal). Proof. Because orthogonal similarity preserves the distance function d(θ), we can assume without loss of gen-erality that M is in the specified form. Denoting s = (a − θ)2, the matrix G = (M − θ)⊤(M − θ) = s + q2 (a − θ)( p + q)(a − θ)( p + q) s + p2
+
+
+
+has a minimum eigenvalue: 
+
+λmin (G) = s + p2 + q2
+
+2 − pD2 + st, where D = p2 − q2
+
+2 , t = ( p + q)2. (24) We assert that λmin (G) ≥ p2+q2 
+
+> 2
+
+− | D| = min( p2, q 2) for all s ≥ 0. This is algebraically equivalent to s + |D| ≥ √D2 + st , which upon squaring simplifies to s2 + 2 s|D| ≥ st . Since pq < 0, we have |p − q| = |p| + |q| ≥ | p + q|,implying 2|D| = |p − q| | p + q| ≥ (p + q)2 = t, validating the assertion. Equality is achieved precisely at s = 0 
+
+(meaning θ = a). The string of identities min( p2, q 2) = |pq | ⇐⇒ | p| = |q| ⇐⇒ M M ⊤ = M ⊤M completes the proof. 
+
+Interpretation. Corollaries D.3.1 and D.3.1 establish our first counter-intuitive result: non-normality acts as a structural subsidy for the shared encoder under a fixed d = 1 predictability budget . Specifically, the activation threshold is compressed from the purely spectral prediction b2 down to min( p2, q 2), demonstrating that pseudo-eigenvectors are cheaper than true eigenvectors. In our three-state numerical baseline, the spectral prediction yields 
+
+b2 = 0 .0175 , while the theoretical non-normal floor yields min( p2, q 2) = 0 .08038 2 = 0 .00646 , matching the grid-search threshold exactly. The true origin of representation cost does not lie in the threshold itself, but rather in the fact that the leading singular value σ1 is driven far above the spectral radius by non-normality (see Theorem D.3.4). 
+
+20 A Control Theory of Predictability in Latent World Models A P REPRINT 
+
+D.3.2 Theorem F2 (Two-Sided Pseudospectral Bounds and the Saturation Boundary) 
+
+For any predictability budget ε ≥ ε∗(1) , the content frontier is bounded by: 
+
+ ρR(√ε) − √ε2+ ≤ C1(ε) ≤ ρR(√ε)2 + ε. (25) Furthermore, if P0 is compact and its leading singular value σ1 is simple (with the corresponding right singular vector denoted as χ1), the saturation boundary is exactly characterized by: 
+
+C1(ε) = σ21 ⇐⇒ ε ≥ σ21 − ⟨ χ1, P 0χ1⟩2. (26) 
+
+Proof. For the upper bound, any feasible vector u satisfies d(θ(u)) ≤ ∥ (P0 − θ(u)) u∥ = δ(u) ≤ √ε, implying 
+
+|θ(u)| ≤ ρR(√ε). From Lemma D.2, the content is bounded by C(u) = θ(u)2 + δ(u)2 ≤ ρR(√ε)2 + ε.For the lower bound, by the closedness of the set (Lemma D.2(i)), we choose |θ| = ρR(√ε) such that d(θ) ≤ √ε. In the compact setting where d(θ) < |θ|, Lemma D.2(ii) guarantees a real witness u (the bound is trivial if d(θ) ≥ | θ|), ensuring that the gap δ(u) ≤ ∥ (P0 − θ)u∥ ≤ √ε is feasible, and the content satisfies C(u) = ∥P0u∥2 ≥ (|θ| − √ε)2+.The non-compact setting follows analogously via an approximating sequence. For the saturation boundary, the global upper bound C(u) ≤ σ21 holds universally, achieved with equality if and only if u = ±χ1 under a simple singular value σ1. The exact gap required for this state evaluates identically to 
+
+δ(χ1)2 = σ21 − ⟨ χ1, P 0χ1⟩2.
+
+D.3.3 Theorem F3 (The Jordan Scaling Law) 
+
+Assume that P0 restricted to an orthogonally invariant (or Schur-embedded) block is a standard Jordan block Jm(λ)
+
+(λ ∈ R, with 1 on the superdiagonal in orthogonal coordinates). Then, for s = |θ − λ| ≤ 12 , the distance function satisfies: 
+
+sm(1 − s) ≤ d(θ) ≤ sm, (27) which implies the scaling ρR(δ) − λ ∈ [δ1/m , (2 δ)1/m ] for sufficiently small δ. Substituting this into Theorem D.3.2, the nilpotent regime ( λ = 0 ) yields the scaling law: 
+
+C1(ε) = Θ( ε1/m ), where ε1/m  1 − o(1)  ≤ C1(ε) ≤ 22/m ε1/m  1 + o(1) . (28) 
+
+Proof. For the upper bound, we evaluate the test vector defined as the geometric sequence u ∝ (1 , θ ′, . . . , θ ′m−1) with 
+
+θ′ = θ − λ. The vector (Jm(λ) − θ)u isolates a single non-zero component at its terminal index, yielding the norm ratio ∥(Jm(λ) − θ)u∥/∥u∥ ≤ sm.For the lower bound, we expand the inverse resolvent norm: ∥(Jm(λ) − θ)−1∥ = ∥ Pm−1 
+
+> k=0
+
+N k/(θ′)k+1 ∥ ≤Pmk=1 s−k ≤ s−m/(1 − s), which directly establishes the lower bound d(θ) ≥ sm(1 − s).
+
+D.3.4 Theorem F4 (The Pricing Formula and the Two Barriers) 
+
+σ21 − ρR(√ε)2 − ε ≤ Π1(ε) ≤ σ21 −  ρR(√ε) − √ε2+. (29) Consequently, the d = 1 representation cost equals exactly the difference between the singular radius and the real pseudospectral radius, up to an error of O(√ε). This splits the representation cost into two distinct operational barriers: 1. The Complex-Pairing Barrier (Spectral Geometry): When σ(P0) is driven far from the real axis, the activation threshold ε∗(1) inflates. This mechanism is independent of non-normality, as exemplified by a pure normal rotation rR 90 ◦ , which incurs a distance function d(θ)2 = θ2 + r2 and a threshold floor of ε∗(1) = r2.This cost vanishes completely at d = 2 .2. The Non-Normal Barrier (Pseudospectral Geometry): Non-normality drives the leading singular value far above the spectral radius ( σ1 ≫ ρ(P0)), elevating the baseline cost. Simultaneously, it induces a hypertrophied real pseudospectrum satisfying d(θ) ≪ dist( θ, σ ), compressing the threshold while inflating ρR. The subsidy and the tax share an identical geometric origin, and the net cost is tightly bounded by Theorem D.3.4. For a nilpotent block, this yields Π1(ε) = 1 − Θ( ε1/m ), grading the severity of non-normality via a slow-climbing fractional exponent. 
+
+Proof. The inequalities follow immediately by shifting terms in Theorem D.3.2. 21 A Control Theory of Predictability in Latent World Models A P REPRINT 
+
+# E The on-manifold content frontier at d ≥ 2
+
+This section prices the on-manifold residual for a shared encoder of any latent dimension d ≥ 2, extending the d = 1 
+
+frontier of Appendix D. The pricing is set by the non-normality of P0, and the spectral tax Πd(ε) measures the content it renders unattainable. 
+
+E.1 Notation and fundamental identities 
+
+As in Appendices D and F, let P0 be a real restricted operator satisfying ∥P0∥ ≤ 1. Let V be a d-frame (isometry) spanning the subspace S = ran V , with the associated orthogonal projections denoted as Π = V V ∗ and Π⊥ = I − Π.The compressed operator is defined as A = V ∗P0V (a real d × d matrix satisfying ∥A∥2 ≤ 1 by Lemma D.2). 
+
+(Id) Fundamental Content-Gap Identities: 
+
+C(S) = ∥P0Π∥2HS = ∥A∥2 
+
+> F
+
++ δ(S)2, δ(S)2 = ∥Π⊥P0Π∥2HS = ∥P0V − V A ∥2 
+
+> F
+
+. (30) 
+
+Proof. Taking the squared Hilbert-Schmidt norm of the orthogonal decomposition P0V = V A + Π ⊥P0V yields the result, noting that ∥V A ∥F = ∥A∥F since V is an isometry. 
+
+(Id’) Pseudospectral Constraint on the Compressed Spectrum: If δ(S) ≤ δ, then every complex eigenvalue 
+
+λ ∈ Λ( A) satisfies λ ∈ σδ (P0). Furthermore, the spectrum Λ( A) is closed under complex conjugation since A is real. 
+
+Proof. Let Ax = λx with ∥x∥ = 1 . Then ∥P0(V x ) − λ(V x )∥ = ∥(P0V − V A )x∥ ≤ ∥ P0V − V A ∥2 ≤ δ, where 
+
+V x ∈ SC serves as the valid witness vector. 
+
+E.2 The content frontier at zero predictability budget M1.1 (Invariant Subspace Content Formula): If S is a d-dimensional P0-invariant subspace, then δ(S) = 0 , and the content evaluates to: 
+
+C(S) = ∥A∥2 
+
+> F
+
+= X 
+
+> λ∈Λ( P0|S)
+
+|λ|2 + dep( S)2, (31) where dep( S)2 := ∥A∥2 
+
+> F
+
+− P |λ|2 ≥ 0 is the Henrici departure from normality of the restricted operator (representing the sum of squares of the strictly upper-triangular elements under a Schur decomposition, which is invariant to the choice of eigenvalue ordering). Consequently, the zero-budget frontier is given by: 
+
+Cd(0) = sup    
+
+> Sinvariant ,dim S=d
+
+ X
+
+> λ∈Λ( S)
+
+|λ|2 + dep( S)2
+
+ . (32) 
+
+Interpretation. Non-normality internal to the invariant subspace ( dep ) inflates the representation content—meaning that non-orthogonal eigenvectors provide a source of free content. The tax associated with non-normality is enforced elsewhere, specifically by elevating the singular value baseline baseline P σ2 
+
+> i
+
+.
+
+M1.2 (Classification of Real Pairings): Assume a finite-dimensional setting where P0 is semi-simple with distinct eigenvalues. Then, ε∗(d) = 0 if and only if there exists a conjugate-closed subset of eigenvalues of cardinality d.Specifically, if the system possesses k real eigenvalues and c complex-conjugate pairs, the set of exactly realizable dimensions is characterized by {a + 2 b : 0 ≤ a ≤ k, 0 ≤ b ≤ c}. Consequently, an entirely complex spectrum under an odd latent dimension forces a strictly positive activation threshold: ε∗(d) > 0.
+
+Proof. A real subspace S is invariant if and only if its complexification SC is both invariant and invariant under complex conjugation. Under distinct eigenvalues and semi-simplicity, any invariant subspace is exactly the span of a subset of eigenvectors. Conjugate invariance of the subspace is then equivalent to the underlying eigenvalue subset being conjugate-closed. 22 A Control Theory of Predictability in Latent World Models A P REPRINT 
+
+M1.3 (The Order-Reduction Filling Lemma; Upper Bound on Odd-Dimensional Thresholds): For any (d − 1) -dimensional invariant subspace S′, let P1 := Π ⊥ 
+
+> S′
+
+P0|(S′)⊥ denote the order-reduced compression. Then, the d-dimensional threshold satisfies: 
+
+ε∗(d) ≤ inf  
+
+> S′
+
+ε∗ 
+
+> P1
+
+(1) = inf  
+
+> S′
+
+min  
+
+> θ∈R
+
+dP1 (θ)2, (33) implying that the threshold for an odd dimension cannot exceed the d = 1 threshold of the residual operator remaining after an optimal invariant filling (which is computed via Theorem D.3.1). 
+
+Proof. Decompose S = S′ ⊕ span( u) where u ⊥ S′. The invariant property P0S′ ⊆ S′ ensures that its projection is completely absorbed by ΠS , meaning the residual is driven exclusively by u: ∥Π⊥ 
+
+> S
+
+P0u∥ ≤ ∥ (I − ΠS′ − uu ∗)P0u∥ =
+
+∥(I(S′)⊥ − uu ∗)P1u∥ = δP1 (u). Taking the infimum over u completes the proof. 
+
+M1.4 (Subspace Lattice and Kernel Tax of a Single Jordan Block): Let P0 = Jm (a standard nilpotent singular Jordan block in orthogonal coordinates). Its invariant subspace lattice is strictly chains of the form {ker Jj =span( e0, . . . , e j−1)}mj=0 . For any dimension 1 ≤ d ≤ m − 1, the content and costs resolve to: 
+
+Cd(0) = d − 1, Πd(0) = 
+
+X
+
+> i≤d
+
+σ2
+
+> i
+
+ − (d − 1) = d − (d − 1) = 1. (34) 
+
+The Kernel Tax Theorem: For a pure Jordan block, the exact cost of invariant satisfaction is uniformly 1, independent of the latent dimension d. Every admissible invariant subspace is algebraically forced to contain the zero-content kernel direction e0.
+
+Proof. For the lattice structure, let S̸ = {0} be an invariant subspace. Define the maximum occupied coordinate index as h = max {i : ∃v ∈ S, v i̸ = 0 }, and choose v ∈ S such that vh̸ = 0 . The sequence {v, Jv, . . . , J hv} is linked to the standard basis {eh, . . . , e 0} via an invertible triangular matrix, implying S ⊇ span( e0, . . . , e h). Maximality of h
+
+enforces the reverse inclusion. For the content, setting S = span( e0, . . . , e d−1) yields the compression block A = Jd,whose Frobenius norm is ∥Jd∥2 
+
+> F
+
+= d − 1. The singular values satisfy σi(Jm) = 1 for all i ≤ m − 1.
+
+Remark on Direct Sums: Consider the direct sum of multiple nilpotent chains (such as the complete Walsh decomposition of a sliding-window chain). A d-dimensional invariant subspace is formed by the product of individual chain prefixes, yielding a total content of P(prefix _length − 1) . Bounding this via a single optimal chain yields a constant zero-budget frontier Cd(0) = d − 1, keeping the kernel tax fixed at 1. (Because a tax of 1 is levied for each distinct chain utilized, the optimal policy restricts allocation to a single chain). 
+
+E.3 The global compression ceiling 
+
+We define the maximum compressed capacity as Φd := sup {∥ V ∗P0V ∥2 
+
+> F
+
+: V is a d-frame } (where for d = 1 , Φ1
+
+matches the squared spectral radius of the symmetric part (P0 + P ∗ 
+
+> 0
+
+)/2, which is the squared radius of the real numerical range). The associated compression deficit is defined as Ψd := P 
+
+> i≤d
+
+σ2 
+
+> i
+
+− Φd ≥ 0.
+
+Theorem M2: For all predictability budgets ε ≥ 0:
+
+Cd(ε) ≤ Φd + ε, Πd(ε) ≥ Ψd − ε. (35) If P0 is a normal operator, then Ψd = 0 . For a standard Jordan block Jm, the parameters evaluate to Φ1 = cos 2 πm+1 
+
+and Ψ1 = sin 2 πm+1 > 0.
+
+Proof. Expanding via identity (Id) yields C = ∥A∥2 
+
+> F
+
++ δ2 ≤ Φd + ε. The property Ψd ≥ 0 follows from ∥A∥F =
+
+∥ΠP0Π∥HS ≤ ∥ P0Π∥HS combined with the Ky Fan variational principle. For normal operators, a frame chosen from the top eigenvalues yields ∥A∥2 
+
+> F
+
+= P 
+
+> i≤d
+
+|λi|2 = P σ2 
+
+> i
+
+. For Jm, the single-dimensional capacity is Φ1 =max ⟨u, Ju ⟩2 = λmax ( J+J⊤ 
+
+> 2
+
+)2, where the tridiagonal Toeplitz spectrum evaluates to cos kπ m+1 .
+
+Interpretation. This defines a universal cost lower bound that holds uniformly across all budgets: the representation cost must be at least the gap between the singular spectrum and the numerical range spectrum. It remains blind to complex pairing barriers (where a normal rotation yields Ψ = 0 ), acting in structural complement to Theorem E.2; it represents the tightest bound in large ε regimes where localized scaling models expand. 
+
+23 A Control Theory of Predictability in Latent World Models A P REPRINT 
+
+E.4 The regular regime: Stewart–Riccati perturbation theory 
+
+Fix a coordinate system partitioned by the frames (V, W ) where W is the orthogonal complement of V . The transition operator acts in block form as P0 ≃
+
+A HR B
+
+
+
+, where R = W ∗P0V dictates the single-step gap ( ∥R∥F = δ(S)), 
+
+H = V ∗P0W , and B = W ∗P0W . Let T (X) = XA −BX denote the Sylvester operator, with its separation parameter defined as sep( A, B ) := inf ∥X∥F =1 ∥T (X)∥F [Stewart, 1973]. 
+
+M3.1 (The Riccati Invariance Lemma, Self-Contained): If sep( A, B ) =: s > 0 and 4∥R∥F ∥H∥F ≤ s2, there exists a matrix X satisfying ∥X∥F ≤ 2∥R∥F /s such that the subspace ran (V + W X )( I + X⊤X)−1/2 is strictly 
+
+P0-invariant. 
+
+Proof. Subspace invariance is algebraically equivalent to satisfying the quadratic Riccati equation T (X) = R − XHX 
+
+(derived by block substitution to eliminate the updated block A′ = A + HX ). Define the mapping Φ( X) = 
+
+T −1(R − XHX ). Over the closed ball B = {∥ X∥F ≤ 2∥R∥F /s }, the norm is bounded by ∥Φ( X)∥F ≤ (∥R∥F +
+
+∥X∥2 
+
+> F
+
+∥H∥F )/s ≤ (∥R∥F + 4∥R∥2  
+
+> F∥H∥F
+> s2
+
+)/s ≤ 2∥R∥F /s . The contractive bound expands as ∥Φ( X) − Φ( Y )∥F ≤∥H∥F (∥X∥F + ∥Y ∥F )∥X − Y ∥F /s ≤ 4∥R∥F ∥H∥F 
+
+> s2
+
+∥X − Y ∥F . Contractivity is strict inside the inequality boundary, and convergence at the boundary follows via standard limits, satisfying the Banach fixed-point theorem under the submultiplicative property ∥XY ∥F ≤ ∥ X∥F ∥Y ∥F .
+
+M3.2 (The Content Transfer Lemma): Let S′ = ran[( V + W X )( I + X⊤X)−1/2] with ∥X∥2 ≤ 1. Then, the projection gap is bounded by ∥Π − Π′∥F ≤ √2∥X∥F , and the content variation satisfies |C (S) − C (S′)| ≤ 
+
+2√d∥Π − Π′∥F .
+
+Proof. Parameterizing the perturbation via the canonical angles tan θi = σi(X), the projection distance evaluates to 
+
+∥Π − Π′∥2 
+
+> F
+
+= 2 P sin 2 θi ≤ 2∥X∥2 
+
+> F
+
+. The content variation expands as ⟨P0(Π − Π′), P 0(Π + Π ′)⟩F ≤⃗ ∥Π − Π′∥F ·
+
+2√d∥P0∥2.
+
+M3.3 (Upper Bound for the Regular Frontier): If every feasible subspace S (satisfying δ(S)2 ≤ ε) satisfies 
+
+sep( AS , B S ) ≥ s0 > 0 and 4√ε∥HS ∥F ≤ s20 (the latter holding automatically whenever ε ≤ s40/(16 d) since 
+
+∥H∥F ≤ √d), then the content frontier obeys: 
+
+Cd(ε) ≤ Cd(0) + 4√2√ds0
+
+√ε. (36) 
+
+Proof. Lemma E.4 establishes the matrix bound ∥X∥F ≤ 2√ε/s 0, which Lemma E.4 maps directly to the exact invariant subspace S′.
+
+M3.4 (Exact First-Order Slopes and Matching Lower Bounds): Let S∗ be an exact invariant subspace ( R = 0 ). Perturbing along the frame path Vt = ( V + tW X )( I + t2X⊤X)−1/2 yields the local variations: 
+
+δ(t) = t∥T (X)∥F + O(t2), C(t) = C(S∗) + 2 t⟨X, G ⟩F + O(t2), (37) where G := W ∗P ∗ 
+
+> 0
+
+P0V = H⊤A. Consequently, the exact first-order derivative of the frontier evaluated at S∗ is: 
+
+d C
+
+d δ S∗
+
+= 2 T −∗ (H⊤A) F ≤ 2∥H∥F ∥A∥2
+
+sep( A, B ) , (38) which establishes the lower bound constraint Cd(ε) ≥ Cd(0) + max S∗ optimal 2∥T −∗ (H⊤A)∥F
+
+ √ε + O(ε).
+
+Proof. The single-step gap expands as R(t) = W ∗ 
+
+> t
+
+P0Vt = t(BX − XA ) + O(t2) = −tT (X) + O(t2). The derivative of the content evaluates to ˙C = tr( P ∗ 
+
+> 0
+
+P0 ˙Π) = 2 ⟨X, G ⟩F , where the projection derivative is ˙Π = W XV ∗ + V X ⊤W ∗.At an exact invariant point, the state collapses to G = W ∗P ∗ 
+
+> 0
+
+V A = H⊤A. Maximizing the directional derivative 
+
+sup X 2⟨X, G ⟩/∥T (X)∥F via the change of variables Y = T (X) yields the dual norm 2∥T −∗ G∥F .
+
+Interpretation. The frontier within the regular regime is governed by a √ε scaling law, where the gradient is explicitly controlled by three distinct operators: the feedback block H from the complementary subspace, the internal dynamics A,and the amplification multiplier 1/sep . Theorems E.4 and E.4 serve to squeeze the frontier within a constant multiplier. 
+
+24 A Control Theory of Predictability in Latent World Models A P REPRINT 
+
+M3.5 (The sep–gap– κ Extremal Lemma): If A and B possess the eigen-decompositions A = XAΛAX−1 
+
+> A
+
+and 
+
+B = XB ΛB X−1 
+
+> B
+
+, then the separation parameter obeys the uniform lower bound: 
+
+sep( A, B ) ≥ dist(Λ( A), Λ( B)) 
+
+κ(XA) κ(XB ) . (39) 
+
+Proof. Vectorizing the equation maps the Sylvester operator to the tensor form T ≃ A⊤ ⊗ I − I ⊗ B. Applying the similarity transformation X⊤ 
+
+> A
+
+⊗ X−1 
+
+> B
+
+renders the system identical to the diagonal eigenvalue differences λA − λB . The similarity operation scales the norm by at most the product of the condition numbers. 
+
+E.5 The defective regime: the Jordan staircase law with exponent d/m 
+
+Assume that P0 is a purely nilpotent operator satisfying P m 
+
+> 0
+
+= 0 (encompassing single Jordan blocks Jm and the canonical sliding-window chain), evaluated across latent dimensions 1 ≤ d ≤ m − 1. From Theorem E.2, the zero-budget capacity is fixed at Cd(0) = d − 1.
+
+M4.1 (The Analytical Upper Bound): 
+
+Cd(ε) ≤ d − 1 +  m√ε2d/m + ε. (40) 
+
+Proof. The proof proceeds in three sequential steps. 
+
+(1) We invoke Theorem F.1.2 of Appendix F (setting A = A∗, δ1 = δ(S) ≤ √ε, and evaluating at horizon 
+
+k = m). This yields the operator bound ∥V A m∥F = ∥P m 
+
+> 0
+
+V − V A m∥F ≤ m√ε, which implies ∥Am∥2 ≤∥Am∥F ≤ m√ε. Consequently, every complex eigenvalue is bounded by |λi(A)| ≤ (m√ε)1/m , forcing the determinant to satisfy Q 
+
+> i
+
+σi(A) = | det A| = Q |λi| ≤ (m√ε)d/m .
+
+(2) We maximize the capacity objective P σ2 
+
+> i
+
+subject to the contractive constraint 0 ≤ σi ≤ 1 (Lemma D.2) and the determinant boundary Q σi ≤ D. If any two singular values occupy the interior of the domain, perturbing them along the hyperbolic path (σiet, σ j e−t) preserves the determinant while strictly increasing the objective P σ2 
+
+> i
+
+due to its strict convexity. Thus, the optimal configuration forces the singular values to the boundaries: 
+
+σ1 = · · · = σd−1 = 1 and σd = D, yielding the maximum capacity d − 1 + D2.
+
+(3) Substituting this optimal profile into identity (Id) yields the stated bound: C = ∥A∥2 
+
+> F
+
++ δ2 ≤ d − 1 + (m√ε)2d/m + ε.
+
+M4.2 (Reachability via the Truncated Neumann Cyclic Frame): Let d | m, K = m/d , and choose a scaling parameter 0 < s < 1. Construct the vector family: 
+
+vj = 1
+
+n
+
+> K−1
+
+X
+
+> k=0
+
+(−s)kej+kd (j = 0 , . . . , d − 1) , where n2 = 1 − s2K
+
+1 − s2 . (41) The family {vj } is strictly orthonormal , as their supports occupy disjoint modulo-d residue classes. The action of the Jordan operator satisfies: 
+
+Jv j = vj−1 (∀1 ≤ j ≤ d − 1 exactly ), Jv 0 = −sv d−1 + (−s)K
+
+n (−1) em−1. (42) Thus, the compressed operator A forms a cyclic companion matrix with a corner element −s (up to a terminal correction of O(s2K−1)), pinning the internal eigenvalues to |λi(A)| = s1/d (1 + o(1)) . The geometric tracking parameters evaluate to: 
+
+δ(Ss) = sK
+
+n ∥Π⊥em−1∥ = sm/d  1 + o(1) , C(Ss) − (d − 1) = s2 1 + o(1) . (43) Mapping this to the predictability budget ε = δ2 yields the lower-bound frontier Cd(ε) ≥ d − 1 + εd/m (1 − o(1)) . In the specific symmetric instance where m = 2 d, this maps to an exact analytical identity: C − (d − 1) = δ.25 A Control Theory of Predictability in Latent World Models A P REPRINT 
+
+Proof. Orthonormality and the forward shift Jv j = vj−1 follow because the modulo residue classes are mutually exclusive; downward translation maps residue class j → j − 1, and the condition d | m ensures that every vector 
+
+vj shares an identical truncation length K, canceling the normalization factors. For the terminal vector Jv 0, index substitution k 7 → k + 1 shifts the sequence to match nv d−1 up to the boundary element (−s)K−1em−1, yielding the stated remainder. For the gap, the projection of em−1 onto the subspace retains a coefficient of (−s)K−1/n ,implying ∥Π⊥em−1∥2 = 1 − s2( K−1) /n 2 = 1 − o(1) . The Frobenius norm of the compression scales as ∥A∥2 
+
+> F
+
+=(d − 1) + s2 + O(s2K−1), which combines with δ2 = O(s2K ) to complete the identity. 
+
+M4.3 (The Fractional Staircase Law and Structural Unification): Synthesizing Theorems E.5 and E.5 (and extending to instances where d ∤ m via the monotonicity of adjacent dimension embeddings d′ | m), any nilpotent operator satisfying P m 
+
+> 0
+
+= 0 obeys the fractional scaling law: 
+
+Cd(ε) − (d − 1) ≍ εd/m , Πd(ε) = 1 − Θ εd/m . (44) Evaluating this at d = 1 yields the ε1/m scaling of Theorem D.3.3. The defective frontier is thus globally unified under the fractional exponent d/m : each additional dimension allocated to the latent budget redeems exactly one higher order of the fractional exponent from the Jordan staircase .
+
+Numericalanchor. Empirical evaluations across configurations (m, d ) = (4 , 2) /(6 , 2) /(6 , 3) yield regression scaling slopes of 0.505 , 0.346 , and 0.510 , tightly tracking the analytical d/m = 0 .5, 0.33 , 0.5 limits, with the constant multipliers converging to 1.
+
+Mechanistic Symmetry: The analytical upper bound and the cyclic frame construction share an identical physical mechanism. Theorem F.1.2 forces the compressed operator to approximate a nilpotent structure (eigenvalues bounded by ε1/2m), and the determinant operator aggregates these individual small bounds into a single constraints concentrated on the terminal singular value (σd ≤ εd/ 2m), while the remaining d − 1 singular values are free to saturate at 1. This is exactly what our cyclic frame constructs: d − 1 dimensions of perfect information transfer paired with a single weak feedback loop modulated by the corner parameter −s. The remaining constant gap ( m2d/m vs. 1) stems entirely from the crude bounds of Theorem F.1.2 and represents a improvable non-load-bearing term. 
+
+M4.4 (The Sharp Boundary Splitting the Regular and Defective Regimes): Evaluating the Sylvester operator at any invariant subspace S∗ = ker Jd of a Jordan block Jm maps the internal blocks to A = Jd and B ≃ Jm−d. Both blocks share an identical spectrum concentrated at {0}, causing the Sylvester operator to become singular and driving the separation parameter to zero: sep( A, B ) = 0 .Consequently, the conditions required for the regular ( √ε) perturbation theory fail precisely inside the defective regime, where the fractional exponent takes over. This establishes the Separation Dichotomy Theorem : a positive separation parameter sep > 0 guarantees a regular √ε scaling law (with a gradient bounded by c/ sep ), whereas a vanishing separation parameter sep = 0 paired with a nilpotent index m activates the fractional εd/m scaling law. 
+
+E.6 Synthesis and corollaries The Global Frontier Profile (Single-Operator Case): The global profile of the content frontier is bounded by a multi-stage squeeze of the form Cd(ε) = min 
+
+nP 
+
+> i≤d
+
+σ2 
+
+> i
+
+, Φd + ε, C d(0) + [ M3 or M4 local scaling laws ]
+
+o
+
+. Small predictability budgets are governed by the separation dichotomy (resolving into either a √ε or a d/m scaling law), large budgets are capped by the numerical range limit Φd and the Ky Fan ceiling, and the activation threshold is explicitly determined by the real pairing geometry of Theorems E.2 and E.2. 
+
+Complete Characterization of the Sliding-Window (Raindrop) Chain: Because the transition operator of the sliding-window chain satisfies P m 
+
+> 0
+
+= 0 globally, the entire profile of Theorem E.2 and the fractional staircase of Theorem E.5 apply unconditionally. The representation dynamics resolve to Cd(ε) = d − 1 + Θ( εd/m ) with a constant kernel tax of 1, implemented by an honest, realizable Markov chain. Appendices D, F, and E share the same running example. 
+
+Operational Takeaways for JEPA Architectures: 
+
+1. The Inescapable Kernel Tax: Under a finite-memory setting, a d-dimensional shared encoder permanently loses exactly one unit of content regardless of how large the latent space is expanded. This missing unit represents the structural cost of “reserving a seat for the oldest historical innovation.” 26 A Control Theory of Predictability in Latent World Models A P REPRINT 
+
+2. The Budget–Dimension Exchange Schedule: The fractional staircase law provides an exact schedule for trading off latent dimensions against predictability. Within the defective regime, achieving a target content gain by adding one latent dimension is exactly equivalent to taking the m-th root of the predictability budget relaxation. This formalizes the marginal rate of substitution between widening the latent space and relaxing the alignment loss. 3. Computable Monitoring Metrics: The separation parameter sep constitutes a fully observable metric that can be tracked from empirical block representations ( ˆA, ˆB). Monitoring the convergence sep → 0 provides a structural warning that the frontier is collapsing from a regular √ε scaling law into a defective fractional exponent law. 
+
+# F Off-manifold error accumulation: rollout drift and control suboptimality 
+
+This section prices how the single-step residual accumulates when the latent state is rolled forward—first autonomously (multi-step rollout, §F.1), then under a control input (§F.3). Throughout we adopt the linear-control premise : the deployed latent dynamics are the learned linear model zt+1 = ˆAz t + ˆBu t, and we ask how the residual compounds along a horizon and along an action-selected trajectory. This supplies the amplification factor GH and the off-manifold excursion that enter the control-suboptimality bound of Theorem 4, taking the on-manifold residual δ0 from Appendices D–E and the one-sided gap analysis from Appendix C. 
+
+F.1 Autonomous Rollout: Drift Upper Bounds and Contraction Shields 
+
+Fix a shared whitened representation ϕ (parameterized by the isometry V ) and an arbitrary within-class predictor A.The autonomous k-step rollout is recursively defined as ˆzt+k = Akϕ(Xt).
+
+F.1.1 Theorem R0 ( k-Step Orthogonal Decomposition) 
+
+Under the first-order Markov assumption (M) , the k-step rollout error admits the exact orthogonal decomposition: 
+
+ek(ϕ, A ) := E∥ϕ(Xt+k) − Akϕ(Xt)∥2 =  d − ∥ P k 
+
+> 0
+
+V ∥2HS 
+
+| {z } 
+
+> k-step Innovation Floor ℓ(k)
+> B
+
++ ∥P k 
+
+> 0
+
+V − V A k∥2HS 
+
+| {z }  
+
+> =: δk(ϕ,A )2
+
+. (45) 
+
+Proof. The transition operator for a k-step transition along the chain is exactly P k under assumption (M) . By the tower property of conditional expectations, the true future state satisfies ϕ(Xt+k) − (P kϕ)( Xt) ⊥ σ(Xt), causing the cross-product terms to vanish identically. The identities E∥ϕ(Xt+k)∥2 = d and E∥(P kϕ)( Xt)∥2 = ∥P k 
+
+> 0
+
+V ∥2HS follow immediately from stationarity. 
+
+F.1.2 Theorem R1 (Principal Drift Bound and Three Dynamical Regimes) 
+
+Let δ1 = δ1(ϕ, A ) = ∥P0V − V A ∥HS denote the single-step gap, and let a = ∥A∥2 be the predictor norm. Then, the 
+
+k-step rollout drift is strictly bounded by: 
+
+δk ≤ δ1 · Gk, where Gk := 
+
+> k−1
+
+X
+
+> j=0
+
+∥P k−1−j 
+
+> 0
+
+∥ ∥ Aj ∥ ≤ 
+
+> k−1
+
+X
+
+> j=0
+
+∥P k−1−j 
+
+> 0
+
+∥ aj . (46) In particular, the drift dynamics resolve into the following operational regimes: 
+
+(i) Universal Bound: There holds universally Gk ≤ k (the crude linear bound). 
+
+(ii) Predictor Contraction Shield: If a < 1, the cumulative gain satisfies Gk ≤ 1−ak 
+
+> 1−a
+
+≤ 11−a . Thus, the contractivity of the predictor acts as a uniform shield against drift amplification , bounding the cumulative rollout error independently of k.
+
+(iii) Normal Operator Dissipation: If P0 is a normal operator with a strict spectral radius ρ < 1, then ∥P j 
+
+> 0
+
+∥ = ρj .This yields Gk ≤ ρk −ak 
+
+> ρ−a
+
+≤ k max( ρ, a )k−1 k→∞ 
+
+−−−−→ 0. In normal systems, rollout drift undergoes a transient hump and then vanishes completely .
+
+(iv) Pythagorean Refinement ( d = 1 ): Let D = P0u − au for a unit vector u. If the sequence of forward residual images {P i 
+
+> 0
+
+D}i≥0 is pairwise orthogonal and satisfies ∥P i 
+
+> 0
+
+D∥ ≤ ∥ D∥, then δ2 
+
+> k
+
+≤ δ21 1−a2k 
+
+> 1−a2
+
+(representing a sharp square-root refinement over the coherent sum in property ii). 27 A Control Theory of Predictability in Latent World Models A P REPRINT 
+
+Proof. We deploy the telescoping identity P k 
+
+> 0
+
+V − V A k = Pk−1 
+
+> j=0
+
+P k−1−j 
+
+> 0
+
+(P0V − V A )Aj , which holds via pointwise cancellation. Taking the Hilbert-Schmidt norm and leveraging the standard submultiplicative properties ∥XY ∥HS ≤∥X∥2∥Y ∥HS and ∥Y B ∥HS ≤ ∥ Y ∥HS ∥B∥2 combined with ∥Aj ∥2 ≤ aj yields the principal bound and properties (i) and (ii). Substituting normal operator norms ∥P j 
+
+> 0
+
+∥ = ρj and computing the geometric series yields property (iii). For property (iv), the telescoping components {aj P k−1−j 
+
+> 0
+
+D} are mutually orthogonal by assumption, allowing their norms to sum directly in squares. 
+
+F.1.3 Theorem R2 (The Content-Shield Conflict; High-Content Feature Exposure) 
+
+The representation content decomposes exactly as C(ϕ) = ∥A∗∥2 
+
+> F
+
++ δ(ϕ)2, which induces the operator norm lower bound ∥A∗∥2 ≥ ∥ A∗∥F /√d ≥ p(C(ϕ) − δ(ϕ)2)/d . For d = 1 , this relation is exact: a = θ(u) = pC − δ21 .
+
+Sign Reversal Principle: Maximizing content toward its theoretical spectral upper bound forces a → 1−, which subsequently causes the rollout drift shield 11−a from Theorem F.1.2(ii) to collapse. Consequently, high-content slow features that best minimize single-step error happen to be the most high-risk directions for multi-step rollout drift , directly reversing the conventional intuition that “slower features are more stable.” 
+
+Proof. The orthogonal projection identity on the Hilbert space yields C = ∥V V ∗P0V ∥2HS + ∥(I − V V ∗)P0V ∥2HS =
+
+∥A∗∥2 
+
+> F
+
++ δ2. Bounding the spectral norm via the Frobenius norm completes the inequality. 
+
+F.2 The state-augmentation shield 
+
+The content-shield conflict of Theorem F.1.3 operates under the first-order Markov condition (M) . Because real-world video sequences are highly non-Markovian, an order-p state augmentation (by stacking frames into the tuple zt = ( xt, . . . , x t−p+1 )) must be executed to satisfy (M) . This forces the underlying transition operator into a 
+
+block-companion structure. Crucially, the conflict identified in Theorem F.1.3 does not degrade under this expansion; rather, it is birthed by the state augmentation . The companion structure represents the non-derogatory generalization of a nilpotent Jordan block 
+
+Jm, where confluent eigenvalues collapse into a single high-dimensional Jordan block Jm(λ). We formalize this regime via three structural parts: the model-invariant floor, the confluent scaling law, and the dimensional axis mapping. 
+
+Notation and Disambiguation: Within this section, the term “shield” refers exclusively to the variance amplification ratio , defined as the ratio between the steady-state autonomous rollout error and the optimal single-step prediction error. This is conceptually distinct from the multi-step drift shield 11−a of Theorem F.1.2(ii). To scalarize the analysis coordinate-by-coordinate, each slow feature sequence is modeled as a stationary auto-regressive process AR( p):
+
+xt+1 =
+
+> p
+
+X
+
+> i=1
+
+aixt+1 −i + wt+1 , where wt ∼ i.i.d. (0 , σ 2
+
+> w
+
+). (47) The roots of the characteristic polynomial a(z) = 1 − P 
+
+> i≤p
+
+aizi are strictly confined inside the open unit disk. The system transfer function expands as 1 
+
+> a(z)
+
+= P 
+
+> j≥0
+
+hj zj , where {hj } is the system impulse response. Vector-valued features are handled via diagonal juxtaposition without inflating content. Autonomous rollout corresponds to the recursive deployment of the single-step predictor ˆg◦k(zt) without feeding the true innovation sequence. 
+
+F.2.1 Lemma R-aug.0 (The Model-Invariant Steady-State Floor) 
+
+Let ˆg be any learned linear single-step model whose autonomous rollout matrix has a spectral radius strictly bounded below unity (ensuring that the whitened representation has an invariant fixed point at the mean 0). Then, the steady-state rollout error satisfies: 
+
+lim  
+
+> k→∞
+
+E xt+k − ˆg◦k(zt) 2 = Var( x), (48) which is fundamentally independent of the predictor parameters ˆg. The absolute floor matches the stationary variance of the process; the bias-driven component decays asymptotically to zero, while the innovation sequence accumulates to fill the full variance, leaving zero cross-residual mass. 
+
+Proof. Expanding the quadratic loss yields E|xt+k|2 = Var( x) by stationarity. Under a stable predictor matrix, 
+
+ˆg◦k(zt) → 0 in L2 as k → ∞ , causing the model term and the cross-product term (via Cauchy-Schwarz) to vanish asymptotically. 28 A Control Theory of Predictability in Latent World Models A P REPRINT 
+
+Remark (Strong Form of Model Invariance) . The identity lim k→∞ ek = Var( x) holds even for a completely inaccurate 
+
+stable predictor. For instance, sweeping the parameter ˆλ of an AR(1) process from its exact analytical value down to a completely broken baseline ( ˆλ = 0 , which constantly predicts the global mean) yields an identical steady-state error 
+
+e∞ = Var( x).Mechanistically, the bias term (λ − ˆλ)zk acts in exact cancellation against the missing innovations; the asymptotic floor is fixed by the variance baseline (= the mean prediction baseline), independent of model fidelity. Consequently, single-step model quality only purchases a transient horizon; it is structurally incapable of lowering the steady-state floor . The entire geometric profile of the rollout shield is encoded in its denominator—validating its use as a sharp structural diagnostic metric. 
+
+F.2.2 Theorem R-aug.1 (The Closed-Form Variance Shield and the Confluent 2m − 1 Scaling Law) (i) Exact Identity: The optimal single-step prediction error matches the innovation variance σ2
+
+> w
+
+. Combining this with Lemma F.2.1, the rollout variance shield evaluates to: 
+
+Shield := Steady-State Steady Error Optimal Single-Step Error = Var( x)
+
+σ2
+
+> w
+
+= 1
+
+a
+
+> 2
+> H2
+
+= X
+
+> j≥0
+
+h2 
+
+> j
+
+. (49) 
+
+(ii) The Confluent 2m − 1 Scaling Law: At a confluent defective structure of order m (where all characteristic roots collapse to a single point, a(z) = (1 − λz )m for |λ| < 1), the variance shield expands exactly as the hypergeometric function: 
+
+Shield = 2F1
+
+ m, m ; 1; |λ|2 =
+
+2m − 2
+
+m − 1
+
+
+
+(1 − | λ|2)−(2 m−1)  1 + o(1)  as |λ| → 1−. (50) 
+
+Proof. (i) The Wold decomposition xt = P 
+
+> j
+
+hj wt−j for a white noise process w yields Var( x) = σ2
+
+> w
+
+P 
+
+> j
+
+h2 
+
+> j
+
+.Parseval’s identity maps this directly to the Hardy space norm ∥1/a ∥2 
+
+> H2
+
+. (ii) Applying the binomial expansion 
+
+(1 − λz )−m = P
+
+> j
+
+ j+m−1
+
+> m−1
+
+(λz )j isolates the coefficients hj =  j+m−1
+
+> m−1
+
+λj . Leveraging the Pochhammer identity 
+
+ j+m−1
+
+> m−1
+
+ = ( m)j /j ! combined with (1) j = j!, the sum transforms into: 
+
+X
+
+> j≥0
+
+j + m − 1
+
+m − 1
+
+2
+
+xj = X
+
+> j≥0
+
+(m)j (m)j
+
+(1) j j! xj = 2F1(m, m ; 1; x). (51) The asymptotic scaling is derived via the Gauss connection formula for the hypergeometric function when a + b − c =2m − 1 > 0, yielding 2F1(a, b ; c; x) ∼ Γ( c)Γ( a+b−c)Γ( a)Γ( b) (1 − x)−(a+b−c) (citation level: DLMF 15.4.23). Evaluating the coefficient ratio Γ(2 m − 1) /Γ( m)2 yields the stated central binomial coefficient  2m−2
+
+> m−1
+
+.
+
+Verification Examples: 
+
+• For m = 1 : 2F1(1 , 1; 1; x) = (1 − x)−1, yielding a slowness exponent of exactly 1.• For m = 2 : P 
+
+> j
+
+(j +1) 2xj = 1+ x 
+
+> (1 −x)3
+
+, yielding a slowness exponent of 3 and an asymptotic multiplier matching 
+
+ 21
+
+ = 2 . Both match the confluent scaling law bit-for-bit. 
+
+F.2.3 Corollary R-aug.2 (The Slowness Exponent Dichotomy, M4 Mapping, and the Sharpest Evaluation Point) (a) The Slowness Exponent Dichotomy: For a first-order normal system ( p = 1 ), the slowness exponent is identically 1. For any defective system of order m ≥ 2, the exponent scales sharply as 2m − 1. The Jordan defect structurally amplifies the slowness vulnerability, steepening the scaling exponent from 1 → 2m − 1.
+
+(b) Mapping to the M4 Dimensional Staircase: This exponent represents the exact manifestation of the Theorem E.5 capacity staircase ( εd/m ) mapped onto the multi-step rollout slowness axis. The same underlying Jordan defect dictates the root exponent in both spaces. 
+
+(c) The Sharpest Evaluation: Any empirically learned predictor incurs a single-step error greater than or equal to the Bayes floor σ2
+
+> w
+
+, while the steady-state floor remains model-invariant (Lemma F.2.1). Consequently, the empirical variance shield is upper-bounded by the analytical expression of Theorem F.2.2, holding with equality if and only if the single-step model is strictly optimal .29 A Control Theory of Predictability in Latent World Models A P REPRINT 
+
+Thus, the paradoxical failure mode where a world model optimized for excellent single-step prediction collapses during long-horizon rollouts represents the exact where this shield ratio is maximized. The more accurate the single-step model, the more severe the rollout collapse. 
+
+(d) Resolution of the First-Order Limitation: The requirement that raw video streams must undergo explicit state augmentation is not a condition that weakens the Theorem F.1.3 conflict. Rather, the state augmentation is the structural birth place of the non-normal content . A first-order Markov single frame ( p = 1 ) represents the weakest manifestation of the conflict; it is the deep companion matrix of video data ( p ≥ 2) that activates the high-order Jordan defects and drives the rollout shield exponent up to 2m − 1.
+
+(e) Interface to the Theorem F.1.2 Drift Shield: The steady-state variance shield derived here interfaces directly with the transient drift shield 11−a from Theorem F.1.2(ii) ... 
+
+F.3 Action Control: Off-Manifold Reachability and Suboptimality 
+
+Still under the linear-control premise, we now let a planner choose the actions. The new ingredient is that actions can push the latent state off the data manifold, where the linear model’s residual grows. We work with the controlled latent dynamics 
+
+zt+1 = ˆAz t + ˆBu t + εt, (52) and prices the extra drift that actions inject by pushing the latent state off the data manifold. It is the deployment-side companion of Theorem F.1.2: the same telescoping drift, now accumulated along an action-selected trajectory and inflated by off-manifold distance. 
+
+F.4 Setup: data manifold, off-manifold residual, and reachability Learned dynamics. The pair ( ˆA, ˆB) is the μ-least-squares (tangent-plane, Koopman/DMD) linearization of the true controlled transition, as used by latent model-predictive planners [Garcia and Ross, 2013, Hafner et al., 2020]. 
+
+Data manifold and off-manifold distance. Let M := supp μ ⊆ Rd (the support of the stationary measure; a linear/affine subspace on the main line, curved case treated locally below). Write r(z) := dist( z, M) = ∥P ⊥z∥, where 
+
+P ⊥ is the orthogonal projection onto the normal space of M and PM = I − P ⊥. Thus r = 0 on the data support (where the model was fit) and r > 0 measures departure into unqueried regions. 
+
+Residual and off-manifold growth. The true one-step latent map is Φ( z, u ) := E[zt+1 | zt = z, u t = u], and the residual is ε(z, u ) := Φ( z, u ) − ( ˆAz + ˆBu ). We assume linear off-manifold growth 
+
+∥ε(z, u )∥ ≤ δ0 + L r (z), δ0 := sup 
+
+> M
+
+∥ε∥, (53) with δ0 the on-manifold residual and L the off-manifold growth rate (a curvature/nonlinearity scale; L = 0 for linear systems). Here δ0 is the on-manifold value of the single-step residual δ of Appendices D and E. 
+
+Tangent/normal split of the input map. ˆB = ˆB∥ + ˆB⊥ with ˆB∥ = PM ˆB (tangent, control gain that stays in the reliable region) and ˆB⊥ = P ⊥ ˆB (normal, gain that pushes the state into the blind region). 
+
+Reachability Gramians. The controllability Gramian is WH = PH−1 
+
+> j=0
+
+ˆAj ˆB ˆB⊤ ˆA⊤j , and its off-manifold part is 
+
+W ⊥ 
+
+> H
+
+:= P ⊥WH P ⊥, tr W ⊥ 
+
+> H
+
+=
+
+> H−1
+
+X
+
+> j=0
+
+P ⊥ ˆAj ˆB 2 
+
+> F
+
+. (54) Note that even a tangent input map ( ˆB⊥ = 0 ) leaks off M within a few steps whenever M is not ˆA-invariant, i.e. whenever ˆA mixes tangent directions into normal ones. 
+
+F.5 Off-manifold reachability and safe control F.5.1 Theorem D1 (Action-Induced Off-Manifold Excitation) 
+
+For i.i.d. actions with Cov( uj ) = σ2
+
+> u
+
+I, starting from z0 ∈ M with predicted rollout ˆzH = ˆAH z0 +PH−1 
+
+> j=0
+
+ˆAH−1−j ˆBu j ,
+
+E r(ˆ zH )2 ≤ 2ρ2 
+
+> M
+
++ 2 σ2 
+
+> u
+
+tr W ⊥ 
+
+> H
+
+, ρM := sup 
+
+> k≤H
+
+r( ˆAkz0). (55) 30 A Control Theory of Predictability in Latent World Models A P REPRINT 
+
+Proof. Write r(ˆ zH ) = ∥P ⊥ ˆzH ∥ and split via the triangle inequality into an autonomous term ∥P ⊥ ˆAH z0∥ ≤ ρM and an action term ∥P ⊥cH ∥ with cH = P 
+
+> j
+
+ˆAH−1−j ˆBu j . Taking expectations of the squared action term, independence and whitening kill the cross terms, leaving σ2
+
+> u
+
+PH−1 
+
+> j=0
+
+∥P ⊥ ˆAH−1−j ˆB∥2 
+
+> F
+
+= σ2 
+
+> u
+
+tr W ⊥ 
+
+> H
+
+. Squaring the split with (a + b)2 ≤
+
+2a2 + 2 b2 gives the claim. 
+
+Interpretation. The energy with which actions push the state off the data manifold equals the off-manifold reachability Gramian scaled by the exploration width σ2
+
+> u
+
+. Larger σu, longer H, or a more normal-leaking ˆB all push the state farther off M; this is the mechanism behind the empirical collapse of control success as the exploration width or planning horizon is increased. 
+
+F.5.2 Theorem D2 (Geometric Condition for On-Manifold Safe Control) 
+
+The following are equivalent to tr W ⊥ 
+
+> H
+
+= 0 (actions never leave M within H steps): (i) M is ˆA-invariant, P ⊥ ˆAP M = 0 ;and (ii) ˆB is tangent, P ⊥ ˆB = 0 .
+
+Proof. Induct on P ⊥ ˆAj ˆB = 0 : the base case j = 0 is (ii); (i) propagates invariance, P ⊥ ˆA(PM ·) = 0 , from j to j + 1 .Every normal component of the Gramian then vanishes. Conversely tr W ⊥ 
+
+> H
+
+= 0 forces each term to zero, giving (ii) at 
+
+j = 0 and (i) on the reachable subspace. 
+
+Interpretation. Safe control has a clean geometric characterization: if the data manifold is closed under the dynamics and actions push only along it, the state never leaves the reliable region and the model stays trustworthy over the whole horizon, with no holes (cf. Appendix C). This is the operator-side statement of the aligned regime in which control suboptimality is exactly zero. 
+
+F.6 Control suboptimality F.6.1 Theorem D3 (Telescoping Residual Accumulation) 
+
+Let the true and predicted rollouts share the same start and actions, and set ek = zk − ˆzk. Then 
+
+eH =
+
+> H−1
+
+X
+
+> j=0
+
+ˆAH−1−j ε(zj , u j ), ∥eH ∥ ≤ GH
+
+ δ0 + L r max 
+
+, GH =
+
+> H−1
+
+X
+
+> i=0
+
+∥ ˆAi∥, r max = max  
+
+> j
+
+r(zj ). (56) 
+
+Proof. The one-step error obeys ek+1 = ˆAe k + εk, since the control terms ˆBu k are identical in the true and predicted rollouts and cancel on subtraction. The discrete Duhamel (telescoping) expansion, submultiplicativity, and the growth assumption yield the bound. Here GH is exactly the drift-amplification factor of Theorem F.1.2; in the near-normal regime ∥ ˆA∥ ≤ 1 gives GH ≤ H.
+
+Interpretation. This is the multi-step drift bound of Appendix F (Theorem F.1.2) replayed on the deployment trajectory. The single new ingredient is rmax : the farther the action-driven trajectory strays off the manifold, the larger the per-step residual δ0 + Lr , and the more the amplification factor GH compounds it. Non-normality (large GH ) and off-manifold excursion (large rmax ) multiply. 
+
+F.6.2 Theorem D4 (Control Suboptimality Bound) 
+
+Let D(u) = ∥zH (u) − zg ∥ be the true terminal distance to the goal, ˆu = arg min u ˆJ(u) the predicted-optimal control and u⋆ = arg min u D(u) the true optimum, with η(u) = ∥eH (u)∥, ηmax = max u∈U η(u), and candidate separation 
+
+∆( U) = min u̸=u⋆ D(u) − D(u⋆). Then (i) D(ˆ u) − D(u⋆) ≤ 2ηmax ≤ 2GH
+
+ δ0 + L r max 
+
+; (57) (ii) 2ηmax < ∆( U) ⇒ ˆu = u⋆ (exact recovery) ; (58) (iii) D(ˆ u) − D(u⋆) ≤ 2GH
+
+ δ0 + Lρ M + Lσ u
+
+q
+
+tr W ⊥
+
+> H
+
+. (59) 
+
+Proof. (i) The reverse triangle inequality gives | ∥ ˆzH (u) − zg ∥ − D(u) | ≤ η(u); since ˆu minimizes the predicted terminal distance, chaining the two bounds yields D(ˆ u) ≤ D(u⋆) + 2 ηmax , and Theorem F.6.1 bounds ηmax . (ii) If 
+
+ˆu̸ = u⋆ then separation forces D(ˆ u) ≥ D(u⋆) + ∆ , contradicting (i). (iii) Substitute the reachability control on rmax 
+
+from Theorem F.5.1. 31 A Control Theory of Predictability in Latent World Models A P REPRINT 
+
+Interpretation. Control suboptimality is capped by the amplification GH times (on-manifold residual δ0 + growth L
+
+× off-manifold reachability 
+
+q
+
+tr W ⊥ 
+
+> H
+
+). In the near-normal deployment regime, where GH is an O(1) constant, the only remaining lever is Lσ u
+
+q
+
+tr W ⊥ 
+
+> H
+
+: reduce the off-manifold nonlinearity L, the exploration width σu, or the off-manifold reachability of the plant. 
+
+F.6.3 Corollary D5 (Optimal Exploration Energy) 
+
+Let D⋆(σ) be the reachable optimal true terminal cost at exploration energy σ (nonincreasing, convex, with D⋆′ → 0). The realized cost ˆJ(σ) = D⋆(σ) + 2 GH (δ0 + Lρ M + Lσ 
+
+q
+
+tr W ⊥ 
+
+> H
+
+) has a unique interior minimizer σ⋆u > 0,characterized by 
+
+−D⋆′(σ⋆u) = 2 GH L
+
+q
+
+tr W ⊥ 
+
+> H
+
+(marginal reach benefit = marginal off-manifold cost ). (60) 
+
+Proof. ˆJ′(σ) = D⋆′(σ) + const > 0; D⋆′ increases from negative to 0, so ˆJ′ crosses zero once, and convexity of D⋆
+
+makes the minimizer unique. 
+
+Interpretation. Too little exploration cannot reach the goal (under-exploration); too much drives the state into the blind region and manufactures holes (over-exploration). Between them lies a unique optimal exploration energy σ⋆u—the exploration width is not monotone but single-peaked. 
+
+F.6.4 Corollary D6 (The Off-Manifold Control Tax) 
+
+The marginal suboptimality per unit exploration energy is Πoff := 2 GH L
+
+q
+
+tr W ⊥ 
+
+> H
+
+, and Πoff = 0 ⇐⇒ L = 0 (no off-manifold nonlinearity) or tr W ⊥ 
+
+> H
+
+= 0 (safe control, Theorem F.5.2). The safely controllable directions are exactly the reachable subspace RH = ran[ ˆB, . . . , ˆAH−1 ˆB] intersected with the tangent space T M; the normal part carries energy tr W ⊥ 
+
+> H
+
+.
+
+Interpretation. The spectral tax Πd penalizes an operator that is intrinsically fragile to predict; the off-manifold control tax Πoff penalizes actions that push the state into the fragile region. It is the measure-side dual of the spectral tax: controllability geometry and manifold geometry jointly fix the dimension of safe control. 
+
+Rigor status. Theorems F.5.1, F.5.2, F.6.2(i)(ii) and Corollary F.6.4 are exact (subspace geometry / convex first-order conditions). Theorem F.6.2(iii) and Corollary F.6.3 are mechanistically exact with constants that depend on the plant geometry. For a curved M, P ⊥ becomes the nearest-point normal projection and Theorems F.5.1–F.5.2 hold locally when the reachable radius is small relative to the curvature radius, with constants controlled by the second fundamental form; Theorems F.6.1–F.6.2(i)(ii) are geometry-independent. 
+
+# G Numerical verification protocols 
+
+The analytical results of Appendices D–F are exact. This section collects the numerical checks that confirm them on explicit synthetic operators. The checks are of two kinds. The first reproduces a closed-form identity: a constructed witness is evaluated and compared against its predicted value, and agreement is reported at the level of floating-point error (about 10 −12 ). The second confirms a scaling law: the content frontier, the rollout drift, or the prediction horizon is computed across a range of the budget ε, the horizon k, or the regularity budget, and the fitted exponent or slope is compared against its predicted value. Every operator is synthetic—Jordan blocks, Walsh chains, and the doubling and cat maps, whose expanding-map and Lyapunov structure is classical [Pesin, 1977, Viana and Oliveira, 2016]—and is chosen so that the quantity under test has a known closed form; this isolates the mathematical content of each theorem from estimation error. These checks verify the theorems on synthetic operators; the deployment-side experiments of Section 5 probe the theory on trained JEPA world models. 
+
+G.1 The single-step frontier ( d = 1 )Threshold subsidy. On a three-state non-normal operator, the purely spectral prediction places the activation threshold at b2 = 0 .0175 , while the pseudospectral value of Corollary D.3.1 gives min( p2, q 2) = 0 .08038 2 = 0 .00646 . A grid search over real targets returns the latter to printed precision, confirming that non-normality lowers the threshold below the spectral prediction. 32 A Control Theory of Predictability in Latent World Models A P REPRINT 
+
+Jordan scaling exponent. For nilpotent Jordan blocks Jm the content frontier obeys C1(ε) = Θ( ε1/m ) (Theo-rem D.3.3). Fitting C1(ε) as a power of ε for m = 2 , 3, 4 recovers the exponents in Table 5, each within 3% of 1/m ,and the prefactor C1(ε)/ε 1/m tends to 1.
+
+G.2 Multi-step rollout Nilpotent chain identities. The m = 3 Walsh chain (eight states) reproduces the shift action P f 0 = 0 , P f 1 = f0,
+
+P f 2 = f1, the operator-power norms ∥P j 
+
+> 0
+
+∥ = 1 , 1, 1, 0, and a spectral radius ρ(P0) ≈ 10 −6; the memory horizon is 
+
+τ = m while the spectrum alone predicts τspec = 1 , a separation the theory attributes to non-normality. Under the constraint δ1 ≤ 10 −2, a search returns sup k δk/δ 1 ≈ 1.39 , 1.52 , 1.47 for k = 2 , 3, 5, in line with the predicted √k-type growth and far below the coarse bound k.
+
+The 2m − 1 augmentation law. On controlled non-Markovian data, a small trained network yields rollout shields that scale as 2m − 1 for m = 1 , 2, with fitted slopes 0.95 and 2.94 against the predicted 1 and 3 (Theorem F.2.2); the shield is large even though the one-step error is small, which is the regime the theorem identifies as most acute. For 
+
+m ≥ 3 the innovation floor is too small for finite training to resolve a clean power law. 
+
+Model invariance. Holding the representation fixed and regularizing the predictor reduces its non-normality by a factor of three, yet the autonomous rollout drift is unchanged. The drift is therefore a property of the dynamics, not of the predictor—the content of the sign reversal (Theorem F.1.3). 
+
+G.3 The frontier at d ≥ 2
+
+Fractional exponent. The staircase law Cd(ε) − (d − 1) ≍ εd/m (Theorem E.5) is fitted for (m, d ) =(4 , 2) , (6 , 2) , (6 , 3) ; the recovered exponents appear in Table 5 and track d/m , with prefactor tending to 1. At the ratio m = 2 d, where the construction of Theorem E.5 gives an exact identity, the gain satisfies gain /√ε = 1 .0000 to machine precision. Result Operator (m, d ) Predicted exponent Fitted slope Thm D.3.3 J2 (2 , 1) 1/2 = 0 .5000 0.5000 
+
+Thm D.3.3 J3 (3 , 1) 1/3 = 0 .3333 0.3369 
+
+Thm D.3.3 J4 (4 , 1) 1/4 = 0 .2500 0.2561 
+
+Thm E.5 (4 , 2) 1/2 = 0 .5000 0.505 
+
+Thm E.5 (6 , 2) 1/3 = 0 .3333 0.346 
+
+Thm E.5 (6 , 3) 1/2 = 0 .5000 0.510 
+
+Table 5: Frontier exponents d/m recovered by fitting the content frontier as a power of the budget ε. The prefactor 
+
+Cd(ε)/ε d/m tends to 1 in every case. 
+
+Summary. Every operator above is synthetic and every predicted quantity is known in closed form, so these checks test the mathematics of the theorems rather than their empirical reach; the deployment-side reach is the subject of Section 5. 33

@@ -1,0 +1,92 @@
+Title: SyncSpace: Layout-Conditioned 3D Gaussian Splatting for Space Reskinning in Mixed Reality
+
+URL Source: https://arxiv.org/pdf/2607.10050v1
+
+Published Time: Tue, 14 Jul 2026 00:28:21 GMT
+
+Number of Pages: 3
+
+Markdown Content:
+# SyncSpace: Layout-Conditioned 3D Gaussian Splatting for Space Reskinning in Mixed Reality 
+
+## Qinchuan Zhang 
+
+qinchuan@usc.edu University of Southern California Los Angeles, California, USA 
+
+## Weibo Xu 
+
+weiboxu@usc.edu University of Southern California Los Angeles, California, USA 
+
+## Yunge Wen 
+
+yungew@mit.edu Massachusetts Institute of Technology MIT Media Lab Cambridge, Massachusetts, USA 
+
+Figure 1: SyncSpace reskins a real room into a stylistically unified, spatially congruent MR world in minutes. Top: the generation pipeline—scan the room, abstract it to a layout-only white panorama, and generate a layout-conditioned Gaussian-splat world. 
+
+Bottom: the in-VR experience—touching a virtual orb makes the virtual world rise and engulf the real room until it fully replaces it, preserving layout while re-imagining appearance. 
+
+Abstract 
+
+We present SyncSpace , a system that achieves both spatial align-ment and visual consistency between a generated 3DGS world and physical space. We first scan the space via depth sensing to extract 3D bounding boxes, which we render into a layout-only panorama and feed as a geometric prior to a generative world model, pro-ducing a Gaussian splat scene in which objects are re-semantized to fit a target style without per-object control. We then align the generated scene to physical space with a coarse-to-fine registration algorithm, refined manually via pinch gestures when automatic registration does not converge. We demonstrate a hand-tracked engulfment interaction in which the virtual world rises to replace the physical space, and show a single space reskinned into multiple stylistically distinct worlds with its layout preserved. 
+
+1 Introduction 
+
+Mixed reality headsets can now render immersive, room-scale vir-tual worlds in real time, enabling gaming, creative exploration, and themed entertainment at home. Depth-sensor-based 3D scanning can reliably extract a space’s walkable range and prevent collisions via geometric shape matching, but generating a virtual world that is both stylistically unified and registered to this scan remains an open problem. Substitutional-reality and proxy-based systems [ 4, 7 ] match in-dividual real objects to shape-similar virtual props, while layout-driven approaches [ 1, 8, 12 ] instead retrieve entire pre-authored room templates to fit real-world geometry, constructing walkable VR at the scale of the whole space. Both are constrained to what-ever their asset library contains, producing stylistically inconsistent results. The emergence of 3D generative models has enabled recent style-transformation systems [ 9, 11 ] to replace retrieval with gen-eration, such as diffusion-based texture propagation onto scanned meshes or per-object 2D-to-3D conversion, yet global style coher-ence is still imposed post hoc rather than emerging intrinsically from the generative process. 3D Gaussian Splatting [ 6] has further enabled real-time, photorealistic rendering, allowing generative world models [ 10 ] to synthesize an entire room in a single genera-tive pass, bypassing per-object assembly altogether; however, the resulting content is unregistered to the user’s physical space, pre-cluding safe walking. No existing approach simultaneously achieves arXiv:2607.10050v1 [cs.HC] 11 Jul 2026 Zhang et al. 
+
+whole-room stylistic coherence, spatial registration to the physical environment, and safe embodied navigation. We present SyncSpace , a system that achieves both spatial align-ment and visual consistency between a generated 3DGS world and physical space. We first scan the space via depth sensing to extract 3D bounding boxes, which we render into a layout-only panorama and feed as a geometric prior to a generative world model, pro-ducing a Gaussian splat scene in which objects are re-semantized to fit a target style without per-object control. We then align the generated scene to physical space with a coarse-to-fine registration algorithm, enabling safe embodied navigation through a stylistically transformed environment. 
+
+2 SyncSpace 
+
+SyncSpace decouples a physical layer (bounding boxes providing per-object colliders and occlusion) from a visual layer (the GS scene, supplying appearance only), so that reskinning the space’s appear-ance never compromises safe navigation. 
+
+2.1 World Generation 
+
+Physical Space Scanning & Abstraction. SyncSpace begins by scanning the space with a Meta Quest 3/3S, which produces axis-aligned bounding boxes for all detected objects and surfaces via depth-sensor-based 3D scanning. We render every box with a uni-form white material, stripping object identity while retaining spatial extent. This gives the world model a geometry-only signal, so whole-room style is applied unconstrained by existing object semantics. The output is a white equirectangular panorama at 4096 × 2048 
+
+encoding spatial layout alone. 
+
+Layout-Conditioned 3DGS Generation. The white-rendered panorama is paired with a whole-room style prompt (e.g., Enchanted Wizard’s Study ) and sent to Marble 1.1 (World Labs), which gener-ates a Gaussian splat scene [ 6] conditioned on the space’s geometric layout. Unlike per-object prompting, the prompt describes a single coherent aesthetic for the entire space, so the model reinterprets every object’s appearance within that style without any object-level control. As a result, objects are emergently re-semantized : their vi-sual identity shifts to match the target world (Fig. 2) while their spatial positions remain fixed. 
+
+2.2 Spatial Alignment 
+
+Scale Alignment. The generated GS scene and the room scan exist at different metric scales, because the world model has no absolute scale reference. We first rescale the GS scene so its axis-aligned bounding box matches that of the room scan, yielding a uniform scale factor 𝑠 applied to all Gaussian centers. 
+
+Coarse-to-Fine Registration. We register the two point clouds with Open3D in two stages. We first extract FPFH descriptors for each point and estimate a coarse rigid transformation (𝑅, 𝑡 ) via RANSAC, minimizing the correspondence error over inlier matches 
+
+{( 𝑝 𝑖 , 𝑞 𝑖 )} :
+
+(𝑅 ∗, 𝑡 ∗) = arg min 
+
+> 𝑅,𝑡
+
+∑︁ 𝑖 
+
+∥( 𝑅𝑝 𝑖 + 𝑡 ) − 𝑞 𝑖 ∥2 (1) where 𝑅 ∈ 𝑆𝑂 (3) and 𝑡 ∈ R3. This coarse pose is then refined with point-to-plane ICP, which minimizes the distance from each source 
+
+Figure 2: The same room reskinned under three style prompts, each preserving the layout while re-semantizing every surface (e.g., the same desk becomes a workbench, an alchemy table, or a treasure chest). 
+
+point to the local tangent plane of its nearest target point 𝑞 𝑖 with normal 𝑛 𝑖 :
+
+(𝑅 ∗, 𝑡 ∗) = arg min 
+
+> 𝑅,𝑡
+
+∑︁ 𝑖 
+
+[( 𝑅𝑝 𝑖 + 𝑡 − 𝑞 𝑖 ) · 𝑛 𝑖 ]2 (2) The transformation is updated iteratively until convergence, pro-ducing a registered GS scene in the physical coordinate frame. 
+
+Manual Refinement for Imperfect Registration. Automatic registration may not fully converge due to noisy generated ge-ometry: single-panorama reconstruction is ill-posed, so occluded regions are hallucinated rather than measured [ 2 ], and 3D Gauss-ian Splatting optimizes photometric rather than geometric fidelity, producing floaters and off-surface spread even in well-observed regions [ 3, 5, 6 ]. We therefore design an interface that allows users to refine the pose with pinch gestures, rendering the GS scene at 20% opacity over passthrough for side-by-side comparison, until satisfactory alignment is reached. To further demonstrate spatial congruence, we implement a hand-tracked engulfment interaction: the user touches a virtual orb, and the reskinned scene rises from the floor to engulf the real room, with the virtual floor meeting the real floor and virtual objects occupying the volume of their physical sources. Because the scene is registered to the room, any misalignment is immediately visible during this transition. 
+
+3 Experiments 
+
+We recruited three users, each of whom generated a distinct style for the same room (Fig. 2: Enchanted Wizard’s Study , Ancient Crypt Filled with Treasures , and Steampunk Inventor’s Workshop ), complet-ing the full pipeline in an average of 10 minutes. All three produced stylistically unified worlds that preserved the room’s layout while re-semantizing its objects in markedly different ways, isolating the style prompt’s effect on a fixed layout. A formal user study and multi-room generalization are left to future work. 
+
+4 Discussion & Future Work 
+
+SyncSpace shows that layout-conditioned generation enables style-consistent, spatially safe MR world creation without modeling skill. Limitations remain: re-semantization is controllable only at the SyncSpace: Layout-Conditioned 3D Gaussian Splatting for Space Reskinning in Mixed Reality 
+
+whole-space level, not per object; the GS scene is static and non-editable; automatic registration may need manual refinement when geometry is noisy. Future work includes per-object controllable gen-eration, dynamic objects, cross-platform support, outdoor scenes, a formal user study, and eliminating manual alignment as world models improve. 
+
+References 
+
+[1] Lung-Pan Cheng, Eyal Ofek, Christian Holz, and Andrew D. Wilson. 2019. VRoamer: Generating On-The-Fly VR Experiences While Walking inside Large, Unknown Real-World Building Environments. In IEEE Conference on Virtual Reality and 3D User Interfaces (VR) . IEEE, 359–366. [2] David Eigen, Christian Puhrsch, and Rob Fergus. 2014. Depth Map Prediction from a Single Image using a Multi-Scale Deep Network. In Advances in Neural Information Processing Systems (NeurIPS) .[3] Antoine Guédon and Vincent Lepetit. 2024. SuGaR: Surface-Aligned Gaussian Splatting for Efficient 3D Mesh Reconstruction and High-Quality Mesh Render-ing. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) .[4] Anuruddha Hettiarachchi and Daniel Wigdor. 2016. Annexing Reality: Enabling Opportunistic Use of Everyday Objects as Tangible Proxies in Augmented Reality. In Proceedings of the 2016 CHI Conference on Human Factors in Computing Systems (CHI) . ACM, 1957–1967. [5] Binbin Huang, Zehao Yu, Anpei Chen, Andreas Geiger, and Shenghua Gao. 2024. 2D Gaussian Splatting for Geometrically Accurate Radiance Fields. In ACM SIGGRAPH 2024 Conference Papers . ACM. [6] Bernhard Kerbl, Georgios Kopanas, Thomas Leimkühler, and George Drettakis. 2023. 3D Gaussian Splatting for Real-Time Radiance Field Rendering. ACM Transactions on Graphics 42, 4 (2023). [7] Adalberto L. Simeone, Eduardo Velloso, and Hans Gellersen. 2015. Substitutional Reality: Using the Physical Environment to Design Virtual Reality Experiences. In Proceedings of the 33rd Annual ACM Conference on Human Factors in Computing Systems (CHI) . ACM, 3307–3316. [8] Misha Sra, Sergio Garrido-Jurado, Chris Schmandt, and Pattie Maes. 2016. Proce-durally Generated Virtual Reality from 3D Reconstructed Physical Environment. In Proceedings of the 22nd ACM Conference on Virtual Reality Software and Tech-nology (VRST) . ACM, 191–200. [9] Xueyang Wang, Qinxuan Cen, Weitao Bi, Yunxiang Ma, Xin Yi, Robert Xiao, Xinyi Fu, and Hewu Li. 2026. Roomify: Spatially-Grounded Style Transformation for Immersive Virtual Environments. In Proceedings of the 2026 CHI Conference on Human Factors in Computing Systems . ACM. [10] World Labs. 2024. Large World Models for 3D Scene Generation. https://www. worldlabs.ai/. Accessed: 2026. [11] Bangbang Yang, Wenqi Dong, Lin Ma, Wenbo Hu, Xiao Liu, Zhaopeng Cui, and Yuewen Ma. 2024. Dreamspace: Dreaming your room space with text-driven panoramic texture propagation. In 2024 IEEE Conference Virtual Reality and 3D User Interfaces (VR) . IEEE, 650–660. [12] Jackie (Junrui) Yang, Christian Holz, Eyal Ofek, and Andrew D. Wilson. 2019. DreamWalker: Substituting Real-World Walking Experiences with a Virtual Reality. In Proceedings of the 32nd Annual ACM Symposium on User Interface Software and Technology (UIST) . ACM, 1093–1107.
