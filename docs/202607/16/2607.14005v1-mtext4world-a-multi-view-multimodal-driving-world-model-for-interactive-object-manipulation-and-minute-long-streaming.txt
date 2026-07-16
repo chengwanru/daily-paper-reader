@@ -1,0 +1,597 @@
+Title: M^4World: A Multi-view Multimodal Driving World Model for Interactive Object Manipulation and Minute-long Streaming
+
+URL Source: https://arxiv.org/pdf/2607.14005v1
+
+Published Time: Thu, 16 Jul 2026 01:33:20 GMT
+
+Number of Pages: 24
+
+Markdown Content:
+M4World July 2026 
+
+# M4World: A Multi-view Multimodal Driving World Model for Interactive Object Manipulation and Minute-long Streaming 
+
+Ke Cheng 1∗, Hanqiao Ye 2∗, Lei Shi 1, Yahui Liu 1, Yunhan Shen 1, Jingtao Dong 3,
+
+Zhenke Wang 1, Wenxuan Ao 1, Weixiang Xu 2, Kaining Huang 1, Shuhan Shen 2†
+
+> 1
+
+Meituan, 2Institute of Automation, Chinese Academy of Sciences 
+
+> 3
+
+Beijing Institute of Technology, ∗Equal contribution, †Corresponding author Driving-world generation has emerged as a core capability for scalable autonomous-driving simula-tion, yet existing methods remain limited in object-level controllability and long-horizon stability. We present M4World , a Multi-view and Multimodal generative driving world model that synthe-sizes future surround-view video streams and synchronized LiDAR scans while supporting interactive object Manipulation and stable Minute-long streaming. Fine-grained object manipulation is realized through a flexible conditioning interface that supports explicit control over both the spatial layout and visual appearance of individual objects. Stable minute-long streaming, on the other hand, is achieved through a multi-stage training framework that enables online causal generation in only four denoising steps while maintaining coherent world dynamics throughout extended rollouts. Building on these components, we introduce an efficient few-clip post-training as well as a suite of visual reference-conditioned generation models, preserving general generation ability while allowing rare-case customization for long-tail controllability. To assess controllability beyond realism, we further introduce an automated VLM-based judging pipeline that evaluates scene-level condition adherence, view-wise object controllability, and cross-view object consistency. Comprehensive experiments show that M 4World consistently delivers high generation quality, precise controllability, and stable minute-long streaming. Together with downstream long-tail augmentation and scene editing, these results demonstrate the potential of M 4World for controllable, scalable driving simulation. 
+
+# 1 Introduction 
+
+Scaling autonomous-driving testbeds and augmenting training data require controllable simulation environ-ments that overcome the cost and sparsity limitations of real-world data collection. Unlike log-replay or reconstruction-only simulators, generative driving world models aim to synthesize action-conditioned, multi-sensor future observations that remain photorealistic, controllable, temporally stable, and responsive to ego-vehicle behaviors over long horizons [11, 15, 35, 44, 51, 62, 65]. Such capabilities make them well suited for large-scale policy evaluation, end-to-end training, and targeted augmentation of rare yet safety-critical driving scenarios. Reconstruction-only simulators deliver strong geometric fidelity in observed regions but remain fundamentally limited in coverage: they inherit the support of logged sensor trajectories and degrade when extrapolating to unseen viewpoints, novel occlusions, or uncommon scene compositions [23, 29, 65, 76]. Generative and interactive world models have begun to relax this bottleneck by enabling open-ended synthesis and causal rollout [1, 11, 15, 70], yet a critical controllability gap remains. In current practice, object conditioning is predominantly geometric, relying on 3D bounding boxes or occupancy grids to guide scene composition and object placement, while offering little explicit control over the visual attributes of individual objects [13, 52, 54, 72]. Such attribute-level control is particularly valuable for closed-loop simulation, in which constructing targeted, safety-critical scenarios requires not only placing an object at a desired pose but also specifying 
+
+> 1arXiv:2607.14005v1 [cs.CV] 15 Jul 2026
+
+A Multi-view Multimodal Driving World Model for Interactive Object Manipulation and Minute-long Streaming Text 
+
+> Sensor
+
+# ... ... ... ... ... 
+
+Few-Step Autoregressive Video Diffusion Model 
+
+# ... ... ... ... ...     
+
+> Time-evolving conditions
+> T = 0 s
+> Global conditions
+> noisy latents clean latents
+> Multi-view multimodal rollout
+> T = 30 s T = 60 s T = 0 s T = 30 s T = 60 s 7132 18 8
+> 333 336 494 654 679 775 798 841 881
+> 53
+> 61
+> 87 89
+> 105 135 262
+> 271 284
+> 14
+> 321 348
+> 413 424 43 1
+> 45 0
+> 494 502
+> 511
+> 611 612 699
+> 720
+> 726 780 80 1
+> 881
+> 1105 130 294
+> 76
+> 591 671 676 688 699 701 766
+
+Figure 1 M 4World is a few-step autoregressive video diffusion world model for controllable driving simula-tion. Conditioned on time-evolving control signals as well as global scene and sensor context, it progressively denoises streaming latent chunks and jointly rolls out synchronized multi-view camera videos and LiDAR observations over long horizons, enabling fine-grained object-level control with stable cross-view consistency. 
+
+precisely what that object should look like. Meanwhile, existing long-tail simulation pipelines often confine rare-agent specification to the synthesized initial frame before delegating temporal evolution to an image-to-video model, thereby losing explicit control over pose, orientation, and multi-agent interactions during rollout [33, 44]. Beyond controllability, closed-loop simulation also requires stable long-horizon streaming generation at low latency, while most existing causal adaptation pipelines remain susceptible to train-test exposure bias or high inference latency [11, 35]. To overcome these limitations, we present M 4World, a generative driving world model that unifies multi-view and multimodal generation with fine-grained object controllability and long-horizon rollout stability. At its core, M 4World builds on a shared latent DiT backbone [34, 43], in which self-attention captures long-range spatiotemporal dependencies and cross-attention integrates heterogeneous control signals and cross-sensor context into the denoising process. This token-based conditioning pathway naturally supports the fine-grained and flexible object-control interface: we extend conventional geometric object conditioning into a more informative object token that fuses 3D box geometry, semantic category, visual appearance description, and textual attributes, allowing control signals to operate at both spatial layout and visual appearance levels. To bridge the gap between offline video priors and causal streaming rollout, we develop a progressive training recipe that involves five stages: bidirectional mid-training, teacher-forcing causal adaptation, few-step student ODE initialization, self-forcing with asymmetric DMD, and iterative long-video fine-tuning, complemented by a latent context refresh mechanism for improved inter-chunk consistency. Building on these generation capabilities, we further adapt M 4World to practical long-tail simulation, in which safety-critical cases are often specified individually and only a handful of real clips are available. We introduce an efficient per-case post-training strategy that combines balanced rare/common sampling with LoRA adaptation [19], allowing the simulator to bind rare visual and textual attributes to object controls while preserving the base model’s general driving-world controllability. To accommodate cases where reference observations or edited images are available, we further extend the model into a suite of visual reference-
+
+2A Multi-view Multimodal Driving World Model for Interactive Object Manipulation and Minute-long Streaming 
+
+conditioned generation variants, including first-frame conditioning and object completion, so that rare-case scenario construction can be anchored by concrete visual evidence without changing the original control-token interface. To make the proposed driving world model scalable in both training and evaluation, we pair it with a dedicated data and evaluation pipeline. We curate large-scale, synchronized multi-view camera and LiDAR driving sequences; mine clips spanning challenging weather, motion, and traffic-agent distributions; and automatically annotate scene-level prompts and object-level visual and textual descriptions for fine-grained conditioning. Since standard FID/FVD metrics [16, 50] capture distributional realism but not condition adherence, we develop an automated VLM-based judging pipeline that evaluates scene-level condition adherence, view-wise object controllability, and cross-view object consistency. Experiments evaluate M 4World from basic generation to downstream customized simulation for long-tail scenarios. On 10 s driving videos, M 4World generates coherent multi-view camera streams and synchronized LiDAR scans, improving FID/FVD over the existing baseline [11] from 41.7/346.1 to 34.8/288.7. Under our VLM-based controllability evaluation protocol, M 4World improves object-level visual and textual fidelity from 13.4% and 11.6% to 62.7% and 59.1%, respectively, demonstrating faithful adherence to object-level visual and textual conditions. These fine-grained conditions, in turn, also enhance cross-view consistency during rollout, raising it from 78.9% to 84.5%. For autoregressive streaming, the causal few-step student sustains 60 s multi-camera rollouts with coherent appearance and dynamics. In our throughput benchmark, it achieves 2.3 FPS at 424 × 800 resolution when jointly generating six camera views and one synchronized LiDAR stream on eight A100 GPUs. Beyond basic generation, few-clip customization enables our model to synthesize targeted data for a representative long-tail case involving tree-hauling trucks. Augmenting 50 000 real clips with 500 synthetic clips improves target recall from 1.0% to 69.7% while leaving regular-set mAP essentially unchanged (66.7% to 66.8%). Finally, by replacing common objects in the first frame with long-tail counterparts, our visual reference-conditioned generation model propagates the edited appearance across views and throughout the subsequent rollout, enabling zero-shot synthesis of long-tail driving data. We summarize our contributions as follows: • We build a unified driving world model that integrates the core generation capabilities needed for controllable simulation: multi-sensor support, low-latency causal streaming rollout, and a flexible object-level control interface over both spatial layout and visual appearance. • Building on this foundation, we propose two customization pathways for controllable long-tail scenario generation: few-clip post-training for rare cases and visual reference-conditioned generation for scenarios specified through real observations or edited images. • We establish a controllability-oriented evaluation suite with a VLM judge for assessing condition adher-ence and cross-view consistency. Experiments demonstrate substantial gains in generation quality and condition adherence, and further show the effectiveness of M 4World in downstream long-tail perception data augmentation. 
+
+# 2 Related Work 
+
+2.1 World Models for Driving Simulation 
+
+Closed-loop autonomous-driving simulation primarily hinges on a world model that generates future states of the environment under actor controls. We discuss existing world model systems for autonomous-driving simulation along the following two axes. 
+
+Reconstruction-based world models. Reconstruction-based world models use captured multi-view ob-servations to recover accurate driving scene structure and deliver photorealistic renderings. In this line of work, NeRF [6, 14, 22, 29, 30, 40, 46] and 3D Gaussian Splatting [23, 25, 28, 53, 57] have been the two domi-nant neural representations. Building on these representations, substantial efforts have focused on modeling dynamic 4D driving scenes. Some approaches model a dynamic scene by using a deformation network to map time-dependent observations to a canonical space [55, 66] or by feeding timestamps as additional inputs to 
+
+> 3A Multi-view Multimodal Driving World Model for Interactive Object Manipulation and Minute-long Streaming
+
+the neural representation [20, 48, 60]. To support individual control of dynamic agents, the scene can be fac-torized into a static background model together with separate moving object models [5, 46, 49, 59, 65, 71, 76]. To overcome the inefficiency of per-scene optimization, feed-forward frameworks have been proposed to learn generalizable priors across scenes, inferring 3D Gaussian representations in a single forward pass [3, 39, 61]. Despite these advancements, reconstruction-based world models are still constrained by the coverage of sensor data and often struggle to render unobserved regions and generalize to uncommon scene conditions. 
+
+Video generation for autonomous driving. Diffusion-based video generation models [17, 32, 34, 41, 43, 45, 75] unlock the potential of synthesizing diverse driving scenarios beyond the coverage of captured data. Motivated by this complementary strength, some methods leverage diffusion priors to synthesize future observations [12, 73] or restore ghost artifacts in novel-view renderings for reconstruction augmenta-tion [31, 38, 56, 64]. In parallel, a growing body of work seeks to directly generate realistic and controllable driving videos from structured scene representations and driving behaviors. These methods have evolved along three main directions. The first introduces structured conditions over scene layouts, weather, agents, and ego trajectories to enable realistic and controllable generation [13, 18, 36, 51]. The second pursues spatial controllability and multi-view consistency through explicit 3D geometry, BEV-style controls, or panoramic generation [10, 11, 52, 54]. The third scales toward large-scale generalist predictors and foundation world models that expand training scale, downstream utility, and controllable rollout across camera and LiDAR observations [35, 62]. Taken together, these directions set the stage for a broader shift from open-loop video synthesis to interactive, action-conditioned simulation for autonomous driving. Recent systems already oper-ationalize this shift by integrating reconstruction and generation for geometric fidelity [44], scaling real-time closed-loop generative simulation [33], improving long-horizon autoregressive stability via self-corrective distil-lation [72], and enabling controllable ego-centric multi-camera rollouts for scalable end-to-end evaluation [15]. Building on this line of work, our method emphasizes object-centric control to improve both controllability and scenario diversity in generated rollouts. Both capabilities are crucial for driving simulation, in which scalable synthesis of long-tail scenarios remains a central challenge. 
+
+2.2 Real-Time Interactive Video World Models 
+
+Recent foundation models for offline video generation provide strong generative priors for visual appear-ance, motion, and scene evolution [2, 17, 41, 43, 75]. Interactive world models can build on these priors to realize low-latency causal rollouts under user controls such as camera trajectories. To this end, recent work combines diffusion modeling with autoregressive (AR) prediction to adapt video generators for causal, streaming rollout. MAGI-1 [1] performs chunk-wise autoregressive generation with progressive denoising. CausVid [70] converts a pretrained bidirectional diffusion transformer [17] into a few-step causal generator with asymmetric distillation [69] and ODE initialization. Building on this causal formulation, diverse training strategies have been proposed to reduce the training-inference gap and improve rollout quality and temporal consistency [8, 9, 21, 74, 77]. To sustain longer rollouts, Rolling Forcing [26] expands the diffusion window, whereas LongLive [63] refreshes the KV cache to preserve visual continuity and prompt adherence across scene transitions. Meanwhile, attention sink behavior [58, 67] has been explored to improve long-range temporal consistency. Following prior interactive world models, we adopt a DiT backbone for multi-view, multimodal video generation. Fine-grained controllability is achieved via cross-attention, which mediates information exchange between control signals and cross-sensor observations. 
+
+# 3 Overview 
+
+3.1 Problem Formulation 
+
+We aim to develop a low-latency, long-horizon video world model for autonomous driving that maintains strong spatial and temporal consistency while supporting multi-view and multimodal generation under diverse control signals. Our model operates autoregressively in the latent space of a video VAE. Let z1: T denote the latent context and CT +1: T +W the control signals for the subsequent W frames to be generated. At each autoregressive step, the model samples the next latent chunk according to 
+
+ˆzT +1: T +W ∼ pθ (zT +1: T +W | z1: T , CT +1: T +W ) , (1)      
+
+> 4A Multi-view Multimodal Driving World Model for Interactive Object Manipulation and Minute-long Streaming Latents
+> LayerNorm
+> Self Attention
+> LayerNorm
+> Cross Attention
+> LayerNorm
+> Cross Attention
+> LayerNorm
+> Cross-View Attention
+> LayerNorm
+> FFN
+> Output
+> Timestep tText MLP
+> Sensor Ego Map Object
+> control signals
+
+N ×
+
+Figure 2 Architecture overview. The M 4World model adopts a shared DiT backbone with two cross-attention pathways to integrate control signals and cross-sensor context, enabling unified multi-view and multimodal generation under heterogeneous driving conditions. 
+
+and appends it to the context for the next step. The resulting latent chunk is decoded into temporally aligned surround-view videos and synchronized LiDAR scans represented as range maps. We instantiate this framework by adapting an open-source bidirectional text-to-video generation model [43] into an autoregressive, controllable, multimodal world model through a multi-stage training strategy. The model architecture and training procedure are detailed in Sec. 3.2 and Sec. 4, respectively. Unlike most prior work [10, 11, 51], whose object-level controls remain largely geometric, we introduce fine-grained conditions that complement conventional geometric controls. These conditions enable precise control over individual objects and, crucially, controllable generation of rare, long-tail objects that are difficult to capture at scale in real-world driving data (Sec. 5). To evaluate this capability at scale, we further introduce a dedicated metric suite for automatically measuring the fidelity of fine-grained control in generated driving scenes (Sec. 8). 
+
+3.2 Model Architecture of M 4World 
+
+A Diffusion Transformer (DiT) [34] is employed as the backbone of our latent video world model. DiT first patchifies and flattens the video latents into spatiotemporal tokens, processes them through stacked Transformer blocks, and then unpatchifies the outputs back into the latent grid. As illustrated in Fig. 2, within each block, self-attention captures long-range spatiotemporal dependencies, while cross-attention in-jects heterogeneous control signals into the shared backbone. Together, these properties provide more flexible multimodal conditioning and more favorable scaling capacity than U-Net backbones or ControlNet-style aux-iliary branches. 
+
+Control signals. We adopt the control signals defined in [10, 11], with the per-frame condition set given by Ct = {L, S, Pt, Mt, Ot}. These signals fall into two categories: global conditions (temporally consistent) and time-evolving conditions. The temporally consistent conditions comprise the scene text prompt L and the sensor parameters S, both fixed throughout a generated sequence. The camera-rig condition is defined as 
+
+Scam = {(Ki, Ri, ti)}Ncam  
+
+> i=1
+
+, where Ki is the intrinsic matrix of camera i, and (Ri, ti) specifies its pose relative to the LiDAR coordinate frame. The time-evolving conditions include the ego-vehicle poses Pt = {(Rt, tt)},the static BEV map Mt ∈ { 0, 1}w×h×c representing a w × h-meter traffic area with c classes, and object attributes Ot, which evolve over time to control the scene dynamics in each frame. In particular, at timestamp t, Ot = {ot,n }Nt 
+
+> n=1
+
+collects the attributes of all Nt objects in the scene. At frame 
+
+t, each object representation ot,n includes not only the conventional 3D bounding box bt,n = {(xj , y j , z j ) ∈
+
+R3}8 
+
+> j=1
+
+and semantic category c, but also an image description Iobj  
+
+> t,n
+
+and a fine-grained textual description 
+
+Lobj 
+
+> t,n
+
+, enabling precise appearance-level control beyond object position and orientation. 
+
+> 5A Multi-view Multimodal Driving World Model for Interactive Object Manipulation and Minute-long Streaming
+
+• Text tokens : We employ the umT5 model [7] to encode the high-level scene description L.• Sensor tokens and ego tokens : Both the camera-rig parameters Scam and ego poses Pt can be represented as sequences of 3D vectors. Each camera condition is formed as [Ki; Ri; t⊤ 
+
+> i
+
+] ∈ R7×3,whereas the ego pose at time t is defined relative to the first frame as [Rt; t⊤ 
+
+> t
+
+] ∈ R4×3. We apply Fourier embedding [29] to each 3D vector and use separate MLPs to obtain control tokens for the camera parameters and ego poses. The LiDAR sensor Slidar serves as the reference coordinate frame and therefore does not require an explicit camera-like geometric parameterization. We instead represent it using a randomly initialized learnable token. • Map tokens : Unlike prior methods that inject 2D structural conditions through ControlNet-style auxiliary branches, which often introduce substantial parameter and computational overhead, we adopt a lightweight tokenizer that patchifies and flattens the 2D BEV map Mt into a sequence of control tokens. • Object tokens : The control token for each object ot,n combines the four complementary types of information described above: a 3D bounding box, a class label, an image description, and a textual description. For the class label, following prior practice [24], we use the pooled embedding of its class name as the label embedding. For the 3D box bt,n ∈ R8×3, represented by the coordinates of its eight corner points, we apply Fourier embedding [29] to each point and encode the resulting features with an MLP. For the image description Iobj 
+
+> t,n
+
+, we extract an appearance feature using SigLIP-V2 [47]. For the textual description Lobj 
+
+> t,n
+
+, we obtain its embedding with the umT5 model [7]. Finally, we concatenate these embeddings and compress them with an MLP, producing a control token for each individual object that captures both its geometric layout and fine-grained appearance and semantics. 
+
+LiDAR modality support. We project each LiDAR scan into a range map, a 2D image whose pixels encode the radial distance to the nearest surface along each ray. This representation allows us to directly reuse the DiT backbone for parallel multimodal generation. The raw range map has resolution 128 × 1300 , where the vertical dimension corresponds to 128 LiDAR beams and the horizontal dimension corresponds to azimuth samples. Before VAE encoding, we normalize LiDAR distances within the valid range of [0 , 100] meters to 
+
+[−1, 1] and resize the range map to the same spatial resolution as the image input. We then reuse the same video VAE to encode the range map into a latent representation, aligning LiDAR and video observations in a unified latent space. 
+
+Multi-condition and multi-view aggregation. Building on a generic text-to-video DiT architecture, we retain its original text-conditioning pathway to integrate the high-level scene description L. The driving-specific control tokens derived from sensor parameters S, ego poses Pt, BEV maps Mt, and object attributes 
+
+Ot are then injected into the video backbone through an additional cross-attention layer in each DiT block. To further enhance cross-view consistency in both surround-view and LiDAR generation, we follow Magic-DriveV2 [10] and introduce another cross-attention layer for view-wise feature aggregation. Specifically, for the latent tokens of each target view, this layer attends to the latents from all views with overlapping fields of view, allowing each view to incorporate shared observational context while preserving its own view-specific structure. In our implementation, we insert this cross-view attention every five Transformer layers as a design trade-off between effectiveness and efficiency. 
+
+# 4 Long-Horizon Streaming Rollout 
+
+We initialize our model from the bidirectional Wan2.1-T2V model [43], which provides strong visual gener-ation priors but is originally designed for offline text-to-video synthesis. Transforming it into a low-latency interactive driving world model that supports controllable multimodal generation, causal streaming rollout, and stable long-horizon extrapolation requires several dedicated training stages. 
+
+> 6A Multi-view Multimodal Driving World Model for Interactive Object Manipulation and Minute-long Streaming
+
+4.1 Bidirectional Mid-Training for Driving Scene Dynamics 
+
+The first stage transfers the base video generator to the driving domain by training it on autonomous-driving data with the full set of control signals introduced in Sec. 3.2. Beyond domain adaptation, this mid-training stage expands the model’s input-output interface: it learns to respond to multiple driving controls while generating synchronized multi-view and multimodal observations. We retain the original bidirectional attention during this stage, allowing the model to exploit both past and future context within each training clip and preserve its ability to model driving-scene dynamics before causal adaptation. Specifically, we optimize the model with a rectified-flow objective [27]. Let x0 denote a clean latent training sample and ϵ ∼ N (0, I) denote Gaussian noise with the same shape. For a randomly sampled interpolation time t ∼ U (0 , 1) , we construct an intermediate latent state by linearly mixing the two endpoints: 
+
+xt = (1 − t)ϵ + tx0. (2) Under this straight transport path, the target velocity is constant along the trajectory and points from the noise sample to the data sample, i.e., 
+
+v∗ = x0 − ϵ. (3) The DiT backbone is trained to predict this velocity field conditioned on the driving control signals C, yielding the objective 
+
+Lrf (θ) = Ex0,ϵ,t 
+
+[
+
+∥vθ (xt, t ; C) − (x0 − ϵ)∥22
+
+]
+
+. (4) During training, we begin with visual-only generation to establish a stable driving-scene prior. We mix video clips at three spatial resolutions, 224 × 400 , 424 × 800 , and 576 × 1024 , with sequence lengths ranging from 13 to 93 frames. Similarly, we randomly sample the camera configuration at each training iteration, using up to 10 views. We then enable LiDAR range-map generation after this training has sufficiently progressed. At generation time, samples are obtained by starting from Gaussian noise and numerically following the learned velocity field toward the data distribution. A practical issue is that standard classifier-free guid-ance (CFG) often causes over-saturation in generated images; for LiDAR range maps, this effect translates into systematic depth shifts that are unacceptable for driving simulation. We therefore adopt Adaptive Pro-jected Guidance (APG) [37] for LiDAR sampling, which introduces no additional computation over standard guidance while effectively improving the quality of generated range maps. 
+
+4.2 Causal Student Distillation for Autoregressive Rollout 
+
+Teacher Forcing (TF). After bidirectional mid-training, Teacher Forcing adapts the model from offline generation to autoregressive streaming rollout by applying a causal mask to temporal attention. Specifically, given a training sequence, we sample a ground-truth video latent z1: T as the context prefix and use the subsequent chunk zT +1: T +W as the prediction target. During this stage, the model is trained with causal attention, so the target chunk can only condition on the observed prefix and the corresponding future control signals CT +1: T +W . Following the same rectified-flow parameterization, we perturb the target chunk with Gaussian noise ϵ ∼ N (0, I) at time t ∼ U (0 , 1) :
+
+xt = (1 − t)ϵ + tzT +1: T +W . (5) The model predicts the velocity from the noisy chunk to the clean target while being conditioned on both driving signals CT +1: T +W and the teacher-forced history z1: T :
+
+Ltf (θ) = Ez1: T +W ,ϵ,t 
+
+[
+
+∥vθ (xt, t ; CT +1: T +W , z1: T ) − (zT +1: T +W − ϵ)∥22
+
+]
+
+. (6) By always providing the clean historical context during training, Teacher Forcing gives the model a stable supervised signal for few-step chunk prediction before it is exposed to its own generated histories in long-horizon rollout. 
+
+> 7A Multi-view Multimodal Driving World Model for Interactive Object Manipulation and Minute-long Streaming
+
+Causal ODE initialization. Following prior work [70, 74, 77], we use the AR diffusion model trained with 
+
+Teacher Forcing to supervise a four-step causal student model. This initialization reduces rollout latency and provides a stronger starting point for the subsequent Self-Forcing and asymmetric distribution matching distillation (DMD) stage. Concretely, the teacher model first produces offline ODE trajectories for target chunks under the ground-truth history z1: T and future controls CT +1: T +W . We then sample an intermediate noisy latent xt along these trajectories over a subset of t values and train the student generator Gθ to map it back to the clean target chunk zT +1: T +W :
+
+Lode (θ) = Ez1: T +W ,t, xt
+
+[
+
+∥Gθ (xt, t ; CT +1: T +W , z1: T ) − zT +1: T +W ∥22
+
+]
+
+. (7) 
+
+Self-Forcing and asymmetric DMD. To close the train-test distribution gap, the four-step causal student model is further trained with Self-Forcing [21], where the model is exposed to its own generated history during training. As a form of holistic video-level supervision, we employ DMD [68, 69] to align the distribution of the causal student’s output with that of the bidirectional teacher. The objective is formulated as the reverse KL divergence, whose gradient can be approximated by the difference between the teacher’s and student’s score functions: 
+
+Ldmd (θ) = Eˆz,t, ˆzt
+
+[ 12 ∥ˆz − sg [ˆ z − (sfake (ˆ zt, t ) − sreal (ˆ zt, t ))] ∥22
+
+]
+
+, (8) where sg [·] denotes the stop-gradient operator. The full video sequence ˆz is generated by the student Gθ
+
+through self-rollout and then perturbed into ˆzt through the forward diffusion process. The score of ˆzt in the real data distribution is estimated by the frozen teacher model, while the score of ˆzt in the student distribution is estimated by a fake score network (critic model) trained online. Since the critic provides the student-distribution score sfake , inaccurate critic estimates can directly produce unstable or biased DMD gradients. Therefore, to keep the critic closely aligned with the evolving distribution of the student generator, we follow DMD2 [68] and update the critic five times for every student-generator update. In addition, with a probability of 10% during training, we combine the DMD objective with the supervised denoising loss Ldenoise 
+
+on ground-truth video latents, which empirically improves training stability and mitigates mode collapse. 
+
+Latent context refresh. Although rolling the KV cache within a fixed-size window [21] enables efficient extrapolation through context reuse, salient flickering artifacts still appear at chunk boundaries due to the distribution mismatch. Inspired by image-to-video conditioning and existing KV-recache implementations for overlapping frames between consecutive sliding windows [1, 70], we introduce a simple latent context refresh mechanism at inference time. Specifically, after denoising each chunk, we feed the latent representation of its final frame back into the network as additional contextual input for the next chunk. This differs from pure autoregressive KV caching, where cached keys and values are computed only from historical tokens and are reused unchanged. In our setting, the refreshed contextual input participates in attention with the noisy latent tokens of the next chunk; its keys and values therefore depend on the current chunk noise and must be recomputed rather than simply rolled forward. By allowing the next chunk to attend to an explicitly refreshed visual anchor, this mechanism empirically improves inter-chunk visual consistency in a training-free manner. 
+
+4.3 Iterative Fine-Tuning on Long Videos 
+
+Although the causal student can autoregressively roll out beyond the short clips seen during training, the previous DMD stages still operate on clips of at most 93 frames. During longer rollouts, the model repeatedly conditions on its own predictions through a finite temporal window, so accumulated errors can gradually corrupt the self-generated context and degrade generation quality. Following LongLive [63], we further adapt the student with iterative long-video fine-tuning, using longer self-rollouts and local temporal supervision to better align the train-time context distribution with that encountered during autoregressive inference. Specifically, the student generates a 600-frame self-rollout, during which we iteratively fine-tune it on each newly generated short clip while treating the previously generated frames as causal context. Moreover, since the control signals include time-evolving conditions such as ego motion, maps, and object states, each rollout step is trained to incorporate control tokens for the current timestamp. Newly injected 
+
+> 8A Multi-view Multimodal Driving World Model for Interactive Object Manipulation and Minute-long Streaming
+
+controls can therefore take effect naturally during autoregressive generation, without requiring an explicit KV-recache operation as in [63]. 
+
+4.4 Infrastructure Optimizations 
+
+Having described how the multi-stage training recipe enables low-latency streaming rollout with a four-step causal student, we further introduce infrastructure-level optimizations used during training and inference. 
+
+Denoising DiT. We optimize the denoising of long spatiotemporal token sequences using balanced sequence parallelism as in [4]. This strategy distributes tokens along the sequence dimension across multiple GPUs to reduce per-GPU activation memory while preserving full-sequence computation. Moreover, since our model delivers multi-view and multimodal generation, we introduce sensor parallelism , which distributes full sequences of different sensors across GPUs for parallel computation. Unlike sequence parallelism, sensor parallelism requires communication only at cross-view attention layers. In practice, we find that inserting one such layer every five Transformer blocks is sufficient; we therefore prioritize sensor parallelism because it requires less frequent communication. 
+
+VAE decoding. For final VAE decoding, another inference bottleneck, we adopt the asynchronous pipeline of LongLive2.0 [4] and parallelize decoding across sensors and modalities. 
+
+# 5 Efficient Post-Training for Long-Tail Scenarios 
+
+Although the model can learn associations between geometric controls and scene- or object-level prompts from abundant common examples, many safety-critical objects and other objects of interest in driving simulation are intrinsically long-tailed. In our data, a rare prompted context often appears only a few times, and in many cases, fewer than five clips contain the target object. We find that training on general driving datasets alone does not guarantee reliable controllability for long-tail objects. To address this limitation, we perform supervised fine-tuning of our base model separately for each rare case. For each rare case, we construct a fine-tuning set with a balanced sampling strategy: 50% from the target rare-object clips and the remaining 50% from ordinary driving clips. Upsampling the target rare-object clips provides a direct learning signal that binds the rare object’s visual and textual prompts to the corresponding object token, thereby strengthening the model’s ability to render the target object within the specified 3D box. At the same time, mixing common training data prevents the adaptation from drifting away from the general driving distribution. Full-parameter fine-tuning on only a few rare clips can still deteriorate output diversity and weaken the pretrained model’s broad controllability. We therefore employ LoRA [19] adapters for this per-case adaptation while keeping the base model frozen. This parameter-efficient update requires only a few hundred iterations to learn the rare-object attributes while preserving the base model’s original control over object position, weather, and illumination. 
+
+# 6 Visual Reference-Conditioned Generation 
+
+The condition set C used by the preceding model contains only the basic control signals required for con-trollable driving-scene generation; it does not include scene-level visual appearance information. In practical applications, however, additional scene-level visual observations are sometimes available and should be in-jected as appearance constraints for subsequent generation. We therefore extend the bidirectional teacher trained in Sec. 4 into a suite of visual reference-conditioned generation models. There are three variants corresponding to different forms of available visual information: • First-frame multi-view conditioning : Given the first frame from all views, the model predicts subsequent multi-view frames. 
+
+> 9
+
+A Multi-view Multimodal Driving World Model for Interactive Object Manipulation and Minute-long Streaming 
+
+• First-frame single-view conditioning : Given the first frame from a single view, the model synthe-sizes synchronized multi-camera views and predicts future frames. • Object completion : Given a complete video with one object masked out, the model completes the missing object according to the control signals. All three variants share the same conditioning mechanism. The video VAE encodes the provided scene-level visual information into a reference latent, which is spatially and temporally expanded to match the resolution and length of the initial noise latent. We concatenate this reference latent with the latent noise along the channel dimension before feeding it into the DiT backbone. For each task, we further construct a task-specific binary mask to indicate the observed visual region or the target completion region and inject it through the same channel-wise concatenation. This design keeps the original control-token pathway unchanged while allowing the generation process to be anchored to explicit visual appearance conditions. 
+
+# 7 Data 10 % 20 % 30 % 40 %                         
+
+> 32 .4%
+> 30 .6%
+> 5.5%
+> 14 .1%
+> 38 .2%
+> 16 %
+> 5.3%
+> 22 .6%
+> Pedestrians
+> Two-wheelers
+> Tricycles
+> Trucks
+> Cars
+> Cone
+> Snowy
+> High-speed
+> Curation Criteria
+> Clip-level attribute descriptions
+> Pedestrians :>15 within 10 m Two-wheelers :>10 within 10 m
+> Tricycles :>5within 10 m Trucks :>10 within 30 m
+> Cars :>15 within 20 m Cone :>10 within 10 m
+> Snowy : snow-covered roads High-speed : ego speed >15 m/s
+
+Figure 3 Distribution of curated training data across clip-level attributes. The po-lar bar chart reports the proportion of clips selected by each curation criterion, covering dense traffic participants, challenging weather, and high-speed ego motion. 
+
+Training a controllable driving world model requires real-world sequences that are both visually faithful and behaviorally di-verse. We collect large-scale, high-fidelity driving sequences that cover a wide range of illumination and weather conditions, ego-vehicle behaviors, and surrounding traffic agents. These se-quences provide the foundation for learning driving-scene dy-namics and controllable responses to fine-grained conditions. Starting from a self-collected pool of raw driving logs, we design an automated data mining and processing pipeline to construct high-quality training data for our world model. 
+
+7.1 Data Curation 
+
+Sensor configuration. We adopt a unified sensor configura-tion for all training and evaluation sequences. Each selected sequence is captured at 10 FPS with 10 surround-view cameras covering the full 360-degree field of view and one front-facing LiDAR sensor. The configuration provides synchronized visual and geometric observations for training the multi-view and mul-timodal world model. 
+
+Data selection. We further select diverse clips from the raw corpus to improve the model’s ability to generate complex dy-namic scenes. Specifically, we use detections by BEV percep-tion models to identify scenes with dense and diverse object distributions around the ego vehicle. These detections provide clip-level attributes, which we use to select clips containing dense and diverse traffic participants, such as pedestrians, two-wheelers, tricycles, and large vehicles. In addition to the object-centric scenarios curated above, we include clips captured in various weather conditions and clips with high-speed ego-vehicle motion, covering challenging appearance and motion patterns that are necessary for driving simulation. 
+
+Data balancing. Finally, we balance the curated data across attributes before training. This balancing prevents common and simple scenarios from dominating the training distribution and preserves sufficient exposure to safety-critical and complex cases. The resulting attribute proportions are reported in Fig. 3. Table 1 summarizes the final data statistics in the training and evaluation sets. 
+
+10 A Multi-view Multimodal Driving World Model for Interactive Object Manipulation and Minute-long Streaming 
+
+Table 1 Dataset statistics and sensor configuration details. The dataset includes both 10 s short clips and minute-level long clips. The 10 s training clips are used for bidirectional mid-training (Sec. 4.1) and teacher forcing (TF, Sec. 4.2) of the initial AR causal model, while the 60 s long clips support iterative long-video fine-tuning (Sec. 4.3). All training and test sequences follow the same sensor configuration. 
+
+Statistics Training Set Test Set 
+
+Mid-training & TF Long-tuning Sequence duration 10 s 60 s 10 s, 60 s Number of sequences ∼40 000 ∼4000 4000 (10 s), 300 (60 s) Sensor suite 10 × cameras at 10 FPS; 1 × 128-beam LiDAR at 10 FPS with a 120° FoV Camera types 1× 60° perspective, 5 × 120° wide-angle, and 4 × 190° fisheye Raw resolutions 576 ×1024 images; 128 ×1300 LiDAR scans 
+
+7.2 Condition Auto-Tagging 
+
+The driving logs already provide several structured conditions required by our model, including sensor param-eters, ego poses, and BEV maps. For the remaining condition inputs, we employ a fully automatic tagging pipeline that annotates each video clip with scene-level and object-level descriptions. • Scene-level textual prompts : We use Qwen3-VL [42], a vision-language model (VLM), to generate a natural-language description for each driving video clip. The description focuses on global scene attributes that affect visual appearance and dynamics, including weather (e.g., sunny, rainy, or snowy) and time of day (e.g., daytime, dusk, or nighttime). Specifically, we feed the first frame of each clip to the VLM, which parses scene-level attributes from this reference image. • Object-level descriptions : The BEV model provides the 3D bounding box and semantic category for each object. For each nearby object, we crop the object region from the video using its labeled 3D bounding box and use the resulting crop as the corresponding image description. We then prompt the VLM to annotate each object with a natural-language description, focusing on appearance, size, and state. Overall, the resulting dataset provides a holistic foundation for training long-horizon driving world models. It contains synchronized multi-view videos and aligned LiDAR observations, enabling joint camera–LiDAR generation under consistent sensor geometry. The clips span both 10-second segments for dense short-term dynamics and minute-level sequences for long-horizon rollout. Together with the additional object-level annotations, the dataset supports fine-grained control over individual objects beyond geometric placement. 
+
+# 8 Controllability Evaluation Using a VLM Judge Generated video First frame   
+
+> Weather
+> Time of Day
+> “Is the scene <weather> ? ”
+> “Is the scene <time> ?”
+> VLM
+> Weather Accuracy
+> Time Accuracy
+> Extract 1st Frame
+
+Figure 4 Scene controllability evaluation. 
+
+We evaluate the generated driving videos from two complementary perspectives. First, we adopt stan-dard distribution-level metrics, including FID [16] and FVD [50], to measure the perceptual realism of the full video rollout. These metrics reflect the fundamental video generation capability of the model, but do not di-rectly measure whether a driving world model follows the rich control signals that define the target simulation. To evaluate such fine-grained controllability, we introduce an automated VLM-based judge that leverages the visual and semantic knowledge encoded in foundation models to examine condition adherence in generated driving scenes. Our evaluation pipeline covers three dimensions: scene-level controllability, view-wise object-level controllability, and cross-view object-level consistency. 
+
+> 11 A Multi-view Multimodal Driving World Model for Interactive Object Manipulation and Minute-long Streaming
+
+8.1 Scene Controllability 
+
+We first evaluate whether the generated sequence follows the requested global scene attributes, including weather and time of day. For each generated rollout, we query the VLM with binary questions derived from the target scene prompt. For example, under a sunny daytime condition, we ask two questions: “Is this scene 
+
+sunny ? Answer yes or no. ” and “Is this scene daytime ? Answer yes or no. ” The two yes-or-no responses are used to measure weather correctness and time-of-day correctness, respectively. 
+
+8.2 View-Wise Object Controllability generated video Object crop 
+
+> 3D bbox
+> VLM
+> Label
+> “Is the object clear...?”
+> Image Description
+> Textual Description
+> Existence
+> Clarity
+> V-Fidelity
+> T-Fidelity
+> Object Crop Corpus
+> Sample
+> Project
+> Exit
+> cropped size
+> >100px?
+
+Figure 5 View-wise object controllability evaluation. 
+
+Beyond global scene attributes, our model aims to sup-port fine-grained control over each traffic object around the ego vehicle. Each object is specified through four complementary conditioning modalities: its 3D bound-ing box, a semantic category, an image description, and a textual description. During evaluation, we take a video generated for one camera view and the four conditioning inputs associated with a given object track ID, and then uniformly sample frames from the video. For each sam-pled frame, we project the conditioned 3D bounding box onto the image plane and crop the corresponding region. We keep only valid crops whose shorter side is larger than 100 pixels, and evaluate each crop using the following view-wise object-level prompts: • Existence. We prompt the VLM to verify whether the cropped region contains an object of the specified semantic category: “Is this object a [object_label] ? Answer yes or no. ” • Clarity. We ask the VLM to judge whether the object in the crop is visually recognizable: “Is this object clearly discernible? Answer yes or no. ” • Visual fidelity. When the object is conditioned on an image crop, we use the crop as the reference appearance and ask the VLM to compare it with the generated crop: “Are these two images of the same object? Answer yes or no. ” • Textual fidelity. When a textual description is provided for the object, we ask the VLM to deter-mine whether the generated crop matches the description: “Does this image match the description 
+
+[textual_description] ? Answer yes or no. ” 
+
+8.3 Cross-View Object Consistency VLM 
+
+> Cropped by the same 3D BBox
+> Object Crop Corpus
+> “Are these image crops the same object?”
+> Consistency
+> Track by ID
+
+Figure 6 Cross-view object consistency evaluation. 
+
+The same traffic object should remain visually consis-tent across time and viewpoints under the shared 3D ob-ject condition. During evaluation, we uniformly sample frames from the generated videos of multiple views. For each timestamp, we project the conditioned 3D bound-ing box associated with the same object track ID onto all camera views and crop the corresponding object regions. We keep valid crops whose shorter side is larger than 100 pixels, and feed all valid crops from the same timestamp and track ID into the VLM jointly. We prompt the VLM with the question, “Are these image crops of the same object? Answer yes or no. ” The binary response measures whether the generated multi-view observations preserve a consistent object identity across viewpoints. 
+
+Scoring. For each prompt type, we report the frequency with which the VLM answers “yes” as the corre-sponding controllability score. A higher score indicates that the generated rollout more reliably satisfies the 
+
+> 12 A Multi-view Multimodal Driving World Model for Interactive Object Manipulation and Minute-long Streaming
+
+evaluated condition. We additionally aggregate object-level scores by semantic category, which provides a category-wise assessment of the model’s ability to generate and control different types of traffic objects. 
+
+# 9 Experiments and Results 
+
+9.1 Basic Evaluation 
+
+Table 2 Quantitative evaluation of ba-sic generation quality.         
+
+> Method FID ↓FVD ↓
+> MagicDriveV2 [11] 41.7 346.1
+> Ours 34.8 288.7
+
+Multi-view and multimodal generation. We first evaluate the bidirectional driving-world-model teacher trained in Sec. 4.1. We use generated 10 s driving videos to assess its generation qual-ity and fine-grained controllability. Figure 7 presents two generated driving clips, each visualized us-ing six of the ten camera views and one LiDAR scan, demon-strating coherent cross-view and cross-modal synthesis. For a quantitative comparison of generation quality, we report FID [16] and FVD [50] against MagicDriveV2 [11]; both models are trained on the same dataset. As shown in Tab. 2, our method achieves lower FID and FVD through a unified design: self-attention performs long-range spatiotemporal modeling, and shared cross-attention injects the encoded control signals. These improvements also suggest that incorporating fine-grained object-level conditioning effectively enhances visual quality. 
+
+Fine-grained controllability. In Fig. 8, we qualitatively visualize the fine-grained object controllability of M 4World. While preserving object positions and orientations specified by the conditions, our method also controls appearance-level attributes such as shape and local visual details. We then assess the condition-following performance using the metrics introduced in Sec. 8. As a baseline, we use MagicDriveV2 [11] with inputs that exclude object-level textual and image descriptions. As shown in Tab. 3, M 4World not only follows object-level textual and visual conditions effectively, but also benefits from these fine-grained conditions to further improve scene control, object-level spatial controllability, visual sharpness, and cross-view consistency. 
+
+Table 3 Quantitative evaluation of fine-grained controllability. Our model achieves superior controllability over MagicDriveV2 [11] in both scene-level and object-level control, while maintaining high cross-view object consistency. We report Oracle results by evaluating the ground-truth test videos, which provide empirical upper bounds for the controllability metrics.                                     
+
+> Method Scene Controllability (%) ↑View-Wise Object Evaluation (%) ↑Cross-View Evaluation Weather Time of Day Existence Clarity Visual Fidelity Textual Fidelity Object Consistency (%) ↑
+> Oracle 76.7 83.0 95.4 74.6 87.0 75.4 93.3 MagicDriveV2 [11] 75.4 79.1 82.6 59.1 13.4 11.6 78.9
+> Ours 76.6 80.9 90.6 67.2 62.7 59.1 84.5
+
+Long-horizon streaming. As shown in Fig. 9, M 4World generates two 60 s multi-camera rollouts at 
+
+1024 × 567 and 10 FPS, while maintaining coherent motion and appearance over long horizons without catastrophic drift. Figure 10 presents holistic results on minute-long rollouts exhibiting fine-grained object controllability. In terms of throughput, our four-step student denoiser achieves 0.7, 2.3, and 7 FPS at 
+
+1024 × 567 , 424 × 800 , and 224 × 400 , respectively, for six camera views plus one synchronized LiDAR stream on eight A100 GPUs. Furthermore, Fig. 11 visualizes the impact of key components in our long-horizon generation training recipe. The results indicate that supplementing the DMD objective with the supervised denoising loss Ldenoise on ground-truth video latents mitigates background degradation, whereas latent context refresh reduces inter-chunk flickering artifacts. 
+
+9.2 Case Study: A Long-Tail Driving Scenario 
+
+One key value of autonomous-driving simulation lies in controllably enriching the diversity of training data for long-tail scenarios. Although the over thousands of hours of driving data collected each day can continually improve perception foundation models on common cases, these models still struggle to generalize to rare 
+
+> 13
+
+A Multi-view Multimodal Driving World Model for Interactive Object Manipulation and Minute-long Streaming 12 515 24 53 66 85 100 119 123 132 143 147 153 180 189 196 213 214 222 233 236 237 246 248 269 287 289 295 310 313 1363 373 381 394 412  
+
+> 12466 100 119 123 132 143 147 153 180 189 196 214 222 233 236 237 246 247 271 272 287 289 295 303 310 313 357 373 381 411 412
+> 0612 13 16 22 28 33 44 48 51 52 54
+> 012 13 16 22 28 33 34 44 48 51 52 53 54
+
+Figure 7 Qualitative results of multi-view and multimodal generation. From left to right, we show the input control signals, generated multi-camera streams, and the LiDAR scan at the synchronized timestamp. 
+
+14 A Multi-view Multimodal Driving World Model for Interactive Object Manipulation and Minute-long Streaming 012346911 12 14 16 19 20 21 22 23 25 28 29 30 34 36 37 39 012467910 12 13 14 16 19 20 22 24 25 26 29 30 32 33 36 39 43 44 45 46 47 51 54 58 59 61 62 64 65 66 68 69 70 77 78 80 81 84 86 90 91 92 93 94 95 96 97 012345678911 12 13 14 17 18 19 20 21 22 23 24 25 26 28 29 30 31 32 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 53 55 56 57 58 59 60 61 62 63 64 66 67 68 69 71 72 73 74 75 76 77 78 79 80 81 82 1234567 8910 11 12 13 14 15 16 17 18 19 20 21 22 23 25 26 27 28 29 30 31 32 33 34 35 36 38 39 40 24 
+
+Figure 8 Qualitative evaluation of fine-grained object control. For each case, the left panel shows the input textual and visual descriptions for four objects near the ego vehicle. In the six-view generation results on the right, color-coded bounding boxes highlight the corresponding conditioned objects. 
+
+15 A Multi-view Multimodal Driving World Model for Interactive Object Manipulation and Minute-long Streaming 
+
+Figure 9 Qualitative evaluation of long-horizon rollouts. We present key frames from 60-second driving videos generated in parallel across six views. The rollouts remain stable over long horizons, preserving coherent motion and visual appearance without catastrophic drift. 
+
+> 16
+
+A Multi-view Multimodal Driving World Model for Interactive Object Manipulation and Minute-long Streaming 7132 186 18 8
+
+336 494 518 654 679 775 798 841 881 
+
+133 135 148 169 207 236 271 309 322 334 335 350 424 
+
+45
+
+473 481 491 494 595 606 640 679 696 699 717 726 749 780 841 861 
+
+5
+
+881 882 
+
+53
+
+61
+
+87 89
+
+105 135 262
+
+271 284 
+
+14 321 348
+
+413 424 431
+
+450
+
+494 502 511 611 612 
+
+679
+
+699 726 
+
+780
+
+801
+
+881 
+
+105 126
+
+127 
+
+140
+
+14
+
+196 338 413 
+
+46
+
+490
+
+563
+
+6
+
+612 699 743
+
+825
+
+8
+
+856
+
+85 
+
+881 
+
+1105 130 294 
+
+76
+
+591 671 
+
+676
+
+688 699 701 766 
+
+Figure 10 Holistic qualitative results demonstrating minute-long rollouts with fine-grained object controllability. 
+
+17 A Multi-view Multimodal Driving World Model for Interactive Object Manipulation and Minute-long Streaming 
+
+Figure 11 Visual ablation of key components in our long-horizon generation training recipe. Our full model maintains clearer scene structure and more stable visual quality throughout autoregressive rollout. 
+
+scenarios that are underrepresented in the captured data. In practical workflows, such long-tail cases are usually defined case by case with concrete attributes: the scenario itself is rare, the failure mode to be addressed is specific, and acquiring sufficient real-world data is prohibitively expensive. We study a representative case of a truck hauling large trees. From the rear view, the truck body is almost completely occluded by tree branches, causing its appearance to differ substantially from that of ordinary vehicles and potentially posing a severe challenge to downstream perception. However, this case is extremely scarce in real logs, with fewer than five clips observed in hundreds of thousands of hours of data. While our world model is trained on regular driving data, its fine-grained object-control interface, together with the efficient post-training procedure introduced in Sec. 5, allows the model to adapt from only a few rare clips. Figure 12 shows two variants of the tree-hauling truck synthesized by the resulting driving simulator. The results demonstrate that providing textual and image descriptions of the truck to the few-clip-adapted simulator is sufficient to generate the target long-tail scenario under diverse conditions. Furthermore, we synthesize 500 10 s video clips of tree-hauling trucks and mix them with 50 000 real clips to construct an augmented training set. We then train a BEV detection model on this dataset and evaluate it on a test set containing 99 annotated boxes of tree-hauling trucks. Table 4 shows that these synthetic clips serve as effective data augmentation, substantially improving perception performance on this specific long-tail case while maintaining comparable regular-set detection performance. 
+
+Table 4 BEV detection results on the tree-hauling truck long-tail case. Synthetic clips generated by the few-clip-adapted simulator improve recall on the target long-tail object while preserving regular-set detection performance.         
+
+> BEV Detector Training Data Tree-Hauling Truck Recall ↑Regular-Set mAP ↑
+> 50k real clips 1.0% 66.7% 50k real clips + 500 synthetic clips 69.7% 66.8%
+
+9.3 First-Frame-Conditioned Generation 
+
+Finally, we demonstrate customizable driving simulation through first-frame editing using the fine-tuned visual reference-conditioned model introduced in Sec. 6. Given an original front-view image, we use image 
+
+> 18
+
+A Multi-view Multimodal Driving World Model for Interactive Object Manipulation and Minute-long Streaming 11 13 14 16 25 27 31 36 37 40 41 44 46 50 51 56 58 61 64 68 80 81 84 85 86 81468911 12 14 15 17 21 22 23 25 27 28 29 30 31 38 44 45 48 
+
+Figure 12 Qualitative evaluation on long-tail scenario augmentation. We insert the same long-tail object —a tree-hauling truck —into two different scene configurations, thereby increasing the diversity of the target scenario. 235710 11 12 13 16 19 20 22 23 24 27 29 31 34 35 38 40 41 44 48 50 51 52 53 54 55 59 61 62 63 64 65 66 68 69 
+
+Figure 13 Qualitative results of vision-conditioned generation prompted with an edited first-frame front view. Left: the original front view at t=0 and the edited prompt image after object replacement. Right: generated results at t=1 sconditioned on the edited prompt. The top and bottom rows show the original bus replaced by a cement mixer truck and a tree-hauling truck, respectively. 
+
+19 A Multi-view Multimodal Driving World Model for Interactive Object Manipulation and Minute-long Streaming 
+
+editing tools to replace any object with an uncommon target object, such as a cement mixer truck or a tree-hauling truck, as illustrated in Fig. 13. Conditioned on this edited first-frame front view, the model completes the remaining camera views and predicts future frames according to the subsequent time-evolving control signals. In these examples, the replacement target is specified through single-view editing, and its subsequent evolution remains controllable through dense temporal signals. This process provides a zero-shot, controllable pathway for generating long-tail driving data. 
+
+# 10 Conclusion 
+
+This paper has introduced M 4World, a generative driving world model suitable for autonomous-driving simulation. One central goal of M 4World is to move beyond geometry-only scene specification: the model generates synchronized multi-view camera streams and LiDAR range maps while conditioning individual traffic agents on 3D layout, category, visual appearance, and textual attributes. This object-centric interface is implemented within a shared DiT latent backbone and made practical for streaming rollout through a progressive training pipeline. For streaming generation, the developed training recipe transfers a bidirectional video prior to a low-latency causal student, exposes the student to self-generated histories, and improves inter-chunk consistency through latent context refresh. On top of our base model, efficient few-clip post-training and visual reference-conditioned variants provide two complementary paths for constructing customized long-tail scenarios. Across generation quality, condition following, rollout stability, and downstream augmentation, the results support the effectiveness of controlling objects at both the spatial-layout and visual-appearance levels for driving simulation. Compared with an existing controllable driving-video generation baseline, M 4World improves FID/FVD from 41.7/346.1 to 34.8/288.7, increases object visual and textual fidelity from 13.4% and 11.6% to 62.7% and 59.1%, respectively, and raises cross-view object consistency from 78.9% to 84.5%. The distilled few-step causal student can generate stable 60-second rollouts, demonstrating that fine-grained conditioning can be retained in long autoregressive generation. We also demonstrate that controllable long-tail synthesis enabled by efficient few-clip post-training can yield measurable perception gains: in a representative tree-hauling-truck case, adding 500 synthetic clips to 50 000 real clips improves target recall from 1.0% to 69.7% while preserving regular-set mAP. More broadly, M 4World suggests a path toward simulation systems in which rare events are specified not only by where objects appear, but also by what they look like and how they persist across views, modalities, and time. Future work should expand the coverage of rare-event taxonomies and evaluate the model in genuine closed-loop settings, where learned driving policies interact with the generated environment and are assessed for their responses to safety-critical events. 
+
+# References         
+
+> [1] Sand AI. MAGI-1: Autoregressive Video Generation at Scale, arXiv preprint arXiv:2505.13211 , 2025. Available at
+> http://arxiv.org/abs/2505.13211 .[2] Tim Brooks, Bill Peebles, Connor Holmes, Will DePue, Yufei Guo, Li Jing, David Schnurr, Joe Taylor, Troy Luhman, Eric Luhman, Clarence Ng, Ricky Wang, and Aditya Ramesh. Video generation models as world simulators, 2024. [3] Xiaoxue Chen, Ziyi Xiong, Yuantao Chen, Gen Li, Nan Wang, Hongcheng Luo, Long Chen, Haiyang Sun, Bing Wang, Guang Chen, Hangjun Ye, Hongyang Li, Ya-Qin Zhang, and Hao Zhao. DGGT: Feedforward 4D Reconstruction of Dynamic Driving Scenes using Unposed Images. In CVPR . 2026. [4] Yukang Chen, Luozhou Wang, Wei Huang, Shuai Yang, Bohan Zhang, Yicheng Xiao, Ruihang Chu, Weian Mao, Qixin Hu, Shaoteng Liu, Yuyang Zhao, Huizi Mao, Ying-Cong Chen, Enze Xie, Xiaojuan Qi, and Song Han. LongLive-2.0: An NVFP4 Parallel Infrastructure for Long Video Generation, arXiv preprint arXiv:2605.18739 ,2026. Available at http://arxiv.org/abs/2605.18739 .[5] Ziyu Chen, Jiawei Yang, Jiahui Huang, Riccardo de Lutio, Janick Martinez Esturo, Boris Ivanovic, Or Litany, Zan Gojcic, Sanja Fidler, Marco Pavone, Li Song, and Yue Wang. OmniRe: Omni Urban Scene Reconstruction. In
+> ICLR . 2025. [6] Kai Cheng, Xiaoxiao Long, Wei Yin, Jin Wang, Zhiqiang Wu, Yuexin Ma, Kaixuan Wang, Xiaozhi Chen, and
+> 20 A Multi-view Multimodal Driving World Model for Interactive Object Manipulation and Minute-long Streaming
+
+Xuejin Chen. UC-NeRF: Neural Radiance Field for Under-Calibrated Multi-View Cameras in Autonomous Driving. In ICLR , 2024. [7] Hyung Won Chung, Noah Constant, Xavier Garcia, Adam Roberts, Yi Tay, Sharan Narang, and Orhan Firat. UniMax: Fairer and more Effective Language Sampling for Large-Scale Multilingual Pretraining. In ICLR , 2023. [8] Justin Cui, Jie Wu, Ming Li, Tao Yang, Xiaojie Li, Rui Wang, Andrew Bai, Yuanhao Ban, and Cho-Jui Hsieh. Self-forcing++: Towards minute-scale high-quality video generation. In ICLR , 2026. [9] Jiaqi Feng, Justin Cui, Yuanhao Ban, and Cho-Jui Hsieh. One-Forcing: Towards Stable One-Step Autoregressive Video Generation, arXiv preprint arXiv:2605.23458 , 2026. Available at http://arxiv.org/abs/2605.23458 .[10] Ruiyuan Gao, Kai Chen, Enze Xie, Lanqing Hong, Zhenguo Li, Dit-Yan Yeung, and Qiang Xu. MagicDrive: Street View Generation with Diverse 3D Geometry Control. In ICLR . 2024. [11] Ruiyuan Gao, Kai Chen, Bo Xiao, Lanqing Hong, Zhenguo Li, and Qiang Xu. MagicDrive-V2: High-Resolution Long Video Generation for Autonomous Driving with Adaptive Control. In ICCV , 2025. [12] Ruiyuan Gao, Kai Chen, Zhihao Li, Lanqing Hong, Zhenguo Li, and Qiang Xu. MagicDrive3D: Controllable 3D Generation for Any-View Rendering in Street Scenes. In WACV . 2026. [13] Shenyuan Gao, Jiazhi Yang, Li Chen, Kashyap Chitta, Yihang Qiu, Andreas Geiger, Jun Zhang, and Hongyang Li. Vista: A Generalizable Driving World Model with High Fidelity and Versatile Controllability. In NeurIPS . 2024. [14] Jianfei Guo, Nianchen Deng, Xinyang Li, Yeqi Bai, Botian Shi, Chiyu Wang, Chenjing Ding, Dongliang Wang, and Yikang Li. StreetSurf: Extending Multi-View Implicit Surface Reconstruction to Street Views, arXiv preprint arXiv:2306.04988 , 2023. Available at https://arxiv.org/abs/2306.04988 .[15] XPeng Inc. GWM Team. X-World: Controllable Ego-Centric Multi-Camera World Models for Scalable End-to-End Driving, 2026. Available at https://arxiv.org/abs/2603.19979v2 .[16] Martin Heusel, Hubert Ramsauer, Thomas Unterthiner, Bernhard Nessler, and Sepp Hochreiter. GANs Trained by a Two Time-Scale Update Rule Converge to a Local Nash Equilibrium. In NeurIPS . 2017. [17] Wenyi Hong, Ming Ding, Wendi Zheng, Xinghan Liu, and Jie Tang. CogVideo: Large-scale Pretraining for Text-to-Video Generation via Transformers. In ICLR . 2023. [18] Anthony Hu, Lloyd Russell, Hudson Yeo, Zak Murez, George Fedoseev, Alex Kendall, Jamie Shotton, and Gianluca Corrado. GAIA-1: A Generative World Model for Autonomous Driving, arXiv preprint arXiv:2309.17080 , 2023. Available at http://arxiv.org/abs/2309.17080 .[19] Edward J. Hu, Yelong Shen, Phillip Wallis, Zeyuan Allen-Zhu, Yuanzhi Li, Shean Wang, Lu Wang, and Weizhu Chen. LoRA: Low-Rank Adaptation of Large Language Models. In ICLR . 2022. [20] Nan Huang, Xiaobao Wei, Wenzhao Zheng, Pengju An, Ming Lu, Wei Zhan, Masayoshi Tomizuka, Kurt Keutzer, and Shanghang Zhang. $\textit{S}^3$Gaussian: Self-Supervised Street Gaussians for Autonomous Driving. In 
+
+ICRA . 2026. [21] Xun Huang, Zhengqi Li, Guande He, Mingyuan Zhou, and Eli Shechtman. Self Forcing: Bridging the Train-Test Gap in Autoregressive Video Diffusion. In arXiv.Org , 2025. [22] Muhammad Zubair Irshad, Sergey Zakharov, Katherine Liu, Vitor Guizilini, Thomas Kollar, Adrien Gaidon, Zsolt Kira, and Rares Ambrus. NeO 360: Neural Fields for Sparse View Synthesis of Outdoor Scenes. In ICCV , 2023. [23] Bernhard Kerbl, Georgios Kopanas, Thomas Leimkühler, and George Drettakis. 3D gaussian splatting for real-time radiance field rendering. ACM Trans. Graph. , 42(4):1–14, 2023. [24] Yuheng Li, Haotian Liu, Qingyang Wu, Fangzhou Mu, Jianwei Yang, Jianfeng Gao, Chunyuan Li, and Yong Jae Lee. GLIGEN: Open-Set Grounded Text-to-Image Generation. In CVPR . 2023. [25] Zhuopeng Li, Yilin Zhang, Chenming Wu, Jianke Zhu, and Liangjun Zhang. HO-Gaussian: Hybrid Optimization of 3D Gaussian Splatting for Urban Scenes. In ECCV . 2024. [26] Kunhao Liu, Wenbo Hu, Jiale Xu, Ying Shan, and Shijian Lu. Rolling Forcing: Autoregressive Long Video Diffusion in Real Time. In ICLR , 2026. [27] Xingchao Liu, Chengyue Gong, and Qiang Liu. Flow Straight and Fast: Learning to Generate and Transfer Data with Rectified Flow. In ICLR . 2023. 
+
+> 21 A Multi-view Multimodal Driving World Model for Interactive Object Manipulation and Minute-long Streaming
+
+[28] Yang Liu, He Guan, Chuanchen Luo, Lue Fan, Junran Peng, and Zhaoxiang Zhang. CityGaussian: Real-time high-quality large-scale scene rendering with gaussians. In ECCV , 2024. [29] Ben Mildenhall, Pratul P. Srinivasan, Matthew Tancik, Jonathan T. Barron, Ravi Ramamoorthi, and Ren Ng. NeRF: Representing Scenes as Neural Radiance Fields for View Synthesis. In ECCV . 2020. [30] Thomas Müller, Alex Evans, Christoph Schied, and Alexander Keller. Instant Neural Graphics Primitives with a Multiresolution Hash Encoding. ACM Trans. Graph. , 41(4):1–15, 2022. [31] Chaojun Ni, Guosheng Zhao, Xiaofeng Wang, Zheng Zhu, Wenkang Qin, Guan Huang, Chen Liu, Yuyin Chen, Yida Wang, Xueyang Zhang, Yifei Zhan, Kun Zhan, Peng Jia, Xianpeng Lang, Xingang Wang, and Wenjun Mei. ReconDreamer: Crafting World Models for Driving Scene Reconstruction via Online Restoration. In CVPR . 2025. [32] NVIDIA. Cosmos World Foundation Model Platform for Physical AI, 2025. Available at https://arxiv.org/abs/ 2501.03575v3 .[33] NVIDIA. NVIDIA OmniDreams: Real-Time Generative World Model for Closed-Loop Autonomous Vehicle Simu-lation, arXiv preprint arXiv:2606.03159 , 2026. Available at http://arxiv.org/abs/2606.03159 .[34] William Peebles and Saining Xie. Scalable diffusion models with transformers. In ICCV , 2023. [35] Xuanchi Ren, Yifan Lu, Tianshi Cao, Ruiyuan Gao, Shengyu Huang, Amirmojtaba Sabour, Tianchang Shen, Tobias Pfaff, Jay Zhangjie Wu, Runjian Chen, Seung Wook Kim, Jun Gao, Laura Leal-Taixe, Mike Chen, Sanja Fidler, and Huan Ling. Cosmos-Drive-Dreams: Scalable Synthetic Driving Data Generation with World Foundation Models, 
+
+arXiv preprint arXiv:2506.09042 , 2025. Available at http://arxiv.org/abs/2506.09042 .[36] Lloyd Russell, Anthony Hu, Lorenzo Bertoni, George Fedoseev, Jamie Shotton, Elahe Arani, and Gianluca Cor-rado. GAIA-2: A Controllable Multi-View Generative World Model for Autonomous Driving, arXiv preprint arXiv:2503.20523 , 2025. Available at http://arxiv.org/abs/2503.20523 .[37] Seyedmorteza Sadat, Otmar Hilliges, and Romann M. Weber. Eliminating Oversaturation and Artifacts of High Guidance Scales in Diffusion Models. In ICLR . 2025. [38] Kaiyuan Tan, Yingying Shen, Haohui Zhu, Zhiwei Zhan, Shan Zhao, Mingfei Tu, Hongcheng Luo, Haiyang Sun, Bing Wang, Guang Chen, and Hangjun Ye. ExtraGS: Geometric-Aware Trajectory Extrapolation with Uncertainty-Guided Generative Priors, arXiv preprint arXiv:2508.15529 , 2025. Available at http://arxiv.org/abs/2508.155 29 .[39] Kaiyuan Tan, Yingying Shen, Mingfei Tu, Haohui Zhu, Bing Wang, Guang Chen, Hangjun Ye, and Haiyang Sun. UFO: Unifying Feed-Forward and Optimization-based Methods for Large Driving Scene Modeling. In CVPR . 2026. [40] Matthew Tancik, Vincent Casser, Xinchen Yan, Sabeek Pradhan, Ben Mildenhall, Pratul P. Srinivasan, Jonathan T. Barron, and Henrik Kretzschmar. Block-NeRF: Scalable Large Scene Neural View Synthesis. In CVPR , 2022. [41] Hunyuan Foundation Model Team. HunyuanVideo: A Systematic Framework For Large Video Generative Models, 
+
+arXiv preprint arXiv:2412.03603 , 2025. Available at http://arxiv.org/abs/2412.03603 .[42] Qwen Team. Qwen3-VL Technical Report, arXiv preprint arXiv:2511.21631 , 2025. Available at http://arxiv.or g/abs/2511.21631 .[43] Wan Team. Wan: Open and Advanced Large-Scale Video Generative Models, arXiv preprint arXiv:2503.20314 ,2025. Available at http://arxiv.org/abs/2503.20314 .[44] Xiaomi EV World Model Team. Xiaomi EV World Model: A Joint World Model Integrating Reconstruction and Generation for Autonomous Driving, arXiv preprint arXiv:2605.18137 , 2026. Available at http://arxiv.org/abs/ 2605.18137 .[45] The Movie Gen team. Movie Gen: A Cast of Media Foundation Models, arXiv preprint arXiv:2410.13720 , 2025. Available at http://arxiv.org/abs/2410.13720 .[46] Adam Tonderski, Carl Lindström, Georg Hess, William Ljungbergh, Lennart Svensson, and Christoffer Petersson. NeuRAD: Neural Rendering for Autonomous Driving. In CVPR . 2024. [47] Michael Tschannen, Alexey Gritsenko, Xiao Wang, Muhammad Ferjad Naeem, Ibrahim Alabdulmohsin, Nikhil Parthasarathy, Talfan Evans, Lucas Beyer, Ye Xia, Basil Mustafa, Olivier Hénaff, Jeremiah Harmsen, An-dreas Steiner, and Xiaohua Zhai. SigLIP 2: Multilingual Vision-Language Encoders with Improved Semantic Understanding, Localization, and Dense Features, arXiv preprint arXiv:2502.14786 , 2025. Available at http: //arxiv.org/abs/2502.14786 .
+
+> 22 A Multi-view Multimodal Driving World Model for Interactive Object Manipulation and Minute-long Streaming
+
+[48] Haithem Turki, Jason Y. Zhang, Francesco Ferroni, and Deva Ramanan. SUDS: Scalable Urban Dynamic Scenes. In CVPR . 2023. [49] Haithem Turki, Qi Wu, Xin Kang, Janick Martinez Esturo, Shengyu Huang, Ruilong Li, Zan Gojcic, and Riccardo de Lutio. SimULi: Real-Time LiDAR and Camera Simulation with Unscented Transforms. In ICLR . 2026. [50] Thomas Unterthiner, Sjoerd van Steenkiste, Karol Kurach, Raphael Marinier, Marcin Michalski, and Sylvain Gelly. Towards Accurate Generative Models of Video: A New Metric & Challenges, arXiv preprint arXiv:1812.01717 , 2019. Available at http://arxiv.org/abs/1812.01717 .[51] Xiaofeng Wang, Zheng Zhu, Guan Huang, Xinze Chen, Jiagang Zhu, and Jiwen Lu. DriveDreamer: Towards Real-world-driven World Models for Autonomous Driving. In ECCV , 2024. [52] Yuqi Wang, Jiawei He, Lue Fan, Hongxin Li, Yuntao Chen, and Zhaoxiang Zhang. Driving into the Future: Multiview Visual Forecasting and Planning with World Model for Autonomous Driving. In CVPR . 2024. [53] Xiaobao Wei, Zhangjie Ye, Yuxiang Gu, Zunjie Zhu, Yunfei Guo, Yingying Shen, Shan Zhao, Ming Lu, Haiyang Sun, Bing Wang, Guang Chen, Rongfeng Lu, and Hangjun Ye. ParkGaussian: Surround-view 3D Gaussian Splatting for Autonomous Parking, arXiv preprint arXiv:2601.01386 , 2026. Available at http://arxiv.org/abs/2601.01386 .[54] Yuqing Wen, Yucheng Zhao, Yingfei Liu, Fan Jia, Yanhui Wang, Chong Luo, Chi Zhang, Tiancai Wang, Xiaoyan Sun, and Xiangyu Zhang. Panacea: Panoramic and Controllable Video Generation for Autonomous Driving. In 
+
+CVPR . 2024. [55] Guanjun Wu, Taoran Yi, Jiemin Fang, Lingxi Xie, Xiaopeng Zhang, Wei Wei, Wenyu Liu, Qi Tian, and Xinggang Wang. 4D gaussian splatting for real-time dynamic scene rendering. In CVPR , 2024. [56] Jay Zhangjie Wu, Yuxuan Zhang, Haithem Turki, Xuanchi Ren, Jun Gao, Mike Zheng Shou, Sanja Fidler, Zan Gojcic, and Huan Ling. Difix3D+: Improving 3D Reconstructions with Single-Step Diffusion Models. In CVPR .2025. [57] Qi Wu, Janick Martinez Esturo, Ashkan Mirzaei, Nicolas Moenne-Loccoz, and Zan Gojcic. 3DGUT: Enabling Distorted Cameras and Secondary Rays in Gaussian Splatting. In CVPR . 2025. [58] Guangxuan Xiao, Yuandong Tian, Beidi Chen, Song Han, and Mike Lewis. Efficient Streaming Language Models with Attention Sinks. In ICLR . 2024. [59] Yunzhi Yan, Haotong Lin, Chenxu Zhou, Weijie Wang, Haiyang Sun, Kun Zhan, Xianpeng Lang, Xiaowei Zhou, and Sida Peng. Street Gaussians: Modeling Dynamic Urban Scenes with Gaussian Splatting. In ECCV . 2024. [60] Jiawei Yang, Boris Ivanovic, Or Litany, Xinshuo Weng, Seung Wook Kim, Boyi Li, Tong Che, Danfei Xu, Sanja Fidler, and Marco Pavone. EmerNeRF: Emergent Spatial-Temporal Scene Decomposition via Self-Supervision. In 
+
+ICLR , 2024. [61] Jiawei Yang, Jiahui Huang, Yuxiao Chen, Yan Wang, Boyi Li, Yurong You, Apoorva Sharma, Maximilian Igl, Peter Karkus, Danfei Xu, Boris Ivanovic, Yue Wang, and Marco Pavone. STORM: Spatio-Temporal Reconstruction Model for Large-Scale Outdoor Scenes. In ICLR . 2025. [62] Jiazhi Yang, Shenyuan Gao, Yihang Qiu, Li Chen, Tianyu Li, Bo Dai, Kashyap Chitta, Penghao Wu, Jia Zeng, Ping Luo, Jun Zhang, Andreas Geiger, Yu Qiao, and Hongyang Li. GenAD: Generalized Predictive Model for Autonomous Driving. In CVPR . 2024. [63] Shuai Yang, Wei Huang, Ruihang Chu, Yicheng Xiao, Yuyang Zhao, Xianbang Wang, Muyang Li, Enze Xie, Ying-cong Chen, Yao Lu, Song Han, and Yukang Chen. LongLive: Real-time Interactive Long Video Generation, 2025. Available at https://arxiv.org/abs/2509.22622v2 .[64] Yuxue Yang, Lue Fan, Ziqi Shi, Junran Peng, Feng Wang, and Zhaoxiang Zhang. NeoVerse: Enhancing 4D World Model with in-the-wild Monocular Videos. In CVPR , 2026. [65] Ze Yang, Yun Chen, Jingkang Wang, Sivabalan Manivasagam, Wei-Chiu Ma, Anqi Joyce Yang, and Raquel Urtasun. UniSim: A neural closed-loop sensor simulator. In CVPR , 2023. [66] Ziyi Yang, Xinyu Gao, Wen Zhou, Shaohui Jiao, Yuqing Zhang, and Xiaogang Jin. Deformable 3D Gaussians for High-Fidelity Monocular Dynamic Scene Reconstruction. In CVPR . 2024. [67] Jung Yi, Wooseok Jang, Paul Hyunbin Cho, Jisu Nam, Heeji Yoon, and Seungryong Kim. Deep Forcing: Training-Free Long Video Generation with Deep Sink and Participative Compression. In ICML . 2026. 
+
+> 23 A Multi-view Multimodal Driving World Model for Interactive Object Manipulation and Minute-long Streaming
+
+[68] Tianwei Yin, Michaël Gharbi, Taesung Park, Richard Zhang, Eli Shechtman, Fredo Durand, and William T. Freeman. Improved Distribution Matching Distillation for Fast Image Synthesis. In NeurIPS . 2024. [69] Tianwei Yin, Michaël Gharbi, Richard Zhang, Eli Shechtman, Fredo Durand, William T. Freeman, and Taesung Park. One-step Diffusion with Distribution Matching Distillation. In CVPR , 2024. [70] Tianwei Yin, Qiang Zhang, Richard Zhang, William T. Freeman, Fredo Durand, Eli Shechtman, and Xun Huang. From Slow Bidirectional to Fast Autoregressive Video Diffusion Models. In CVPR , 2025. [71] Zikang Yuan, Yuechuan Pu, Hongcheng Luo, Fengtian Lang, Cheng Chi, Teng Li, Yingying Shen, Haiyang Sun, Bing Wang, and Xin Yang. Uni-Gaussians: Unifying Camera and Lidar Simulation with Gaussians for Dynamic Driving Scenarios, arXiv preprint arXiv:2503.08317 , 2025. Available at http://arxiv.org/abs/2503.08317 .[72] Conglang Zhang, Yifan Zhan, Qingjie Wang, Zhanpeng Ouyang, Yu Li, Zihao Yang, Xiaoyang Guo, Weiqiang Ren, Qian Zhang, Zhen Dong, Yinqiang Zheng, Wei Yin, and Zhengqing Chen. HorizonDrive: Self-Corrective Autoregressive World Model for Long-horizon Driving Simulation, arXiv preprint arXiv:2605.11596 , 2026. Available at http://arxiv.org/abs/2605.11596 .[73] Guosheng Zhao, Chaojun Ni, Xiaofeng Wang, Zheng Zhu, Xueyang Zhang, Yida Wang, Guan Huang, Xinze Chen, Boyuan Wang, Youyi Zhang, Wenjun Mei, and Xingang Wang. DriveDreamer4D: World Models Are Effective Data Machines for 4D Driving Scene Representation. In CVPR . 2025. [74] Min Zhao, Hongzhou Zhu, Bokai Yan, Zihan Zhou, Yimin Chen, Wenqiang Sun, Kaiwen Zheng, Guande He, Xiao Yang, Chongxuan Li, Fan Bao, and Jun Zhu. minWM: A Full-Stack Open-Source Framework for Real-Time Inter-active Video World Models, 2026. Available at https://arxiv.org/abs/2605.30263v1 .[75] Zangwei Zheng, Xiangyu Peng, Tianji Yang, Chenhui Shen, Shenggui Li, Hongxin Liu, Yukun Zhou, Tianyi Li, and Yang You. Open-Sora: Democratizing Efficient Video Production for All, arXiv preprint arXiv:2412.20404 , 2024. Available at http://arxiv.org/abs/2412.20404 .[76] Xiaoyu Zhou, Zhiwei Lin, Xiaojun Shan, Yongtao Wang, Deqing Sun, and Ming-Hsuan Yang. DrivingGaussian: Composite Gaussian Splatting for Surrounding Dynamic Autonomous Driving Scenes. In CVPR . 2024. [77] Hongzhou Zhu, Min Zhao, Guande He, Hang Su, Chongxuan Li, and Jun Zhu. Causal Forcing: Autoregressive Diffusion Distillation Done Right for High-Quality Real-Time Interactive Video Generation. In ICML . 2026.
