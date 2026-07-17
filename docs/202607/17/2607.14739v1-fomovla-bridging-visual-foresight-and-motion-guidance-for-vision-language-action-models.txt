@@ -1,0 +1,288 @@
+Title: FoMoVLA: Bridging Visual Foresight and Motion Guidance for Vision-Language-Action Models
+
+URL Source: https://arxiv.org/pdf/2607.14739v1
+
+Published Time: Fri, 17 Jul 2026 01:19:06 GMT
+
+Number of Pages: 12
+
+Markdown Content:
+# FoMoVLA: Bridging Visual Foresight and Motion Guidance for Vision-Language-Action Models 
+
+# Wei Li 1,∗, Peijin Jia 1,∗, Yuan Ma 1,∗,‡, Xuefeng Jiang 2, Titong Jiang 3, Sheng Sun 2,Yujian Li 1, Xin Wen 1, Han Hong 1, Zhikang Liu 1, Bailin Li 1, Kun Zhan 1,† 
+
+> 1
+
+LiAuto 2 University of Chinese Academy of Sciences 3 Tsinghua University  
+
+> ∗
+
+Equal contribution. ‡ Project lead. † Corresponding author. 
+
+Abstract 
+
+Vision-Language-Action (VLA) models have achieved im-pressive results in visuomotor policy learning, yet remain fun-damentally reactive, mapping current observations and lan-guage to actions without explicit forward prediction of world dynamics. Existing visual foresight methods predict future vi-sual states but lack explicit motion guidance — they show where to go but not how to get there. We argue that future fea-ture prediction and sparse point tracking are naturally comple-mentary: the former provides the goal state, while the latter captures the continuous motion path toward it. We propose 
+
+FoMoVLA , a framework that augments VLA representations with explicit spatio-temporal supervision by jointly learning future feature foresight and sparse 2D point tracking, en-hancing the continuous action policy. FoMoVLA introduces compact foresight tokens to decode future feature states, de-codes sparse temporal 2D point trajectories to model compact geometric motion, and couples both through a lightweight future-conditioned cross-attention module that enables con-sistent reasoning between anticipated states and point dy-namics. Extensive experiments on LIBERO, RoboCasa GR-1 Tabletop, and LIBERO-Plus demonstrate the state-of-the-art performance and strong zero-shot generalization. Project page is available at https://liauto-research.github.io/FoMoVLA. 
+
+# 1 Introduction 
+
+Recent advances in robot learning have established VLA models as a powerful paradigm for robotic manipulation, demonstrating strong performance across diverse manipula-tion tasks (Brohan et al. 2023; Kim et al. 2024; Li et al. 2024; Ghosh et al. 2024; Black et al. 2025b; Bjorck et al. 2025). However, existing VLA approaches typically rely solely on instantaneous visual observations and language instructions to learn direct reactive mappings. While effective in canon-ical embodied tasks, this reactive paradigm inherently lacks the spatio-temporal foresight required to model future scene evolution or long-horizon object dynamics. A growing research line seeks to enhance the foresight capability of VLA models through future-predictive super-vision (Zhang et al. 2025; Bu et al. 2025; Bai et al. 2026; Lin et al. 2026). However, existing approaches still fall short when it comes to truly serving action control. On the one hand, dense pixel-level prediction of multi-frame future vi-sual states preserves rich scene information but inevitably captures large amounts of static content irrelevant to con-
+
+Figure 1: Architecture comparison. (a) Vanilla VLA directly maps observations to actions. (b) VLA augmented with vi-sual foresight as an auxiliary task. (c) FoMoVLA jointly predicts visual foresight and motion, enforcing their consis-tency to significantly enhance action generation. trol (Zhang et al. 2026c), leading to representational redun-dancy and high modeling overhead. On the other hand, more compact keyframe-level future representations improve effi-ciency yet typically only characterize the target state to be reached, failing to capture the concrete dynamic interactions required to arrive at that state (Zhong et al. 2025; Lin et al. 2026). We argue that actionable foresight should encode not only the future state itself but also the continuous temporal mo-tion dynamics leading toward it. Building on this insight, we realize visual foresight by predicting future features in-stead of raw pixels and motion guidance by sparse point tracking that encodes where task-relevant objects will move. Beyond merely predicting future visual pixels, motion track-ing (Karaev et al. 2024; Zhang et al. 2026b; Qian et al. 2026) via 2D point trajectories offers a more action-aligned spatio-temporal representation of world dynamics, captur-ing the continuous local movements and interaction details throughout task execution. Crucially, we use future feature as a goal-state anchor and unify terminal-state modeling with temporal point tracking to jointly guide action generation. In this way, future imagination is no longer an isolated aux-arXiv:2607.14739v1 [cs.CV] 16 Jul 2026 iliary objective. Instead, it works alongside point tracking to channel foresight directly into action generation, enabling the policy to learn actions that are both future-oriented and physically constrained. To this end, we propose FoMoVLA , which jointly learns future feature prediction and sparse 2D point tracking as complementary training-only supervision within a founda-tion model. Specifically, several learnable foresight tokens are supervised to learn the visual foresight via an EMA teacher, providing a compact goal-state representation, while a frozen off-the-shelf point tracker provides per-frame dis-placement targets for sparse grid points, forcing image-token hidden states to encode explicit motion cues. Crucially, the two objectives are not independent: a zero-initialized cross-attention module (FCCA) conditions point tracking on the foresight representation, anchoring local trajectory estima-tion to a global foresight prior. At inference, all auxiliary branches are discarded, incurring zero parameter overhead and negligible latency. Our main contributions are as follows: 
+
+• We introduce a novel VLA framework that augments la-tent representations with explicit spatio-temporal supervi-sion by jointly learning compact future feature prediction and sparse 2D point tracking. 
+
+• We propose a future-conditioned cross-attention module that couples foresight tokens with temporal point tracking, ensuring consistency between anticipated visual states and geometric motion dynamics. 
+
+• We achieve the state-of-the-art performance on LIBERO and RoboCasa GR-1 Tabletop, along with strong zero-shot generalization on LIBERO-Plus, outperforming competitive VLA baselines across diverse manipulation tasks. 
+
+# 2 Related Work 
+
+Vision-Language-Action Models. By directly fine-tuning pretrained vision-language models (VLMs) on robot demon-stration data, Vision-Language-Action (VLA) models map visual observations and language instructions to robot ac-tions. (Brohan et al. 2023; Kim et al. 2024; Ghosh et al. 2024). The field has since advanced along two primary axes. On the policy side, more expressive action decoders have been developed, including flow-matching (Black et al. 2025b; Physical Intelligence et al. 2026) and diffusion-based formu-lations (Chi et al. 2023; Liu et al. 2025; Li et al. 2024). On the perception side, stronger backbones with dual-system architectures (Bjorck et al. 2025) and specialized vision en-coders (Shi et al. 2026) have been adopted to improve visual grounding. Despite these advances, recent studies indicate that the primary bottleneck in embodied control lies in the visual module of VLMs, rather than in their language under-standing or action decoding capabilities (Zhang et al. 2026a). This suggests that improvements in downstream manipula-tion require not merely scaling the VLM backbone, but fun-damentally enhancing its ability to represent visual structure and dynamics. 
+
+Predictive Supervision and Motion Tracking. To bridge this gap, a growing line of work incorporates future predic-tion into VLA training through explicit or implicit predic-tive objectives. Pixel-level approaches forecast future frames or interleave visual generation with action prediction (Cen et al. 2025; Zhang et al. 2025; Hu et al. 2026; Cai et al. 2026), providing rich supervision at the cost of substantial computational overhead. Latent-space methods offer a more efficient alternative by predicting future representations di-rectly in the VLM feature space (Sun et al. 2026; Fan et al. 2026; Lyu et al. 2026; Su et al. 2026; Ma et al. 2025; Syed et al. 2026). Geometric approaches capture motion more compactly: FlowVLA predicts pixel-level optical flow as a visual chain-of-thought (Zhong et al. 2025), JOPAT jointly denoises sparse 2D point tracks, visibility masks, and actions within a diffusion framework (Guan et al. 2026), and Spatial Forcing distills geometric knowledge from a frozen teacher as auxiliary supervision during training (Li et al. 2026a). These methods indicate that motion and geometric informa-tion can enhance action prediction. However, these methods learn visual foresight or motion tracking separately, without explicit interaction. In contrast, our approach jointly learns future feature prediction and point tracking within a shared backbone. 
+
+# 3 Method 
+
+Our framework, illustrated in Fig. 2, augments a VLA policy with three complementary training-time branches that inject explicit spatio-temporal supervision into the learned repre-sentations. Specifically, it comprises: (1) a point tracking branch that predicts 2D point trajectories from image token hidden states under the supervision of a frozen point tracker, grounding image features in explicit motion cues ( how to move) (Section 3.2); (2) a future feature prediction branch to learn a compact representation of the future visual state (where to end up) (Section 3.3); and (3) a future-conditioned cross-attention (FCCA) module that couples these two ob-jectives by conditioning motion prediction on the predicted future (Section 3.4). 
+
+3.1 Preliminaries 
+
+VLA Policy Formulation. A typical VLA model defines a policy π that maps a visual observation ot ∈ RH×W ×3 and a natural-language instruction l to a chunk of T consecutive actions at:t+T ∈ RT ×D, where D is the action dimension-ality. Following the action-chunking paradigm (Black et al. 2025b; Jiang et al. 2025), predicting the full chunk jointly at each control step enables temporally coherent execution over the horizon. A pretrained VLM serves as the backbone: the vision encoder tokenizes ot into M spatial image tokens of hidden dimension d; together with the tokenized instruc-tion l, they are fed into the VLM, which produces contextual representations c that condition the action head. 
+
+Flow Matching Action Head. The action head is trained via conditional flow matching (Black et al. 2025b; Bjorck et al. 2025). A linear interpolation path is defined between standard Gaussian noise x0 ∼ N (0, I) and the ground-truth action chunk x1 = at:t+T :
+
+xτ = (1 − τ ) x0 + τ x1, τ ∼ U [0 , 1] . (1) Figure 2: Overview of FoMoVLA. Given a current observation and language instruction, the VLM backbone processes image tokens (with text tokens placed first for goal-aware conditioning) alongside K learnable <Foresight> tokens. A DiT network vθ (xτ , τ, c) is trained to match the constant conditional velocity x1 − x0:
+
+Laction = Eτ, x0, x1
+
+h
+
+∥vθ (xτ , τ, c) − (x1 − x0)∥2i
+
+. (2) At inference, the action chunk is recovered by integrating 
+
+dx/dτ = vθ (xτ , τ, c) from τ =0 to τ =1 .
+
+3.2 Point Tracking 
+
+To ground the VLM’s image token representations in explicit spatial motion, we supervise them to predict 2D point trajec-tories spanning the entire action chunk. A key prerequisite is that these representations be goal-aware : the model must understand where objects should move given the language instruction. In standard autoregressive VLMs with causal at-tention, image tokens placed before text tokens cannot attend to text tokens that appear later in the sequence. We there-fore reorder the input sequence such that text tokens precede image tokens, thereby ensuring that the hidden state of each image token is conditioned on the complete language instruc-tion, which provides a necessary foundation for decoding task-relevant motion from image-token hidden states. 
+
+Sparse Point Selection. The vision encoder processes the input image at a fixed patch stride s, producing an H′ × W ′
+
+spatial feature map. We define a sparse set of N = H′ × W ′
+
+query points by mapping the center of each compressed patch cell back to its corresponding coordinate in the original im-age, establishing a one-to-one correspondence between im-age tokens and spatial query locations, yielding a lightweight geometric supervision signal. Each image token’s hidden state is thus directly associated with a trackable point over the action chunk horizon. 
+
+Supervision via Point Tracking. Given the current frame 
+
+ot and the N grid points, a frozen point tracker serves as a teacher to generate sparse ground-truth displacement targets, , avoiding the need for costly dense pixel rendering. d⋆ ∈
+
+RN ×T ×2 (normalized by image dimensions) and visibility labels v⋆ ∈ { 0, 1}N ×T , where T is the action chunk length. Concretely, we use CoTracker-v3 (Karaev et al. 2024) as the tracking teacher. The tracker follows each point forward across all T frames of the action chunk, providing dense per-frame temporal supervision. It is used exclusively during training and discarded at inference; all motion knowledge is absorbed into the VLM backbone parameters. 
+
+Alignment Heads. From the VLM hidden states at the N
+
+image token positions, we extract latent features h ∈ RN ×d.Two lightweight projection heads predict point displace-ments and visibility: 
+
+ˆd = ftrack (h) ∈ RN ×T ×2, ˆv = fvis (h) ∈ RN ×T (3) where ftrack is a two-layer MLP (LayerNorm → Linear →
+
+GELU → Linear) and fvis has a similar architecture with smaller hidden dimension. 
+
+Motion Losses. The motion alignment objective combines displacement regression, visibility classification, and trajec-tory smoothness: 
+
+Ltrack = Ldisp + Lvis + λsmooth Lsmooth (4) Ldisp = 1
+
+N T 
+
+X
+
+> n,t
+
+v⋆n,t ∥ˆdn,t − d⋆n,t ∥2 (5) 
+
+Lvis = BCE(ˆ v, v⋆) (6) 
+
+Lsmooth = 1
+
+N (T − 2) 
+
+X
+
+> n,t
+
+v⋆n,t ∥∆2 ˆdn,t ∥2 (7) The smoothness term regularizes the second-order temporal difference ∆2 ˆdn,t = ˆdn,t +1 − 2ˆdn,t + ˆdn,t −1, suppressing abrupt motion changes and promoting physically plausible trajectories. All losses are masked by ground-truth visibility so that occluded points do not contribute noisy gradients. 
+
+3.3 Future Feature Prediction 
+
+While the tracking branch provides sparse per-frame motion supervision grounded in individual spatial locations, it does not encode a holistic representation of the final goal state. Therefore, we append K special <Foresight> tokens af-ter the image and instruction tokens, and train their hidden states to encode the visual features of ot+T , the final frame of the action chunk. These tokens thus provide a compact semantic representation of the target scene configuration. Unlike the tracking branch which uses all N image token hidden states to predict per-frame displacements across T
+
+steps, the K-token bottleneck is deliberately compact, en-couraging the model to capture global scene-level changes rather than fine-grained temporal details. 
+
+EMA Teacher. To provide stable regression targets, we maintain a shadow copy of the vision encoder updated via exponential moving average (EMA) with momentum μ as the teacher. For the target frame ot+T , the frozen EMA teacher yields target visual features z⋆ ∈ RM ×d, where M = H′ ×
+
+W ′ is the number of visual patches. 
+
+MAE Decoder. To reconstruct the compact M -patch tar-get from the compact K-token bottleneck, we employ a lightweight MAE decoder. The K <Foresight> hidden states are concatenated with M −K learnable mask tokens and passed through a lightweight ViT decoder with sinu-soidal positional embeddings, yielding reconstructed predic-tions ˆz ∈ RM ×d. The reconstruction objective is a cosine-similarity loss: 
+
+Lforesight = 1 − 1
+
+M
+
+> M
+
+X
+
+> i=1
+
+ˆzi · z⋆i
+
+∥ˆzi∥ ∥ z⋆i ∥ . (8) For inference, the K <Foresight> tokens are retained in the input sequence, allowing the action head to cross-attend to future-informed hidden states and acquire an explicit prior of the target visual state for the subsequent action chunk. 
+
+3.4 Future-Conditioned Point Tracking 
+
+The two aforementioned objectives, namely future feature prediction and geometric point tracking, can be optimized independently as parallel auxiliary loss terms. However, this treats them as unrelated regularizers. We hypothesize that motion prediction benefits from knowing the intended future state: if the model knows what the future visual state will look like, predicting how each point moves to reach it becomes a better-constrained problem. To instantiate this conditioning, we insert a lightweight FCCA module between the VLM’s visual token extraction and the displacement projector. Let Hvis ∈ RN ×d denote the vision features at grid positions and Hfut ∈ RK×d the VLM hidden states at <Foresight> positions. The FCCA module computes: 
+
+˜Hvis = Hvis +MHA(LN( Hvis ), LN( Hfut ), LN( Hfut )) (9) where MHA is multi-head attention with 8 heads and LN denotes layer normalization. The output projection of the MHA is zero-initialized , such that the module behaves as an identity mapping at the begin-ning of training and thereby preserves the pretrained VLM features without perturbation. As training progresses, the module gradually learns to inject future information into the spatial tokens that feed the displacement predictor. This design connects the two branches by using the fore-sight representation as a conditioning signal to motion pre-diction via FCCA, ensuring that the predicted future state and point trajectories are jointly consistent. 
+
+3.5 Training and Inference 
+
+Training Objective. The overall training loss combines action prediction with the two auxiliary objectives:           
+
+> L=Laction +λ1Lforesight +λ2(Ldisp +Lvis +λsmooth Lsmooth )(10)
+
+where λ1, λ2, and λsmooth are loss weighting coefficients detailed in Section 4.1. The action loss Laction is the flow-matching objective of the DiT action head. The point tracker teacher is used only to generate supervisory signals and receives no gradient updates; the EMA teacher is updated solely via momentum averaging without backpropagation. 
+
+Inference. At test time, all auxiliary branches are dis-carded. The only modification is the addition of K
+
+<Foresight> tokens to the input, increasing median la-tency by 9.4 ms and GPU memory by 0.1 GB (Table 8). 
+
+# 4 Experiments 
+
+4.1 Experimental Setup 
+
+Benchmarks. LIBERO (Liu et al. 2023) comprises four suites (Spatial, Object, Goal, Long), each with 10 tasks and 50 demonstrations per task. We report success rates over 20 rollouts per task with T =8 . RoboCasa GR-1 Table-top (Nasiriany et al. 2024) contains 24 tabletop pick-place tasks for the GR-1 humanoid, with 1,000 demonstrations per task (24,000 total). We report success rates over 50 rollouts per task with T =16 . LIBERO-Plus (Fei et al. 2025) extends LIBERO with 7 perturbation dimensions (viewpoint, robot state, language, lighting, background, noise, layout) across 10,030 instances. We evaluate zero-shot without any fine-tuning on the perturbed data. 
+
+Baselines. We compare FoMoVLA with three groups of existing methods. The first group consists of generalist VLA and world-action models (GR00T-N1.5 (Bjorck et al. 2025) and π0 (Black et al. 2025b), X-VLA (Zheng et al. 2026), Type Method Spatial Object Goal Long Avg.                                                                                                           
+
+> VLA/WAM GR00T-N1.5 (Bjorck et al. 2025) (arXiv ’25) 92.0 92.0 86.0 76.0 86.5
+> π0(Black et al. 2025b) (RSS ’25) 96.8 98.8 95.8 85.2 94.1 X-VLA (Zheng et al. 2026) (ICLR ’26) 98.2 98.6 97.8 97.6 98.1 LangForce (Lian et al. 2026) (ICML ’26) 99.2 99.6 99.4 95.2 98.4 Fast-WAM (Yuan et al. 2026b) (arXiv ’26) 98.2 100.0 97.0 95.2 97.6 LingBot-VA (Li et al. 2026b) (RSS ’26) 98.5 99.6 97.2 98.5 98.5 Cosmos Policy (Kim et al. 2026) (ICLR ’26) 98.1 100.0 98.2 97.6 98.5 Spatial Forcing (Li et al. 2026a) (ICLR ’26) 99.4 99.6 98.8 96.0 98.5 Future Prediction WorldVLA (Cen et al. 2025) (arXiv ’25) 87.6 96.2 83.4 60.0 81.8 DreamVLA (Zhang et al. 2025) (NeurIPS ’25) 97.5 94.0 89.5 89.5 92.6 UniVLA (Bu et al. 2025) (RSS ’25) 96.5 96.8 95.6 92.0 95.2 LaRA-VLA (Bai et al. 2026) (ICML ’26) 96.4 99.8 98.6 96.6 97.9 HiF-VLA (Lin et al. 2026) (CVPR ’26) 98.8 99.4 97.4 96.4 98.0 Point Tracking FlowVLA (Zhong et al. 2025) (arXiv ’25) 93.2 95.0 91.6 72.6 88.1 GeoPredict (Qian et al. 2026) (CVPR ’26) 98.0 98.2 95.7 94.0 96.5 JOPAT (Guan et al. 2026) (arXiv ’26) 97.2 98.9 98.4 96.4 97.8 Ours Base Backbone 97.8 98.8 97.4 92.0 96.5 + Future Prediction 99.0 99.4 97.2 94.4 97.5 + Tracking 98.6 99.2 99.0 94.4 97.8 + Future Prediction + Tracking 98.8 99.4 99.2 95.8 98.3 + Future Prediction + Tracking + FCCA 98.4 99.6 99.4 97.6 98.8
+
+Table 1: LIBERO evaluation results. We compare our method with representative VLA baselines, future-prediction methods, and point tracking methods, and further provide ablations of each proposed component. The full model achieves the highest average success rate across 4 task suites. LangForce (Lian et al. 2026), Spatial Forcing (Li et al. 2026a), Fast-WAM (Yuan et al. 2026b), LingBot-VA (Li et al. 2026b), Cosmos Policy (Kim et al. 2026)). The second group includes future prediction methods (WorldVLA (Cen et al. 2025), DreamVLA (Zhang et al. 2025), UniVLA (Bu et al. 2025), and LaRA-VLA (Bai et al. 2026), HiF-VLA (Lin et al. 2026)) that predict future visual representations without modeling geometric motion. The third group contains point tracking methods (FlowVLA (Zhong et al. 2025), GeoPre-dict (Qian et al. 2026) and JOPAT (Guan et al. 2026)), which leverage optical flow or point trajectories but do not predict future visual states. 
+
+Implementation Details. All variants are built upon the StarVLA-GR00T (Ye et al. 2026) as base backbone. In-put images are resized to 224 ×224 pixels. The ViT patch size is 16, yielding a 14 ×14 feature map that is further compressed by the spatial merger module to 8×8 image tokens ( M =N =64 ) fed to the VLM. The N =64 tracking query points are placed at the center of each 8×8 patch cell mapped back to the original image resolution. We use K=16 
+
+<Foresight> tokens. The MAE decoder expands these with M −K=48 learnable mask tokens through a 2-layer ViT decoder. The EMA teacher uses momentum μ=0 .999 .The loss weights are λ1=0 .1, λ2=0 .3, and λsmooth =0 .1. We train with 8 ×H20 GPUs with DeepSpeed ZeRO-2, AdamW (β1=0 .9, β2=0 .95 ), and per-module learning rates (VLM: 
+
+1×10 −5; auxiliary heads: 1×10 −4). For LIBERO, the train-ing steps are 30K with batch size fixed to 12 while for Robo-Casa, the training steps are 100K with the batch size fixed to 8. 
+
+4.2 Main Experiments 
+
+Tab. 1 presents the main results and several observations are as follows: (1) Both auxiliary objectives individually im-prove over the Base VLA, confirming that predictive and geometric supervision provide complementary inductive bi-ases. (2) Naively combining both objectives without future interaction yields modest improvements, suggesting that in-dependent multi-task training suffers from limited synergy. (3) The full design with FCCA achieves the competitive re-sults across all LIBERO suites, demonstrating that explicitly connecting the two objectives via future conditioning pro-duces gains beyond simple loss aggregation. The advantage is evident on LIBERO-Long and RoboCasa, where long-horizon reasoning and precise spatial control are more criti-cal. Tab. 2 reports zero-shot OOD robustness on LIBERO-Plus. FoMoVLA achieves 80.5% overall, matching Abot-M0 without additional pretrain and significantly outperforming StarVLA (+6.4%). The strongest gains appear on language (+5.5% over StarVLA) and background perturbations. The gains on camera and robot state shifts are more modest, likely because the model is trained on fixed viewpoints and initial poses, making it difficult to generalize to novel configurations with purely 2D motion cues. Tab. 3 summarizes average success rates on RoboCasa GR-1 Tabletop. FoMoVLA achieves 56.9%, improving over the StarVLA-GR00T backbone by 9.1%, demonstrating con-sistent gains from our dual-objective training on a humanoid platform with egocentric observations. Per-task results and component-wise ablation on RoboCasa are provided in Tab. 7 Method Pretrain Camera Robot Language Light Background Noise Layout Total 
+
+π0 (Black et al. 2025b) ✓ 13.8 6.0 58.8 85.0 81.4 79.0 68.9 53.6 VLA-JEPA (Yang et al. 2026) ✓ 63.3 67.1 85.4 95.6 93.6 66.3 85.1 79.5 Abot-M0 (Yang et al. 2026) ✓ 60.4 67.9 86.4 96.2 91.6 86.4 82.6 80.5 OpenVLA (Kim et al. 2024) ✗ 0.8 3.5 23.0 8.1 34.8 15.2 28.5 15.6 WorldVLA (Cen et al. 2025) ✗ 0.1 27.9 41.6 43.7 17.1 10.9 38.0 25.0 UniVLA (Bu et al. 2025) ✗ 1.8 46.2 69.6 69.0 81.0 21.2 31.9 42.9 DreamVLA (Zhang et al. 2025) ✗ 26.2 17.6 67.0 77.5 71.5 53.6 43.5 48.9 Cosmos Policy (Kim et al. 2026) ✗ 69.6 51.0 89.6 97.7 85.7 87.3 83.7 79.7 StarVLA (Ye et al. 2026) ✗ 52.5 49.8 88.5 95.7 95.7 73.0 76.9 74.1 Qwen-RobotManip-scratch (Yuan et al. 2026a) ✗ 70.4 44.9 88.1 95.8 95.5 84.4 79.1 78.3 FoMoVLA (Ours) ✗ 64.0 62.2 94.0 94.1 96.2 82.2 79.6 80.5 
+
+Table 2: Out-of-distribution robustness evaluation on LIBERO-Plus. All methods are evaluated zero-shot without fine-tuning. in the appendix.           
+
+> Method Avg.
+> π0.5(Black et al. 2025a) 37.0 StarVLA-FAST (Ye et al. 2026) 39.0 StarVLA-π(Ye et al. 2026) 43.9 StarVLA-GR00T (Ye et al. 2026) 47.8 GR00T-N1.6 (Bjorck et al. 2025) 47.6 StarVLA-OFT (Ye et al. 2026) 48.8 FoMoVLA (Ours) 56.9
+
+Table 3: Average success rate (%) on RoboCasa GR-1 Table-top (24 tasks, 50 rollouts/task). 
+
+4.3 Ablation Study 
+
+Future Conditioning. Tab. 1 shows that the full model with FCCA achieves consistent gains over the non-FCCA variant (e.g., +1.8% in LIBERO-Long), confirming that the two objectives achieve synergy only when motion prediction is explicitly conditioned on the predicted future represen-tation. Fig. 3 illustrates this qualitatively: without FCCA, predicted point trajectories exhibit incorrect displacement directions; with FCCA, motion predictions align with the actual tracking trajectories of the points.This qualitative ev-idence suggests that jointly optimizing the two objectives leads to more coherent spatiotemporal representations than naive multi-task training. 
+
+Sparse Supervision Design. We first ablate the point grid density (top section of Table 4): the sparse 8 × 8 grid (64 points, patch-aligned) achieves the best overall performance, particularly on long-horizon tasks, while denser grids ( 16 ×
+
+16 ) degrade performance. This validates our design choice of lightweight sparse point supervision, which uses a 4×
+
+sparser set yet sufficiently captures task-relevant motion. For the foresight decoder architecture, the MAE bottle-neck design outperforms Direct-64 on long-horizon tasks, confirming that the compact K-token bottleneck encourages global goal-state encoding rather than patch-level memoriza-tion. 
+
+Figure 3: Effect of FCCA on point tracking. Conditioning point tracking on visual foresight yields trajectories aligned with action dynamics. 
+
+Auxiliary Task Coupling. The bottom section of Table 4 ablates design choices for coupling the foresight and tracking objectives. When both branches draw from the same 16 learn-able goal tokens ( Shared goal tokens ), performance degrades drastically on long-horizon tasks (85.8%). We attribute this drop to gradient interference on the shared token embed-dings, as the two auxiliary objectives favor different infor-mation: future appearance versus spatial motion. Assigning each branch its own set of 16 learnable queries ( Separate query tokens ) eliminates this gradient conflict and recov-ers strong performance (98.2%). Using the 64 ViT image Figure 4: Qualitative results of FoMoVLA. FoMoVLA ef-fectively learns future features and point tracking.                                                
+
+> Design Spatial Object Goal Long Avg.
+> Point Grid Density
+> 8×8(64 points) 98.4 99.6 99.4 97.6 98.8
+> 16 ×16 (256 points) 98.8 99.4 99.6 94.8 98.1
+> Foresight Architecture
+> MAE (16 →64 tokens) 98.4 99.6 99.4 97.6 98.8
+> Direct-64 (64 tokens) 98.6 99.4 98.0 95.0 97.8
+> Foresight–Motion Coupling
+> Shared goal tokens 98.2 99.2 96.0 85.8 94.8 Separate query tokens 98.4 99.6 99.0 95.8 98.2 Shared image tokens 97.8 99.0 97.4 95.6 97.4 Image + Goal CrossAttn 98.4 99.6 99.4 97.6 98.8
+
+Table 4: Design choices: Point Grid Density, Foresight Archi-tecture and Foresight-Motion Coupling design on LIBERO success rate (%). tokens for both branches ( Shared image tokens ) offers a dif-ferent solution: since these features are primarily optimized by the main by the main action prediction objective, the aux-iliary losses no longer directly clash at the embedding level, yielding 97.4%. Our final design ( Image + Goal CrossAttn )achieves the best result (98.8%) by keeping image tokens as the motion decoder input while injecting goal-oriented context via cross-attention from the foresight query tokens, which enables cooperative information flow without repre-sentational interference. 
+
+4.4 Scalability Across Different Frameworks. 
+
+To evaluate whether FoMoVLA is tied to a specific action formulation, we further instantiate it on top of two alternative StarVLA variants: StarVLA-π and StarVLA-OFT. As shown in Tab. 5, FoMoVLA consistently improves both variants. In particular, it boosts StarVLA-π from 95.7% to 97.9% average success rate, with the largest gain on LIBERO-Long (+8.2), while improving StarVLA-OFT from 96.6% to 98.0%. These                                    
+
+> Method Spatial Object Goal Long Avg.
+> StarVLA-π98.8 99.6 95.8 88.4 95.7 + FoMoVLA 98.2 98.6 98.0 96.6 97.9
+> ∆-0.6 -1.0 +2.2 +8.2 +2.2
+> StarVLA-OFT 97.8 98.6 96.2 93.8 96.6 + FoMoVLA 99.0 99.4 99.0 94.8 98.0
+> ∆+1.2 +0.8 +2.8 +1.0 +1.4
+
+Table 5: Scalability of FoMoVLA across diverse policy heads of mainstream VLA frameworks. results indicate that FoMoVLA complements different policy heads rather than relying on a specific action decoder design. 
+
+4.5 Qualitative Analysis. 
+
+We visualize current observation features, predicted vs. GT future features, predicted vs. GT point tracking, and the pre-dicted change heatmap (per-patch cosine distance between current and predicted future features) in Fig. 4. The predicted foresight closely reconstructs GT future features, confirm-ing that the K-token bottleneck captures global scene-level changes rather than memorizing local texture. The predicted point trajectories align with GT motion, showing that geo-metric supervision is successfully absorbed into the VLM backbone. Critically, the predicted change heatmap con-centrates on task-relevant regions (manipulated object and end-effector path) while suppressing static background. The foresight anchor tells the model where the scene changes and point tracking guide how , together providing complementary evidence that FoMoVLA learns a spatio-temporal grounded representation rather than independently optimizing two aux-iliary losses. 
+
+# 5 Conclusion 
+
+In this paper, we proposed FoMoVLA, a training-only framework that equips VLA models with explicit spatio-temporal foresight through future feature prediction and future-conditioned point tracking. jointly learning com-pact future feature prediction and sparse, lightweight point tracking, our method produces more predictive and spatio-temporally grounded visual representations, leading to im-proved modeling of future state transitions and more effec-tive robotic manipulation. Since all auxiliary components are used only during training, FoMoVLA incurs no additional inference overhead. Extensive experiments on LIBERO and RoboCasa demonstrate consistent improvements over strong baselines, highlighting the effectiveness of explicit spatio-temporal supervision for VLA models. Regarding limitations, current tracking supervision only models view dependent motion in image space, failing to capture the 3D geometry over a dynamic scene. For future works, a promising direction is to complement 2D point tracking with 3D motion prediction, enabling richer geomet-ric reasoning and greater robustness to viewpoint and depth variation. References 
+
+Bai, S.; Lyu, J.; Zhou, W.; Li, Z.; Wang, D.; Xing, L.; Zhao, X.; Wang, P.; Wang, Z.; Chi, C.; et al. 2026. Latent Reasoning VLA: Latent Thinking and Prediction for Vision-Language-Action Models. In ICML .Bjorck, J.; Castañeda, F.; Cherniadev, N.; Da, X.; Ding, R.; Fan, L.; Fang, Y.; Fox, D.; Hu, F.; Huang, S.; et al. 2025. GR00T N1: An Open Foundation Model for Generalist Hu-manoid Robots. arXiv:2503.14734. Black, K.; Brown, N.; Darpinian, J.; et al. 2025a. π0.5: a Vision-Language-Action Model with Open-World General-ization. arXiv:2504.16054. Black, K.; Brown, N.; Driess, D.; Esmail, A.; Equi, M.; Finn, C.; Fusai, N.; Groom, L.; Hausman, K.; Ichter, B.; et al. 2025b. π0: A Vision-Language-Action Flow Model for Gen-eral Robot Control. In Robotics: Science and Systems (RSS) .Brohan, A.; Brown, N.; Carbajal, J.; Chebotar, Y.; Chen, X.; Choromanski, K.; Ding, T.; Driess, D.; Dubey, A.; Finn, C.; et al. 2023. RT-2: Vision-Language-Action Models Transfer Web Knowledge to Robotic Control. In Conference on Robot Learning (CoRL) , 2165–2183. PMLR. Bu, Q.; Yang, Y.; Cai, J.; Gao, S.; Ren, G.; Yao, M.; Luo, P.; and Li, H. 2025. UniVLA: Learning to Act Anywhere with Task-centric Latent Actions. In RSS .Cai, J.; Cai, Z.; Cao, J.; Chen, Y.; He, Z.; Jiang, L.; Li, H.; Li, H.; Li, Y.; Liu, Y.; et al. 2026. InternVLA-A1: Unifying Understanding, Generation and Action for Robotic Manipu-lation. arXiv:2601.02456. Cen, J.; Yu, C.; Yuan, H.; Jiang, Y.; Huang, S.; Guo, J.; Li, X.; Song, Y.; Luo, H.; Wang, F.; et al. 2025. WorldVLA: Towards Autoregressive Action World Model. arXiv:2506.21539. Chi, C.; Xu, Z.; Feng, S.; Cousineau, E.; Du, Y.; Burch-fiel, B.; Tedrake, R.; and Song, S. 2023. Diffusion Policy: Visuomotor Policy Learning via Action Diffusion. In RSS .Fan, J.; Liu, Y.; Li, S.; Ren, B.; Li, S.; Zhang, X.-P.; Ding, W.; and Deng, Z. 2026. FUTURE-VLA: Forecasting Unified Trajectories Under Real-time Execution. arXiv:2602.15882. Fei, S.; Wang, S.; Shi, J.; Dai, Z.; Cai, J.; Qian, P.; Ji, L.; He, X.; Zhang, S.; Fei, Z.; Fu, J.; Gong, J.; and Qiu, X. 2025. LIBERO-Plus: In-depth Robustness Analysis of Vision-Language-Action Models. arXiv:2510.13626. Ghosh, D.; Walke, H.; Pertsch, K.; Black, K.; Mees, O.; Dasari, S.; Hejna, J.; Kreiman, T.; Xu, C.; Luo, J.; et al. 2024. Octo: An Open-Source Generalist Robot Policy. In 
+
+Robotics: Science and Systems (RSS) .Guan, J.; Zhao, W.; Pei, Y.; Chen, Z.; Solin, A.; and Kannala, J. 2026. Point Tracking Improves World Action Models. arXiv:2605.23856. Hu, Y.; Zhang, J.; Luo, Y.; Guo, Y.; Chen, X.; Sun, X.; Feng, K.; Lu, Q.; Chen, S.; Zhang, Y.; Li, W.; and Chen, J. 2026. BagelVLA: Enhancing Long-Horizon Manipu-lation via Interleaved Vision-Language-Action Generation. arXiv:2602.09849. Jiang, T.; Jiang, X.; Ma, Y.; Wen, X.; Li, B.; Zhan, K.; Jia, P.; Liu, Y.; Sun, S.; and Lang, X. 2025. The better you learn, the smarter you prune: Towards efficient vision-language-action models via differentiable token pruning. arXiv preprint arXiv:2509.12594 .Karaev, N.; Rocco, I.; Graham, B.; Neverova, N.; Vedaldi, A.; and Rupprecht, C. 2024. CoTracker: It is Better to Track Together. arXiv:2307.07635. Kim, M. J.; Gao, Y.; Lin, T.-Y.; Lin, Y.-C.; Ge, Y.; Lam, G.; Liang, P.; Song, S.; Liu, M.-Y.; Finn, C.; and Gu, J. 2026. Cosmos Policy: Fine-Tuning Video Models for Visuomotor Control and Planning. arXiv:2601.16163. Kim, M. J.; Pertsch, K.; Karamcheti, S.; Xiao, T.; Balakr-ishna, A.; Nair, S.; Rafailov, R.; Foster, E.; Lam, G.; San-keti, P.; et al. 2024. OpenVLA: An Open-Source Vision-Language-Action Model. In Conference on Robot Learning (CoRL) , volume 270, 2679–2713. PMLR. Li, F.; Song, W.; Zhao, H.; Wang, J.; Ding, P.; Wang, D.; Zeng, L.; and Li, H. 2026a. Spatial Forcing: Implicit Spa-tial Representation Alignment for Vision-language-action Model. In ICLR .Li, L.; Zhang, Q.; Luo, Y.; Yang, S.; Wang, R.; Han, F.; Yu, M.; Gao, Z.; Xue, N.; Zhu, X.; Shen, Y.; and Xu, Y. 2026b. Causal World Modeling for Robot Control. arXiv:2601.21998. Li, Q.; Liang, Y.; Wang, Z.; Luo, L.; Chen, X.; Liao, M.; Wei, F.; Deng, Y.; Xu, S.; Zhang, Y.; et al. 2024. Co-gACT: A Foundational Vision-Language-Action Model for Synergizing Cognition and Action in Robotic Manipulation. arXiv:2411.19650. Lian, S.; Yu, B.; Lin, X.; Yang, L. T.; Shen, Z.; Wu, C.; Miao, Y.; Huang, C.; and Chen, K. 2026. LangForce: Bayesian De-composition of Vision Language Action Models via Latent Action Queries. In Proceedings of the 43rd International Conference on Machine Learning , Proceedings of Machine Learning Research. PMLR. Lin, M.; Ding, P.; Wang, S.; Zhuang, Z.; Liu, Y.; Tong, X.; Song, W.; Lyu, S.; Huang, S.; and Wang, D. 2026. HiF-VLA: Hindsight, Insight and Foresight through Mo-tion Representation for Vision-Language-Action Models. arXiv:2512.09928. Liu, B.; Zhu, Y.; Gao, C.; Feng, Y.; Liu, Q.; Zhu, Y.; and Stone, P. 2023. LIBERO: Benchmarking Knowledge Trans-fer for Lifelong Robot Learning. In Advances in Neural Information Processing Systems (NeurIPS) .Liu, S.; Wu, L.; Li, B.; Tan, H.; Chen, H.; Wang, Z.; Xu, K.; Su, H.; and Zhu, J. 2025. RDT-1B: A Diffusion Foundation Model for Bimanual Manipulation. In ICLR .Lyu, J.; Liu, K.; Zhang, X.; Liao, H.; Feng, Y.; Zhu, W.; Shen, T.; Chen, J.; Zhang, J.; Dong, Y.; et al. 2026. LDA-1B: Scaling Latent Dynamics Action Model via Universal Embodied Data Ingestion. In RSS .Ma, X.; Xing, L.; Zhang, H.; Li, W.; and Lu, S. 2025. Uni-fying Perception and Action: A Hybrid-Modality Pipeline with Implicit Visual Chain-of-Thought for Robotic Action Generation. arXiv:2511.19859. Nasiriany, S.; Maddukuri, A.; Zhang, L.; Parikh, A.; Lo, A.; Joshi, A.; Mandlekar, A.; and Zhu, Y. 2024. RoboCasa: Large-Scale Simulation of Everyday Tasks for Generalist Robots. In Robotics: Science and Systems (RSS) .Physical Intelligence; Ai, B.; Amin, A.; Aniceto, R.; Bal-akrishna, A.; Black, K.; Driess, D.; Finn, C.; Hausman, K.; Levine, S.; et al. 2026. π0.7: A Steerable General-ist Robotic Foundation Model with Emergent Capabilities. arXiv:2604.15483. Qian, J.; Han, B.; Shi, C.; Xiao, L.; Yang, L.; Shi, S.; and Jiang, L. 2026. GeoPredict: Leveraging Predictive Kinemat-ics and 3D Gaussian Geometry for Precise VLA Manipula-tion. arXiv:2512.16811. Shi, H.; Xie, B.; Liu, Y.; Sun, L.; Liu, F.; Wang, T.; Zhou, E.; Fan, H.; Zhang, X.; and Huang, G. 2026. MemoryVLA: Perceptual-Cognitive Memory in Vision-Language-Action Models for Robotic Manipulation. In ICLR .Su, Y.; Chen, S.; Shi, H.; Liu, M.; Zhang, Z.; Huang, N.; Zhong, W.; Zhu, Z.; Liu, Y.; and Liu, X. 2026. World Guidance: World Modeling in Condition Space for Action Generation. arXiv:2602.22010. Sun, J.; Zhang, W.; Qi, Z.; Ren, S.; Liu, Z.; Zhu, H.; Sun, G.; Jin, X.; and Chen, Z. 2026. VLA-JEPA: Enhancing Vision-Language-Action Model with Latent World Model. arXiv:2602.10098. Syed, S. N.; Jakobsson, A.; Hao, H.; and Ichnowski, J. 2026. Intercepting the Future: Latent-Space Predictive World Model for Dynamic VLA Manipulation. arXiv:2606.02486. Yang, Y.; Zeng, S.; Lin, T.; Chang, X.; Qi, D.; Xiao, J.; Liu, H.; Chen, R.; Chen, Y.; Huo, D.; et al. 2026. ABot-M0: VLA Foundation Model for Robotic Manipulation with Action Manifold Learning. arXiv:2602.11236. Ye, J.; et al. 2026. StarVLA: A Lego-like Code-base for Vision-Language-Action Model Developing. arXiv:2604.05014. Yuan, H.; Liang, Z.; Chen, A.; Wang, Y.; Li, H.; Lin, P.; Huang, Y.; Lei, Z.; Zhang, T.; Zhang, J.; Zhang, J.; Fan, J.; Zhou, G.; Peng, Q.; Lv, C.; Chen, X.; Yang, A.; Huang, F.; Lin, J.; Liu, D.; Zhou, J.; Wu, C.; and Chen, X.-H. 2026a. Qwen-RobotManip Technical Report: Alignment Un-locks Scale for Robotic Manipulation Foundation Models. arXiv:2606.17846. Yuan, T.; Dong, Z.; Liu, Y.; and Zhao, H. 2026b. Fast-WAM: Do World Action Models Need Test-time Future Imagina-tion? arXiv:2603.16666. Zhang, J.; Chen, X.; Wang, Q.; Li, M.; Guo, Y.; Hu, Y.; Zhang, J.; Bai, S.; Lin, J.; and Chen, J. 2026a. VLM4VLA: Revisiting Vision-Language-Models in Vision-Language-Action Models. arXiv:2601.03309. Zhang, J.; Zheng, C.; Yang, Y.; Argus, M.; Soraki, R.; Han, W.; Anderson, T.; Li, C.-L.; Liu, S.; Duan, J.; Ren, Z.; Zhang, J.; and Krishna, R. 2026b. MolmoMotion: Fore-casting Point Trajectories in 3D with Language Instruction. arXiv:2606.18558. Zhang, W.; Liu, H.; Qi, Z.; Wang, Y.; Yu, X.; Zhang, J.; Dong, R.; He, J.; Lu, F.; Wang, H.; et al. 2025. DreamVLA: A Vision-Language-Action Model Dreamed with Compre-hensive World Knowledge. arXiv:2507.04447. Zhang, Z.; Luo, W.; Wang, H.; Sheng, Y.; Wang, Y.; Guo, H.; Ren, H.; Du, X.; Che, Y.; Cao, T.; Yuan, L.; and Yu, Y. 2026c. Anticipation-VLA: Solving Long-Horizon Em-bodied Tasks via Anticipation-based Subgoal Generation. arXiv:2605.01772. Zheng, J.; Li, J.; Wang, Z.; Liu, D.; Kang, X.; Feng, Y.; Zheng, Y.; Zou, J.; Chen, Y.; Zeng, J.; et al. 2026. X-VLA: Soft-Prompted Transformer as Scalable Cross-Embodiment Vision-Language-Action Model. In ICLR .Zhong, Z.; Yan, H.; Li, J.; Liu, X.; Gong, X.; Zhang, T.; Song, W.; Chen, J.; Zheng, X.; Wang, H.; and Li, H. 2025. FlowVLA: Visual Chain of Thought-based Motion Reason-ing for Vision-Language-Action Models. arXiv:2508.18269. FoMoVLA: Bridging Visual Foresight and Motion Guidance for Vision-Language-Action Models 
+
+Supplementary Material 
+
+# A
+
+A.1 Model Parameter Breakdown 
+
+Tab. 6 details the parameter breakdown of FoMoVLA. Dur-ing training, the full model introduces 60.7 M additional pa-rameters (+1.3%) from auxiliary branches: foresight decoder (30.5 M), FCCA module (26.2 M), track projector (2.6 M), and visibility head (1.3 M). Since all auxiliary branches are discarded at inference, the deployment parameters remain identical to the Vanilla baseline (4599.3 M).                   
+
+> Module Vanilla FoMoVLA
+> VLM Backbone 4437.8 4437.8 Action Model 161.5 161.5 Foresight Decoder –30.5 FCCA Module –26.2 Track Projector –2.6 Visibility Head –1.3 Training Total (M) 4599.3 4660.0 Inference Total (M) 4599.3 4599.3
+
+Table 6: Model parameter breakdown (in millions). Auxiliary branches (shaded rows) are discarded at inference, keeping the deployment footprint identical to the Vanilla baseline. 
+
+A.2 Attention Mask Design 
+
+As described in Section 3.2, we reorder the input sequence to place instruction tokens before image tokens to ensure goal-aware visual representations. Here we detail the full attention mask design governing inter-modal interactions within the VLM backbone. The input sequence is organized as: Instruction → Cur-rent Image → Foresight → Action . We employ a struc-tured attention mask with the following rules: (1) Instruction tokens use strict causal attention among themselves, attend-ing only to preceding tokens; (2) Current image tokens at-tend causally to all preceding instruction tokens and among themselves, ensuring that visual representations are fully conditioned on the language instruction; (3) Foresight to-kens employ bidirectional attention among themselves, while additionally attending to all instruction and current image tokens—this allows the K <Foresight> tokens to freely exchange information, facilitating holistic encoding of the predicted future state grounded in both the task specification and the current observation; and (4) Action tokens attend to all preceding modalities—instruction, current image, and foresight tokens—enabling the action head to leverage the complete context including future-informed representations for action prediction. This asymmetric attention design ensures that (1) instruc-tion tokens provide unidirectional conditioning to all down-stream modalities without being influenced by visual obser-vations, (2) foresight tokens aggregate global context through 
+
+Figure 5: Attention mask design of FoMoVLA. bidirectional self-attention to form a coherent future repre-sentation, and (3) action tokens have full visibility over all available information. Fig. 5 illustrates the attention mask structure. 
+
+# B Additional Experimental Analysis 
+
+B.1 Inference Cost 
+
+Tab. 8 compares the inference cost between the Vanilla base-line and FoMoVLA. The only additional overhead at deploy-ment comes from processing the K=16 <Foresight> to-kens appended to the input sequence. This increases median inference latency by only 9.4 ms and allocated GPU memory by merely 0.1 GB. These marginal costs are negligible com-pared to the substantial performance gains reported in the main paper, confirming that FoMoVLA introduces minimal deployment overhead. 
+
+B.2 Quantitative Effect of FCCA on Point Tracking 
+
+To quantify the effect of FCCA on point tracking quality, we evaluate models trained with and without FCCA on 10,000 samples from the LIBERO-10 training set using a frozen CoTracker teacher as ground truth. We report four metrics: (1) ATE-all, the average trajectory error over all 64 tracked grid points; (2) ATE-moving, restricted to points whose ground-truth displacement exceeds 3 px (capturing task-relevant motion); (3) Median TE, the median trajectory error over moving points (robust to outliers); and (4) Sur-vival@10px, the fraction of moving points whose final-frame Task Vanilla + Fut Pred. + Tracking + Fut Pred. + Tracking + Fut Pred. + Tracking + FCCA 
+
+PnPBottleToCabinetClose 46.0 64.0 70.0 68.0 72.0 PnPCanToDrawerClose 80.0 68.0 72.0 79.0 73.0 PnPCupToDrawerClose 54.0 52.0 50.0 51.0 41.0 PnPMilkToMicrowaveClose 48.0 60.0 38.0 56.0 51.0 PnPPotatoToMicrowaveClose 28.0 42.0 28.0 40.0 38.0 PnPWineToCabinetClose 46.0 44.0 56.0 54.0 49.0 PnPNovelFromCuttingboardToBasket 48.0 48.0 52.0 57.0 54.0 PnPNovelFromCuttingboardToCardboardbox 40.0 54.0 36.0 52.0 53.0 PnPNovelFromCuttingboardToPan 68.0 82.0 70.0 70.0 69.0 PnPNovelFromCuttingboardToPot 52.0 62.0 42.0 61.0 67.0 PnPNovelFromCuttingboardToTieredbasket 56.0 62.0 44.0 51.0 55.0 PnPNovelFromPlacematToBasket 42.0 60.0 54.0 55.0 60.0 PnPNovelFromPlacematToBowl 44.0 54.0 60.0 56.0 51.0 PnPNovelFromPlacematToPlate 48.0 54.0 74.0 57.0 71.0 PnPNovelFromPlacematToTieredshelf 18.0 24.0 30.0 44.0 27.0 PnPNovelFromPlateToBowl 60.0 62.0 70.0 58.0 51.0 PnPNovelFromPlateToCardboardbox 50.0 54.0 60.0 53.0 61.0 PnPNovelFromPlateToPan 54.0 58.0 64.0 54.0 63.0 PnPNovelFromPlateToPlate 70.0 74.0 76.0 76.0 76.0 PnPNovelFromTrayToCardboardbox 38.0 40.0 62.0 56.0 60.0 PnPNovelFromTrayToPlate 56.0 58.0 78.0 74.0 78.0 PnPNovelFromTrayToPot 50.0 68.0 64.0 53.0 71.0 PnPNovelFromTrayToTieredbasket 36.0 44.0 50.0 51.0 45.0 PnPNovelFromTrayToTieredshelf 16.0 18.0 34.0 32.0 30.0 
+
+Average 47.8 54.4 55.6 56.6 56.9 
+
+Table 7: Ablation study on RoboCasa GR-1 Tabletop: per-task success rate (%) across 24 tasks (50 rollouts/task). Each column progressively adds a component to the Vanilla baseline. 
+
+Figure 6: Quantitative comparison of point tracking ac-curacy with and without FCCA. Incorporating future-conditioned cross-attention reduces trajectory errors (ATE-all, ATE-moving, Median TE) and substantially improves Survival@10px, confirming that future-state conditioning provides a strong geometric prior for motion prediction. error remains below 10 px. As shown in Fig. 6, incorporating FCCA yields consistent improvements across all metrics. ATE-all decreases from 1.2 px to 0.9 px ( −25.0%), and ATE-moving drops from 3.8 px to 2.3 px ( −39.5%), indicating substantially more accurate displacement predictions for task-relevant moving points. Median TE similarly decreases from 3.7 px to 2.1 px (−43.2%), confirming that the improvement is not driven by outlier correction alone. Most notably, Survival@10px increases from 78.0% to 95.3% ( +17.3 pp), demonstrating         
+
+> Metric Vanilla FoMoVLA
+> Median Latency (ms) 94.3 103.7 Mean Latency (ms) 97.5 103.8 Allocated GPU Memory (GB) 9.3 9.4
+
+Table 8: Inference cost comparison. Latency and memory are measured on a single H20 GPU with batch size 1, averaged over 1000 runs after 50 warmup iterations. that FCCA enables the vast majority of tracked points to converge within a tight error bound by the end of the ac-tion chunk. These results confirm that explicitly conditioning motion prediction on the predicted future state—rather than treating future prediction and point tracking as independent objectives—yields significantly more accurate and reliable trajectory estimation. 
+
+B.3 RoboCasa GR-1 Tabletop Ablation 
+
+Quantitative Results Tab. 7 presents a component-wise ablation on the RoboCasa GR-1 Tabletop benchmark (24 tasks, 50 rollouts per task). Starting from the Vanilla base-line (47.8%), adding future prediction alone improves the average success rate to 54.4% (+6.6%), and adding point Figure 7: Qualitative results on RoboCasa GR-1 Tabletop (egocentric view). From left to right: current observation, GT future frame, GT future PCA features, predicted foresight PCA, GT point tracks, predicted point tracks, and predicted change heatmap. The model successfully handles non-stationary egocentric viewpoints, producing accurate future predictions and motion trajectories. tracking alone yields 55.6% (+7.8%), indicating that both auxiliary objectives independently enhance policy learning. Combining the two objectives further boosts performance to 56.6% (+8.8%), demonstrating their complementarity: fu-ture prediction provides semantic goal-state understanding while tracking supplies geometric motion reasoning. Finally, incorporating FCCA achieves the best overall performance of 56.9% (+9.1%), confirming that explicit conditioning of motion prediction on future representations is essential for full synergy. These trends are consistent with the LIBERO ablation (Tab. 1), validating that the proposed components generalize across different robot embodiments and camera configurations (egocentric vs. third-person). 
+
+Qualitative Results To further validate the generality of FoMoVLA beyond fixed-camera setups, we present qualita-tive visualizations on the RoboCasa GR-1 Tabletop bench-mark (Fig. 7). Unlike LIBERO, which uses a static third-person camera, RoboCasa provides egocentric observations mounted on the robot’s head, introducing continuous view-point changes induced by the robot’s body motion. This set-ting requires the model to disentangle ego-motion from task-relevant object motion under a non-stationary camera. Overall, FoMoVLA produces coherent predictions: the predicted foresight closely matches ground-truth future fea-tures under viewpoint shifts, and the predicted point tra-jectories correctly capture both ego-motion (global camera displacement) and local arm manipulation motion. The pre-dicted heatmap change further confirms that the model con-centrates predictive attention on task-relevant regions (target object and end-effector path) rather than static background, demonstrating spatially grounded foresight under dynamic egocentric viewpoints.

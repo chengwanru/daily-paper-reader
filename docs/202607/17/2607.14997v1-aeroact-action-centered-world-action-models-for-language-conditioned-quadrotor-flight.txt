@@ -1,0 +1,575 @@
+Title: AeroAct: Action-Centered World-Action Models for Language-Conditioned Quadrotor Flight
+
+URL Source: https://arxiv.org/pdf/2607.14997v1
+
+Published Time: Fri, 17 Jul 2026 01:38:34 GMT
+
+Number of Pages: 14
+
+Markdown Content:
+# AERO ACT : Action-Centered World-Action Models for Language-Conditioned Quadrotor Flight 
+
+Xinhong Zhang 1,∗, Qiyuan Zhu 1,∗, Yubo Huang 1,∗, Haolin Chen 2,∗, Runqing Wang 1,Yuhao Mo 1, Zhongxin Chen 1, Yu Hu 3, Xinjiang Wang 3, Jian Sun 1, Gang Wang 1,†
+
+> 1
+
+School of Automation, Beijing Institute of Technology 
+
+> 2
+
+School of Mechanical Engineering, Beijing Institute of Technology 
+
+> 3
+
+Independent researcher  
+
+> ∗
+
+Equal contribution † Corresponding author AeroAct: Action -Centered WAM 
+
+> Temporal
+> context
+> Temporal
+> context
+> Chunked
+> trajectory
+> Chunked
+> trajectory
+> Action
+> centered
+> Action
+> centered
+
+Visual obs Visual obs 
+
+Proprioception Proprioception 
+
+Instruction Instruction 
+
+> “Fly to the plant ”“Fly to the plant ”
+
+Instruction 
+
+> “Fly to the plant ”
+
+Future frames 
+
+Trajectory Chunk 
+
+> Disabled at inference time
+
+Simulation Deployment      
+
+> Isaac Sim Isaac Sim DiffAero DiffAero
+> Fast rendering for
+> visual dynamics learning
+> Flight controllers for
+> efficient traj. gen.
+> Gaussian Splatting
+> Generated assets
+> for visual diversity
+> Inference with
+> self -guidance
+> for smooth flight
+> Self -made
+> handheld device
+> for
+> efficient data collection
+
+Figure 1: Overview of AeroAct. The policy receives egocentric visual history, proprioception and language, and predicts a chunked local trajectory for aerial navigation. Training uses paired flight actions and future visual observations from Isaac, DiffAero, 3DGS scenes, and real-world handheld data; deployment decodes actions with self-guidance and executes these actions through a trajectory controller. 
+
+Abstract: 
+
+Language-conditioned quadrotor flight requires a policy to ground semantic goals, anticipate the visual consequences of ego-motion, and output control references that remain smooth and dynamically executable under rapidly changing first-person views. Existing aerial vision-language navigation and vision-language-action methods commonly use discrete actions, high-level waypoints, or instanta-neous velocity commands, which provide limited supervision about how flight ac-tions change future observations. We present AeroAct, an action-centered world-action model (WAM) for quadrotor navigation. To the best of our knowledge, AeroAct is the first WAM instantiated and demonstrated for real-world aerial flight. The model adapts a pretrained video diffusion Transformer to predict local trajectory-action chunks from egocentric visual history, proprioception, and lan-guage. Future first-person frames are used during training as dense consequence supervision, while deployment directly decodes actions without generating future video. To obtain aligned visual, state, language, and dynamically feasible action data, we build a DiffAero-based pipeline with complementary Isaac Lab and 3D Gaussian splatting renderers. We further introduce a low-cost handheld collection device that couples camera observations with motion estimates to recreate flight-arXiv:2607.14997v1 [cs.RO] 16 Jul 2026 like egocentric trajectories, and a self-guidance procedure that improves tempo-ral consistency across overlapping trajectory chunks. Closed-loop simulation and real-world experiments show that temporal visual context improves target track-ing and object-search performance, and that WAM-based policies can be executed on a physical quadrotor. 
+
+## 1 Introduction 
+
+Aerial robots are increasingly expected to execute natural-language commands while flying safely through cluttered 3D scenes. This problem is substantially more demanding than standard vision-language navigation (VLN). The robot observes the world through a rapidly moving egocentric camera, its actions immediately alter the future visual stream, and unsafe commands can quickly lead to oscillation, loss of target visibility, or collision. A practical language-conditioned flight policy must therefore do more than identify the goal in an image: it must connect semantic grounding with a control representation that is local, smooth, and compatible with quadrotor dynamics. Learning-based agile flight has shown that reinforcement learning and imitation learning can pro-duce highly reactive policies for racing, obstacle avoidance, target tracking, and aggressive ma-neuvering. These systems demonstrate the effectiveness of end-to-end perception and control, but they are often trained with task-specific rewards or expert demonstrations and typically condition on geometric goals rather than open-vocabulary instructions. In parallel, vision-language-action (VLA) models have improved semantic generalization by attaching action heads to large vision-language representations. However, direct action decoding alone does not explicitly teach the policy how first-person observations evolve under its own actions. Recent world-model advances, includ-ing Dreamer-style latent dynamics and generative interactive simulators, suggest that predicting future observations can provide a compact substrate for control, planning, and representation learn-ing [1, 2, 3, 4, 5, 6, 7, 8]. World-action models (WAMs) push this idea further by jointly training visual consequence prediction and action generation, allowing dense video supervision to regularize the learned action distribution [9, 10]. Bringing WAMs to quadrotor navigation is nevertheless nontrivial. First, training a flight WAM requires large-scale multimodal trajectories with tightly synchronized egocentric video, language instructions, proprioceptive states, and dynamically feasible flight actions. Such data are much harder to collect than tabletop demonstrations because quadrotor motion is fast, safety-critical, and constrained by underactuated dynamics. Second, video-centric WAMs can be expensive at infer-ence time. Autoregressive future-video generation increases latency, and small visual prediction errors may accumulate and corrupt downstream action decoding. These failure modes are particu-larly problematic for aerial robots, whose low-level controllers require smooth, locally executable trajectory references to maintain stable flight. We address these challenges with AeroAct, an action-centered WAM for language-conditioned quadrotor flight. Instead of generating future video during deployment, AeroAct uses a history of egocentric observations and proprioceptive states to infer the current flight context and predicts a chunk of local fifth-order trajectory parameters. Future visual prediction is retained only as dense auxiliary supervision during training. A blockwise causal mask prevents the action stream from accessing future-frame tokens, so that deployment can decode actions autoregressively without test-time video generation. This design preserves the temporal and geometric priors of video models, re-duces inference-time computation by 37 .8%, and avoids error accumulation from imagined frames. To address the data bottleneck, we construct a scalable hybrid pipeline that combines DiffAero dy-namics [11], Isaac Lab, and 3D Gaussian splatting (3DGS) [12, 13, 14]. The pipeline produces aligned egocentric video, language, proprioception, and dynamically feasible action chunks across tracking and object-reaching scenarios. We also introduce a handheld collection device that ap-proximates flight-like egocentric motion, enabling low-cost real-world fine-tuning without requiring extensive autonomous flight data collection. The experiments validate the design choices: longer temporal context substantially improves target tracking and object search, mixed-domain training 2maintains strong closed-loop performance, and real-world flight demonstrates that the learned ac-tion interface can be executed on a physical quadrotor. The main contributions of this paper are as follows: • We introduce AeroAct, an action-centered, history-aware WAM for language-conditioned quadrotor flight. Future-frame prediction provides dense consequence supervision during training, while deployment decodes smooth trajectory-action chunks without inference-time video generation. • We develop a scalable data-generation pipeline that aligns egocentric RGB, propriocep-tion, language, and dynamically feasible actions using DiffAero with Isaac Lab and 3DGS rendering, together with a handheld real-world collection device. • We formulate a smooth chunked action space based on local fifth-order trajectory segments, introduce inference-time self-guidance for temporal consistency, and demonstrate, to the best of our knowledge, the first real-world quadrotor flight using a WAM-based policy. 
+
+## 2 Related Work 
+
+2.1 Aerial Vision-Language Navigation 
+
+Aerial VLN asks a quadrotor to follow language instructions in three-dimensional environments from egocentric observations. Early benchmarks established the task: AVDN introduced a dialog-based commander-agent setting [15], and AerialVLN provided city-scale simulation with human-annotated routes [16], highlighting the importance of spatial relations, temporal ordering, and di-rectional references in aerial scenes. Later platforms improved realism and scale. OpenUAV em-phasizes realistic target-oriented flight [17]; OpenFly integrates multiple rendering engines and an automated toolchain for large-scale data generation [18]; and UAV-Flow reframes aerial navigation as fine-grained “flying-on-a-word” imitation learning [19]. A common limitation is that many ac-tion spaces are inherited from ground VLN, such as discrete moves or high-level waypoints, which abstract away the continuous, dynamics-coupled behavior of quadrotors. Recent methods use pretrained vision-language models for zero-shot aerial navigation, such as On-Fly [20], or train VLA policies for onboard deployment, such as VLA-AN [21]. These approaches improve semantic grounding and long-horizon instruction following, but their action interfaces are often waypoints, primitives, or velocity commands. As a result, the policy may select semantically plausible actions without explicitly learning their visual and dynamical consequences. AeroAct complements this line by coupling trajectory-level action chunks with future first-person observa-tions during training, while retaining a command representation suitable for quadrotor control. 
+
+2.2 World-Action Models 
+
+World-action models, recently formalized by Ye et al. [10], are robot policies built on video-generation backbones that jointly model future observations and actions. They differ from classical world models, such as Dreamer, Genie, and UniSim [1, 3, 4], which learn predictive dynamics but do not by themselves define a deployable closed-loop policy. They also differ from standard VLA policies, which map observations and language directly to actions but typically lack an explicit ob-jective for modeling the visual consequences of actions. By co-training video and action prediction, WAMs use video as dense supervision for physical dynamics and transfer temporal-geometric priors from the video backbone to the action stream. Recent WAMs differ in backbone and action-generation design. Action-video WMs couple video and action diffusion on large-scale robot datasets [22]; Cosmos Policy fine-tunes a video model for visuomotor control [23]; DreamZero introduces autoregressive joint denoising with closed-loop caching [10]; Motus uses separate understanding, video-generation, and action experts [24]; Fast-WAM avoids future-frame generation during inference [25]; and GigaWorld-Policy pursues 3VAE Encoder Action Encoder   
+
+> Action Decoder
+> State Encoder VAE Encoder
+> VAE Decoder
+
+DiT Actions Future frames Ref frames States           
+
+> cross -attn
+> Disabled at
+> inference time
+> Text Encoder
+> “Fly to the plant ”
+> vel acc uzvel acc uz
+> Ts
+> To
+> Ta
+> Tf
+> TsToTaTf
+> Ts
+> To
+> Ta
+> Tf
+> TsToTaTf
+
+Figure 2: Action-centered world-action Transformer. Visual history, proprioception, and lan-guage condition the action decoder. Future-frame tokens are used during training as consequence supervision, but are masked from action tokens and can be disabled at inference time. an action-centered design for efficient control [9]. These methods are mainly developed for table-top manipulation, where cameras are comparatively stable and actions parameterize end-effectors or joints. Aerial navigation is substantially different: the egocentric viewpoint changes rapidly, and commands must remain smooth, local, dynamically feasible, and safe. To the best of our knowledge, AeroAct is the first action-centered WAM for quadrotor flight on a physical platform. 
+
+## 3 Methodology 
+
+3.1 Problem Formulation 
+
+We formulate language-conditioned aerial navigation as sequential prediction from first-person sens-ing. At time t, the robot observes an RGB image ot, a proprioceptive state st, and a language instruc-tion l. Instead of acting from a single frame, AeroAct conditions on a temporally strided observation history 
+
+Oht =  ot−(h−1)∆ , o t−(h−2)∆ , . . . , o t
+
+ , (1) where h is the number of reference frames and ∆ is the temporal stride. The policy predicts an action chunk at:t+p−1 = ( at, a t+1 , . . . , a t+p−1) of length p. Each action compactly parameterizes a dynamically executable local trajectory segment, rather than an instantaneous discrete command or a global waypoint. Following the WAM formulation [9], we use a unified model gΘ for both action prediction and visual consequence modeling, 
+
+(at:t+p−1, c t) ∼ gΘ
+
+ ·|O ht , s t, l  , (2) where ct is an action latent used to condition visual forecasting. Given the same context and ct, the model predicts future observations 
+
+(ot+∆ , o t+2∆ , . . . , o t+K∆) ∼ gΘ
+
+ ·|O ht , s t, l, c t
+
+ , (3) where K = ⌊p/ ∆⌋. In our implementation, ∆ = 3 and p = 24 , so each inference chunk contains 
+
+K = 8 future visual frames and 24 low-level action steps. 
+
+3.2 Model Architecture 
+
+AeroAct adapts a 1.3B-parameter Wan video diffusion Transformer [26] to aerial navigation. En-coding and predicting every 10 Hz video frame is computationally expensive and visually redundant, 4DiffAero        
+
+> Fast quadrotor dyanmics
+> Simple flight controllers
+> DiffAero
+> Fast quadrotor dyanmics
+> Simple flight controllers
+> Shared control interface
+> DiffAero -Isaac Isaac Sim Isaac Sim
+> Fast rendering
+> Lighting & shadow
+> Limited assets
+> Hard to configure
+> DiffAero -Isaac Isaac Sim
+> Fast rendering
+> Lighting & shadow
+> Limited assets
+> Hard to configure
+> DiffAero -3DGS CUDA CUDA
+> Easily generated
+> Customizability
+> Less interactable
+> Bad visual detail
+
+Figure 3: Simulation data pipeline. DiffAero provides a shared dynamics and control interface. Isaac Lab improves visual fidelity, while the 3DGS branch scales scene and object diversity with lower asset-engineering cost. so we encode and forecast one observation every ∆ steps. At training time, a clip ot−(h−1)∆: t+K∆
+
+is encoded by the frozen video VAE into spatiotemporal latent tokens. After 3D RoPE positional encoding, the tokens are divided into reference tokens To and future tokens Tf . The proprioceptive state st and action chunk at:t+p−1 are projected by MLP encoders into state tokens Ts and action tokens Ta. The instruction l is encoded by the pretrained text encoder into language tokens Tl.Instead of introducing separate transformer experts, we concatenate the non-language tokens into a single sequence Tt = [ Ts; To; Ta; Tf ]. Language tokens Tl are provided as cross-attention context. A blockwise causal mask preserves the action-consequence ordering: state and reference tokens cannot attend to predicted tokens; action tokens attend only to state, reference and action tokens; future visual tokens attend to all tokens. Thus, action prediction cannot leak information from fu-ture frames, while future-frame reconstruction remains conditioned on the generated action chunk. At inference, the model omits Tf and decodes only the action stream, reducing memory and com-putation and avoiding error propagation from imagined images to control. With 4 denoising steps, disabling video prediction reduces inference time from 0.296 s to 0.184 s, saving 37 .8% of time. The training objective couples action prediction with visual consequence modeling. Let ϵa and ϵf
+
+denote the target noise or velocity fields for action and future-frame latent tokens under the diffusion or flow-matching parameterization. The model is trained with 
+
+L(Θ) = Lact + λvis Lvis , (4) where 
+
+Lact = E ∥ga
+
+> Θ
+
+(Ts, T o, T a, T l) − ϵa∥22
+
+ , Lvis = E
+
+h
+
+∥gf
+
+> Θ
+
+(Ts, T o, T a, T f , T l) − ϵf ∥22
+
+i
+
+. (5) The visual term is used to shape the representation and action prior during training; deployment relies on ga 
+
+> Θ
+
+alone. This separation is important for flight: the model benefits from consequence supervision, but the closed-loop controller is not forced to wait for or trust generated future frames. 
+
+3.3 Data Simulators. Ordinary video and embodied-agent datasets do not provide the synchronized super-vision needed here: first-person RGB, proprioception, natural language, and action chunks must all be consistent with quadrotor motion. We therefore build the data stack around DiffAero [11], which supplies fast quadrotor dynamics and flight controllers. As shown in Fig. 3, two rendering branches share this control interface. The Isaac Lab branch provides realistic lighting, material, shadow, and camera effects, but scene diversity is limited by asset availability and manual configuration cost. The 3DGS branch renders RGB and depth directly from Gaussian-splat scenes, making it easier to scale across generated scenes and objects [27]; its limitation is lower fidelity for close-range geometry and lighting. The two branches are complementary: Isaac improves visual realism, while 3DGS improves scene and object diversity. 
+
+Scenarios. We collect three classes of simulation demonstrations. First, in Isaac tracking, a target moves through random corridors and an expert controller keeps the quadrotor close to it, teaching 5n n n+1 n+1 n+2 
+
+> Result of inference n
+> Result of inference n+1
+
+overwrite  
+
+> Control with result n Control with result n+1
+
+Time   
+
+> Inference interval Inference complete Inference complete Inference start Inference start Inference complete Inference start
+
+Figure 4: Inference-time self-guidance. Consecutive action chunks overlap in time. The prefix of the new chunk is guided by the suffix of the previous chunk, reducing discontinuities before the remaining horizon is sampled. motion anticipation and visual servoing. Second, in Isaac reaching, a language-specified object is placed among distractors and the quadrotor approaches it, linking language grounding to goal-directed flight. Third, in 3DGS reaching, a scene and object are sampled from the asset library, merged by placing the object on an empty plane, and used to collect object-approach demonstrations from randomized initial states. Together, these scenarios train the model to produce collision-aware local trajectories, ground language in egocentric observations, and forecast the visual consequences of predicted actions. 
+
+Real-world data collection. Directly collecting large-scale real quadrotor demonstrations remains expensive and risky. We therefore design a handheld device containing a fisheye camera, an Intel RealSense T265 stereo camera, and a lightweight computer, as shown in Fig. 5(b). The device esti-mates its own odometry with the T265 and converts the measured motion into simulated quadrotor poses. These poses are used to crop fisheye images into first-person views consistent with quadro-tor camera motion. Using this setup, we collect 858 real-world trajectories with 332 , 429 frames, corresponding to approximately 3 hours of data. 
+
+3.4 Smooth Trajectory Generation with Self-Guidance 
+
+Diffusion and flow-matching models [28] can represent multimodal action distributions, but inde-pendently sampled action chunks may differ across neighboring replanning calls. For quadrotors, such inconsistency can create jitter in the reference trajectory, especially when the action horizon is longer than the inference interval. We therefore introduce self-guidance to make consecutive action chunks agree over their overlapping time window. Specifically, when inference n + 1 starts before the chunk from inference n has expired, the two chunks overlap, as illustrated in Fig. 4. During denoising, we replace the prefix velocity of the new sample with the corresponding suffix from the previous action chunk and sample only the remaining suffix in the usual way 
+
+aσi 
+
+> n+1 ,0: ⌊tinfer /t data ⌋
+
+← aσi−1 
+
+> n+1 ,0: ⌊tinfer /t data ⌋
+
++ δt × a1
+
+> n, ⌊tinterval /t data ⌋:⌊(tinterval +tinfer )/t data ⌋
+
+, (6a) 
+
+aσi 
+
+> n+1 ,⌊tinfer /t data ⌋:p
+
+← aσi−1 
+
+> n+1 ,⌊tinfer /t data ⌋:p
+
++ δt × gΘ
+
+ aσi−1 
+
+> n+1
+
+, o n+1 , s n+1 , l  
+
+> ⌊tinfer /t data ⌋:p
+
+, (6b) where tinfer , tinterval , and tdata denote inference latency, inference interval, and data time step, respec-tively, and δt = σi − σi−1. This operation does not change the model architecture; it constrains the sampler so that the low-level controller receives temporally consistent trajectory references. 
+
+## 4 Experiments 
+
+4.1 Implementation Details and Setup 
+
+We use Wan2.1-1.3B [26] as the backbone, including its video DiT, text encoder, and video VAE. The proprioception encoder, action encoder, and action decoder are MLPs with hidden sizes 128 and 
+
+256 . Simulation and real-world demonstrations are collected at 30 Hz and temporally downsampled by 3×, giving one video frame per three actions, eight future video frames, and 24 actions per 6Task Reference frames Success ↑ Collision ↓                        
+
+> AeroAct tracking 120.0 90.0 AeroAct searching 190.0 10.0 AeroAct tracking 9100.0 0.0
+> AeroAct searching 9100.0 0.0
+> AeroAct-FT tracking 995.0 0.0
+> AeroAct-FT searching 9100.0 0.0
+
+Table 1: Closed-loop simulation results in Isaac Lab over 20 episodes. Success denotes target visibility for at least 80% of the trajectory in tracking and target discovery in searching; collision denotes the percentage of episodes ending in collision.                   
+
+> Model Reference frames Average final distance Success ↑Collision ↓
+> AeroAct 13.819 75.0 25.0
+> AeroAct 91.983 100.0 0.0
+> AeroAct-FT 91.988 100.0 0.0
+
+Table 2: Simulation results on the searching task with unseen target objects. chunk. The model uses nine reference frames, corresponding to 2.4 s of visual context. Pretraining on simulation data takes 36 hours on a single machine with 8× NVIDIA A100 GPUs. We use AdamW [29] with learning rate 4.3 × 10 −5 and weight decay 0.01 . The pretraining set contains 
+
+900 K simulation video clips and 320 M frames: 500 K tracking clips, 200 K Isaac reaching clips, and 
+
+200 K 3DGS reaching clips. All inference experiments are conducted on a single NVIDIA RTX 5090 24G Laptop GPU. The approximate VRAM usage is 4, 500 MB for both simulation experiments and real-world deploy-ment. In real-world experiments, inference requests are sent to the workstation through ZeroMQ; the predicted action chunk is returned to the quadrotor, converted into local trajectory segments, and tracked by an on-manifold model predictive controller [30]. 
+
+4.2 Simulation Results 
+
+We evaluate closed-loop performance in two Isaac Lab tasks: target tracking and language-conditioned object search. AeroAct-FT denotes the model after real-world finetuning. The eval-uation is designed to test whether the proposed temporal context and action-centered WAM design lead to executable trajectories rather than only accurate open-loop predictions. With only one reference frame, the model struggles in closed-loop tracking, achieving 20% success and 90% collision. This confirms that a single egocentric image is insufficient for estimating relative motion and producing safe trajectory chunks. Using nine reference frames improves both tracking and searching to 100% success with zero collisions. The improvement also holds for unseen tar-get objects, where success increases from 75% to 100% and the average final distance decreases from 3.819 m to 1.983 m. After real-world finetuning, AeroAct-FT maintains strong simulation performance with zero collisions and only minor success degradation, suggesting that real-world adaptation does not substantially compromise the learned closed-loop policy. 
+
+4.3 Real-World Flight 
+
+We further validate AeroAct through real-world flight experiments. The quadrotor platform is built by modifying an OddityRC 35Pro frame and is equipped with an Intel RealSense D435i camera and a Radxa ROCK 5C onboard computer. The experiments are conducted in a laboratory environment with a motion-capture system for state measurement and safety monitoring. Under this hardware configuration, the inference latency of the model is approximately tinfer = 0 .8 s. 7(a) (b) Figure 5: Experimental hardware platforms. (a) UAV platform for flight-task execution, equipped with onboard sensing modules and connected to a remote server via a local network for offboard inference. The resulting trajectories are tracked using OM-MPC. (b) Self-made portable data-collection platform for recording cropped camera observations and corresponding trajectory an-notations, enabling efficient large-scale collection of interaction data. 
+
+Figure 6: Real-world flight with language-conditioned WAM. AeroAct generates feasible flight commands and guides the quadrotor toward the specified target object in a lab environment. The trajectory illustrates closed-loop execution of the learned WAM policy on a physical aerial robot. To the best of our knowledge, this is the first WAM-based real-world quadrotor flight demonstra-tion, where a learned model directly connects visual-language task specification, predictive action generation, and closed-loop quadrotor execution. In the experiment shown in Fig. 6, the instruc-tion given to the model is “fly to the yellow foam mat.” The model successfully generates feasible flight commands and navigates the quadrotor toward the target object, demonstrating the potential of world-action modeling for embodied aerial intelligence beyond simulation. 
+
+## 5 Limitations 
+
+Our real-world experiments are currently limited to short indoor trajectories. The temporal context is sufficient for single-stage target reaching, but not yet for complex instructions that require multiple semantic sub-goals, recovery behaviors, or long-horizon memory. Real-world deployment also relies on offboard inference because of the computational cost of the video-diffusion backbone. 
+
+## 6 Conclusion 
+
+We presented AeroAct, an action-centered WAM for language-conditioned quadrotor flight. Instead of predicting discrete actions, high-level waypoints, or instantaneous velocities, AeroAct outputs smooth local trajectory chunks and uses future egocentric visual prediction as training-time conse-quence supervision. This design preserves the temporal and geometric priors of generative video models while enabling efficient action decoding without test-time video generation. To support aerial WAM training, AeroAct combines DiffAero dynamics, Isaac Lab, 3DGS ren-dering, and handheld real-world demonstrations into a hybrid data pipeline with aligned vision, 8language, proprioception, and dynamically feasible actions. Simulation results show that tempo-ral visual history and mixed-domain data improve target tracking and language-conditioned object search. Real-world experiments further validate, to the best of our knowledge, the first WAM-based quadrotor flight on a physical platform. Current limitations include short indoor trials and reliance on offboard inference. Future work will focus on onboard efficiency, robustness under more ag-gressive flight dynamics, uncertainty-aware action generation, and long-horizon multi-stage aerial instruction following. 
+
+Acknowledgments 
+
+This work was supported in part by the National Natural Science Foundation of China under Grants U23B2059, 62088101, and also by the Zhongguancun Academy under Grant 20240307. 
+
+## References 
+
+[1] D. Hafner, J. Pasukonis, J. Ba, and T. Lillicrap. Mastering diverse control tasks through world models. Nature , 640(8059):647–653, Apr. 2025. ISSN 1476-4687. doi:10.1038/ s41586-025-08744-2. [2] W. Zhang, G. Wang, J. Sun, Y. Yuan, and G. Huang. STORM: Efficient stochastic transformer based world models for reinforcement learning. In Proc. Adv. Neural Inf. Process. Syst. , 2023. [3] J. Bruce, M. Dennis, A. Edwards, J. Parker-Holder, Y. Shi, E. Hughes, M. Lai, A. Mavalankar, R. Steigerwald, C. Apps, Y. Aytar, S. Bechtle, F. Behbahani, S. Chan, N. Heess, L. Gonzalez, S. Osindero, S. Ozair, S. Reed, J. Zhang, K. Zolna, J. Clune, N. de Freitas, S. Singh, and T. Rockt¨ aschel. Genie: Generative interactive environments, 2024. [4] S. Yang, Y. Du, S. K. S. Ghasemipour, J. Tompson, L. P. Kaelbling, D. Schuurmans, and P. Abbeel. Learning interactive real-world simulators. In The Twelfth International Conference on Learning Representations , 2024. [5] A. Romero, A. Shenai, I. Geles, E. Aljalbout, and D. Scaramuzza. Dream to fly: Model-based reinforcement learning for vision-based drone flight. arXiv:2501.14377 , 2025. [6] Y. Zhang, B. Gao, G. Wang, J. Sun, and Z. Li. CORB-Planner: Corridor as observations for rl planning in high-speed flight. IEEE/ASME Trans. Mechatron. , 2025. doi:10.1109/TMECH. 2025.3620233. [7] X. Zhang, R. Wang, Y. Ren, D. Yu, B. Zhou, J. Sun, F. Deng, J. Chen, and G. Wang. Mad: Mapping-aware world models for agile quadrotor flight. arXiv preprint arXiv:2606.04534 ,2026. [8] Z. Feng, R. Xue, L. Yuan, Y. Yu, N. Ding, M. Liu, B. Gao, J. Sun, X. Zheng, and G. Wang. Multi-agent embodied ai: Advances and future directions. Science China Information Sci-ences , 69(5):151202, 2026. [9] A. Ye, B. Wang, C. Ni, G. Huang, G. Zhao, H. Li, H. Li, J. Li, J. Lv, J. Liu, M. Cao, P. Li, Q. Deng, W. Mei, X. Wang, X. Chen, X. Zhou, Y. Wang, Y. Chang, Y. Li, Y. Zhou, Y. Ye, Z. Liu, and Z. Zhu. GigaWorld-Policy: An efficient action-centered world–action model, 2026. [10] S. Ye, Y. Ge, K. Zheng, S. Gao, S. Yu, G. Kurian, S. Indupuru, Y. L. Tan, C. Zhu, J. Xi-ang, A. Malik, K. Lee, W. Liang, N. Ranawaka, J. Gu, Y. Xu, G. Wang, F. Hu, A. Narayan, J. Bjorck, J. Wang, G. Kim, D. Niu, R. Zheng, Y. Xie, J. Wu, Q. Wang, R. Julian, D. Xu, Y. Du, Y. Chebotar, S. Reed, J. Kautz, Y. Zhu, L. J. Fan, and J. Jang. World action models are zero-shot policies, 2026. [11] X. Zhang, R. Wang, Y. Ren, J. Sun, H. Fang, J. Chen, and G. Wang. DiffAero: A GPU-accelerated differentiable simulation framework for efficient quadrotor policy learning, 2025. 9[12] B. Kerbl, G. Kopanas, T. Leimk¨ uhler, and G. Drettakis. 3d gaussian splatting for real-time radiance field rendering. ACM Transactions on Graphics , 42(4):139:1–139:14, 2023. doi: 10.1145/3592433. [13] Y. Jia, G. Wang, Y. Dong, J. Wu, Y. Zeng, H. Lin, Z. Wang, H. Ge, W. Gu, C. Li, Z. Wang, Y. Cheng, W. Sui, R. Huang, and G. Zhou. Discoverse: Efficient robot simulation in complex high-fidelity environments. arXiv preprint arXiv:2507.21981 , 2025. [14] Y. Jia, H. Zhang, Z. Zhang, J. Wu, M. Yu, Z. Wang, D. Jiang, Z. Li, C. Cao, Z. Yu, X. Yang, H. Ge, Y. Zhang, J. Zhang, Z. Huang, T. Liu, S. Chen, J. Wang, B. Xie, X. Yao, X. Deng, G. Wang, J. Zhang, L. Hao, Z. Chen, Y. Chen, A. Wang, H. Tian, Y. Yan, Z. Cao, Y. Jiang, H. Shao, Y. Li, L. Shi, B. Chen, W. Sui, H. Cui, Y. Qin, R. Huang, L. Han, T. Wang, and G. Zhou. Gs-playground: A high-throughput photorealistic simulator for vision-informed robot learning. arXiv preprint arXiv:2604.25459 , 2026. [15] Y. Fan, W. Chen, T. Jiang, C. Zhou, Y. Zhang, and X. E. Wang. Aerial vision-and-dialog navigation, 2023. [16] S. Liu, H. Zhang, Y. Qi, P. Wang, Y. Zhang, and Q. Wu. AerialVLN: Vision-and-language navigation for uavs, 2023. [17] X. Wang, D. Yang, Z. Wang, H. Kwan, J. Chen, W. Wu, H. Li, Y. Liao, and S. Liu. Towards realistic UAV vision-language navigation: Platform, benchmark, and methodology. In The Thirteenth International Conference on Learning Representations , 2025. [18] Y. Gao, C. Li, Z. You, J. Liu, L. Zhen, P. CHEN, Q. Chen, Z. Tang, L. Wang, Yangpenghui, Y. Tang, Y. Tang, S. Liang, S. Zhu, Z. Xiong, Y. Su, X. Ye, J. Li, Y. Ding, D. Wang, Z. Wang, B. Zhao, and X. Li. OpenFly: A comprehensive platform for aerial vision-language navigation. In The Fourteenth International Conference on Learning Representations , 2026. [19] X. Wang, D. Yang, Y. Liao, W. Zheng, wenjun wu, B. Dai, H. Li, and S. Liu. UAV-Flow Colosseo: A real-world benchmark for flying-on-a-word UAV imitation learning. In 
+
+The Thirty-ninth Annual Conference on Neural Information Processing Systems Datasets and Benchmarks Track , 2026. [20] G. Zheng, Y. Ban, M. Zhang, J. Zheng, and B. Zhou. OnFly: Onboard zero-shot aerial vision-language navigation toward safety and efficiency, 2026. [21] Y. Wu, M. Zhu, X. Li, Y. Du, Y. Fan, W. Li, Z. Han, X. Zhou, and F. Gao. VLA-AN: An efficient and onboard vision-language-action framework for aerial navigation in complex envi-ronments, 2025. [22] C. Zhu, R. Yu, S. Feng, B. Burchfiel, P. Shah, and A. Gupta. Unified World Models: Coupling video and action diffusion for pretraining on large robotic datasets. In Proceedings of Robotics: Science and Systems (RSS) , 2025. [23] M. J. Kim, Y. Gao, T.-Y. Lin, Y.-C. Lin, Y. Ge, G. Lam, P. Liang, S. Song, M.-Y. Liu, C. Finn, and J. Gu. Cosmos Policy: Fine-tuning video models for visuomotor control and planning, 2026. [24] H. Bi, H. Tan, S. Xie, Z. Wang, S. Huang, H. Liu, R. Zhao, Y. Feng, C. Xiang, Y. Rong, H. Zhao, H. Liu, Z. Su, L. Ma, H. Su, and J. Zhu. Motus: A unified latent action world model, 2025. [25] T. Yuan, Z. Dong, Y. Liu, and H. Zhao. Fast-WAM: Do world action models need test-time future imagination?, 2026. 10 [26] T. Wan, A. Wang, B. Ai, B. Wen, C. Mao, C.-W. Xie, D. Chen, F. Yu, H. Zhao, J. Yang, J. Zeng, J. Wang, J. Zhang, J. Zhou, J. Wang, J. Chen, K. Zhu, K. Zhao, K. Yan, L. Huang, M. Feng, N. Zhang, P. Li, P. Wu, R. Chu, R. Feng, S. Zhang, S. Sun, T. Fang, T. Wang, T. Gui, T. Weng, T. Shen, W. Lin, W. Wang, W. Wang, W. Zhou, W. Wang, W. Shen, W. Yu, X. Shi, X. Huang, X. Xu, Y. Kou, Y. Lv, Y. Li, Y. Liu, Y. Wang, Y. Zhang, Y. Huang, Y. Li, Y. Wu, Y. Liu, Y. Pan, Y. Zheng, Y. Hong, Y. Shi, Y. Feng, Z. Jiang, Z. Han, Z.-F. Wu, and Z. Liu. Wan: Open and advanced large-scale video generative models, 2025. [27] T. HY-World, C. Cao, X. Zuo, Z. Wang, Y. Zhang, J. Wu, Z. Liu, Y. Gong, Y. Liu, B. Yuan, C. Zhang, C. Li, D. Guo, F. Yang, H. Zhang, H. Cao, J. Zhu, J. Lin, J. Xiao, J. Zhang, J. Yu, L. Wang, L. Wang, L. Wang, Linus, M. Chen, P. He, P. Zhao, Q. Chen, R. Chen, R. Shao, S. Liu, W. Qin, X. Niu, X. Yuan, Y. Sun, Y. Tang, Y. Sun, Y. Lian, Y. Tan, Y. Liu, Y. Yin, Z. Min, T. Wang, and C. Guo. HY-World 2.0: A multi-modal world model for reconstructing, generating, and simulating 3d worlds, 2026. [28] Y. Lipman, R. T. Q. Chen, H. Ben-Hamu, M. Nickel, and M. Le. Flow matching for generative modeling. In The Eleventh International Conference on Learning Representations, ICLR 2023, Kigali, Rwanda, May 1-5, 2023 . OpenReview.net, 2023. [29] I. Loshchilov and F. Hutter. Decoupled weight decay regularization. In 7th International Conference on Learning Representations, ICLR 2019, New Orleans, LA, USA, May 6-9, 2019 .OpenReview.net, 2019. [30] G. Lu, W. Xu, and F. Zhang. On-Manifold model predictive control for trajectory tracking on robotic systems. IEEE Transactions on Industrial Electronics , 70(9):9192–9202, 2023. doi:10.1109/TIE.2022.3212397. [31] J. Lu, X. Zhang, H. Shen, L. Xu, and B. Tian. You only plan once: A learning-based one-stage planner with guidance learning. IEEE Robotics and Automation Letters , 9(7):6083–6090, July 2024. doi:10.1109/LRA.2024.3399589. 11 A Appendix 
+
+A.1 Observation and Action Spaces 
+
+Proprioception and actions are expressed in a yaw-aligned local frame. Its x-axis lies in the vertical plane defined by the body x-axis, and its z-axis points upward. The proprioceptive input is 
+
+s = [ vl⊤, al⊤, ul⊤ 
+
+> z
+
+]⊤ ∈ R9, (7) where vl, al, and ul 
+
+> z
+
+are the local velocity, local acceleration, and body-z unit vector represented in the local frame. Each action parameterizes a local trajectory segment rather than an instantaneous velocity command. For each dimension μ ∈ { x, y, z }, the segment is a fifth-order polynomial 
+
+plμ(t) = α0 + α1t + α2t2 + α3t3 + α4t4 + α5t5. (8) Similar to Lu et al. [31], the action specifies the endpoint of a T = 2 s local trajectory segment 
+
+a = [ r, θ, ψ, vl⊤
+
+> end
+
+, al⊤
+
+> end
+
+]⊤ ∈ R9, (9) where vl 
+
+> end
+
+and al 
+
+> end
+
+are endpoint velocity and acceleration, and (r, θ, ψ ) defines the endpoint dis-placement by 
+
+plx, end = r cos( θ) cos( ψ),ply, end = r cos( θ) sin( ψ),plz, end = −r sin( θ).
+
+(10) Given pl 
+
+> start
+
+= 0, vl
+
+> start
+
+, al
+
+> start
+
+, and the endpoint conditions, the polynomial coefficients for μ ∈{x, y, z } are obtained as follows 
+
+
+
+αμ
+
+> 0
+
+αμ
+
+> 1
+
+αμ
+
+> 2
+
+αμ
+
+> 3
+
+αμ
+
+> 4
+
+αμ
+
+> 5
+
+
+
+=
+
+
+
+1 0 0 0 0 00 1 0 0 0 00 0 2 0 0 01 T T 2 T 3 T 4 T 5
+
+0 1 2T 3T 2 4T 3 5T 4
+
+0 0 2 6T 12 T 2 20 T 3
+
+ 
+
+> −1
+
+
+
+plμ, start 
+
+vlμ, start 
+
+alμ, start 
+
+plμ, end 
+
+vlμ, end 
+
+alμ, end 
+
+
+
+. (11) 
+
+A.2 Evaluation Metrics Tracking metrics. Tracking evaluates whether the UAV follows a saved moving-target trajectory. The final-distance metric is 
+
+dist m i = dfinal  
+
+> i
+
+= di(Ti), Dtrk final = 1
+
+N
+
+> N
+
+X
+
+> i=1
+
+dist m i. (12) Because final distance alone does not certify that the target stayed visible, we also report collision and camera-based metrics 
+
+Rtrk coll = 1
+
+N
+
+> N
+
+X
+
+> i=1
+
+I (∃t, terminated i(t) ∨ collision i(t)) . (13) Let vi(t) indicate whether the target center is inside the camera frustum, and let ci(t) indicate whether its normalized image-plane offset is no larger than τc = 0 .25 :
+
+Rview ,i = 1
+
+KiKi−1X
+
+> t=0
+
+vi(t), Rcenter ,i = 1
+
+KiKi−1X
+
+> t=0
+
+ci(t), (14) with dataset-level averages 
+
+Rview = 1
+
+N
+
+> N
+
+X
+
+> i=1
+
+Rview ,i , Rcenter = 1
+
+N
+
+> N
+
+X
+
+> i=1
+
+Rcenter ,i . (15) The centered-target rate is stricter than the in-view rate because it additionally requires the target to remain close to the optical axis. 12 Searching metrics. The searching task measures whether the language-conditioned policy reaches a specified object without collision. An episode reaches the target if the environment reports success or the drone enters the τs = 2 .0 m success radius at any time. The success metric additionally requires no collision 
+
+Rsrch succ = 1
+
+N
+
+> N
+
+X
+
+> i=1
+
+I ((success env  
+
+> i
+
+∨ ∃ t, d i(t) ≤ τs) ∧ ¬ collided i) . (16) The collision rate is 
+
+Rsrch coll = 1
+
+N
+
+> N
+
+X
+
+> i=1
+
+I (∃t, terminated i(t) ∨ collision i(t)) , (17) and the final distance is 
+
+dist m i = final dist m i = di(Ti), Dsrch final = 1
+
+N
+
+> N
+
+X
+
+> i=1
+
+dist m i. (18) In the current logging code, dist m and final dist m denote the same final-distance value. 
+
+A.3 Additional Experimental Results 
+
+Let pi(t) be the drone position in rollout i at simulation time t, and let gi(t) denote the target position. The instantaneous target distance and final valid step are 
+
+di(t) = ∥pi(t) − gi(t)∥2 , Ti = Ki − 1. (19) All reported means are averaged over N trajectories or episodes. The policy is queried every 
+
+nreplan = max 
+
+
+
+1, round 
+
+ 1
+
+> fserver dt
+
+ 
+
+(20) simulation steps, where fserver is the inference frequency and dt is the simulation step size. We compare three checkpoints under the same Isaac Lab scenes, camera model, controller settings, and inference-server interface. Tracking uses 20 trajectories at 1, 2, and 5 Hz. Searching uses 20 
+
+language-specified object-search episodes at 1, 2, and 5 Hz. For tracking, final distance can be misleading: a rollout may end near the target after losing it, or may keep the target in view while ending farther away. We therefore treat target visibility as the primary tracking signal. In Table 3, view success counts a trajectory as successful when its target-in-view rate is at least 80% . Table 4 reports success, collision and final target distance. Model Reference frames Freq. View succ. ↑ In-view ↑ Centered ↑ Dist. ↓ Coll. ↓
+
+AeroAct 1 1 Hz 20.0 55.6 21.8 7.902 90.0 AeroAct 1 2 Hz 5.0 55.7 25.3 12.306 100.0 AeroAct 1 5 Hz 10.0 57.9 30.9 13.163 90.0 AeroAct 9 1 Hz 100.0 100.0 64.2 3.436 0.0 
+
+AeroAct 9 2 Hz 100.0 99.3 77.0 2.245 0.0 
+
+AeroAct 9 5 Hz 100.0 98.7 78.7 2.375 5.0 AeroAct-FT 9 1 Hz 95.0 97.5 61.0 2.845 0.0 
+
+AeroAct-FT 9 2 Hz 100.0 99.2 73.3 2.865 0.0 
+
+AeroAct-FT 9 5 Hz 100.0 99.4 81.8 2.668 0.0 
+
+Table 3: Closed-loop tracking results in simulation. View success is the percentage of 20 trajectories whose target-in-view rate is at least 80% . In-view, centered, and collision are percentages; distance is measured in meters. 13 Model Reference frames Freq. Success ↑ Collision ↓ Final dist. ↓
+
+AeroAct 1 1 Hz 90.0 10.0 2.616 AeroAct 1 2 Hz 80.0 20.0 3.421 AeroAct 1 5 Hz 75.0 20.0 4.064 AeroAct 9 1 Hz 100.0 0.0 1.982 
+
+AeroAct 9 2 Hz 100.0 0.0 1.980 
+
+AeroAct 9 5 Hz 100.0 0.0 1.981 AeroAct-FT 9 1 Hz 100.0 0.0 1.984 
+
+AeroAct-FT 9 2 Hz 100.0 0.0 1.987 AeroAct-FT 9 5 Hz 100.0 0.0 1.984 
+
+Table 4: Closed-loop searching results in simulation. Success and collision are percentages over 20 
+
+episodes, and final distance is measured in meters. 14
