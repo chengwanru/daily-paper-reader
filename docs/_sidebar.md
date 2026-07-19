@@ -1,6 +1,9 @@
 * <a class="dpr-sidebar-root-link" href="#/">首页</a>
 * <a class="dpr-sidebar-root-link dpr-sidebar-noactive-link" href="javascript:void(0)" data-dpr-hash="#/tutorial/README">使用教程</a>
 * Daily Papers
+  * 2026-07-19 <!--dpr-date:20260719-->
+    * 速读区
+      * <a class="dpr-sidebar-item-link dpr-sidebar-item-structured" href="#/202607/19/2607.13681v1-towards-spatial-supersensing-in-the-wild" data-sidebar-item="{&quot;title&quot;: &quot;Towards Spatial Supersensing in the Wild&quot;, &quot;link&quot;: &quot;https://arxiv.org/abs/2607.13681v1-towards-spatial-supersensing-in-the-wild&quot;, &quot;score&quot;: &quot;7.0&quot;, &quot;tags&quot;: [{&quot;kind&quot;: &quot;query&quot;, &quot;label&quot;: &quot;video-wam&quot;}], &quot;evidence&quot;: &quot;用于评估空间推理中世界模型的基准&quot;}">Towards Spatial Supersensing in the Wild</a>
   * 2026-07-18 <!--dpr-date:20260718-->
     * 速读区
       * <a class="dpr-sidebar-item-link dpr-sidebar-item-structured" href="#/202607/18/2607.09818v1-ts-mask-vla-2d-temporal-spatial-masking-for-vision-language-action-model-with-effective-bridging" data-sidebar-item="{&quot;title&quot;: &quot;TS-Mask VLA: 2D Temporal-Spatial Masking for Vision-Language-Action Model with Effective Bridging&quot;, &quot;link&quot;: &quot;https://arxiv.org/abs/2607.09818v1-ts-mask-vla-2d-temporal-spatial-masking-for-vision-language-action-model-with-effective-bridging&quot;, &quot;score&quot;: &quot;6.0&quot;, &quot;tags&quot;: [{&quot;kind&quot;: &quot;query&quot;, &quot;label&quot;: &quot;video-wam&quot;}], &quot;evidence&quot;: &quot;面向机器人操作的视觉-语言-行动模型；处理视频到行动生成&quot;}">TS-Mask VLA: 2D Temporal-Spatial Masking for Vision-Language-Action Model with Effective Bridging</a>
