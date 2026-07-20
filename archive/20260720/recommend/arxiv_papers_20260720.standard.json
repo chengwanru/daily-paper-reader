@@ -1,0 +1,298 @@
+{
+  "mode": "standard",
+  "generated_at": "2026-07-20T20:46:06.289638+00:00",
+  "stats": {
+    "mode": "standard",
+    "tag_count": 1,
+    "deep_divecandidates": 3,
+    "deep_cap": 6,
+    "deep_selected": 3,
+    "quick_candidates": 3,
+    "quick_skim_target": 11,
+    "quick_selected": 3
+  },
+  "deep_dive": [
+    {
+      "id": "2607.13960v3",
+      "source": "arxiv",
+      "title": "GigaWorld-Policy-0.5: A Faster and Stronger WAM Empowered by AutoResearch",
+      "abstract": "World Action Models (WAMs) improve robot policy learning by jointly modeling actions and future visual observations, using future scene evolution as dense supervision for physically grounded action generation. However, a common design in existing WAMs is to explicitly generate future videos at inference time, incurring substantial computational overhead and hindering real-time closed-loop deployment. GigaWorld-Policy addresses this issue with an action-centered formulation, where future visual dynamics are used during training while action-only decoding is used at inference time. Building upon this framework, we present GigaWorld-Policy-0.5, an enhanced action-centered WAM designed for more efficient robot control. During pretraining, GigaWorld-Policy-0.5 adopts a mixed Action-Conditioned World Modeling (AC-WM) and WAM training strategy. This strengthens the coupling between visual dynamics and robot actions and improves the transferability of action representations for downstream policy learning. For efficient inference, GigaWorld-Policy-0.5 introduces a Mixture-of-Transformers architecture that separates visual dynamics modeling and action generation into specialized experts, reducing active computation during action-only inference and achieving 85 ms inference latency on a local RTX 4090 setup. In addition, we employ an agent-based AutoResearch pipeline to systematically search training configurations, enabling more efficient identification of optimal experimental setups while reducing the time and manual intervention required for hyperparameter tuning. Experiments and ablations show that GigaWorld-Policy-0.5 preserves the training benefits of future visual dynamics while improving inference efficiency for robot control.",
+      "authors": [
+        "GigaWorld Team",
+        "Angen Ye",
+        "Angyuan Ma",
+        "Boyuan Wang",
+        "Chaojun Ni",
+        "Fangzheng Ye",
+        "Guan Huang",
+        "Guo Li",
+        "Guosheng Zhao",
+        "Haodong Yan",
+        "Hengtao Li",
+        "Jiwen Lu",
+        "Kai Wang",
+        "Mingming Yu",
+        "Qitang Hu",
+        "Qiuping Deng",
+        "Songling Liu",
+        "Xiaoyu Tian",
+        "Xiaofeng Wang",
+        "Xinyu Zhou",
+        "Xiuwei Xu",
+        "Xinze Chen",
+        "Yang Wang",
+        "Yejun Zeng",
+        "Yifan Chang",
+        "Yun Ye",
+        "Zhenyu Wu",
+        "Zhanqian Wu",
+        "Zheng Zhu"
+      ],
+      "primary_category": "cs.RO",
+      "categories": [
+        "cs.RO"
+      ],
+      "published": "2026-07-15T15:46:42+00:00",
+      "link": "https://arxiv.org/pdf/2607.13960v3",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 10.0,
+      "llm_evidence_en": "GigaWorld-Policy-0.5: a faster and stronger WAM empowered by AutoResearch",
+      "llm_evidence_cn": "GigaWorld-Policy-0.5: 更快速更强的World Action Model",
+      "llm_evidence": "GigaWorld-Policy-0.5: 更快速更强的World Action Model",
+      "canonical_evidence": "GigaWorld-Policy-0.5: 更快速更强的World Action Model",
+      "llm_tldr_en": "Presents GigaWorld-Policy-0.5, an action-centered World Action Model that uses future visual dynamics during training but decodes actions only at inference, reducing computational overhead for real-time robot control.",
+      "llm_tldr_cn": "GigaWorld-Policy-0.5是一种以动作为中心的World Action Model改进版本。现有WAM在推理时显式生成未来视频，导致高计算开销。该工作提出在训练时使用未来视觉动态监督，推理时仅解码动作，大幅降低延迟。通过AutoResearch自动搜索优化策略，进一步提升了模型效率和强度。实验表明该方法在机器人控制任务上实现了接近实时的闭环部署，且性能优于先前WAM。",
+      "llm_tldr": "GigaWorld-Policy-0.5是一种以动作为中心的World Action Model改进版本。现有WAM在推理时显式生成未来视频，导致高计算开销。该工作提出在训练时使用未来视觉动态监督，推理时仅解码动作，大幅降低延迟。通过AutoResearch自动搜索优化策略，进一步提升了模型效率和强度。实验表明该方法在机器人控制任务上实现了接近实时的闭环部署，且性能优于先前WAM。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "world action model",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2607.15898v1",
+      "source": "arxiv",
+      "title": "Orbis 2: A Hierarchical World Model for Driving",
+      "abstract": "Current world models operate at a single level of abstraction, with most prioritizing perceptual fidelity while lacking the spatial reasoning and semantic understanding required for real-world downstream tasks. We present a hierarchical driving world model that factorizes future prediction across two levels operating at distinct temporal and abstraction scales: a high-level predictor that forecasts coarse scene structure over extended temporal horizons, and a low-level generator that produces detailed predictions conditioned on the high-level output. This decomposition yields high perceptual fidelity while also capturing strong spatial and semantic representations. We further show that pretraining with a diffusion forcing objective yields substantially richer internal representations than the standard teacher forcing objective, while teacher forcing -- predicting only the next frame from clean context -- produces more stable autoregressive rollouts. We therefore introduce a generic two-stage training paradigm that pretrains the model with diffusion forcing and fine-tunes with teacher forcing, combining the representational benefits of the former with the rollout stability of the latter. Our approach achieves state-of-the-art results across the standard suite of driving world model evaluations on established benchmarks, including long-horizon generation fidelity, steering responsiveness evaluated on counterfactual scenarios, and internal representation quality. Project page with code, demo, checkpoints and qualitative results: https://lmb-freiburg.github.io/orbis2.github.io/",
+      "authors": [
+        "Sudhanshu Mittal",
+        "Arian Mousakhan",
+        "Silvio Galesso",
+        "Karim Farid",
+        "Jonannes Dienert",
+        "Rajat Sahay",
+        "Thomas Brox"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV",
+        "cs.AI",
+        "cs.LG",
+        "cs.RO"
+      ],
+      "published": "2026-07-17T12:12:33+00:00",
+      "link": "https://arxiv.org/pdf/2607.15898v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 8.0,
+      "llm_evidence_en": "hierarchical driving world model with video generation",
+      "llm_evidence_cn": "分层驾驶世界模型，包含视频生成",
+      "llm_evidence": "分层驾驶世界模型，包含视频生成",
+      "canonical_evidence": "分层驾驶世界模型，包含视频生成",
+      "llm_tldr_en": "Orbis 2 proposes a hierarchical world model for driving that factorizes future prediction across two abstraction levels, using a high-level predictor and a low-level video generator, achieving high perceptual fidelity and spatial reasoning.",
+      "llm_tldr_cn": "现有驾驶世界模型常单一抽象层次，缺乏空间推理。Orbis 2提出分层世界模型，高维预测场景结构，低维生成器产生细节预测，并通过扩散强迫预训练提升内部表征。实验表明该方法在感知保真度和语义理解上优于单层模型，为自动驾驶视频世界模型提供了新范式。",
+      "llm_tldr": "现有驾驶世界模型常单一抽象层次，缺乏空间推理。Orbis 2提出分层世界模型，高维预测场景结构，低维生成器产生细节预测，并通过扩散强迫预训练提升内部表征。实验表明该方法在感知保真度和语义理解上优于单层模型，为自动驾驶视频世界模型提供了新范式。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "video world model",
+      "matched_requirement_id": "req-5",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2607.16192v1",
+      "source": "arxiv",
+      "title": "MotionForesight: Re-purposing Video Models for Future 3D Scene-Flow Prediction",
+      "abstract": "Humans can infer how objects are likely to move from passive observation: a cup may be lifted, a drawer may slide, and a lid may rotate shut. Such predictions expose the physical consequences of interaction needed to act in the real world. We study how to learn this anticipation from ordinary monocular videos of human-object interaction. Given a short observed video context, MotionForesight predicts future 3D trajectories for points on the manipulated object. This casts interaction prediction as object-centered 3D motion forecasting without any assumptions on the object properties. Our key insight is that video prediction models already encode rich priors about how objects move during human interactions. We redirect these priors from pixel prediction toward future 3D scene flow. We start from a dense 3D tracker built on a pretrained video model, generate pseudo-ground-truth tracks from complete clips, and train the forecaster using only the observed frames. We replace future RGB and geometry with learned mask latents and train a lightweight adapter to turn the retrospective tracking representation into a forward predictor, while freezing the large video and tracking components. Using just 40k human videos and no auxiliary inputs such as language, MotionForesight generalizes across diverse out-of-distribution objects, environments, viewpoints, and interactions. It also outperforms substantially larger models that use over a million training videos. These results show that we can efficiently re-purpose video priors into explicit geometric forecasts for embodied intelligence. https://motionforesight.github.io/",
+      "authors": [
+        "Homanga Bharadhwaj",
+        "Yash Jangir"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV"
+      ],
+      "published": "2026-07-17T17:59:38+00:00",
+      "link": "https://arxiv.org/pdf/2607.16192v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 8.0,
+      "llm_evidence_en": "predicts future 3D trajectories from video, similar to video-based world action prediction",
+      "llm_evidence_cn": "从视频预测未来3D轨迹，类似于基于视频的世界动作预测",
+      "llm_evidence": "从视频预测未来3D轨迹，类似于基于视频的世界动作预测",
+      "canonical_evidence": "从视频预测未来3D轨迹，类似于基于视频的世界动作预测",
+      "llm_tldr_en": "MotionForesight repurposes video prediction models to forecast future 3D scene flow from monocular videos of human-object interaction, enabling action anticipation without object assumptions.",
+      "llm_tldr_cn": "本文针对从被动观测视频中预测物体未来运动的问题，提出MotionForesight方法，重新利用视频预测模型中的先验知识，从单目人类-物体交互视频中预测未来3D轨迹，将交互预测转化为以物体为中心的3D运动预测，无需对物体属性做任何假设。实验表明该方法能有效预测物体在交互中的运动。",
+      "llm_tldr": "本文针对从被动观测视频中预测物体未来运动的问题，提出MotionForesight方法，重新利用视频预测模型中的先验知识，从单目人类-物体交互视频中预测未来3D轨迹，将交互预测转化为以物体为中心的3D运动预测，无需对物体属性做任何假设。实验表明该方法能有效预测物体在交互中的运动。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "video based world action prediction",
+      "matched_requirement_id": "req-7",
+      "selection_source": "fresh_fetch"
+    }
+  ],
+  "quick_skim": [
+    {
+      "id": "2607.15038v2",
+      "source": "arxiv",
+      "title": "Video = World + Event Stream",
+      "abstract": "We present Wan-Streamer v0.3, which reframes our native-streaming interaction model under a single organizing view: a video is a world plus an event stream. The world is the persistent context in which a video unfolds, including the environment, scene, subjects, ambient acoustic conditions, voice characteristics, and other relatively stable conditions. The event stream is everything that changes over time within that world, including scene or environmental changes, subject behavior, speech, and other sounds. This yields a general-purpose pretraining task over large amounts of real video: given a world and incoming input, predict how the world moves, changes, and responds in real time. The resulting competence can be specialized to a broad family of real-time downstream tasks. We instantiate it on real-time full-duplex audio-visual interaction, where the event stream is the agent's speech together with free-form behavior. Functionally, the model's multimodal understanding process is vision-language-action-like: it maps multimodal user input to language-form speech and behavior actions. Wan-Streamer v0.3 preserves the v0.2 operating point: 640x368 video at 25 FPS, a 160 ms streaming unit, approximately 200 ms model-side response latency, and approximately 550 ms total interaction latency under a 350 ms bidirectional network budget.",
+      "authors": [
+        "Lianghua Huang",
+        "Zhi-Fan Wu",
+        "Yupeng Shi",
+        "Wei Wang",
+        "Mengyang Feng",
+        "Cheng Yu",
+        "Chen Liang",
+        "Junjie He",
+        "Chen-Wei Xie",
+        "Yu Liu",
+        "Jingren Zhou",
+        "Ang Wang",
+        "Bang Zhang",
+        "Baole Ai",
+        "Chongyang Zhong",
+        "Jinwei Qi",
+        "Kai Zhu",
+        "Pandeng Li",
+        "Peng Zhang",
+        "Wenyuan Zhang",
+        "Xinhua Cheng",
+        "Yitong Huang",
+        "Yun Zheng",
+        "Yuxiang Bao",
+        "Yuzheng Wang",
+        "Zhiwei Lin",
+        "Zoubin Bi"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV"
+      ],
+      "published": "2026-07-16T14:19:42+00:00",
+      "link": "https://arxiv.org/pdf/2607.15038v2",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 7.0,
+      "llm_evidence_en": "treats video as world plus event stream, enabling real-time world modeling",
+      "llm_evidence_cn": "将视频视为世界加事件流，支持实时世界建模",
+      "llm_evidence": "将视频视为世界加事件流，支持实时世界建模",
+      "canonical_evidence": "将视频视为世界加事件流，支持实时世界建模",
+      "llm_tldr_en": "Wan-Streamer v0.3 reframes video as a world plus an event stream, enabling a general-purpose pretraining task for real-time prediction of world changes and downstream specialization.",
+      "llm_tldr_cn": "本文提出Wan-Streamer v0.3，将视频解构为持久的世界上下文和随时间变化的事件流。基于此视角设计通用预训练任务：给定世界和输入，预测世界如何实时变化和响应。该能力可特化到多种实时下游任务。框架支持视频中的世界建模与动态事件响应。",
+      "llm_tldr": "本文提出Wan-Streamer v0.3，将视频解构为持久的世界上下文和随时间变化的事件流。基于此视角设计通用预训练任务：给定世界和输入，预测世界如何实时变化和响应。该能力可特化到多种实时下游任务。框架支持视频中的世界建模与动态事件响应。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "video world model",
+      "matched_requirement_id": "req-5",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "7"
+    },
+    {
+      "id": "2607.15550v1",
+      "source": "arxiv",
+      "title": "SeerGuard: A Safety Framework for Mobile GUI Agents via World Model Prediction",
+      "abstract": "Mobile graphical user interface (GUI) agents have demonstrated remarkable capabilities in automating complex tasks, yet they introduce critical safety risks where a single erroneous action can lead to irreversible consequences. Existing safety mechanisms are primarily reactive, lacking the ability to assess risks before execution. In this paper, we introduce SeerGuard, a consequence-aware safety framework designed to mitigate these risks through pre-execution instruction-level screening and action-level risk assessment. Specifically, the action-level assessment analyzes agent-proposed actions within current GUI states, anticipating likely outcomes to identify risks before they are executed. To enable these capabilities, we construct a unified safety-augmented world model (SAWM) via multi-task learning, integrating semantic next-state prediction with safety risk assessment. Extensive experiments demonstrate that SeerGuard generalizes effectively across diverse mobile GUI agents. On Qwen3-VL-8B-Instruct, it increases the safety-utility score from $0.191$ to $0.596$ at $ω=0.8$ and reduces the risk-cost score from $0.347$ to $0.130$ at $α=0.8$. Further analyses on our SAWM validate the effectiveness of the instruction-level screening, alongside the capability of action risk assessment and next-state prediction.",
+      "authors": [
+        "Xue Yu",
+        "Bo Yuan",
+        "Pengshuai Yang",
+        "Kailin Zhao",
+        "Hong Hu",
+        "Junlan Feng"
+      ],
+      "primary_category": "cs.AI",
+      "categories": [
+        "cs.AI"
+      ],
+      "published": "2026-07-17T01:45:54+00:00",
+      "link": "https://arxiv.org/pdf/2607.15550v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "world model prediction for mobile GUI agent safety",
+      "llm_evidence_cn": "基于世界模型预测的移动GUI代理安全框架",
+      "llm_evidence": "基于世界模型预测的移动GUI代理安全框架",
+      "canonical_evidence": "基于世界模型预测的移动GUI代理安全框架",
+      "llm_tldr_en": "Proposes SeerGuard, a safety framework that uses a world model to predict action outcomes before execution, enabling preemptive risk assessment for mobile GUI agents.",
+      "llm_tldr_cn": "SeerGuard是一种利用世界模型预测移动GUI代理动作后果的安全框架。现有安全机制多为反应式，无法在执行前评估风险。SeerGuard通过构建统一的世界模型，在指令和动作层面进行预执行筛查和风险评估，预测行动结果以避免不可逆错误。该工作展示了世界模型在安全关键应用中的潜力，虽然领域不同，但其预测未来状态的核心思想与视频世界模型一致。",
+      "llm_tldr": "SeerGuard是一种利用世界模型预测移动GUI代理动作后果的安全框架。现有安全机制多为反应式，无法在执行前评估风险。SeerGuard通过构建统一的世界模型，在指令和动作层面进行预执行筛查和风险评估，预测行动结果以避免不可逆错误。该工作展示了世界模型在安全关键应用中的潜力，虽然领域不同，但其预测未来状态的核心思想与视频世界模型一致。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "world model",
+      "matched_requirement_id": "req-2",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    },
+    {
+      "id": "2607.15849v1",
+      "source": "arxiv",
+      "title": "Test-Time Noise Guided Adaptation for Realistic Autoregressive Video Generation",
+      "abstract": "Autoregressive video diffusion models have enabled the generation of arbitrarily long videos by removing conditioning on future frames, thus greatly improving computational efficiency. Yet, they suffer from error accumulation over time, as the denoised sequence gradually drifts away from the conditioning distribution seen during training. Recent advances attempt to reduce this error by anchoring each generated frame to the learned manifold of real ones. However, even when all generated individual frames lie close to the real manifold, there are trajectories which the model lacks sufficient knowledge to continue without exiting it, thus reaching a terminal point. To prevent the model from being trapped in terminal points, we start from the hypothesis that for well-modeled future trajectories the distribution of the predicted noise should match the one of the forward noising process. To enforce such a prior at test time, we introduce Terminal points Avoidance through Noise Guided Optimization (TANGO), which uses the diffusion model as a critic of its own outputs, by predicting one step forward and requiring an isotropic Gaussian noise prediction. We use the deviation from this expected noise distribution to search for an alternative trajectory that does not lead to a terminal point. Our approach achieves a $3.1\\%$ absolute improvement on VBench over state-of-the-art, while reducing Fréchet Video Distance by $28.3\\%$ on average across $15$s videos. Our code is available on https://mever-team.github.io/tango.",
+      "authors": [
+        "Dimitrios Karageorgiou",
+        "Symeon Papadopoulos",
+        "Ioannis Kompatsiaris",
+        "Efstratios Gavves"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV",
+        "cs.AI"
+      ],
+      "published": "2026-07-17T11:07:07+00:00",
+      "link": "https://arxiv.org/pdf/2607.15849v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 7.0,
+      "llm_evidence_en": "test-time adaptation for autoregressive video generation",
+      "llm_evidence_cn": "自回归视频生成的测试时自适应方法",
+      "llm_evidence": "自回归视频生成的测试时自适应方法",
+      "canonical_evidence": "自回归视频生成的测试时自适应方法",
+      "llm_tldr_en": "Proposes test-time noise guided adaptation to prevent error accumulation in autoregressive video diffusion models, enabling longer, higher-quality generation.",
+      "llm_tldr_cn": "本文针对自回归视频扩散模型的误差累积问题，提出测试时噪声引导自适应方法。该方法在生成过程中动态调整噪声分布，防止模型陷入终止点，从而生成长时间高质量视频。这项工作直接推动了视频生成技术的发展，为将视频生成用于世界模型（如世界动作模型中的未来帧预测）提供了关键技术支撑。",
+      "llm_tldr": "本文针对自回归视频扩散模型的误差累积问题，提出测试时噪声引导自适应方法。该方法在生成过程中动态调整噪声分布，防止模型陷入终止点，从而生成长时间高质量视频。这项工作直接推动了视频生成技术的发展，为将视频生成用于世界模型（如世界动作模型中的未来帧预测）提供了关键技术支撑。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "research on video generation for world models",
+      "matched_requirement_id": "req-8",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "7"
+    }
+  ]
+}
