@@ -1,0 +1,313 @@
+{
+  "mode": "standard",
+  "generated_at": "2026-07-21T21:08:02.812572+00:00",
+  "stats": {
+    "mode": "standard",
+    "tag_count": 1,
+    "deep_divecandidates": 6,
+    "deep_cap": 6,
+    "deep_selected": 6,
+    "quick_candidates": 1,
+    "quick_skim_target": 11,
+    "quick_selected": 1
+  },
+  "deep_dive": [
+    {
+      "id": "2607.17454v1",
+      "source": "arxiv",
+      "title": "Test-Time Scaling for World Action Models via Zero-Shot Geometric Evaluation",
+      "abstract": "Test-time scaling improves foundation-model inference by spending additional computation, but robot control requires deciding whether extra compute is useful before executing an action. World Action Models (WAMs) make this decision natural: each rollout exposes both an action chunk and predicted future observations. We propose \\methodgated, a training-free selective test-time scaling framework for WAMs. We first instantiate \\method, a fixed-budget Best-of-$N$ selector that ranks sampled rollouts by cross-view depth reprojection consistency of their predicted futures, computed with a frozen geometry foundation model. \\methodgated\\ adds a lightweight action--future consistency gate that invokes \\method\\ only when the initial rollout appears internally inconsistent. Across five benchmark--backbone settings on RoboCasa, LIBERO Long, and RoboTwin~2.0, fixed-budget \\method\\ improves $N{=}8$ task success in every setting, e.g., raising the RoboCasa group average from $66.3\\%$ to $68.4\\%$ with Cosmos Policy and from $80.8\\%$ to $82.5\\%$ with X-WAM. With gating enabled, \\methodgated\\ recovers on average $74.8\\%$ of the always-on success gain while triggering additional sampling on only $26.2\\%$ of decision points. Offline diagnostics show that cross-view reprojection is a strong task-label-free selector, and we identify false low-score selections as a failure mode that helps explain why performance can saturate or degrade as $N$ increases.",
+      "authors": [
+        "Zesen Zhao",
+        "Minkyoung Cho",
+        "Hui shen",
+        "Boyuan Zheng",
+        "Kunxiao Gao",
+        "Yulong Cao",
+        "Z. Morley Mao"
+      ],
+      "primary_category": "cs.RO",
+      "categories": [
+        "cs.RO"
+      ],
+      "published": "2026-07-20T01:05:02+00:00",
+      "link": "https://arxiv.org/pdf/2607.17454v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 10.0,
+      "llm_evidence_en": "directly proposes test-time scaling for World Action Models",
+      "llm_evidence_cn": "直接提出世界行动模型的测试时扩展方法",
+      "llm_evidence": "直接提出世界行动模型的测试时扩展方法",
+      "canonical_evidence": "直接提出世界行动模型的测试时扩展方法",
+      "llm_tldr_en": "Proposes a training-free selective test-time scaling framework for World Action Models that ranks rollouts by cross-view depth reprojection consistency, with a lightweight action-future consistency gate.",
+      "llm_tldr_cn": "该论文针对世界行动模型（WAM）提出无训练的测试时扩展框架，利用冻结几何基础模型的跨视图深度重投影一致性对采样轨迹排序，并附加动作-未来一致性门控仅在必要时调用扩展。实验表明该方法显著提升WAM在机器人控制中的决策质量，无需额外训练即可自适应计算预算。",
+      "llm_tldr": "该论文针对世界行动模型（WAM）提出无训练的测试时扩展框架，利用冻结几何基础模型的跨视图深度重投影一致性对采样轨迹排序，并附加动作-未来一致性门控仅在必要时调用扩展。实验表明该方法显著提升WAM在机器人控制中的决策质量，无需额外训练即可自适应计算预算。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "world action model",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2607.16602v1",
+      "source": "arxiv",
+      "title": "PAVXploreRL: Physical-Action-Visual World Model Reinforcement Learning with Action Exploration",
+      "abstract": "Action-conditioned world models are a key component of embodied AI, serving as scalable policy evaluators that reduce reliance on expensive real-world rollouts. To accurately capture diverse action-induced dynamics, such models should satisfy three key objectives-Physical Plausibility (P), Action Adherence (A), and Visual Fidelity (V), collectively referred to as PAV-while remaining robust to both in-distribution (ID) expert demonstrations and out-of-distribution (OOD) actions. However, existing methods primarily rely on ID action-video pairs and pixel-level reconstruction losses, which do not explicitly optimize PAV objectives and generalize poorly beyond expert data. To address this, we propose PAVXploreRL, a reinforcement learning framework built on a pretrained latent world model that explicitly optimizes PAV objectives through reward-driven training. To improve action generalization, our method jointly leverages ID trajectories and noise-driven OOD action exploration, without paired video supervision. Experiments show that PAVXploreRL consistently outperforms pretrained baselines, achieving a 5.6% average gain across benchmarks and producing higher-quality PAV properties. As a policy evaluator, it also yields more reliable performance estimates and reduces the overestimation bias of prior expert-only world models such as Ctrl-World. Code: https://github.com/Social-AI-Studio/PAVXploreRL",
+      "authors": [
+        "Han Wang",
+        "Zijun Wang",
+        "Shuoshuo Xue",
+        "Rui Cao",
+        "Fenjiao Cheng",
+        "Xiaodang Liang",
+        "Roy Ka-Wei Lee"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV"
+      ],
+      "published": "2026-07-18T02:42:27+00:00",
+      "link": "https://arxiv.org/pdf/2607.16602v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 9.0,
+      "llm_evidence_en": "action-conditioned world model with PAV objectives",
+      "llm_evidence_cn": "动作条件世界模型，满足物理合理性、动作遵循和视觉保真度",
+      "llm_evidence": "动作条件世界模型，满足物理合理性、动作遵循和视觉保真度",
+      "canonical_evidence": "动作条件世界模型，满足物理合理性、动作遵循和视觉保真度",
+      "llm_tldr_en": "Proposes PAVXploreRL, a RL framework to train action-conditioned world models that explicitly optimize Physical Plausibility, Action Adherence, and Visual Fidelity for robust in-distribution and out-of-distribution action rollouts.",
+      "llm_tldr_cn": "本文针对动作条件世界模型在分布外动作泛化差的问题，提出了PAVXploreRL强化学习框架。该方法通过同时优化物理合理性、动作遵循和视觉保真度三个目标，并使用探索策略收集分布外数据，训练出对专家演示和未知动作均鲁棒的世界模型。实验表明，该方法在多种仿真环境中优于现有基线。",
+      "llm_tldr": "本文针对动作条件世界模型在分布外动作泛化差的问题，提出了PAVXploreRL强化学习框架。该方法通过同时优化物理合理性、动作遵循和视觉保真度三个目标，并使用探索策略收集分布外数据，训练出对专家演示和未知动作均鲁棒的世界模型。实验表明，该方法在多种仿真环境中优于现有基线。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "world action model",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2607.17521v1",
+      "source": "arxiv",
+      "title": "GeoWorldAD: Geometry World Action Model for Autonomous Driving",
+      "abstract": "Autonomous driving requires both safe and efficient planning decisions in dynamic 3D environments. Although recent Vision/Video-Action models learn policies directly from visual observations and scale well with advances in vision transformers and large-scale training data, they often lack explicit geometric grounding and future-aware spatial guidance, limiting their ability to balance collision avoidance and driving progress. In this work, we propose GeoWorldAD, a geometry world action model that grounds trajectory planning in ego-aligned 3D space and anticipates short-horizon scene evolution with latent future geometry tokens. Present geometry provides essential spatial constraints for safe planning, while future geometry reveals how surrounding agents and ego-centric free space may evolve, reducing overly conservative decisions without sacrificing safety. To efficiently exploit these geometric cues, GeoWorldAD progressively aggregates multi-scale present geometry and latent future geometry through iterative trajectory refinement. Experiments on NAVSIM v1 and v2 demonstrate state-of-the-art performance, highlighting the effectiveness of explicit 3D geometry grounding and future geometry world modeling for safe and efficient autonomous driving.",
+      "authors": [
+        "Songyan Zhang",
+        "Jinyuan Tian",
+        "Hanbing Li",
+        "Daqi Liu",
+        "Hao Chen",
+        "Wenhui Huang",
+        "Fang Li",
+        "Guang Chen",
+        "Hangjun Ye",
+        "Long Chen",
+        "Kuiyuan Yang",
+        "Chen Lv"
+      ],
+      "primary_category": "cs.RO",
+      "categories": [
+        "cs.RO"
+      ],
+      "published": "2026-07-20T03:56:07+00:00",
+      "link": "https://arxiv.org/pdf/2607.17521v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 9.0,
+      "llm_evidence_en": "geometry world action model for autonomous driving using video generation",
+      "llm_evidence_cn": "用于自动驾驶的几何世界动作模型，使用视频生成",
+      "llm_evidence": "用于自动驾驶的几何世界动作模型，使用视频生成",
+      "canonical_evidence": "用于自动驾驶的几何世界动作模型，使用视频生成",
+      "llm_tldr_en": "GeoWorldAD proposes a geometry world action model that grounds trajectory planning in 3D space and anticipates scene evolution using latent future geometry tokens.",
+      "llm_tldr_cn": "自动驾驶中的视觉/视频动作模型缺乏几何基础和空间未来感知。本文提出GeoWorldAD，一个几何世界动作模型，将轨迹规划锚定在自车对齐的3D空间，并通过潜在未来几何令牌预测短时场景演化。模型结合视频生成能力与几何推理，平衡避障和行驶效率。该工作直接体现了基于视频生成的世界动作模型在自动驾驶中的应用。",
+      "llm_tldr": "自动驾驶中的视觉/视频动作模型缺乏几何基础和空间未来感知。本文提出GeoWorldAD，一个几何世界动作模型，将轨迹规划锚定在自车对齐的3D空间，并通过潜在未来几何令牌预测短时场景演化。模型结合视频生成能力与几何推理，平衡避障和行驶效率。该工作直接体现了基于视频生成的世界动作模型在自动驾驶中的应用。",
+      "llm_tags": [
+        "query:video-wam:composite"
+      ],
+      "matched_query_tag": "query:video-wam:composite",
+      "matched_query_text": "Papers central to 基于视频生成模型的World Action Model相关论文, especially work that connects or combines: world action model; world model; generative world model; video action model; video world model; World Action Model using video generation models; video based world action prediction; research on video generation for world models.",
+      "matched_requirement_id": "req-composite-video-wam",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2607.17523v1",
+      "source": "arxiv",
+      "title": "Thinking in Video: Can Video Generators Really Reason About the Real World?",
+      "abstract": "Recent advances in world models and video generation have given rise to an emerging reasoning paradigm that leverages video generative models to simulate, predict, and reason about real-world dynamics. We redefine this paradigm as Thinking in Video, where video is not merely an output artifact but a medium for constructing, extending, and verifying causal thought. However, this promise remains unverified: convincing rollouts may reflect memorized appearances rather than causal understanding, while existing metrics separate perceptual fidelity from semantic logic. To evaluate whether video generators support such reasoning, we introduce the Causal-Generative Dual-Judge (CGDJ), auditing World Model Consistency from two perspectives. Explicit Causal Perception tests whether a generator reads a video scenario as a reasoning problem through spatio-temporal flattened visual question answering, while Implicit Generative Perception-Prediction Gap evaluates whether it renders the causal consequence as a consistent future video. Applying CGDJ to representative open- and closed-source generators reveals a clear Perception-Prediction Gap: open-source models produce plausible dynamics despite near-zero explicit causal perception, whereas advanced closed-source systems show stronger but still limited alignment between reasoning and generation. Further analysis exposes audio-visual misalignment, where models verbalize correct causal logic more reliably than they render it, challenging the \"world simulator\" narrative.",
+      "authors": [
+        "Yongheng Zhang",
+        "Guang Yang",
+        "Ruihan Hou",
+        "Qiguang Chen",
+        "Ziang Liu",
+        "Xiaolong Liu",
+        "Manman Zhang",
+        "Yanchao Hao",
+        "Zheng Wei",
+        "Hao Wu",
+        "Libo Qin",
+        "Peishan Dai",
+        "Yinghui Li",
+        "Di Yin",
+        "Xing Sun"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV",
+        "cs.AI",
+        "cs.CL"
+      ],
+      "published": "2026-07-20T03:56:43+00:00",
+      "link": "https://arxiv.org/pdf/2607.17523v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 9.0,
+      "llm_evidence_en": "evaluates video generators as world models for reasoning",
+      "llm_evidence_cn": "评估视频生成器作为世界模型的推理能力",
+      "llm_evidence": "评估视频生成器作为世界模型的推理能力",
+      "canonical_evidence": "评估视频生成器作为世界模型的推理能力",
+      "llm_tldr_en": "Proposes a dual-judge framework to audit world model consistency of video generators from both causal and generative perspectives, redefining video as a reasoning medium.",
+      "llm_tldr_cn": "本文提出Causal-Generative Dual-Judge (CGDJ)审计框架，从显式因果和隐式生成一致性两个维度评估视频生成模型是否真正具备世界模型推理能力。作者重新定义了‘视频思考’范式，强调视频不仅是输出物，更是构建和验证因果推理的媒介。实验结果揭示当前视频生成器在因果理解上的局限。",
+      "llm_tldr": "本文提出Causal-Generative Dual-Judge (CGDJ)审计框架，从显式因果和隐式生成一致性两个维度评估视频生成模型是否真正具备世界模型推理能力。作者重新定义了‘视频思考’范式，强调视频不仅是输出物，更是构建和验证因果推理的媒介。实验结果揭示当前视频生成器在因果理解上的局限。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "research on video generation for world models",
+      "matched_requirement_id": "req-8",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2607.16401v1",
+      "source": "arxiv",
+      "title": "Apple-$π$: Benchmarking Thinking with Video Towards Law-Grounded Physical Intelligence",
+      "abstract": "Modern video generation models are increasingly hailed as emerging world models with an internalized grasp of physical law. Yet existing benchmarks largely evaluate physical plausibility only at the output level, without verifying whether the model arrives there through a faithful, law-grounded reasoning process. We introduce Apple-PI, the first benchmark that anchors video-model evaluation explicitly in physical laws. Apple-PI comprises three components. 1) Orchard: a dataset of 400 videos covering ten canonical tasks in classical mechanics. It separates single-law tasks for confounder-free diagnosis from multi-law tasks for probing generalization. 2) Benchmark Protocol: a three-stage protocol based on scientific reasoning, including Perception, Formulation, and Deduction. It uses chain-of-frames prompting on infographic-annotated first frames, treating the generated video as the model's visible reasoning trace. 3) Evaluation Suite: a hybrid evaluation suite that combines MLLM-based subjective scoring with physics-law-grounded objective measures. This enables stage-resolved diagnosis of not only whether a model fails, but where it fails. Benchmarking 11 models shows that current video models remain far from reliable law-grounded world simulators, with the best video model scoring only 0.473. Our stage-, pillar-, and source-resolved analyses further expose a Perception-to-Formulation-to-Deduction bottleneck, weak multi-law state transfer, and a persistent Sim-to-Real gap. These findings position Apple-PI as a diagnostic foundation for guiding future video models toward world models with law-grounded physical intelligence.",
+      "authors": [
+        "Runmao Yao",
+        "Kairui Hu",
+        "Yukang Cao",
+        "Ruisi Wang",
+        "Shulin Tian",
+        "Ziang Cao",
+        "Weichen Fan",
+        "Ziqi Huang",
+        "Yuhao Dong",
+        "Hao Li",
+        "Zhaoxi Chen",
+        "Zhongang Cai",
+        "Lei Yang",
+        "Ziwei Liu"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV"
+      ],
+      "published": "2026-07-17T18:00:05+00:00",
+      "link": "https://arxiv.org/pdf/2607.16401v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 8.0,
+      "llm_evidence_en": "benchmark for video generation models as world models",
+      "llm_evidence_cn": "将视频生成模型作为世界模型的基准测试",
+      "llm_evidence": "将视频生成模型作为世界模型的基准测试",
+      "canonical_evidence": "将视频生成模型作为世界模型的基准测试",
+      "llm_tldr_en": "Introduces Apple-PI, a benchmark evaluating video models as world models grounded in physical laws, with 400 videos and a three-stage protocol.",
+      "llm_tldr_cn": "现代视频生成模型常被视为蕴含物理规律的世界模型，但现有基准仅从输出层面评估物理合理性。本文提出Apple-PI基准，包含400个经典力学视频和三阶段科学推理协议，用于诊断和评估视频生成模型是否真正理解物理定律。该工作为世界模型在视频生成中的评估提供了标准化框架。",
+      "llm_tldr": "现代视频生成模型常被视为蕴含物理规律的世界模型，但现有基准仅从输出层面评估物理合理性。本文提出Apple-PI基准，包含400个经典力学视频和三阶段科学推理协议，用于诊断和评估视频生成模型是否真正理解物理定律。该工作为世界模型在视频生成中的评估提供了标准化框架。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "generative world model",
+      "matched_requirement_id": "req-3",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2607.17973v1",
+      "source": "arxiv",
+      "title": "SAGE: Subgoal-Conditioned Action Generation for Latent World Model Planning",
+      "abstract": "Latent world models have emerged as a powerful planning paradigm by learning action-conditioned predictive dynamics and using them as internal simulators to imagine and evaluate candidate action sequences. However, as the planning horizon grows, performance becomes increasingly constrained by proposal quality: a fixed candidate budget must search an exponentially larger action space, making it difficult to expose the world model to high-quality candidate futures for evaluation. In this paper, we introduce a prior-conditioned planner that replaces random proposal initialization with structured guidance. At each planning stage, a goal-conditioned generator predicts the next reachable latent subgoal for a specified duration, which is then used to condition the generation of candidate action sequences. To capture semantic information across temporal scales, we use subgoals of varying durations as priors, balancing fine-grained local control with higher-level long-horizon progress. Then the frozen world model evaluates and refines these subgoal-conditioned proposals before execution. Experiments on PushT and OGBench Cube show that coupling latent subgoal decomposition with prior-conditioned action generation substantially improves long-horizon planning while preserving strong short-horizon performance. To be specific, when the target offset is $150$, it raises PushT success from $12.7\\%$ to $64.7\\%$ and OGBench Cube success from $26.7\\%$ to $67.3\\%$.",
+      "authors": [
+        "Letian Cheng",
+        "Qi Zhang",
+        "Yisen Wang"
+      ],
+      "primary_category": "cs.AI",
+      "categories": [
+        "cs.AI"
+      ],
+      "published": "2026-07-20T14:10:56+00:00",
+      "link": "https://arxiv.org/pdf/2607.17973v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 8.0,
+      "llm_evidence_en": "latent world model planning with subgoal-conditioned action generation",
+      "llm_evidence_cn": "基于潜世界模型规划的次目标条件动作生成",
+      "llm_evidence": "基于潜世界模型规划的次目标条件动作生成",
+      "canonical_evidence": "基于潜世界模型规划的次目标条件动作生成",
+      "llm_tldr_en": "SAGE introduces a prior-conditioned planner for latent world model planning, using subgoal-conditioned action generation to improve long-horizon planning quality.",
+      "llm_tldr_cn": "该论文提出SAGE方法，针对潜世界模型规划中长视界动作搜索困难的问题，引入先验条件规划器，通过次目标条件生成器预测可达潜次目标，从而引导动作搜索。实验表明该方法在复杂规划任务中显著提升规划成功率。该工作将世界模型与动作生成紧密结合，为世界动作模型的发展提供了规划视角。",
+      "llm_tldr": "该论文提出SAGE方法，针对潜世界模型规划中长视界动作搜索困难的问题，引入先验条件规划器，通过次目标条件生成器预测可达潜次目标，从而引导动作搜索。实验表明该方法在复杂规划任务中显著提升规划成功率。该工作将世界模型与动作生成紧密结合，为世界动作模型的发展提供了规划视角。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "world model",
+      "matched_requirement_id": "req-2",
+      "selection_source": "fresh_fetch"
+    }
+  ],
+  "quick_skim": [
+    {
+      "id": "2607.15667v1",
+      "source": "arxiv",
+      "title": "PE-Field 4D: Video Generation Models as Canvas",
+      "abstract": "Diffusion Transformers have recently achieved strong performance in video generation, yet controlling scene geometry under viewpoint changes and camera motion remains challenging. In this work, we revisit the role of positional encoding in video diffusion transformers and show that it provides a useful spatial bias for geometry-aware control. Specifically, if reference tokens are encoded according to their projected locations in the target view, the denoising model is encouraged to retrieve content from position aligned regions of the input video. Building on this observation, we introduce a geometry-aware cross-attention mechanism that enables target video latent tokens to attend to structured context tokens derived from reference images or frames. To establish correspondence between the reference content and the target camera trajectory, we equip the context tokens with a projected positional encoding scheme that combines target-view 2D reprojection with depth-aware disambiguation. At the same time, we preserve the original spatiotemporal positional encoding of the generated video latent, allowing geometric guidance to be injected while maintaining consistency with the video model's native latent structure. The resulting framework provides a simple and effective approach for controllable video generation. It improves spatial controllability in viewpoint-dependent editing tasks, including camera re-trajectory, novel-view video synthesis, and geometry-aware video editing, while preserving the generative prior of the underlying video diffusion model. The code is available at: https://github.com/MTLab/PE-Field.",
+      "authors": [
+        "Yunpeng Bai",
+        "Haoxiang Li",
+        "Qixing Huang"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV"
+      ],
+      "published": "2026-07-17T06:22:14+00:00",
+      "link": "https://arxiv.org/pdf/2607.15667v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "video generation geometry-aware control for world models",
+      "llm_evidence_cn": "用于世界模型的视频生成几何控制",
+      "llm_evidence": "用于世界模型的视频生成几何控制",
+      "canonical_evidence": "用于世界模型的视频生成几何控制",
+      "llm_tldr_en": "Proposes geometry-aware cross-attention for controllable video generation, enabling better scene geometry control useful for world model video generation.",
+      "llm_tldr_cn": "本文针对视频生成中的几何控制问题，提出了一种基于位置编码的几何感知交叉注意力机制，使得目标视图的潜在标记能够从参考图像的结构化上下文标记中检索内容，从而在不明显增加计算开销的情况下实现视角变化下的几何一致控制。该方法为世界模型中的视频生成提供了更精细的几何控制能力。",
+      "llm_tldr": "本文针对视频生成中的几何控制问题，提出了一种基于位置编码的几何感知交叉注意力机制，使得目标视图的潜在标记能够从参考图像的结构化上下文标记中检索内容，从而在不明显增加计算开销的情况下实现视角变化下的几何一致控制。该方法为世界模型中的视频生成提供了更精细的几何控制能力。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "research on video generation for world models",
+      "matched_requirement_id": "req-8",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    }
+  ]
+}

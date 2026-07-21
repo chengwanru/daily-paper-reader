@@ -1,0 +1,552 @@
+Title: Thinking in Video: Can Video Generators Really Reason About the Real World?
+
+URL Source: https://arxiv.org/pdf/2607.17523v1
+
+Published Time: Tue, 21 Jul 2026 01:27:19 GMT
+
+Number of Pages: 10
+
+Markdown Content:
+# Thinking in Video: Can Video Generators Really Reason About the Real World? 
+
+# Yongheng Zhang 1,2∗ Guang Yang 1∗ Ruihan Hou 1∗ Qiguang Chen 1∗ Ziang Liu 1
+
+# Xiaolong Liu 2 Manman Zhang 2 Yanchao Hao 2 Zheng Wei 2 Hao Wu 3
+
+# Libo Qin 1 Peishan Dai 1† Yinghui Li 3 Di Yin 2 Xing Sun 21Central South University 2Tencent 3Tsinghua University Flatten Temporal Video 
+
+> Time
+
+## …
+
+> Query Transform
+> Transform
+
+## …
+
+Input Video 
+
+Output Video 
+
+Explicit Causal Perception 
+
+> Time
+
+Implicit Generative Prediction 
+
+Explicit Causal Perception 
+
+Implicit Generative Prediction  
+
+> Understanding Reasoning
+> Natural
+> Sciences
+> Sociology
+> Humanities
+
+Perception & Prediction 
+
+AI Video Generators 
+
+> Time Time
+
+Final Reasoning 
+
+Figure 1: The overall workflow of the Causal Generative Dual Judge ( CGDJ ) consists of two components, Explicit Causal Perception (top) and Implicit Generative Prediction (bottom). Specifically, the pipeline transforms raw video sequences into model-compatible image inputs via the Flatten Temporal Video strategy. The video generator then processes this context to execute the assigned task and synthesize the final reasoning video. 
+
+## Abstract 
+
+Recent advances in world models and video generation have given rise to an emerging reasoning paradigm that leverages video gen-erative models to simulate, predict, and reason about real-world dynamics. We redefine this paradigm as Thinking in Video , where video is not merely an output artifact but a medium for constructing, extending, and verifying causal thought. However, this promise remains unverified: convincing rollouts may reflect memorized appearances rather than causal understanding, while existing met-rics separate perceptual fidelity from semantic logic. To evaluate whether video generators support such reasoning, we introduce the Causal-Generative Dual-Judge (CGDJ ), auditing World Model Consistency from two perspectives. Explicit Causal Perception 
+
+tests whether a generator reads a video scenario as a reasoning prob-lem through spatio-temporal flattened visual question answering, 
+
+> ∗Equal Contribution.
+> †Corresponding Author.
+
+while Implicit Generative Perception-Prediction Gap evalu-ates whether it renders the causal consequence as a consistent future video. Applying CGDJ to representative open- and closed-source generators reveals a clear Perception-Prediction Gap :open-source models produce plausible dynamics despite near-zero explicit causal perception, whereas advanced closed-source systems show stronger but still limited alignment between reasoning and generation. Further analysis exposes audio-visual misalignment, where models verbalize correct causal logic more reliably than they render it, challenging the “world simulator” narrative. 
+
+## CCS Concepts 
+
+• Computing methodologies → Artificial intelligence ; Com-puter vision ; Natural language processing .
+
+## Keywords 
+
+World Models, Video Generative Models, Thinking in Video. arXiv:2607.17523v1 [cs.CV] 20 Jul 2026 Zhang et al. 
+
+## 1 Introduction 
+
+Recent progress in video generation has changed what video models appear able to do. Autoregressive and diffusion-based systems now synthesize high-definition, minute-long clips with coherent objects, motions, and interactions [ 1 –7]. This leap motivates a claim beyond visual synthesis: if a model can roll out plausible futures from visual conditions, it may use video as a medium for reasoning. We call this direction Thinking in Video : instead of merely describing answers in language, the model constructs, extends, and audits a visual world over time. Video generators thus become candidate 
+
+General World Simulators , internalizing the physical laws and social dynamics that govern reality across diverse scenarios [ 8– 10 ]. Recent attempts at “thinking with video” explore this possibility for mathematics, navigation, and embodied problem solving [11–18]. However, the central promise of Thinking in Video remains unverified. A convincing rollout is not necessarily a correct reason-ing process. A model may generate shattering glass, a falling object, or a human response because it understands causal conditions or memorized high-frequency visual associations [ 19 , 20 ]. The distinc-tion matters: reasoning requires counterfactual and causal validity, not photorealistic continuation alone. Existing evaluation often re-wards perceptual quality through Fréchet Video Distance (FVD) or Inception Score, while ignoring whether the generated future obeys scene mechanics [ 21 – 23 ]. Without separating visual plausibility from causal correctness, treating video generators as reasoning engines for open-world decision making is premature [24–28]. Existing benchmarks rarely test whether a model can understand 
+
+a causal situation and act through generation. This reflects a struc-tural deficiency: paradigms bifurcate visual fidelity from semantic logic. Distributional metrics measure smoothness, realism, or text alignment, yet hallucinations may score well [ 19 , 29 –32 ]. Static mul-timodal benchmarks probe symbolic or visual question-answering, but not evolving video answers [ 33 , 34 ]. Thus, when a generator seems to reason, we cannot tell whether it simulates causality or im-itates appearances. This gap hides Perception-Prediction Disso-nance : a model may know the outcome yet fail to render consistent pixels. Evaluating Thinking in Video requires auditing perception and prediction across physical and social dynamics [35–37]. To close this gap, as shown in Figure 1, we introduce the Causal-Generative Dual-Judge (CGDJ ), a benchmark and evaluation frame-work for assessing whether video generative models can truly 
+
+Think in Video . Rather than asking only whether the output looks good, CGDJ asks whether the model can use video as a reasoning medium: it must recognize causal structure from visual evidence and then ground that structure by generating a valid temporal consequence. The paradigm contains two complementary modules: 
+
+❶ Explicit Causal Perception : We test whether a model can identify and articulate a video’s causal structure, rather than merely generate a plausible continuation. Since most video generators cannot process interleaved video-text prompts, our Flatten Temporal Video strategy converts video frames and rasterized queries into a unified image grid. This creates an explicit, directly judgeable visual QA task, forcing the model to reveal its recognized causal progression instead of relying on statistical continuation. 
+
+❷ Implicit Generative Prediction : We test whether a model can enact its reasoning in video. Conditioned on a causal antecedent, the model must synthesize the consequent fu-ture sequence. This generative protocol forces the model to move beyond choosing or verbalizing an answer: it must physically render the outcome, enabling direct inspection of whether its visual rollout is causally valid. Experiments reveal that current video generators are only par-tially capable of Thinking in Video . On the explicit side, advanced closed-source generators such as Sora-2 and Veo-3.1 show mea-surable causal perception, whereas open-source generators nearly collapse under the same flattened reasoning protocol. On the gen-erative side, however, open-source models can still produce moder-ately plausible causal continuations, exposing a sharp Perception-Prediction Gap : visual action can surpass explicit causal under-standing. Further analysis shows an audio-visual misalignment where models often articulate the correct causal logic more reli-ably than they render it. These results challenge a simple “world simulator” narrative. Current systems can imitate parts of world dynamics, and the strongest models begin to align perception with prediction, but robust video-based reasoning still requires stronger grounding between causal knowledge and visual computation. Our key contributions are summarized as follows: (1) We redefine reasoning with video generative models as the Thinking in Video paradigm, where video becomes a medium for constructing and verifying causal thought, and highlight the need to properly evaluate whether current generators can support such reasoning. (2) We propose the Causal-Generative Dual-Judge ( CGDJ ) frame-work, with the Flatten Temporal Video strategy, to jointly evaluate Explicit Causal Perception and Implicit Generative Prediction in current video generative models. (3) Through experiments, we reveal a fundamental Perception-Prediction Gap: current models can exhibit plausible vi-sual dynamics without reliable causal perception, while advanced systems show early but still limited alignment between explicit reasoning and generative simulation. To facilitate further research, all code and data will be publicly available: https://github.com/BRZ911/Thinking-in-Video. 
+
+## 2 Causal–Generative Dual-Judge 
+
+To evaluate whether video generative models are simply mimicking pixel statistics or truly simulating world dynamics, we propose the 
+
+Causal–Generative Dual-Judge ( CGDJ ). As shown in Figure 2, this paradigm decouples the evaluation of semantic comprehension (Perception ) from physical rendering ( Prediction ). CGDJ consists of: (i) Causal–Generative Dual-Judge Benchmark (§2.1), and (ii) 
+
+Causal–Generative Dual-Judge Evaluation .
+
+## 2.1 Causal–Generative Dual-Judge Benchmark 
+
+2.1.1 Explicit Causal Understanding Data. As shown in Figure 2 (a), the comprehensive benchmark construction process consists of two main phases: Data Collection and Flatten Temporal Video Transition :Thinking in Video: Can Video Generators Really Reason About the Real World? Input Video 
+
+…  
+
+> Gold Video
+> Input Video
+
+…
+
+…
+
+> Time
+
+Q: How many red socks are …? 
+
+O: A. 1 B.4 C.2 D.3   
+
+> Input Text Query
+> Flatten Temporal Video
+
+(a) Explicit Causal Perception Data 
+
+> Original Video
+
+…
+
+…
+
+> Flatten Temporal Video
+
+(b) Implicit Generative Prediction Data  
+
+> Manually Split
+
+This video is about people ... 
+
+> Video Description
+> Time
+
+Figure 2: The construction process of the CGDJ benchmark. (a) Explicit Causal Perception Data utilizes a Flatten Temporal Video 
+
+strategy to map temporal dynamics into a spatial grid, combining visual history with rasterized text queries for direct reasoning. (b) Implicit Generative Prediction Data evaluates simulation by splitting videos at a critical inflection point; The pre-event frames serve as a flattened visual condition, prompting the model to generate the physically consistent post-event future. Data Collection. To evaluate the causal reasoning of video gen-erative models, we align our benchmark with video understanding standards by adopting all 900 videos from Video-MME [ 38 ]. To ensure a comprehensive evaluation across different temporal scales, the collection spans short, medium, and long durations. Further-more, the dataset covers a diverse range of real-world dynamics, cat-egorized into six domains: (i) Knowledge , (ii) Life Record , (iii) Sports Competition , (iv) Artistic Performance , (v) Film & Television , and (vi) Multilingual . The statistical distribution across these individual domains is presented in Figure 3 (a). This enables evaluating causal internalization across diverse physical and social dynamics. 
+
+Flatten Temporal Video Transition. Since current video gen-erative models are strictly restricted to processing only static image inputs, to overcome this fundamental limitation, we propose the 
+
+Flatten Temporal Video strategy that maps a video-question pair onto a single static image 𝐼 composite ∈ R720 ×1280 ×3.Formally, given a video V and a question-option pair Q, the construction process consists of three steps: 
+
+1. Temporal Grid Construction: We extract a sequence of 𝑁 =
+
+70 frames through uniform temporal sampling. These frames are concatenated into a spatial matrix 𝐼 grid with dimensions 7 × 10 :
+
+𝐼 grid = 7
+
+⊕ 
+
+> 𝑟 =1
+
+ 10 
+
+⊕
+
+> 𝑐 =1
+
+𝑥 𝑡 (𝑟 −1)10 +𝑐 
+
+
+
+(1) where ⊕ denotes spatial concatenation. This grid effectively trans-forms the temporal sequence into a spatial texture accessible to the visual encoder. 
+
+2. Semantic Rendering: Instead of relying on conventional pre-trained external text encoders, we directly transform the specific textual query Q into a dense pixel-space representation 𝐼 text via a dedicated high-fidelity rasterization function. This newly rendered text block is strategically positioned to occupy the entire upper spatial visual field of the final image grid. 
+
+3. Vertical Integration: The final composite input for the model is meticulously synthesized by vertically concatenating the spe-cific semantic instruction tensor and the flattened temporal grid tensor along the primary height dimension. In order to ensure full technical compatibility with existing standard video generation architectures, this newly fused tensor subsequently undergoes an adaptive resizing operation to match the required target resolution: 
+
+𝐼 composite = Resize 1280 ×720 ([ 𝐼 text ; 𝐼 grid ]) (2) This layout creates a “visual representation” by stacking text above the grid, enabling causal reasoning through joint attention to in-structions and history. 
+
+2.1.2 Implicit Generative Action Data. As shown in Figure 2 (b), the construction process consists of three main steps: Data Collection ,
+
+Video Splitting , and Flattening of Temporal Video Transitions :
+
+Data Collection. We systematically classify the broad spectrum of World Dynamics into Natural Sciences and Sociology & Human-ities , balancing the evaluation between rigid physical mechanics and complex human behaviors. 
+
+• Natural Sciences: This category evaluates the model’s fundamental understanding of physical laws. We aggregate data from various authoritative benchmarks including The Sound of Water [39 ], Physion [40 ], and Physics IQ Bench-mark [27 ]. We classify these into four fine-grained sub-domains: (i) Physical Mechanics , (ii) Natural & Life Sciences ,(iii) Materials & Structures , and (iv) Fields & Energy .
+
+• Sociology & Humanities: This category evaluates the sim-ulation of human behaviors and social logic. Data sources include the TLD Benchmark (Vehicle Signals) [ 41 ], Kinetics Human Action [ 42 ], Ego4D [ 43 ], and selected web videos. These are categorized into sub-domains: (i) Transportation Behavior , (ii) Life Behavior , (iii) Occupational Role Behavior ,(iv) Public Social Behavior , and (v) Sports Activity Behavior .As shown in Figure 3 (b), the final curated benchmark comprises a total of 600 high-quality videos. To ensure an unbiased evaluation between physical rigidity and social complexity, we maintain a strictly balanced distribution across the two domains: 300 samples for Natural Sciences and 300 samples for Sociology & Humanities .Zhang et al. 
+
+Video Splitting. To rigorously reformulate the standard genera-tive task as a structured causal prediction problem, we implement a precise temporal segmentation strategy. For every video in the benchmark, expert annotators manually identify and pinpoint the 
+
+Causal Inflection Point (or critical node). This specific times-tamp represents the definitive boundary where the accumulation of causal conditions triggers an irreversible event or state transition. 
+
+❶ Input Video: The pre-event sequence serves as the visual condition, providing the necessary causal context for the subsequent generation. Furthermore, we use Gemini-3-Pro 
+
+[ 44 ] to produce a detailed semantic video description, which is co-injected with the video to facilitate the generation. 
+
+❷ Gold Video: The subsequent temporal segment functions as the immutable ground truth reference, capturing the realized outcome of the initial conditions. This empirically recorded footage serves as a rigorous baseline to audit the validity of the model’s extrapolation. 
+
+Flattening of Temporal Video Transitions. Similar to the previ-ously mentioned strategy in the Explicit Understanding module, we employ a flattening technique to input the video context into the generative model. Specifically, we extract 𝑁 = 7 keyframes from the Input Video at uniform discrete temporal steps to represent the motion trajectory. Formally, these frames are spatially concatenated to form a continuous visual condition 𝐼 motion :
+
+𝐼 motion = 𝑁 
+
+⊕
+
+> 𝑖 =1
+
+𝑥 𝑡 𝑖 (3) where 𝑥 𝑡 𝑖 represents the frame at time step 𝑡 𝑖 and ⊕ denotes spatial horizontal concatenation. This arrangement constructs a coherent “visual arrow of time”, effectively encoding the directional vector of motion and dynamic temporal state changes. 
+
+## 2.2 Causal–Generative Dual-Judge Evaluation 
+
+To quantify the capabilities of the model in simulating world dy-namics, as shown in Figure 4, we design an automated evaluation pipeline based on advanced multimodal models. 
+
+2.2.1 Explicit Causal Evaluation. To assess causal validity through reasoning, as shown in Figure 4 (a), we establish a robust, compre-hensive, and fully automated two-stage framework: Audio-Text Alignment and MLLM-based Causal Adjudication .
+
+Audio Context Extraction. The generated videos often contain the correct solution or reasoning steps encoded directly within the audio. To strictly evaluate this verbal information, we utilize the 
+
+whisper-large-v2 [45 ] model to extract and transcribe the audio track. By converting the spoken problem-solving process into text, we ensure that the judge considers both the visual outcome and the model’s narrated logic for a more holistic assessment. 
+
+MLLM-based Adjudication. We employ the Gemini-3-Pro [ 44 ]as the core evaluator, owing to its superior video understanding and long-context reasoning capabilities critical for our analysis. Specifically, the evaluation process functions as follows: 
+
+❶ Input Construction: We construct a composite prompt for Gemini, which includes the following key inputs: (1) the Short/Medium/Long Video Categorization 
+
+270 Knowledge 
+
+210 Life Record 
+
+150 Sports Competition 
+
+120 Artistic Performance 
+
+120 Film & Television 
+
+30 Multilingual 
+
+900 Total 
+
+> Video Categorization
+
+300 Total Natural Sciences 
+
+110 Physical Mechanics 
+
+80 Natural and Life Sciences 
+
+60 Materials and Structures 
+
+50 Fields and Energy 
+
+300 Total Sociology & Humanities 
+
+100 Transportation Behavior 
+
+100 Life Behavior 
+
+60 Occupational Role Behavior 
+
+20 Public Social Behavior 
+
+20 Sports Activity Behavior 
+
+600 Total 
+
+(a) Explicit Causal Understanding 
+
+(b) Implicit Generative Action 
+
+Figure 3: Statistical distribution of the Causal-Generative Dual-Judge Benchmark. (a) The distribution of 900 videos for Explicit Causal Understanding across six domains. (b) The classification of 600 videos for Implicit Generative Action. 
+
+Generated Video produced by the model under test, (2) the 
+
+Transcribed Audio Text , (3) the Original Question and Option ,and (4) the Ground Truth Answer .
+
+❷ Causal Judgment: Gemini-3-Pro is tasked to act as a judge. It compares the visual events in the generated video against the logical requirements of the correct answer. The MLLM determines whether the generated video depicts the causal consequence implied by ground truth, classifying the generation as “Correct” or “Incorrect” . We validate this automated metric against human judgment in Figure 6. This automated pipeline ensures that the evaluation moves beyond superficial pixel metrics and focuses on the semantic and causal correctness of the generated content. 
+
+2.2.2 Implicit Generative Evaluation. To evaluate the real-world simulation authenticity, as shown in Figure 4 (b), we employ a com-prehensive, systematic, and rigorous Reference-Based Comparative Evaluation . Using Gemini-3-Pro effectively serves as a dedicated “Video Quality Auditor”. It systematically benchmarks the video gen-erated by the model against the ground truth “Gold Video”, while ensuring strict adherence to the governing textual description. 
+
+Scoring Mechanism. The automated evaluator assigns a score 
+
+𝑆 ∈ [ 0.0, 1.0] based on the following three dimensions: (i) Semantic Thinking in Video: Can Video Generators Really Reason About the Real World? Output Video 
+
+…
+
+…                                    
+
+> Time
+> NLP
+> Instruction :You are an expert answer
+> evaluator …0.First, determine the
+> visible answer from the image …need
+> to respond with `Correct` or `Incorrect` .
+> Input :
+> Video :[Output Video ]
+> Audio Text :[Transcribed Audio Text ]
+> Question :[Original Question ]
+> Options :[Original Options ]
+> Correct Answer :[Gold Answer ]
+> Judge Response: … the answer
+> generated in the video is Correct.
+
+(a) Explicit Causal Perception Evaluation  
+
+> Output Video
+
+…                                 
+
+> Time
+> NLP
+> Instruction :You are astrict …
+> Compare the Model Generated Video
+> against the Standard Video …
+> Scoring Rubric (0.0-1.0):
+> -0.0-0.2:Major hallucinations …
+> …
+> Input :
+> Video Description :[Video Description ]
+> Standard Video :[Gold Video ]
+> Output Video :[Output Video ]
+> Judge Response: … correctly identifies
+> the archery setting … Score: 0.9.
+
+… 
+
+> Gold Video
+> Time
+
+(b) Implicit Generative Prediction Evaluation 
+
+Figure 4: The overall evaluation pipeline of the Causal–Generative Dual-Judge consists of two distinct yet complementary protocols: (a) Explicit Causal Understanding Evaluation and (b) Implicit Generative Action Evaluation .
+
+Alignment (object/action correctness), (ii) Reference Consistency 
+
+(logical flow vs. ground truth), and (iii) Physical Validity (absence of flickering/physics violations). Scores range from 0.0 (hallucinations) to 1.0 (perfect match), effectively quantifying the model’s innate ability to ground reasoning into physical action. 
+
+## 3 Experiments 
+
+In this section, we conduct a comprehensive empirical analysis to validate the newly proposed Causal–Generative Dual-Judge ( CGDJ ). Our systematic experiments are structured to probe the two most distinct facets of world simulation: (1) Explicit Causal Understanding: We first assess whether various models possess the essential theoretical knowledge to identify correct causal dynamics governing complex real-world events through specific analytical tasks. (2) Implicit Generative Action: We then evaluate the in-trinsic ability of the video generation models to physically ground this knowledge by generating valid future video sequences that closely align with real-world dynamics. By comparing these two complementary modalities, we aim to further quantify the “Perception-Prediction Gap” and diagnose the state of modern video generative models as world simulators. 
+
+## 3.1 Experimental Setup for Explicit Causal Understanding 
+
+To evaluate the explicit reasoning capabilities of video generative models, we benchmark them against advanced MLLMs to quantita-tively highlight the critical perception and reasoning performance gap. The experimental setup is designed as follows: 
+
+Multimodal Large Language Model Baselines. To establish a per-formance ceiling and validate the effectiveness of our visual repre-sentation, we evaluate a suite of advanced MLLMs. This includes 
+
+Qwen3-VL-Instruct (2B, 4B, and 8B)[ 46 ], as well as proprietary fron-tier models including GPT-5 [ 47 ] and Gemini-3-Flash [44 ]. For these MLLMs, we design two distinct input protocols to analyze the 
+
+Table 1: Detailed configurations of the representative base-line video generative models evaluated in our experiments. Model Resolution Source Type Duration Price 
+
+Wan-2.2-14B [6] 1280 × 720 open 5s -Hunyuan-1.5 [4] 1280 × 720 open 5s -Veo-3.1 [5] 1280 × 720 closed 8s $0.4/s Sora-2 [3] 1280 × 720 closed 12s $0.1/s 
+
+impact of information formatting: (1) Setting A (Native Video In-put): The models process the original video tokens directly, utilizing their native temporal encoders. (2) Setting B (Flatten Temporal Video Input): The models process the “flattened” spatial grid image (as described in §2.1), identical to the input format used for video generative models. This comparison verifies whether the flattening strategy preserves sufficient causal information for reasoning. 
+
+Video Generative Model Baselines and Inference. We benchmark a representative set of leading video generation models, categorizing them into open-source and closed-source groups. Since models can-not natively process interleaved video-text inputs for understanding tasks, all are evaluated using our proposed Flatten Temporal Video 
+
+strategy. The configurations are tailored to model accessibility: 
+
+• Open-Source Models (Local Inference): We select Wan-2.2-14B [6] and HunyuanVideo-1.5 [4]. We utilized their official implementations for inference on a local server. 
+
+• Closed-Source Models (API Access): We assess both ad-vanced Veo-3.1 [5] and Sora-2 [ 3 ] via their official APIs. These models were tested using their default stable dura-tion settings (up to 12s). To ensure economic transparency per benchmarks, we recorded pricing during evaluation. Comprehensive parameter settings, including resolution, max dura-tion, and pricing, are detailed for comparative purposes in Table 1. Zhang et al. 
+
+Table 2: Accuracy (%) on Explicit Causal Understanding Tasks. Area: Setting A (Native Video Input). Area: Setting B (Flatten Temporal Video Input). The Red represents better AVG performance. Model Video Length Video Category AVG Short Medium Long Know. Film. Sports. Artistic. Life. Multi. 
+
+Native Video Input (Language Model) 
+
+Qwen3-VL-2B [46] 70.3 52.0 49.0 63.7 59.2 48.7 55.0 56.7 43.3 57.1 Qwen3-VL-4B [46] 76.3 59.3 49.0 66.3 62.5 59.3 61.7 58.1 50.0 61.6 Qwen3-VL-8B [46] 82.3 65.3 56.7 71.5 73.3 62.7 66.7 66.7 60.0 68.1 GPT-5 [47] 88.0 79.3 71.0 82.2 82.5 75.3 81.7 78.1 63.3 79.4 Gemini-3-Flash [44] 91.7 82.3 75.0 85.2 86.7 82.7 79.2 83.3 63.3 83.0 
+
+Flatten Temporal Video Input (Language Model) 
+
+Qwen3-VL-2B [46] 48.7 40.0 42.3 47.0 41.7 40.0 40.0 45.7 40.0 43.7 Qwen3-VL-4B [46] 57.3 40.3 43.7 54.8 46.7 38.0 41.7 48.1 40.0 47.1 Qwen3-VL-8B [46] 64.7 50.7 50.0 61.5 56.7 49.3 47.5 53.8 60.0 55.1 GPT-5 [47] 74.3 65.0 63.3 72.2 73.3 58.7 68.3 65.2 60.0 67.6 Gemini-3-Flash [44] 79.7 72.7 70.0 78.5 77.5 64.0 74.2 74.8 66.7 74.1 
+
+Flatten Temporal Video Input (Video Generative Model) 
+
+Wan-2.2-14B [6] 1.0 0.7 0.3 0.4 0.8 0.7 1.7 0.5 0.0 0.7 HunyuanVideo-1.5 [4] 1.3 0.3 1.8 1.5 1.7 2.0 0.0 1.5 3.3 1.5 Veo-3.1 [5] 52.3 48.0 49.3 54.1 49.2 48.3 44.6 51.9 30.0 49.9 Sora-2 [3] 52.5 49.5 51.5 53.9 52.1 45.3 51.7 51.2 50.0 51.2 
+
+## 3.2 Main Results 
+
+Table 2 and Table 3 summarize the quantitative results of our Causal–Generative Dual-Judge evaluation. From these experimen-tal comparisons, we observe that: 
+
+1. Spatio-Temporal Flattening serves as a valid medium for causal reasoning. To validate whether our flattening strategy preserves sufficient information for reasoning, we compare MLLM performance under Native versus Flatten Temporal Video Input. The results show that while transforming temporal videos into spa-tial grids naturally causes some information loss, advanced MLLMs maintain robust performance. Notably, Gemini-3-Flash achieves 
+
+74.1% under the flattened setting, retaining approximately 89% of its native performance ( 83.0% ). Even the smaller Qwen3-VL-8B main-tains a respectable 81% relative to its native performance. This evidence confirms that the “visual medium” constructed by our flattening technique contains sufficient logical cues. 
+
+2. Emergent but Limited Reasoning in Generative Models. 
+
+A distinct divide emerges. Closed-source models such as Sora-2 
+
+(51.2% ) and Veo-3.1 (49.9% ) exhibit measurable explicit reasoning capabilities, performing on par with an 8B-parameter MLLM. This suggests that scaling video generation, or internal prompt rewriting pipelines, fosters an emergent, albeit rudimentary, understanding of world dynamics. However, they significantly trail behind state-of-the-art reasoning engines, Gemini-3-Flash at 74.1%, indicating that current “World Simulators” are not yet robust reasoners. Notably, open-weights models like Wan-2.2 (0.7% ) and HunyuanVideo (1.5% )suffer a complete collapse in this discriminative task, likely due to a lack of instruction-following alignment in their training. 
+
+3. Closed-Source Models Dominate Physical Simulation. 
+
+In the generative domain, Sora-2 leads with an average score of 
+
+61.6% , followed closely by Veo-3.1 (58.9% ), demonstrating superior capability in simulating complex dynamics. Open-source models lag behind at 42.5% and 41.5% under our automated MLLM evaluation. Interestingly, models consistently perform better in Sociology & Humanities, Sora-2: 65.6%, than in Natural Sciences, Sora-2: 57.7% .This divergence suggests that the rigid, immutable laws of physics governing the real world may present a more formidable challenge for models to internalize than the patterns of social dynamics. 
+
+4. Advanced Mimicry vs. True Understanding. By juxtapos-ing Table 2 and Table 3, we uncover a critical “Perception-Prediction Gap” that distinguishes advanced mimicry from true understand-ing. A striking dissonance is observed in open-weights models like 
+
+Wan-2.2 , which achieves a respectable competency in Implicit Gen-erative Action ( 41.5% ) despite a near-zero score in Explicit Under-standing ( 0.7% ). This implies that such models operate via statistical pixel mimicry, rendering the texture of causal events without com-prehending the underlying logic. In contrast, Sora-2 demonstrates a synchronized profile (Explicit: 51.2% , Implicit: 61.6% ). This cor-relation suggests that as models scale towards authentic “World Simulators,” their generative actions become increasingly grounded in an explicit grasp of causal laws, marking the transition from surface-level synthesis to physically consistent simulation. Thinking in Video: Can Video Generators Really Reason About the Real World? 
+
+Table 3: Score (%) on Implicit Generative Action Tasks. The Red represents better AVG performance. Model Natural Sciences Sociology & Humanities AVG Physical. Natural. Materials. Fields. AVG Transport. Life. Occupat. Public. Sports. AVG 
+
+Wan-2.2-14B [6] 52.1 27.0 48.5 49.5 38.6 51.1 29.7 33.3 30.0 46.0 44.3 41.5 Hunyuan-1.5 [4] 44.4 33.8 39.8 47.7 41.2 42.9 46.0 48.4 34.0 34.5 44.0 42.5 Veo-3.1 [5] 60.6 58.1 51.6 54.0 57.0 49.1 69.8 67.4 61.3 55.3 60.8 58.9 Sora-2 [3] 56.9 59.0 59.3 55.7 57.7 60.6 73.0 65.1 69.8 52.0 65.6 61.6 31.0   
+
+> 27.4
+> 39.6
+> 42.4
+> 49.4
+> 46.8
+> 49.9 51.2
+> 25
+> 30
+> 35
+> 40
+> 45
+> 50
+> 55
+> 60
+> Veo-3.1 Sora-2
+
+Audio ∩Video Video Audio Audio ∪Video 
+
+Figure 5: Comparison of Audio ∩ Video , Video-Only and 
+
+Audio-Only . The empirical results show that Audio accu-racy consistently surpasses Video accuracy by a significant margin. This indicates models can semantically describe out-comes but fail to physically generate them. 
+
+## 3.3 Causal–Generative Dual-Judge Analysis 
+
+To gain deeper insights into the underlying mechanisms of the “Perception-Prediction Gap” and address potential formatting con-founders, we conduct a series of in-depth analytical experiments. 
+
+1. The Disconnect Between Linguistic Knowledge and Gen-erative Action. To deeply diagnose the “Perception-Prediction Gap”, we evaluate the consistency between the model’s verbal out-put and visual output under identical input conditions . Specifically, we assess the generation accuracy across two distinct channels: the 
+
+Audio-Only (whether the model verbally articulates the correct rea-soning/answer) and the Video-Only (whether the model physically renders the correct reasoning). The results shown in Figure 5, the comparative results reveal a striking Audio-Visual Misalignment independent of instruction-following recognition accuracy. We ob-serve that the accuracy of Audio generation significantly surpasses that of Video generation. This indicates that the model has success-fully internalized the Semantic Knowledge necessary to describe the causal outcome, proving it theoretically “understands” the scenario. However, this semantic comprehension fails to transfer into Physi-cal Grounding . The model acts as a “theoretical expert but practical novice”, capable of verbally predicting the future but incapable of simulating the pixel-level dynamics. This result demonstrates that current models rely on linguistic priors to solve problems, rather than operating on a robust internal world model. 
+
+2. Validation of Automated Scoring via Human Alignment. 
+
+To validate the reliability of our Gemini-3-Pro evaluator, we con-duct a Human Evaluation Alignment study. Three human experts 0.0 
+
+0. 2
+
+0. 4
+
+0. 6
+
+0. 8
+
+1.0 
+
+> Score
+
+0 30 0 60 0  
+
+> Video ID
+> Average of 3 Human Ratings
+> Gemini -3-Pro Ratings
+
+Figure 6: Alignment analysis between Gemini-3-Pro Ratings 
+
+(Blue) and Human Expert Ratings (Green) on the Implicit Gen-erative Action task. The plot illustrates the score distribution across video samples. With a high Pearson Correlation of 
+
+0.82 and a low Mean Absolute Difference of 0.14 .
+
+blindly rate the test set, and we compute their average scores to benchmark physical and consistency. The result, as shown in Fig-ure 6, comparing their consensus scores against the model’s predic-tions reveals a high degree of concordance. We achieve a Pearson Correlation of 0.8205 and a Mean Absolute Difference of 0.1468 . These metrics confirm that Gemini-3-Pro mirrors human judgment, serv-ing as a robust agent for evaluation. 
+
+3. The Trade-off Between Temporal Density and Spatial Resolution. To validate the optimal sampling strategy for the 
+
+Flatten Temporal Video , we evaluate the reasoning capacity under varying temporal granularities. The results are as follows: 
+
+❶ Explicit Causal Understanding (5 ×8 vs. 7 ×10 vs. 8 ×12): 
+
+As shown in Figure 7, the results reveal a distinct inverted-U performance curve across most durations, peaking at our default 7 × 10 configuration. Notably, increasing density to 
+
+8 × 12 causes a performance drop (e.g., Veo-3.1 falls from 
+
+49 .9% to 43 .4% , while Sora-2 drops to 47 .4% ). This suggests that while more frames theoretically offer richer temporal context, they induce severe Visual Compression that hinders semantic extraction from the dense grid due to reduced cell resolution. Furthermore, while the 5×8 layout benefits short clips, it lacks the necessary temporal resolution required for complex causal reasoning in longer sequences. Zhang et al. 25                            
+
+> 33
+> 41
+> 49
+> 57
+> 65
+> Short Medium Long AVG
+> Veo-(5×8) 61.5 42.9 38.5 47.6
+> Veo-(7×10) 52.3 48.0 49.3 49.9
+> Veo-(8×12) 48.2 46.2 36.0 43.4
+> Sora-(5×8) 55.6 45.5 46.2 49.1
+> Sora-(7×10) 52.5 49.5 51.5 51.2
+> Sora-(8×12) 50.0 43.8 48.3 47.4
+> Performance (%)
+> (5 ×8)
+> (5 ×8)
+> (5 ×8)
+> (5 ×8)
+> (5 ×8)
+> (5 ×8)
+> (5 ×8)
+> (5 ×8)
+> (7 ×10)
+> (7 ×10)
+> (7 ×10)
+> (7 ×10)
+> (7 ×10)
+> (7 ×10)
+> (7 ×10)
+> (8 ×12)
+> (8 ×12)
+> (8 ×12)
+> (8 ×12)
+> (8 ×12)
+> (8 ×12)
+> (8 ×12)
+> (8 ×12)
+> (7 ×10)
+
+Figure 7: Performance comparison across different spatial grid layouts and video durations. The bar chart and table illustrate the Explicit Causal Understanding accuracy for Veo-3.1 and Sora-2 under three specific flattening strategies: 5 × 8 (sparse), 
+
+7 × 10 (balanced), and 8 × 12 (dense). The 7 × 10 setting yields the optimal average performance across all categories. 1 Pics 4 Pics 7 Pics 10 Pics         
+
+> Veo-3.1 54.8 57.2 58.9 56.7
+> Sora-2 60.3 57.5 61.6 59.5
+> 50
+> 53
+> 56
+> 59
+> 62
+> 65
+> Performance (%)
+
+Figure 8: Performance comparison across varying inputs for the action task. The results demonstrate that the 7-Pics yields the highest fidelity, outperforming both sparse and dense contexts by achieving an optimal balance. 
+
+❷ Implicit Generative Action (1 vs. 4 vs. 7 vs. 10 Pics): 
+
+As shown in Figure 8, comparing the results confirms that 7-pics represent the optimal prompt, outperforming both sparse (1, 4 pics) and dense (10 pics) inputs. The lower scores at fewer frames suggest Motion Ambiguity , where the model lacks sufficient temporal vectors to extrapolate future states. Conversely, the slight decline at 10 frames points to Contextual Redundancy where highly compressed keyframes introduce spatial noise that overwhelms the vi-sual encoder’s semantic feature extraction. In summary, these findings confirm that our chosen configurations (7 × 10 grid and 7 frames) strike the optimal balance between pre-serving spatial fidelity and encoding sufficient temporal dynamics required for robust simulation. 
+
+## 4 Related Work 
+
+Towards “Thinking with Video”. Recent advancements in Video Generation Model have evolved beyond high-fidelity texture syn-thesis toward complex spatiotemporal dynamics modeling [ 48 –50 ]. This progression supports the conceptualization of video generators as nascent general world simulators and promotes the “thinking with video” paradigm, where generation functions as an intrin-sic component of reasoning [ 12 , 51 –53 ]. However, distinguishing genuine causal understanding from mere statistical memorization remains a pivotal challenge, as traditional metrics disproportion-ately favor perceptual fidelity over logical consistency. 
+
+The Gap in Existing Reasoning Benchmarks. Emerging benchmarks evaluate various reasoning facets, ranging from rule-based dynamics [ 54 –56 ] to open-ended visual reasoning [ 15 , 52 , 57 ]and specific tasks [ 13 ]. While recent efforts attempt to mitigate appearance biases [ 58 –62 ]. However, relying on rudimentary tasks, they fail to verify physical and social dynamics. By evaluating discrimination and generation in isolation, they overlook the gap between surface-level outputs and genuine causal understanding. To address the critical gap in current causal evaluation and in contrast to existing methods, we introduce the Causal–Generative Dual-Judge ( CGDJ ) framework. Unlike previous works, CGDJ jointly evaluates internal consistency through two complementary modal-ities, Explicit Causal Understanding and Implicit Generative Action .By constructing the Causal–Generative Evaluation Benchmark, we provide a rigorous testbed to distinguish whether video generative models have genuinely internalized the physical laws and causal structures governing the scenes they render. 
+
+## 5 Conclusions 
+
+We redefine reasoning with video generative models as Think-ing in Video and introduce the Causal-Generative Dual-Judge (CGDJ ) to evaluate whether current generators can support this par-adigm. By jointly examining Explicit Causal Perception and Implicit Generative Prediction , we reveal a clear Perception-Prediction Gap : models may generate plausible visual dynamics without re-liable causal perception, while stronger systems show early but limited alignment between reasoning and generation. We further identify audio-visual misalignment, where verbalized causal knowl-edge does not necessarily translate into consistent video rollouts. Ultimately, CGDJ advocates shifting video generation evaluation from perceptual fidelity toward causal consistency, offering diag-nostic insights for grounded, reasoning-capable world models. Thinking in Video: Can Video Generators Really Reason About the Real World? 
+
+## References 
+
+[1] Junru Lu, Jiarui Qin, Lingfeng Qiao, Yinghui Li, Xinyi Dai, Bo Ke, Jianfeng He, Ruizhi Qiao, Di Yin, Xing Sun, Yunsheng Wu, Yinsong Liu, Shuangyin Liu, Mingkong Tang, Haodong Lin, Jiayi Kuang, Fanxu Meng, Xiaojuan Tang, Yunjia Xi, Junjie Huang, Haotong Yang, Zhenyi Shen, Yangning Li, Qianwen Zhang, Yifei Yu, Siyu An, Junnan Dong, Qiufeng Wang, Jie Wang, Keyu Chen, Wei Wen, Taian Guo, Zhifeng Shen, Daohai Yu, Jiahao Li, Ke Li, Zongyi Li, and Xiaoyu Tan. Youtu-llm: Unlocking the native agentic potential for lightweight large language models, 2026. URL https://arxiv.org/abs/2512.24618. [2] Andreas Blattmann, Tim Dockhorn, Sumith Kulal, Daniel Mendelevitch, Maciej Kilian, Dominik Lorenz, Yam Levi, Zion English, Vikram Voleti, Adam Letts, et al. Stable video diffusion: Scaling latent video diffusion models to large datasets. 
+
+arXiv preprint arXiv:2311.15127 , 2023. [3] OpenAI. Sora 2. https://openai.com/index/sora-2 , 2025. [4] Bing Wu, Chang Zou, Changlin Li, Duojun Huang, Fang Yang, Hao Tan, Jack Peng, Jianbing Wu, Jiangfeng Xiong, Jie Jiang, Linus, Patrol, Peizhen Zhang, Peng Chen, Penghao Zhao, Qi Tian, Songtao Liu, Weijie Kong, Weiyan Wang, Xiao He, Xin Li, Xinchi Deng, Xuefei Zhe, Yang Li, Yanxin Long, Yuanbo Peng, Yue Wu, Yuhong Liu, Zhenyu Wang, Zuozhuo Dai, Bo Peng, Coopers Li, Gu Gong, Guojian Xiao, Jiahe Tian, Jiaxin Lin, Jie Liu, Jihong Zhang, Jiesong Lian, Kaihang Pan, Lei Wang, Lin Niu, Mingtao Chen, Mingyang Chen, Mingzhe Zheng, Miles Yang, Qiangqiang Hu, Qi Yang, Qiuyong Xiao, Runzhou Wu, Ryan Xu, Rui Yuan, Shanshan Sang, Shisheng Huang, Siruis Gong, Shuo Huang, Weiting Guo, Xiang Yuan, Xiaojia Chen, Xiawei Hu, Wenzhi Sun, Xiele Wu, Xianshun Ren, Xiaoyan Yuan, Xiaoyue Mi, Yepeng Zhang, Yifu Sun, Yiting Lu, Yitong Li, You Huang, Yu Tang, Yixuan Li, Yuhang Deng, Yuan Zhou, Zhichao Hu, Zhiguang Liu, Zhihe Yang, Zilin Yang, Zhenzhi Lu, Zixiang Zhou, and Zhao Zhong. Hunyuanvideo 1.5 technical report, 2025. URL https://arxiv.org/abs/2511.18870. [5] Google. Veo 3. https://aistudio.google.com/models/veo-3 , 2025. [6] Team Wan, Ang Wang, Baole Ai, Bin Wen, Chaojie Mao, Chen-Wei Xie, Di Chen, Feiwu Yu, Haiming Zhao, Jianxiao Yang, Jianyuan Zeng, Jiayu Wang, Jingfeng Zhang, Jingren Zhou, Jinkai Wang, Jixuan Chen, Kai Zhu, Kang Zhao, Keyu Yan, Lianghua Huang, Mengyang Feng, Ningyi Zhang, Pandeng Li, Pingyu Wu, Ruihang Chu, Ruili Feng, Shiwei Zhang, Siyang Sun, Tao Fang, Tianxing Wang, Tianyi Gui, Tingyu Weng, Tong Shen, Wei Lin, Wei Wang, Wei Wang, Wenmeng Zhou, Wente Wang, Wenting Shen, Wenyuan Yu, Xianzhong Shi, Xiaoming Huang, Xin Xu, Yan Kou, Yangyu Lv, Yifei Li, Yijing Liu, Yiming Wang, Yingya Zhang, Yitong Huang, Yong Li, You Wu, Yu Liu, Yulin Pan, Yun Zheng, Yuntao Hong, Yupeng Shi, Yutong Feng, Zeyinzi Jiang, Zhen Han, Zhi-Fan Wu, and Ziyu Liu. Wan: Open and advanced large-scale video generative models, 2025. URL https://arxiv.org/abs/2503.20314. [7] Yongheng Zhang, Ziang Liu, Jiaxuan Zhu, Shuai Wang, Xiangqi Chen, Haojing Huang, Jiayi Kuang, Siyu Chen, Ao Shen, Hao Wu, et al. From chatbot to digital colleague: The paradigm shift toward persistent autonomous ai. arXiv preprint arXiv:2606.14502 , 2026. [8] Arslan Ali, Junjie Bai, Maciej Bala, Yogesh Balaji, Aaron Blakeman, Tiffany Cai, Jiaxin Cao, Tianshi Cao, Elizabeth Cha, Yu-Wei Chao, et al. World simulation with video foundation models for physical ai. arXiv preprint arXiv:2511.00062 ,2025. [9] Jingtao Ding, Yunke Zhang, Yu Shang, Yuheng Zhang, Zefang Zong, Jie Feng, Yuan Yuan, Hongyuan Su, Nian Li, Nicholas Sukiennik, et al. Understanding world or predicting future? a comprehensive survey of world models. ACM Computing Surveys , 58(3):1–38, 2025. [10] Hritik Bansal, Clark Peng, Yonatan Bitton, Roman Goldenberg, Aditya Grover, and Kai-Wei Chang. Videophy-2: A challenging action-centric physical com-monsense evaluation in video generation. arXiv preprint arXiv:2503.06800 , 2025. [11] Yinghui Li, Qingyu Zhou, Yangning Li, Zhongli Li, Ruiyang Liu, Rongyi Sun, Zizhen Wang, Chao Li, Yunbo Cao, and Hai-Tao Zheng. The past mistake is the future wisdom: Error-driven contrastive probability optimization for chinese spell checking. In Findings of the Association for Computational Linguistics: ACL 2022 , pages 3202–3213, 2022. [12] Jingqi Tong, Yurong Mou, Hangcheng Li, Mingzhe Li, Yongzhuo Yang, Ming Zhang, Qiguang Chen, Tianyi Liang, Xiaomeng Hu, Yining Zheng, et al. Think-ing with video: Video generation as a promising multimodal reasoning paradigm. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recog-nition , pages 41121–41129, 2026. [13] Cheng Yang, Haiyuan Wan, Yiran Peng, Xin Cheng, Zhaoyang Yu, Jiayi Zhang, Junchi Yu, Xinlei Yu, Xiawu Zheng, Dongzhan Zhou, et al. Reasoning via video: The first evaluation of video models’ reasoning abilities through maze-solving tasks. arXiv preprint arXiv:2511.15065 , 2025. [14] Wei Chow, Jiachun Pan, Yongyuan Liang, Mingze Zhou, Xue Song, Liyu Jia, Sain-ing Zhang, Siliang Tang, Juncheng Li, Fengda Zhang, et al. Weave: Unleashing and benchmarking the in-context interleaved comprehension and generation. 
+
+arXiv preprint arXiv:2511.11434 , 2025. [15] Harold Haodong Chen, Disen Lan, Wen-Jie Shu, Qingyang Liu, Zihan Wang, Sirui Chen, Wenkai Cheng, Kanghao Chen, Hongfei Zhang, Zixin Zhang, et al. Tivibench: Benchmarking think-in-video reasoning for video generative models. 
+
+arXiv preprint arXiv:2511.13704 , 2025. [16] Gemini Robotics Team, Coline Devin, Yilun Du, Debidatta Dwibedi, Ruiqi Gao, Abhishek Jindal, Thomas Kipf, Sean Kirmani, Fangchen Liu, Anirudha Majumdar, et al. Evaluating gemini robotics policies in a veo world simulator. arXiv preprint arXiv:2512.10675 , 2025. [17] Jingxuan Wei, Caijun Jia, Xi Bai, Xinglong Xu, Siyuan Li, Linzhuang Sun, Bihui Yu, Conghui He, Lijun Wu, and Cheng Tan. Ggbench: A geometric generative reasoning benchmark for unified multimodal models. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 5199– 5210, 2026. [18] Xu Liu, Yongheng Zhang, Qiguang Chen, Yao Li, Sheng Wang, and Libo Qin. Let’s think with images efficiently! an interleaved-modal chain-of-thought reasoning framework with dynamic and precise visual thoughts. In Proceedings of the AAAI Conference on Artificial Intelligence , volume 40, pages 32213–32221, 2026. [19] Shaowei Liu, Zhongzheng Ren, Saurabh Gupta, and Shenlong Wang. Physgen: Rigid-body physics-grounded image-to-video generation. In European Conference on Computer Vision , pages 360–378. Springer, 2024. [20] Minghui Lin, Xiang Wang, Yishan Wang, Shu Wang, Fengqi Dai, Pengxiang Ding, Cunxiang Wang, Zhengrong Zuo, Nong Sang, Siteng Huang, et al. Exploring the evolution of physics cognition in video generation: A survey. arXiv preprint arXiv:2503.21765 , 2025. [21] Tim Salimans, Ian Goodfellow, Wojciech Zaremba, Vicki Cheung, Alec Rad-ford, and Xi Chen. Improved techniques for training gans. Advances in neural information processing systems , 29, 2016. [22] Thomas Unterthiner, Sjoerd van Steenkiste, Karol Kurach, Raphaël Marinier, Marcin Michalski, and Sylvain Gelly. FVD: A new metric for video generation, 2019. URL https://openreview.net/forum?id=rylgEULtdN. [23] Songwei Ge, Aniruddha Mahapatra, Gaurav Parmar, Jun-Yan Zhu, and Jia-Bin Huang. On the content bias in fréchet video distance. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 7277– 7288, 2024. [24] Tarun Gupta, Wenbo Gong, Chao Ma, Nick Pawlowski, Agrin Hilmkil, Meyer Scetbon, Marc Rigter, Ade Famoti, Ashley Juan Llorens, Jianfeng Gao, et al. The essential role of causality in foundation world models for embodied ai. arXiv preprint arXiv:2402.06665 , 2024. [25] Gowthami Somepalli, Vasu Singla, Micah Goldblum, Jonas Geiping, and Tom Goldstein. Diffusion art or digital forgery? investigating data replication in diffusion models. In Proceedings of the IEEE/CVF conference on computer vision and pattern recognition , pages 6048–6058, 2023. [26] Karthik Valmeekam, Matthew Marquez, Alberto Olmo, Sarath Sreedharan, and Subbarao Kambhampati. Planbench: An extensible benchmark for evaluating large language models on planning and reasoning about change. Advances in Neural Information Processing Systems , 36:38975–38987, 2023. [27] Saman Motamed, Laura Culp, Kevin Swersky, Priyank Jaini, and Robert Geirhos. Do generative video models understand physical principles? In Proceedings of the IEEE/CVF Winter Conference on Applications of Computer Vision , pages 948–958, 2026. [28] Hao Wu, Yuqi Li, Yuan Gao, Fan Xu, Fan Zhang, Kun Wang, Penghao Zhao, Qiufeng Wang, Yizhou Zhao, Weiyan Wang, Yingli Tian, Xian Wu, and Xiaomeng Huang. Roboalign-r1: Distilled multimodal reward alignment for robot video world models, 2026. URL https://arxiv.org/abs/2605.03821. [29] Ziqi Huang, Yinan He, Jiashuo Yu, Fan Zhang, Chenyang Si, Yuming Jiang, Yuanhan Zhang, Tianxing Wu, Qingyang Jin, Nattapol Chanpaisit, et al. Vbench: Comprehensive benchmark suite for video generative models. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 21807–21818, 2024. [30] Yaofang Liu, Xiaodong Cun, Xuebo Liu, Xintao Wang, Yong Zhang, Haoxin Chen, Yang Liu, Tieyong Zeng, Raymond Chan, and Ying Shan. Evalcrafter: Benchmarking and evaluating large video generation models. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 22139–22149, 2024. [31] Tim Brooks, Bill Peebles, Connor Holmes, Will DePue, Yufei Guo, Li Jing, David Schnurr, Joe Taylor, Troy Luhman, Eric Luhman, et al. Video generation models as world simulators. OpenAI Blog , 1(8):1, 2024. [32] Minh-Quan Le, Yuanzhi Zhu, Vicky Kalogeiton, and Dimitris Samaras. What about gravity in video generation? post-training newton’s laws with verifiable rewards. arXiv preprint arXiv:2512.00425 , 2025. [33] Kaiyue Sun, Kaiyi Huang, Xian Liu, Yue Wu, Zihan Xu, Zhenguo Li, and Xihui Liu. T2v-compbench: A comprehensive benchmark for compositional text-to-video generation. In Proceedings of the Computer Vision and Pattern Recognition Conference , pages 8406–8416, 2025. [34] Vipula Rawte, Sarthak Jain, Aarush Sinha, Garv Kaushik, Aman Bansal, Prathik-sha Rumale Vishwanath, Samyak Rajesh Jain, Aishwarya Naresh Reganti, Vinija Jain, Aman Chadha, et al. Vibe: A text-to-video benchmark for evaluating hal-lucination in large multimodal models. In Proceedings of the 5th Workshop on Trustworthy NLP (TrustNLP 2025) , pages 232–246, 2025. [35] David Ha and Jürgen Schmidhuber. World models. arXiv preprint arXiv:1803.10122 , 2(3), 2018. Zhang et al. 
+
+[36] Yann LeCun. A path towards autonomous machine intelligence version 0.9. 2, 2022-06-27. Open Review , 62(1):1–62, 2022. [37] Ning Li, Jingran Zhang, and Justin Cui. Have we unified image generation and understanding yet? an empirical study of gpt-4o’s image generation ability. arXiv preprint arXiv:2504.08003 , 2025. [38] Chaoyou Fu, Yuhan Dai, Yongdong Luo, Lei Li, Shuhuai Ren, Renrui Zhang, Zihan Wang, Chenyu Zhou, Yunhang Shen, Mengdan Zhang, et al. Video-mme: The first-ever comprehensive evaluation benchmark of multi-modal llms in video analysis. In Proceedings of the Computer Vision and Pattern Recognition Conference ,pages 24108–24118, 2025. [39] Piyush Bagad, Makarand Tapaswi, Cees GM Snoek, and Andrew Zisserman. The sound of water: Inferring physical properties from pouring liquids. In ICASSP 2025-2025 IEEE International Conference on Acoustics, Speech and Signal Processing (ICASSP) , pages 1–5. IEEE, 2025. [40] Daniel M Bear, Elias Wang, Damian Mrowca, Felix J Binder, Hsiao-Yu Fish Tung, RT Pramod, Cameron Holdaway, Sirui Tao, Kevin Smith, Fan-Yun Sun, et al. Physion: Evaluating physical prediction from vision in humans and machines. 
+
+arXiv preprint arXiv:2106.08261 , 2021. [41] Jinhao Chai, Shiyi Mu, and Shugong Xu. Tld: A vehicle tail light signal dataset and benchmark. arXiv preprint arXiv:2409.02508 , 2024. [42] Will Kay, Joao Carreira, Karen Simonyan, Brian Zhang, Chloe Hillier, Sudheendra Vijayanarasimhan, Fabio Viola, Tim Green, Trevor Back, Paul Natsev, et al. The kinetics human action video dataset. arXiv preprint arXiv:1705.06950 , 2017. [43] Kristen Grauman, Andrew Westbury, Eugene Byrne, Zachary Chavis, Antonino Furnari, Rohit Girdhar, Jackson Hamburger, Hao Jiang, Miao Liu, Xingyu Liu, et al. Ego4d: Around the world in 3,000 hours of egocentric video. In Proceedings of the IEEE/CVF conference on computer vision and pattern recognition , pages 18995–19012, 2022. [44] Gemma Team, Aishwarya Kamath, Johan Ferret, Shreya Pathak, Nino Vieil-lard, Ramona Merhej, Sarah Perrin, Tatiana Matejovicova, Alexandre Ramé, Morgane Rivière, Louis Rouillard, Thomas Mesnard, Geoffrey Cideron, Jean bastien Grill, Sabela Ramos, Edouard Yvinec, Michelle Casbon, Etienne Pot, Ivo Penchev, Gaël Liu, Francesco Visin, Kathleen Kenealy, Lucas Beyer, Xiaohai Zhai, Anton Tsitsulin, Robert Busa-Fekete, Alex Feng, Noveen Sachdeva, Ben-jamin Coleman, Yi Gao, Basil Mustafa, Iain Barr, Emilio Parisotto, David Tian, Matan Eyal, Colin Cherry, Jan-Thorsten Peter, Danila Sinopalnikov, Surya Bhu-patiraju, Rishabh Agarwal, Mehran Kazemi, Dan Malkin, Ravin Kumar, David Vilar, Idan Brusilovsky, Jiaming Luo, Andreas Steiner, Abe Friesen, Abhanshu Sharma, Abheesht Sharma, Adi Mayrav Gilady, Adrian Goedeckemeyer, Alaa Saade, Alex Feng, Alexander Kolesnikov, Alexei Bendebury, Alvin Abdagic, Amit Vadi, András György, André Susano Pinto, Anil Das, Ankur Bapna, Antoine Miech, Antoine Yang, Antonia Paterson, Ashish Shenoy, Ayan Chakrabarti, Bilal Piot, Bo Wu, and Bobak Shahriari et al. Gemma 3 technical report, 2025. URL https://arxiv.org/abs/2503.19786. [45] Alec Radford, Jong Wook Kim, Tao Xu, Greg Brockman, Christine McLeavey, and Ilya Sutskever. Robust speech recognition via large-scale weak supervision. In International conference on machine learning , pages 28492–28518. PMLR, 2023. [46] Shuai Bai, Yuxuan Cai, Ruizhe Chen, Keqin Chen, Xionghui Chen, Zesen Cheng, Lianghao Deng, Wei Ding, Chang Gao, Chunjiang Ge, Wenbin Ge, Zhifang Guo, Qidong Huang, Jie Huang, Fei Huang, Binyuan Hui, Shutong Jiang, Zhaohai Li, Mingsheng Li, Mei Li, Kaixin Li, Zicheng Lin, Junyang Lin, Xuejing Liu, Jiawei Liu, Chenglong Liu, Yang Liu, Dayiheng Liu, Shixuan Liu, Dunjie Lu, and et al. Qwen3-vl technical report, 2025. URL https://arxiv.org/abs/2511.21631. [47] Aaditya Singh, Adam Fry, Adam Perelman, Adam Tart, Adi Ganesh, Ahmed El-Kishky, Aidan McLaughlin, Aiden Low, AJ Ostrow, Akhila Ananthram, Akshay Nathan, Alan Luo, Alec Helyar, Aleksander Madry, Aleksandr Efremov, Aleksan-dra Spyra, Alex Baker-Whitcomb, Alex Beutel, Alex Karpenko, Alex Makelov, Alex Neitz, Alex Wei, Alexandra Barr, Alexandre Kirchmeyer, Alexey Ivanov, Alexi Christakis, Alistair Gillespie, Allison Tam, Ally Bennett, Alvin Wan, Alyssa Huang, Amy McDonald Sandjideh, Amy Yang, Ananya Kumar, Andre Saraiva, Andrea Vallone, Andrei Gheorghe, Andres Garcia Garcia, Andrew Braunstein, Andrew Liu, Andrew Schmidt, Andrey Mereskin, Andrey Mishchenko, Andy Applebaum, Andy Rogerson, Ann Rajan, Annie Wei, Anoop Kotha, Anubha Srivastava, Anushree Agrawal, Arun Vijayvergiya, Ashley Tyra, Ashvin Nair, Avi Nayak, Ben Eggers, Bessie Ji, Beth Hoover, Bill Chen, Blair Chen, Boaz Barak, Borys Minaiev, Botao Hao, Bowen Baker, Brad Lightcap, Brandon McK-inzie, Brandon Wang, Brendan Quinn, Brian Fioca, Brian Hsu, Brian Yang, Brian Yu, Brian Zhang, Brittany Brenner, Callie Riggins Zetino, Cameron Raymond, Camillo Lugaresi, Carolina Paz, Cary Hudson, Cedric Whitney, and et al. Openai gpt-5 system card, 2025. URL https://arxiv.org/abs/2601.03267. [48] Zijian Zhou, Shikun Liu, Haozhe Liu, Haonan Qiu, Zhaochong An, Weiming Ren, Zhiheng Liu, Xiaoke Huang, Kam Woh Ng, Tian Xie, Xiao Han, Yuren Cong, Hang Li, Chuyan Zhu, Aditya Patel, Tao Xiang, and Sen He. Scaling zero-shot reference-to-video generation. arXiv preprint , 2025. [49] Yunhong Lu, Yanhong Zeng, Haobo Li, Hao Ouyang, Qiuyu Wang, Ka Leong Cheng, Jiapeng Zhu, Hengyuan Cao, Zhipeng Zhang, Xing Zhu, Yujun Shen, and Min Zhang. Reward forcing: Efficient streaming video generation with rewarded distribution matching distillation, 2025. URL https://arxiv.org/abs/2512.04678. [50] Wuyang Li, Wentao Pan, Po-Chien Luan, Yang Gao, and Alexandre Alahi. Stable video infinity: Infinite-length video generation with error recycling. arXiv preprint arXiv:2510.09212 , 2025. [51] Zuhao Yang, Sudong Wang, Kaichen Zhang, Keming Wu, Sicong Leng, Yifan Zhang, Bo Li, Chengwei Qin, Shijian Lu, Xingxuan Li, et al. Longvt: Incentivizing" thinking with long videos" via native tool calling. arXiv preprint arXiv:2511.20785 ,2025. [52] Yang Luo, Xuanlei Zhao, Baijiong Lin, Lingting Zhu, Liyao Tang, Yuqi Liu, Ying-Cong Chen, Shengju Qian, Xin Wang, and Yang You. V-reasonbench: Toward unified reasoning benchmark suite for video generation models, 2025. URL https://arxiv.org/abs/2511.16668. [53] Yongheng Zhang, Xu Liu, Ruihan Tao, Qiguang Chen, Hao Fei, Wanxiang Che, and Libo Qin. Vitcot: Video-text interleaved chain-of-thought for boosting video understanding in large language models. In Proceedings of the 33rd ACM International Conference on Multimedia , pages 5267–5276, 2025. [54] Xuming He, Zehao Fan, Hengjia Li, Fan Zhuo, Hankun Xu, Senlin Cheng, Di Weng, Haifeng Liu, Can Ye, and Boxi Wu. Ruler-bench: Probing rule-based reasoning abilities of next-level video generation models for vision foundation intelligence, 2025. URL https://arxiv.org/abs/2512.02622. [55] Xinxin Liu, Zhaopan Xu, Ming Li, Kai Wang, Yong Jae Lee, and Yuzhang Shang. Can world simulators reason? gen-vire: A generative visual reasoning benchmark, 2025. URL https://arxiv.org/abs/2511.13853. [56] Yongheng Zhang, Xu Liu, Ruoxi Zhou, Qiguang Chen, Hao Fei, Wenpeng Lu, and Libo Qin. CCHall: A novel benchmark for joint cross-lingual and cross-modal hallucinations detection in large language models. In Wanxiang Che, Joyce Nabende, Ekaterina Shutova, and Mohammad Taher Pilehvar, editors, 
+
+Proceedings of the 63rd Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers) , pages 30728–30749, Vienna, Austria, July 2025. Association for Computational Linguistics. ISBN 979-8-89176-251-0. doi: 10. 18653/v1/2025.acl-long.1485. URL https://aclanthology.org/2025.acl-long.1485/. [57] Libo Qin, Qiguang Chen, Xiachong Feng, Yang Wu, Yongheng Zhang, Yinghui Li, Min Li, Wanxiang Che, and Philip S Yu. Large language models meet nlp: A survey. Frontiers of Computer Science , 20(11):2011361, 2026. [58] Ziyu Guo, Xinyan Chen, Renrui Zhang, Ruichuan An, Yu Qi, Dongzhi Jiang, Xiangtai Li, Manyuan Zhang, Hongsheng Li, and Pheng-Ann Heng. Are video models ready as zero-shot reasoners? an empirical study with the mme-cof benchmark. arXiv preprint arXiv:2510.26802 , 2025. [59] Hokin Deng. Video models start to solve chess, maze, sudoku, mental rotation, and raven’matrices. arXiv preprint arXiv:2512.05969 , 2025. [60] Yongheng Zhang, Zhipeng Xu, Hao Wu, Yinghui Li, Di Yin, Xing Sun, and Philip S Yu. Latent visual cache for video reasoning. arXiv preprint arXiv:2607.02607 ,2026. [61] Zefan Cai, Haoyi Qiu, Tianyi Ma, Haozhe Zhao, Gengze Zhou, Kung-Hsiang Huang, Parisa Kordjamshidi, Minjia Zhang, Xiao Wen, Jiuxiang Gu, et al. Mmgr: Multi-modal generative reasoning. arXiv preprint arXiv:2512.14691 , 2025. [62] Yifan Li, Yukai Gu, Yingqian Min, Zikang Liu, Yifan Du, Kun Zhou, Min Yang, Wayne Xin Zhao, and Minghui Qiu. Beyond the last frame: Process-aware evaluation for generative video reasoning, 2026. URL https://arxiv.org/abs/2512. 24952.

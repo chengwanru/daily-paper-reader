@@ -1,0 +1,248 @@
+Title: SAGE: Subgoal-Conditioned Action Generation for Latent World Model Planning
+
+URL Source: https://arxiv.org/pdf/2607.17973v1
+
+Published Time: Tue, 21 Jul 2026 01:57:27 GMT
+
+Number of Pages: 12
+
+Markdown Content:
+Preprint 
+
+# SAGE: S UBGOAL -C ONDITIONED ACTION GENERA -
+
+# TION FOR LATENT WORLD MODEL PLANNING 
+
+Letian Cheng ∗ Qi Zhang ∗ Yisen Wang †
+
+Peking University 
+
+# ABSTRACT 
+
+Latent world models have emerged as a powerful planning paradigm by learn-ing action-conditioned predictive dynamics and using them as internal simulators to imagine and evaluate candidate action sequences. However, as the planning horizon grows, performance becomes increasingly constrained by proposal qual-ity: a fixed candidate budget must search an exponentially larger action space, making it difficult to expose the world model to high-quality candidate futures for evaluation. In this paper, we introduce a prior-conditioned planner that re-places random proposal initialization with structured guidance. At each planning stage, a goal-conditioned generator predicts the next reachable latent subgoal for a specified duration, which is then used to condition the generation of candidate action sequences. To capture semantic information across temporal scales, we use subgoals of varying durations as priors, balancing fine-grained local control with higher-level long-horizon progress. Then the frozen world model evaluates and refines these subgoal-conditioned proposals before execution. Experiments on PushT and OGBench Cube show that coupling latent subgoal decomposition with prior-conditioned action generation substantially improves long-horizon planning while preserving strong short-horizon performance. To be specific, when the tar-get offset is 150 , it raises PushT success from 12 .7% to 64 .7% and OGBench Cube success from 26 .7% to 67 .3% .
+
+# 1 INTRODUCTION 
+
+Latent world models offer a compelling framework for planning by learning how latent representa-tions evolve under candidate actions and using these learned dynamics to simulate possible futures. Instead of reconstructing future observations at the pixel level, they predict directly in a compact rep-resentation space and evaluate imagined outcomes against a target, making planning substantially more efficient (Zhou et al., 2025; Maes et al., 2026; Assran et al., 2025). During the planning pro-cess, a typical planner repeatedly proposes action sequences, rolls them forward through the latent dynamics, and selects the candidates whose predicted futures best match the desired goal. The planning process naturally separates prediction from proposal: the world model determines how candidate actions are evaluated, whereas the proposal mechanism determines which parts of the action space are exposed to that evaluation (Zhou et al., 2025). As the planning horizon grows, the proposal mechanism becomes increasingly critical (Wang et al., 2026). Under a fixed candidate budget, initializing action search from a generic random distribution provides increasingly poor coverage of the rapidly expanding action space, making goal-directed action sequences unlikely to be sampled. A more effective planner therefore requires a structured proposal distribution that concentrates search on plausible behaviors. Consequently, in this paper, we introduce SAGE, a prior-conditioned planning framework in which actions are sampled conditioned on predicted latent subgoals rather than initialized from a generic random distribution. To be specific, we first train a variable-length latent subgoal generator to de-compose long-horizon tasks into different temporal scales. Given the current observation history, the distant goal, and a requested future horizon, the generator predicts a reachable intermediate state 
+
+> ∗
+
+Equal contribution 
+
+> †
+
+Corresponding author: Yisen Wang (yisen.wang@pku.edu.cn) 
+
+1arXiv:2607.17973v1 [cs.AI] 20 Jul 2026 Preprint at that horizon. Shorter subgoals preserve fine-grained information needed for local corrections, whereas longer subgoals capture higher-level progress toward the final goal. A single generator sup-ports multiple subgoal lengths, allowing the same planning framework to reason over both local and coarse temporal abstractions. We then use these generated subgoals as structured priors for action search. Rather than initializing the planner from a generic random distribution, the planner gener-ates action sequences conditioned on these predicted subgoals over the corresponding horizon. The frozen world model evaluates and refines these subgoal-conditioned proposals before execution. In this way, variable-length subgoals not only decompose the distant goal, but also directly shape the candidate distribution explored by the planner. Experiments on PushT and OGBench Cube validate our method under a controlled planning setup. Using the same frozen LeWM, candidate budget, and CEM refinement procedure as the baselines, our planner consistently improves performance across planning horizons, with the gains becoming increasingly pronounced as the goal becomes more distant. When target offset H=150, success rises from 12.7% to 64.7% on PushT and from 26.7% to 67.3% on OGBench Cube. Component studies further show that both generating local targets and using them as proposal priors yield substantial gains, while LeWM-based refinement remains essential for selecting the final action sequence. The contributions can be summarized as: • We introduce a multi-horizon latent subgoal generator that decomposes distant goals into reachable intermediate states at different temporal horizons, capturing both fine-grained local dynamics and higher-level task progress. • We develop a subgoal-conditioned action generator that generates action candidates con-ditioned on each predicted subgoal and uses a frozen latent world model to evaluate and refine these proposals. • Experiments on PushT and OGBench Cube show that combining variable-length subgoal generation with subgoal-conditioned action generation substantially improves long-horizon planning while preserving strong short-horizon performance. 
+
+# 2 RELATED WORK 
+
+2.1 LATENT WORLD MODEL PLANNING 
+
+Latent world models support control by predicting how compact state representations evolve un-der actions and using imagined trajectories to guide behavior. Model-based reinforcement learning methods such as Dreamer learn policies and value functions from latent imagination (Hafner et al., 2023; Hansen et al., 2024). A complementary line considers reward-free, goal-conditioned planning, where candidate actions are optimized by comparing predicted latent states against a target obser-vation. PLDM learns JEPA-based latent dynamics from offline, reward-free trajectories and studies their generalization for zero-shot goal reaching (Sobal et al., 2026). DINO-WM instead predicts future DINO patch features and plans by treating target features as the optimization objective (Zhou et al., 2025), while LeWM learns the visual representation and action-conditioned dynamics jointly from pixels before planning with CEM (Maes et al., 2026). V-JEPA 2 scales joint-embedding pre-diction through large-scale video pretraining and adapts the resulting model to action-conditioned prediction and robotic planning (Assran et al., 2023; 2025). In contrast to these works on learning or scaling the predictive model, we keep the encoder, latent dynamics, and planning cost fixed, and instead improve the local targets and action proposals presented to the frozen world model. 2.2 LONG -H ORIZON PLANNING 
+
+Long-horizon planning is a central challenge for sequential decision-making, as agents must main-tain goal-directed progress while coordinating decisions across multiple temporal scales. A broad range of approaches has therefore explored intermediate decisions and structured action distribu-tions. The options framework formalizes temporally extended closed-loop behaviors (Sutton et al., 1999); HIRO learns a high-level subgoal policy together with a low-level controller (Nachum et al., 2018); and Play-LMP learns latent plans and goal-conditioned control from teleoperated play (Lynch et al., 2020). Guider similarly combines an offline latent subgoal prior with a reachability-aware con-troller (Shin & Kim, 2023). More recent world-model approaches introduce temporal abstraction 2Preprint directly into predictive modeling: HWM learns dynamics at multiple temporal scales and plans hi-erarchically across them (Zhang et al., 2026), whereas VLWM predicts latent transitions over action segments of different lengths (Du et al., 2026). Two concurrent works come closest to the setting studied here. PRISM introduces learned proposal guidance for frozen JEPA planning by predicting a Gaussian action prior conditioned on the current state and integrating it into MPPI (Williams et al., 2017; Wang et al., 2026). Our method introduces stronger task structure by first predicting a reachable latent subgoal and then conditioning an action prior on the local progress specified by that subgoal. FF-JEPA also predicts latent subgoals for successive local planning (Masip et al., 2026), but uses them only as optimization targets rather than as conditioning signals for learned action proposals. In our method, each subgoal jointly defines the target evaluated by latent world models and the action distribution explored by the planner. Moreover, a single generator in our framework supports multiple requested durations, enabling the same framework to coordinate planning across temporal scales. 
+
+# 3 SUBGOAL -C ONDITIONED ACTION GENERATION PLANNER FOR WORLD 
+
+# MODEL PLANNING 
+
+When the target lies far beyond the planner’s immediate prediction horizon, directly optimizing actions toward the final goal provides limited guidance for local decision-making. We therefore decompose long-horizon planning into two tightly coupled decisions: determining a useful and reachable intermediate state, and generating an action sequence conditioned on that. Specifically, we introduce SAGE (subgoal-conditioned action generation planner), which learns both decisions while keeping the underlying world model fixed. In this section, we first review the standard latent world model planning procedure, and then introduce its two learned components: a latent subgoal generator and a subgoal-conditioned action generator. 3.1 PRELIMINARIES 
+
+Latent world models such as LeWM (Maes et al., 2026) and Dino-WM (Zhou et al., 2025) serve as simulators for planning by encoding observations into spatial latent tokens and predicting how these tokens evolve under candidate action sequences. At time t, the planner receives a recent observation history ht = ( ot−k+1 , . . . , o t) and a goal observation gt+δ at offset δ. The frozen encoder maps the observation history and the goal into the latent space: 
+
+zt−k:t = Eθ (ht), zgt+δ = Eθ (gt+δ ). (1) At each decision point, the planner samples K candidate action sequences a(i) = a(i) 
+
+> t:t+δ−1
+
+from a proposal distribution. For each candidate, the frozen latent dynamics model predicts the correspond-ing future latent, 
+
+˜z(i) 
+
+> t+δ
+
+= Fθ
+
+
+
+zt−k:t, a(i)
+
+, (2) and evaluates its discrepancy from the goal latent: 
+
+Cθ
+
+
+
+zt−k:t, z gt+δ , a(i)
+
+= d
+
+
+
+˜z(i) 
+
+> t+δ
+
+, z gt+δ
+
+
+
+. (3) CEM retains the lowest-cost candidates, fits a Gaussian distribution to the elite set, and iteratively refines the action population for a fixed number of rounds. The planner then executes the leading segment of the selected sequence, observes the resulting state, and replans. This procedure allows latent world models to compare action-conditioned imagined futures before committing to an action in the environment. For short-horizon queries, the final goal latent often provides a sufficiently informative target for ac-tion optimization. However, as the goal becomes more distant, directly comparing locally predicted futures with the final goal can yield a weak or poorly aligned learning signal. For example, a goal 150 steps away may offer little guidance about which action should be taken next. Consequently, we propose a subgoal-conditioned action generation planner (SAGE), which addresses this mismatch by introducing a reachable local target between the current state and the distant goal, and by using that target to guide the generation of the CEM proposal population. The frozen LeWM remains 3Preprint 
+
+Figure 1: The planning stage in SAGE. The subgoal generator converts the current history, a far-goal latent, and a requested duration τ into a local target. Then the action generator proposes τ -step action options conditioned on that target. Frozen LeWM predicts and ranks their latent futures, while CEM refines the best proposal region before execution. responsible for predicting and ranking candidate futures, while SAGE specifies both the local future to be evaluated and the action sequences proposed to reach it. We will first introduce how SAGE generates such local latent targets in the following. 3.2 GOAL -C ONDITIONED SUBGOAL GENERATION 
+
+The first component in SAGE is a subgoal generator, which provides LeWM with a reachable local subgoal for the next τ steps. Here, τ denotes the local planning duration: it determines both how far ahead the subgoal is defined and the length of the action sequence used to reach it. As shown in Figure 1, the subgoal generator takes the history tokens zt−k:t, the low-dimensional state xt, the far-goal tokens zgt+δ , embeddings of the remaining goal offset δ, and requested duration τ as input. It predicts the latent state expected at time t + τ :
+
+ˆzt+τ = zgt+δ + Dψ (zt−k:t, x t, z gt+δ , δ, τ ). (4) We parameterize Dψ with a four-layer Transformer decoder. Typed input embeddings distinguish history, goal, state, and temporal inputs. One decoder output token is produced for each spatial goal token. The residual form keeps the output in LeWM’s latent space while letting the far-goal observation anchor the predicted local target. In the subgoal generator, the observation history and current state describe the agent’s present trajectory context, while the far goal specifies the overall task objective. The pair (δ, τ ) indicates how far the final goal remains and how much progress should be made during the current stage. By combining these inputs, the generator produces a duration-matched local latent target that LeWM can use to evaluate the next action option. 3.3 SUBGOAL -C ONDITIONED ACTION GENERATION 
+
+The second component in SAGE maps the current history, far goal, and generated target to a distri-bution of action options. The local target describes the next transition, while the far goal tells the generator which larger task that transition belongs to. Specifically, the action generator takes the history tokens zt−k:t, the low-dimensional state xt, the predicted local subgoal ˆzt+τ , the far-goal tokens zgt+δ , and the temporal variables (δ, τ ) as input. A three-layer Transformer decoder uses learned action queries to attend to this conditioning memory. Each query represents b=5 environ-ment actions, and a duration mask activates the first Lτ = τ /b queries. The same network can produce options of different lengths while preserving an explicit correspondence between an option and its predicted subgoal. The decoder parameterizes a trajectory-level Gaussian mixture, 
+
+qϕ(at:t+τ −1 | zt−k:t, x t, ˆzt+τ , z gt+δ , δ, τ ) = 
+
+> M
+
+X
+
+> m=1
+
+πmN (at:t+τ −1; μm, Σm). (5) 4Preprint Each gaussian describes a complete action option. Several gaussians allow the population to re-tain distinct contact points and approach directions. Samples from this mixture initialize the CEM population; the frozen LeWM cost then selects and refines promising regions of the distribution. 3.4 TRAINING AND EVALUATION PROCESS OF SAGE 
+
+Training the subgoal generator. Both components in SAGE use aligned windows from expert trajectories. A window starting at t contains a history, a far goal at t + δ, a local future at t + τ ,and the τ expert actions between them. We sample valid pairs with τ ≤ δ across the supported time scales. The subgoal generator matches the frozen LeWM latent of the local future, 
+
+Lsubgoal = SmoothL1(ˆ zt+τ , z t+τ ) + λcos [1 − cos(ˆ zt+τ , z t+τ )] . (6) 
+
+Training the action generator. Once the subgoal generator is trained, we freeze it and condition the action generator on its predicted local targets. The action loss is the likelihood of the expert option under the corresponding mixture, 
+
+Loption = − log qϕ(a∗  
+
+> t:t+τ−1
+
+| zt−k:t, x t, ˜zt+τ , z gt+δ , δ, τ ), (7) where ˜zt+τ denotes the frozen generator prediction. Thus the action generator learns under the same local-target errors that arise during planning, while the desired action sequence remains supervised by the expert trajectory. For the reported model, we use far-goal offsets 
+
+δ ∈ { 15 , 20 , 25 , 30 , 40 , 45 , 50 , 60 , 65 , 75 , 90 , 100 , 115 , 125 , 140 , 150 }, (8) and local durations 
+
+τ ∈ { 15 , 20 , 25 }. (9) For each component, we sample 400k valid training windows while balancing the distribution over far-goal offsets. Each window contains a duration-compatible local future together with its corre-sponding expert action segment. 
+
+Online planning. At test time, a query with total horizon H is decomposed into a duration sched-ule (τ1, . . . , τ R). At stage r, the remaining offset is 
+
+δr = H − X
+
+> j<r
+
+τj . (10) SAGE predicts ˆzt+τr from the current history and the remaining goal, samples K action options of duration τr , and gives them to LeWM. LeWM ranks their imagined futures against ˆzt+τr ; elite CEM fits a Gaussian to the lowest-cost candidates for the same 30 refinement rounds used by Base CEM. The agent executes the selected τr -step option, receives a new observation, and moves to the next stage. The reported model supports τ ∈ { 15 , 20 , 25 }, so one trained generator–planner pair can serve repeated short commitments, longer local motions, and mixed schedules. 
+
+# 4 EXPERIMENTS 
+
+The experiments follow the structure of the planner. We first evaluate whether generated local targets and duration-matched action options improve a frozen latent planner as the goal moves farther away. We then remove the two learned components in turn and vary the temporal schedule while keeping the learned weights fixed. PushT and OGBench Cube provide two useful contrasts: one requires sustained planar contact, while the other combines arm motion, grasping, and object placement. 4.1 EXPERIMENTAL SETUP 
+
+We evaluate frozen LeWM checkpoints on held-out expert trajectories from PushT and OGBench Cube. Each query consists of a current observation and a goal observation H steps later in the same trajectory, with H ∈ 25 , 50 , 75 , 100 , 125 , 150 when supported by training. For each horizon, we construct three fixed evaluation manifests using seeds 32 , 42 , 52 , each containing 50 start–goal pairs. 5Preprint  
+
+> (a) PushT. (b) OGBench Cube.
+
+Figure 2: Success across goal offsets. Bars show the mean over the three fixed held-out manifests indexed by seeds {32 , 42 , 52 }; error bars show sample standard deviation. All methods share the frozen LeWM checkpoint, 300 initial candidates, and 30 CEM rounds. All methods are evaluated on the same queries with identical environment budgets and candidate counts. All planning methods use the same frozen LeWM checkpoint and optimization budget. Base CEM uses 300 candidates, 30 refinement rounds, and 30 elites. SAGE follows a shared duration schedule across benchmarks: 25 for H=25 , 25+25 for H=50 , 15 ×5 for H=75 , 15 ×5+25 for H=100 ,
+
+15 ×7+20 for H=125 , and 15 ×10 for H=150 . PushT uses an environment budget of 2H, while Cube uses H. We report mean and standard deviation over the three fixed manifests. We compare against several matched baselines. LeWM (Maes et al., 2026) uses its standard Gaus-sian CEM proposal. PRISM (Wang et al., 2026) uses its released state-conditioned proposal head to initialize the same CEM procedure, enabling a controlled comparison of proposal mechanisms. 
+
+Generator-only uses generated local targets with the original Gaussian proposal, isolating the ef-fect of subgoal generation. SAGE prior top directly executes the highest-weight option from the learned prior, without LeWM ranking or CEM refinement. Full SAGE combines generated local targets, multimodal action proposals, and LeWM-guided elite CEM. The subgoal generator uses a four-layer Transformer decoder with width 512 and eight heads, while the action generator uses three layers and eight trajectory-level Gaussian modes. Both share parameters across all (∆ , τ )
+
+pairs; further implementation details are provided in Section A.3. 4.2 EMPIRICAL PERFORMANCE ACROSS PLANNING HORIZONS 
+
+Figure 2 compares the full planner with frozen LeWM on PushT and Cube. The H=25 query can be handled in one local decision. Later columns require the planner to regenerate targets and actions several times before it reaches the query goal. The short query remains strong: the full planner reaches 94 .0% at H=25 . The gap widens once the rollout requires more local actions and planning. At H=50 , SAGE reaches 81 .3% , while LeWM and PRISM reach 56 .0% and 54 .7% . At H=150 ,the three values are 64 .7% , 12 .7% , and 17 .3% . The result is consistent with the role of the two learned components: the generator gives each stage a target that fits its next commitment, and the action generator places CEM around motions that can pursue that target. The benefit accumulates as a route contains more replanning stages. The right panel repeats the comparison on Cube. On Cube, the local target gives the planner a direct geometric reference for the arm and object. The learned options improve every reported horizon: success rises from 66 .7% to 98 .7% at H=25 , from 57 .3% to 85 .3% at H=100 , and from 26 .7% 
+
+to 67 .3% at H=150 . PushT relies more on temporal context around contact. Cube relies more on a duration-indexed local reference. The shared interface accommodates both cases. The gain at 
+
+H=25 also shows that a nearby query can benefit when LeWM compares candidates with a target that matches the next executed option. 6Preprint 4.3 BENEFITS OF GENERATED LOCAL TARGETS 
+
+Generator-only retains the generated local target and uses original Gaussian action generation with random initialization. Table 1 pairs it with the full planner on the same checkpoints, manifests, candidate budget, and CEM updates. Hence, the comparison isolates the contribution of the learned option distribution after the local target has been fixed. Table 1: Matched generator-only decomposition on OGBench Cube and PushT. Success rate (%), mean ± sample standard deviation over fixed manifests for seeds {32 , 42 , 52 }. Within each task, Generator-only and SAGE share the learned subgoal generator, evaluation queries, 300 candidates, and 30 CEM rounds.                                                                               
+
+> Method H25 H50 H75 H100 H125 H150
+> OGBench Cube
+> Generator-only 91.3 ±1.2 63.3 ±5.0 76.0 ±4.0 70.7 ±13.3 59.3 ±11.7 51.3 ±4.2 SAGE 98.7 ±1.2 76.0 ±5.3 86.0 ±4.0 85.3 ±1.2 77.3 ±3.1 67.3 ±3.1 PushT
+> Generator-only 90.7 ±1.2 75.3 ±9.5 70.7 ±6.1 72.7 ±7.6 66.7 ±7.6 58.7 ±7.6 SAGE 94.0 ±3.5 81.3 ±3.1 81.3 ±4.2 72.7 ±9.0 68.7 ±3.1 64.7 ±9.5
+
+The generator alone already improves action selection significantly. On PushT, its gains persist through H=150 , where Generator-only reaches 58 .7% under the same Gaussian search used by Base CEM. Cube shows the same pattern: generated local targets support 76 .0% at H=75 and 
+
+51 .3% at H=150 . The full planner improves these matched runs most clearly at the longer offsets, where the action distribution has more opportunity to constrain the candidate set. 4.4 IMPORTANCE OF WORLD -M ODEL -G UIDED REFINEMENT 
+
+SAGE prior top receives the same generated local target and final goal as the full planner, then executes the highest-weight GMM option directly. It therefore removes LeWM candidate ranking and CEM refinement while retaining the learned generator and action model. Table 2 reports the full PushT horizon range. The gap grows with horizon: prior top reaches 16 .0% at H=150 , while the complete planner reaches 64 .7% . The result shows that the option prior supplies useful proposals, while LeWM-guided search selects and refines them over long horizons. Table 2: PushT option-search ablation. Success rate (%), mean ± sample standard deviation over the same fixed manifests for seeds {32 , 42 , 52 }. SAGE prior top retains the generated local target and final goal, but uses neither LeWM ranking nor CEM refinement.                                           
+
+> Method H25 H50 H75 H100 H125 H150 SAGE prior top 55.3 ±11.5 42.0 ±6.9 35.3 ±4.6 28.7 ±2.3 24.0 ±10.0 16.0 ±5.3 SAGE 94.0 ±3.5 81.3 ±3.1 81.3 ±4.2 72.7 ±9.0 68.7 ±3.1 64.7 ±9.5
+
+4.5 PLANNING WITH DIFFERENT TEMPORAL SCHEDULES 
+
+The time-conditioned model can use several different planning schedules. We compare repeated 25-step commitments, repeated 15-step commitments, and schedules that mix the two. Every stage receives a generated target and produces an action option at the duration prescribed by that schedule. As shown in Table 3, the schedule study highlights two distinct effects. First, performance de-pends on the frequency of replanning. At H=125 , five 25-step commitments achieve 62% success, whereas seven 15-step commitments followed by a 20-step option reach 80% . As reflected by R,using more stages provides more opportunities to observe the environment, regenerate local targets, and rerun CEM, although it also incurs greater planning cost. These comparisons therefore capture the joint effect of temporal granularity, feedback frequency, and computation. Second, performance also depends on the ordering of durations. At H=75 , the schedule 25 + 20 + 15 + 15 achieves 84% , compared with 70% for 15 + 15 + 20 + 25 , despite using the same set of 7Preprint Table 3: Variable-duration planning on PushT, evaluated on a dedicated fixed held-out manifest indexed by seed 42 ( n=50 ). Rows share the same generator, option prior, LeWM checkpoint, and per-stage CEM budget. R counts executed options and therefore replanning stages.                                                    
+
+> Goal horizon Option schedule RSuccess (%) 50 25 + 25 280.0 50 15 + 15 + 20 384.0
+> 75 25 ×3376.0 75 15 ×5586.0
+> 75 25 + 20 + 15 + 15 484.0
+> 75 15 + 15 + 20 + 25 470.0 100 25 + 20 + 20 + 20 + 15 564.0 100 15 + 20 + 20 + 20 + 25 572.0
+> 125 25 ×5562.0 125 15 ×7 + 20 880.0
+> 150 25 ×6648.0 150 15 ×10 10 60.0
+
+durations and the same number of CEM calls. A similar ordering effect appears at H=100 , where one arrangement reaches 72% and the reverse reaches 64% . These results suggest that duration order influences the intermediate states encountered by the planner and, consequently, the difficulty of subsequent planning stages. Learning a state- and horizon-aware duration policy is therefore a promising direction for future work. 
+
+# 5 CONCLUSION 
+
+In this paper, we introduced SAGE, a subgoal-conditioned action generation planning framework for improving long-horizon planning with frozen latent world models. Rather than relying on generic action proposals directed toward a distant goal, SAGE decomposes planning into two coupled deci-sions: predicting a reachable latent subgoal for the current planning duration and generating action options conditioned on that subgoal. The frozen world model then evaluates and refines these struc-tured proposals, preserving its role as an action-conditioned simulator while improving the candidate futures exposed to it. Experiments on PushT and OGBench Cube show that this combination sub-stantially improves planning performance as the goal horizon increases, while maintaining strong performance on short-horizon queries. The ablations further demonstrate that local target generation already provides substantial gains, subgoal-conditioned action proposals offer additional improve-ments, and world-model-guided search remains essential for selecting and refining the final action sequence. Our temporal schedule study also shows that both the duration and ordering of local deci-sions affect planning outcomes. Overall, these results suggest that improving the structure of action proposals can extend the planning capability of existing latent world models without modifying or retraining their predictive dynamics. 
+
+# REFERENCES 
+
+Mahmoud Assran, Quentin Duval, Ishan Misra, Piotr Bojanowski, Pascal Vincent, Michael Rabbat, Yann LeCun, and Nicolas Ballas. Self-supervised learning from images with a joint-embedding predictive architecture. In CVPR , 2023. Mido Assran, Adrien Bardes, David Fan, Quentin Garrido, Russell Howes, Matthew Muckley, Am-mar Rizvi, Claire Roberts, Koustuv Sinha, Artem Zholus, et al. V-jepa 2: Self-supervised video models enable understanding, prediction and planning. arXiv preprint arXiv:2506.09985 , 2025. Tianqi Du, Qi Zhang, Yifei Wang, and Yisen Wang. Beyond the next step: Variable-length latent world models for long-horizon planning. arXiv preprint arXiv:2606.21775 , 2026. Danijar Hafner, Jurgis Pasukonis, Jimmy Ba, and Timothy Lillicrap. Mastering diverse domains through world models. arXiv preprint arXiv:2301.04104 , 2023. 8Preprint Nicklas Hansen, Hao Su, and Xiaolong Wang. TD-MPC2: Scalable, robust world models for con-tinuous control. In ICLR , 2024. Corey Lynch, Mohi Khansari, Ted Xiao, Vikash Kumar, Jonathan Tompson, Sergey Levine, and Pierre Sermanet. Learning latent plans from play. In CoRL , 2020. Lucas Maes, Quentin Le Lidec, Damien Scieur, Yann LeCun, and Randall Balestriero. Leworld-model: Stable end-to-end joint-embedding predictive architecture from pixels. arXiv preprint arXiv:2603.19312 , 2026. Sergi Masip, Jonathan Swinnen, Yutong Hu, Renaud Detry, and Tinne Tuytelaars. Ff-jepa: Long-horizon planning in world models with latent planners. arXiv preprint arXiv:2606.09311 , 2026. Ofir Nachum, Shixiang Shane Gu, Honglak Lee, and Sergey Levine. Data-efficient hierarchical reinforcement learning. In NeurIPS , 2018. Seohong Park, Kevin Frans, Benjamin Eysenbach, and Sergey Levine. OGBench: Benchmarking offline goal-conditioned RL. In ICLR , 2025. Wonchul Shin and Yusung Kim. Guide to control: Offline hierarchical reinforcement learning using subgoal generation for long-horizon and sparse-reward tasks. In IJCAI , 2023. Uladzislau Sobal, Wancong Zhang, Kyunghyun Cho, Randall Balestriero, Tim GJ Rudner, and Yann LeCun. Learning from reward-free offline data: A case for planning with latent dynamics models. In NeurIPS , 2026. Richard S Sutton, Doina Precup, and Satinder Singh. Between mdps and semi-mdps: A frame-work for temporal abstraction in reinforcement learning. Artificial intelligence , 112(1-2):181– 211, 1999. Yuhai Wang, Jiawei Xia, Rongxuan Zhou, Xiao Hu, Yongliang Shi, Jing Du, and Yang Ye. Prism: Prior-guided imagination sampling in world models. arXiv preprint arXiv:2606.07974 , 2026. Grady Williams, Andrew Aldrich, and Evangelos A. Theodorou. Model predictive path integral control: From theory to parallel computation. Journal of Guidance, Control, and Dynamics , 40 (2):344–357, 2017. Wancong Zhang, Basile Terver, Artem Zholus, Soham Chitnis, Harsh Sutaria, Mido Assran, Randall Balestriero, Amir Bar, Adrien Bardes, Yann LeCun, et al. Hierarchical planning with latent world models. arXiv preprint arXiv:2604.03208 , 2026. Gaoyue Zhou, Hengkai Pan, Yann Lecun, and Lerrel Pinto. DINO-WM: World models on pre-trained visual features enable zero-shot planning. In ICML , 2025. 9Preprint 
+
+# A APPENDIX 
+
+A.1 ENVIRONMENT AND DATASET DETAILS 
+
+PushT is a planar contact-rich manipulation task in which a circular pusher moves a T-shaped object to a target pose. We use the expert demonstration dataset and episode split distributed with the LeWM evaluation stack. OGBench Cube is a robot manipulation task from OGBench (Park et al., 2025); its expert dataset contains 10,000 episodes of 200 environment steps. Training windows come exclusively from train episodes, and online evaluation starts from held-out test states. Table 4: Dataset and evaluation summary. Splits are defined at the episode level before training windows are constructed.                      
+
+> Task Train eps. Val eps. Test eps. Action dim. Success criterion PushT 14,948 1,868 1,869 2position <20 , angle < π/ 9
+> Cube 8,000 1,000 1,000 5target-block distance <0.04 m
+
+A.2 CANONICAL EVALUATION PROTOCOL 
+
+An evaluation key consists of 
+
+(benchmark , split , H, n, sample seed ).
+
+For every benchmark, horizon, and sample seed in {32 , 42 , 52 }, the sample builder draws one fixed manifest of n=50 valid held-out start–goal pairs. Each record stores an episode id, start frame, goal frame, goal offset, record id, and a SHA-256 hash of its semantic fields. All methods at a given benchmark, horizon, and seed consume the same manifest. PushT evaluates H ∈ { 25 , 50 , 75 , 100 , 125 , 150 } with a 2H environment-step budget; Cube uses an H-step budget. Base CEM and our planner use 300 candidates, 30 CEM rounds, 30 elites, and variance scale 1.0. Main results and the matched component studies aggregate the same three fixed manifests. Table 5: Training and online-planning alignment.                                  
+
+> Field Training tuple Online planning stage History observations through tobservations through current time Far goal latent at t+ ∆ query goal with remaining ∆r
+> Local target latent at t+τgenerator prediction for τr
+> Action target expert actions over τsampled option over τr
+> LeWM target latent at t+τgenerated local latent at t+τr
+> Execution duration label τexecute τrenvironment steps
+
+A.3 ARCHITECTURE AND TRAINING DETAILS 
+
+The frozen LeWM encoder supplies spatial history tokens and far-goal tokens; available low-dimensional state passes through a separate projection. Typed embeddings distinguish history, far goal, state, and time variables. The subgoal generator uses a four-layer Transformer decoder with width 512 and eight heads. Goal-shaped queries predict a residual added to the far-goal latent. It contains 20.71M trainable parameters and optimizes SmoothL1 plus cosine loss on frozen LeWM targets. The action generator uses a three-layer, width-512, eight-head Transformer decoder and an eight-mode trajectory GMM. Learned action queries cover the longest supported option, and the duration mask activates one query per five environment actions. It contains 13.61M trainable parameters and optimizes trajectory mixture negative log likelihood. For the reported PushT model, the generator samples far-goal offsets from 
+
+∆ ∈ { 15 , 20 , 25 , 30 , 40 , 45 , 50 , 60 , 65 , 75 , 90 , 100 , 115 , 125 , 140 , 150 }
+
+10 Preprint and the action generator uses τ ∈ { 15 , 20 , 25 } whenever τ ≤ ∆. Both stages use 400k train examples and 40k validation examples drawn from the full train-window pool. The pair sampler balances the far-goal offsets and the valid (∆ , τ ) combinations. The main action generator receives generated local targets for every training row (Gen100), matching its online input. Cube uses the same generator–option interface and the same supported option durations. Table 6: Training configuration for the reported PushT model.                             
+
+> Field Subgoal generator Option prior Architecture Transformer decoder Transformer decoder + trajectory GMM Depth / width / heads 4/512 /83/512 /8
+> Mixture modes –8Trainable parameters 20.71M 13.61M Training / validation rows 400k / 40k 400k / 40k Batch size 128 128 Optimizer AdamW AdamW Learning rate 10 −410 −4
+> Weight decay 10 −410 −4
+> Gradient clipping 1.0 1.0 Precision BF16 BF16 Selected epoch 53Loss SmoothL1 + cosine trajectory mixture NLL
+
+A.4 PLANNER DEFINITIONS 
+
+• Base CEM : Gaussian CEM proposals scored by frozen LeWM. • Generator-only : generated local targets paired with Gaussian CEM action search. • SAGE prior top : the highest-weight learned option conditioned on the same generated local target and final goal, executed without LeWM candidate selection or CEM refinement. • SAGE : generated local targets, duration-matched multimodal options, and LeWM-scored elite CEM. At each stage, our planner samples its initial population from the option prior. LeWM scores pre-dicted futures against the generated local target, and CEM fits the next Gaussian to the 30 lowest-cost samples. The remaining 29 rounds use the same update as Base CEM. 11 Preprint 
+
+Figure 3: Representative successful held-out rollouts at H=75 . Each row shows the online obser-vation at the start, after 15, 30, 45, and 75 environment steps, followed by the query goal. The intermediate frames come from the planner’s own closed-loop rollout; they do not come from the offline demonstration. A.5 QUALITATIVE HELD -O UT ROLLOUTS 
+
+A.6 PER -S EED MAIN RESULTS 
+
+Table 7: PushT success rate (%) on the fixed held-out manifests indexed by seeds {32 , 42 , 52 }.                                                 
+
+> Seed Method H25 H50 H75 H100 H125 H150 32 Base CEM 90 64 40 20 614 32 SAGE 96 82 80 82 66 72 42 Base CEM 88 48 20 26 12 10 42 SAGE 90 78 86 72 68 54 52 Base CEM 90 56 24 10 414 52 SAGE 96 84 78 64 72 68
+
+A.7 CAPACITY STUDY 
+
+We vary the capacity of both learned components while preserving the focused temporal interface, GMM mode count, candidate budget, CEM updates, and the held-out seed-42 manifest. This isolates representation capacity from the choice of temporal schedule. The compact stack retains useful short-horizon control, while additional capacity steadily improves the longer planning queries. Table 8: PushT capacity study on the fixed seed-42 manifests. Both rows use the default duration schedule and 300-candidate elite CEM. 
+
+## Scale Generator Planner Total H25 H50 H75 H100 H125 H150 (M) (M) (M) Small 3.00 2.41 5.41 92 58 66 70 48 46 Main 20.71 13.61 34.31 90 78 72 72 66 56 
+
+A.8 VARIABLE -D URATION SCHEDULES 
+
+The reported model uses a repeated short-option default with a final option that closes the remaining horizon. We additionally test prescribed schedules on the fixed PushT manifest indexed by seed 42. These diagnostics keep all learned weights fixed and change only the ordered duration sequence. They measure temporal decomposition; schedule selection remains outside the learned model. 12

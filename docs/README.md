@@ -6,38 +6,41 @@
 </div>
 
 ## 每次日报
-- 最新运行日期：2026-07-20
-- 运行时间：2026-07-20 20:50:31 UTC
+- 最新运行日期：2026-07-21
+- 运行时间：2026-07-21 21:12:27 UTC
 - 运行状态：成功
-- 本次总论文数：6
-- 精读区：3
-- 速读区：3
+- 本次总论文数：7
+- 精读区：6
+- 速读区：1
 
 ### 今日简报（AI）
-今日精读三篇，最高分10分的GigaWorld-Policy-0.5和8分的Orbis 2引领世界模型与自动驾驶新突破。 值得关注世界模型和WAM加速方向。 建议继续跟踪世界模型在视频生成和安全框架中的落地。
-- 详情：[/202607/20/README](/202607/20/README)
+今日精读6篇速读1篇，重点推荐《Test-Time Scaling for World Action Models》和《PAVXploreRL》。值得关注零样本几何评估提升世界动作模型性能，以及结合物理动作与视觉的世界模型强化学习。建议进一步了解这两种方法在实际动作规划中的应用潜力。
+- 详情：[/202607/21/README](/202607/21/README)
 
 ### 精读区论文标签
-1. [GigaWorld-Policy-0.5: A Faster and Stronger WAM Empowered by AutoResearch](/202607/20/2607.13960v3-gigaworld-policy-05-a-faster-and-stronger-wam-empowered-by-autoresearch)  
+1. [Test-Time Scaling for World Action Models via Zero-Shot Geometric Evaluation](/202607/21/2607.17454v1-test-time-scaling-for-world-action-models-via-zero-shot-geometric-evaluation)  
    标签：评分：10.0/10、query:video-wam
-   evidence：GigaWorld-Policy-0.5: 更快速更强的World Action Model
-2. [Orbis 2: A Hierarchical World Model for Driving](/202607/20/2607.15898v1-orbis-2-a-hierarchical-world-model-for-driving)  
+   evidence：直接提出世界行动模型的测试时扩展方法
+2. [PAVXploreRL: Physical-Action-Visual World Model Reinforcement Learning with Action Exploration](/202607/21/2607.16602v1-pavxplorerl-physical-action-visual-world-model-reinforcement-learning-with-action-exploration)  
+   标签：评分：9.0/10、query:video-wam
+   evidence：动作条件世界模型，满足物理合理性、动作遵循和视觉保真度
+3. [GeoWorldAD: Geometry World Action Model for Autonomous Driving](/202607/21/2607.17521v1-geoworldad-geometry-world-action-model-for-autonomous-driving)  
+   标签：评分：9.0/10、query:video-wam
+   evidence：用于自动驾驶的几何世界动作模型，使用视频生成
+4. [Thinking in Video: Can Video Generators Really Reason About the Real World?](/202607/21/2607.17523v1-thinking-in-video-can-video-generators-really-reason-about-the-real-world)  
+   标签：评分：9.0/10、query:video-wam
+   evidence：评估视频生成器作为世界模型的推理能力
+5. [Apple-$π$: Benchmarking Thinking with Video Towards Law-Grounded Physical Intelligence](/202607/21/2607.16401v1-apple--benchmarking-thinking-with-video-towards-law-grounded-physical-intelligence)  
    标签：评分：8.0/10、query:video-wam
-   evidence：分层驾驶世界模型，包含视频生成
-3. [MotionForesight: Re-purposing Video Models for Future 3D Scene-Flow Prediction](/202607/20/2607.16192v1-motionforesight-re-purposing-video-models-for-future-3d-scene-flow-prediction)  
+   evidence：将视频生成模型作为世界模型的基准测试
+6. [SAGE: Subgoal-Conditioned Action Generation for Latent World Model Planning](/202607/21/2607.17973v1-sage-subgoal-conditioned-action-generation-for-latent-world-model-planning)  
    标签：评分：8.0/10、query:video-wam
-   evidence：从视频预测未来3D轨迹，类似于基于视频的世界动作预测
+   evidence：基于潜世界模型规划的次目标条件动作生成
 
 ### 速读区论文标签
-1. [Video = World + Event Stream](/202607/20/2607.15038v2-video--world--event-stream)  
-   标签：评分：7.0/10、query:video-wam
-   evidence：将视频视为世界加事件流，支持实时世界建模
-2. [Test-Time Noise Guided Adaptation for Realistic Autoregressive Video Generation](/202607/20/2607.15849v1-test-time-noise-guided-adaptation-for-realistic-autoregressive-video-generation)  
-   标签：评分：7.0/10、query:video-wam
-   evidence：自回归视频生成的测试时自适应方法
-3. [SeerGuard: A Safety Framework for Mobile GUI Agents via World Model Prediction](/202607/20/2607.15550v1-seerguard-a-safety-framework-for-mobile-gui-agents-via-world-model-prediction)  
+1. [PE-Field 4D: Video Generation Models as Canvas](/202607/21/2607.15667v1-pe-field-4d-video-generation-models-as-canvas)  
    标签：评分：6.0/10、query:video-wam
-   evidence：基于世界模型预测的移动GUI代理安全框架
+   evidence：用于世界模型的视频生成几何控制
 
 
 <div class="dpr-home-promo-card">
