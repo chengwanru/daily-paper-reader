@@ -1,0 +1,483 @@
+Title: DWM: Separating World Effects from Actions in Latent World Models
+
+URL Source: https://arxiv.org/pdf/2607.18715v1
+
+Published Time: Wed, 22 Jul 2026 00:30:40 GMT
+
+Number of Pages: 16
+
+Markdown Content:
+Preprint 
+
+# DWM: S EPARATING WORLD EFFECTS FROM ACTIONS IN LATENT WORLD MODELS 
+
+Yi-Ge Zhang Tianqi Du Qi Zhang Yisen Wang ∗
+
+Peking University 
+
+# ABSTRACT 
+
+Latent world models underpin much of modern model-based control, yet current action-conditioned formulations supervise the next-latent transition with a single, undifferentiated target , forcing a monolithic learning signal to absorb every source of state change. In real world, however, transitions arise from two heterogeneous sources: an action-driven component induced by the agent, and an action-invariant world effect —the change that would still occur under a null action, dictated by the environment’s intrinsic dynamics (e.g., gravity-driven sliding, inertia, contact rebound, and persistent drift). Fusing them into a single target entangles the two inside the latent transition, prevents the model from attributing observed changes to their underlying causes, and undermines the transferability of the learned dynamics. We introduce DWM (Decomposed World Model ), a supervision-level framework that operationalizes this decomposition. DWM augments the predictor of a latent world model with an auxiliary world head , regularized by a normalized world-contrastive objective to be action-invariant, while the original 
+
+pred head is coupled to it via an orthogonality constraint; together, the two signals induce an explicit additive decomposition of the predicted transition into an action-invariant and a complementary action-driven component, without altering the underlying architecture or inference pipeline. To evaluate DWM under persistent world effects, we construct W-variants of three standard control benchmarks— PushT-W , Reacher-W , and TwoRoom-W —each instantiating a distinct action-invariant dynamic. DWM matches strong baselines on the flat counterparts and delivers a mean absolute improvement of 13 .1% in CEM planning success across the W-variants. 
+
+# 1 INTRODUCTION 
+
+Latent world models have gained increasing attention in embodied AI: by predicting future states in a learned latent space, they enable model-based planning, imagination-based policy learning, and long-horizon reasoning directly from pixel observations (Hafner et al., 2019; 2020; 2021; 2023; Hansen et al., 2022; 2024). Recent action-conditioned latent-dynamics formulations, represented by LeWM (Assran et al., 2023; Maes et al., 2026), further strengthen this line by learning end-to-end action-conditioned latent dynamics that generalize across manipulation, navigation, and control tasks, while showing that a compact latent transition model is often sufficient for planning competitive policies from raw images. A physical transition, however, is rarely caused by the agent’s action alone. Consider a block sliding on a tilted surface. Part of its motion is produced by the agent’s push, while another part would occur even if the agent did nothing, because gravity continues to move the block. We refer to these two sources of change as the action effect and the world effect , respectively. More precisely, the world effect is the part of the transition that would persist under the same state and history if the current action were replaced by a null action; the action effect is the remaining change attributable to the chosen action. Similar decompositions arise when objects move because of inertia, articulated bodies swing under gravity, or agents drift under persistent external forces. Existing action-conditioned latent world models generally do not distinguish between these two sources. They predict the next latent state using a single target that contains both the action effect 
+
+> ∗
+
+Corresponding author: Yisen Wang (yisen.wang@pku.edu.cn) 
+
+1arXiv:2607.18715v1 [cs.AI] 21 Jul 2026 Preprint 
+
+Figure 1: World/action entanglement on PushT-W. In every panel, the gray T is the current block, the green T is the goal pose, and the blue circle is the pusher (i.e., the end-effector controlled by the agent). The arrow labelled g in the top-left of each panel indicates the direction of the persistent gravity that defines the PushT-W world effect: the block keeps sliding along g even when the pusher is idle. Top: zero-action rollout in which the pusher is held still, isolating the action-invariant world effect—the gray T slides along g toward the lower-right without any push. Middle: on the same episode, the single-head LeWM baseline fuses the action-driven and the action-invariant components into a single next-latent target and fails to reproduce the sliding motion: its predicted block trajectory drifts away from the green goal. Bottom: our proposed DWM on the same episode disentangles the two components and recovers both the gravity-induced sliding of the block and the pusher-driven change, bringing the gray T back onto the green T. and the world effect. Consequently, the model only observes their combined outcome and receives no explicit training signal indicating which part of the transition is caused by the action and which part reflects the environment’s autonomous dynamics. This limitation can remain hidden in nearly static benchmarks, such as flat-table pushing, where objects move primarily in response to the agent. It becomes more consequential when the environment continues to evolve independently of the current action. In such settings, a model that fails to represent the world effect reliably may produce inaccurate multi-step rollouts, causing a planner to select actions based on an incorrect prediction of how the environment will evolve. Figure 1 illustrates this issue on PushT-W, a gravity-perturbed variant of the standard PushT task. Even when the pusher remains idle, the block continues to slide along the direction of gravity. A conventional single-head latent world model fails to reproduce this passive motion accurately, and its predicted trajectory consequently deviates from the goal. In contrast, our model explicitly encourages the latent transition to separate the gravity-induced world effect from the change induced by the pusher, resulting in a more accurate rollout and a successful plan. These observations motivate the central question of this work: 
+
+Can latent world models be improved by explicitly separating what the world does on its own from what the agent’s action changes? 
+
+We answer this question with Decomposed World Model (DWM), a world/action-decomposed training framework for action-conditioned latent world models. DWM retains the original prediction head, which continues to predict the complete next latent state and remains the only head used at inference. During training, we introduce an auxiliary world head that is encouraged to capture the action-invariant component of the transition. For the same observation history, we perturb the current action and require the world-head prediction to remain stable, while preserving its ability to distinguish different states. We then define the complementary action-driven component as the residual between the complete prediction and the world-head prediction, and introduce an orthogonality regularizer to encourage the two components to encode complementary transition information. Because the 2Preprint additional branch is used only during training, DWM leaves the inference-time architecture and planning pipeline of the underlying world model unchanged. To evaluate DWM, we construct controlled variants of three standard benchmarks, i.e., PushT-W, Reacher-W, and TwoRoom-W, in which the environment exhibits a persistent source of action-invariant motion. The three tasks respectively introduce gravity-driven sliding, vertical-plane gravity, and constant environmental drift. Their original counterparts serve as controls in which autonomous world dynamics are weak or absent. We additionally evaluate on Ball-in-Cup, a more challenging simulated control task with state-dependent pendulum-like dynamics. Across the three W-variant benchmarks, DWM improves CEM planning success by 12.0%, 10.7%, and 16.7%, respectively, corresponding to an average absolute improvement of 13.1%. At the same time, it remains comparable to the single-head baseline on the original tasks. Representation diagnostics, multi-step rollout evaluations, ablation studies, and out-of-distribution tests further show that the gains are associated with increased action invariance in the world head and more accurate latent dynamics. Our main contributions are as follows: • We identify a supervision-level limitation of action-conditioned latent world models: a single next-latent target merges changes caused by the agent with changes that would occur without the current action, providing no explicit signal for separating the two sources of transition. • We introduce a controlled benchmark suite consisting of PushT-W, Reacher-W, and TwoRoom-W, which adds persistent action-invariant dynamics to standard control tasks while retaining their original objectives and flat counterparts as controls. • We propose DWM, a training framework that augments an existing latent world model with an auxiliary action-invariant world head and a complementary world/action separation objective, without changing the base backbone or inference-time pipeline. • DWM consistently improves CEM planning on all three W-variant tasks by an average of 13.1%, improves performance on Ball-in-Cup by 6.0%, and preserves performance on tasks without substantial world effects. 
+
+# 2 RELATED WORK 
+
+Latent world models for planning. Latent world models learn compact predictive representations for imagination, planning, and policy learning (Hafner et al., 2021; 2023; Hansen et al., 2022; 2024; Maes et al., 2026; Micheli et al., 2023; Robine et al., 2023). Despite differences in model architecture and downstream use, most existing methods train latent dynamics with a single next-state prediction objective, where one predictor output is matched to the future latent representation. Under this formulation, state changes induced by the agent’s actions and those governed by the environment’s own dynamics are absorbed into the same supervision signal. Our method is complementary to prior advances in planners (Rubinstein, 1997; Chua et al., 2018; Hansen et al., 2024), backbones (Bardes et al., 2024; Caron et al., 2021), and policy objectives (Hafner et al., 2020; 2023). Instead, it modifies the supervision of a shared latent predictor by introducing two projections with complementary objectives, explicitly separating action-driven and action-invariant dynamics during training. 
+
+Decomposing latent transitions in world models. Most prior work has focused on disentangling what a latent state represents, rather than what causes its transition. Object-centric models factorize states into entities or spatial components (Kipf et al., 2020; Ferraro et al., 2025; Locatello et al., 2020), while task-oriented methods separate task-relevant from irrelevant factors (Wang et al., 2022; Fu et al., 2021). Exogenous-state methods often discard uncontrollable factors (Efroni et al., 2022), whereas such dynamics must be retained and predicted for planning in our setting. Recent work on softly state-invariant world models (Saanum et al., 2024) simplifies latent dynamics by regularizing how much action effects depend on the current state. This makes action effects more parsimonious, but still leaves the next-latent target to mix action-invariant world motion with action-driven change. Iso-Dream (Pan et al., 2022) uses separate latent branches and forward models for controllable and noncontrollable dynamics. Since both world effects and action effects jointly determine the next latent state, the goal is not to discard the action-invariant component but to allocate supervision between the world- and action-driven parts. In contrast, we retain a shared encoder and predictor, and separate 3Preprint these components only through two shallow projection heads with complementary objectives and an orthogonality constraint. Our method therefore treats disentanglement as a supervision problem rather than an architectural decomposition, making it applicable to existing action-conditioned latent world models without modifying their backbone. 
+
+# 3 WORLD AND ACTION EFFECTS IN LATENT DYNAMICS 
+
+3.1 PRELIMINARIES 
+
+Action-conditioned latent world model. We adopt the general recipe shared by essentially all action-conditioned latent world models (Assran et al., 2023; Maes et al., 2026): instead of predicting future pixels, the model predicts future latents , and all supervision happens in that latent space. Concretely, we assume access to trajectories of raw observations ot (e.g., pixels) and executed actions 
+
+at, and introduce three components on top of them: • an encoder ϕ that maps each raw observation ot to a compact latent state zt = ϕ(ot), i.e., the representation on which all downstream prediction and planning operates; • an action-conditioned predictor g that summarizes a short context window of past latents and actions (zt−h+1: t, a t−h+1: t) into an intermediate rollout state rt = g(zt−h+1: t, a t−h+1: t),where h is the context length; rt can be read as “what the model believes about the world after observing history up to t and taking at”; • a projection head that reads out rt and produces the predicted next latent ˆzt+1 1.The predictor is trained by regressing ˆzt+1 towards the true next latent zt+1 with a mean-squared loss 
+
+Lpred , together with a latent-space regularizer Lsigreg that keeps the representation from collapsing to a trivial constant; we denote the standard training objective by LWM = Lpred + λsig Lsigreg .
+
+CEM planning in latent space. For control, we use model-predictive planning with the Cross-Entropy Method (CEM) directly in the latent space induced by the encoder ϕ and the predictor 
+
+g (Rubinstein, 1997; Chua et al., 2018). Given a raw image goal og , the goal is embedded once into a latent target zg = ϕ(og ), and planning is carried out entirely by rolling the world model forward from the current context. Concretely, at each planning step the current history (zt−h+1: t, a t−h+1: t−1) is fixed, and CEM optimizes an action sequence at:t+H−1 of horizon H under a Gaussian proposal 
+
+N (μi, Σi) that is refined over iterations i = 1 , . . . , I :
+
+{a(k)
+
+> t:t+H−1
+
+}Nk=1 ∼ N (μi, Σi), ˆz(k) 
+
+> t+j+1
+
+= π
+
+
+
+g
+
+
+
+ˆz(k) 
+
+> t+j−h+1: t+j
+
+, a (k)
+
+> t+j−h+1: t+j
+
+ 
+
+, (1) where π denotes the projection head reading out rt (in Section 4, π = hp), and ˆz(k) 
+
+> t
+
+= zt initializes the rollout with the encoded context. Each candidate sequence is scored by a cost function c(ˆ z(k) 
+
+> t+1: t+H
+
+; zg )
+
+that we instantiate either as a terminal latent distance 
+
+c
+
+
+
+ˆz(k) 
+
+> t+1: t+H
+
+; zg
+
+
+
+= ∥ˆz(k) 
+
+> t+H
+
+− zg ∥22 (2) for tasks where the raw latent distance is informative, or as c(ˆ z(k) 
+
+> t+1: t+H
+
+; zg ) = −s(ˆ z(k) 
+
+> t+1: t+H
+
+; zg ) for Ball-in-Cup (Section 5.6), with s a learned success head that scores the entire predicted rollout. The elite set Ei of the top-K lowest-cost samples is then used to update the proposal, 
+
+μi+1 = 1
+
+K
+
+X
+
+> k∈E i
+
+a(k)
+
+> t:t+H−1
+
+, Σi+1 = 1
+
+K
+
+X
+
+> k∈E i
+
+ a(k) 
+
+> t:t+H−1
+
+− μi+1 
+
+2, (3) and the first action of the resulting mean, μI [0] , is executed in the environment; the context is then advanced and planning repeats in receding-horizon fashion. 
+
+> 1
+
+We denote the generic one-step prediction ˆzt+1 simply by ˆz when no ambiguity arises, while retaining full time indices for multi-step rollouts. 
+
+4Preprint 3.2 DEFINING WORLD AND ACTION EFFECTS 
+
+The introduction described the world effect as the part of a transition that would persist if the current action were replaced by a null action. We now formalize this counterfactual notion in latent space. Fixing the same history zt−h+1: t and past actions at−h+1: t−1, but replacing the current action at
+
+with the zero action 0, we define the action-invariant component of the latent transition as 
+
+∆zworld  
+
+> t
+
+:= E zt+1 zt−h+1: t, a t−h+1: t−1, a t=0  − zt. (4) Intuitively, ∆zworld  
+
+> t
+
+is what the world would do on its own if the agent chose not to intervene at step t. It captures the persistent phenomena that our benchmarks are designed to expose, such as gravity-driven sliding, inertia, and drift. Crucially, Eq. 4 depends only on the environment dynamics and the current context, not on the actual at, so ∆zworld  
+
+> t
+
+is well-defined for every transition regardless of whether the two effects combine additively in the true dynamics. Given ∆zworld  
+
+> t
+
+, we define the action-driven component as the residual, ∆zaction  
+
+> t
+
+:= ∆ zt − ∆zworld  
+
+> t
+
+,so that 
+
+∆zt = ∆ zworld  
+
+> t
+
++ ∆ zaction  
+
+> t
+
+(5) holds by construction. This is a modelling identity rather than a claim that the two effects combine additively at the physical level. In real environments they may couple nonlinearly, for instance when the same push produces different net motion depending on the current gravity-induced velocity. Our formulation does not assume such coupling away; instead, the residual absorbs whatever interaction the two effects have, and the interaction itself is later carried by the shared latent representation that both prediction paths read from (Section 4.1). 3.3 DIAGNOSING MONOLITHIC TRANSITION SUPERVISION 
+
+Existing high-performing latent world models such as LeWM (Maes et al., 2026) and Dino-WM (Zhou et al., 2024) already report strong planning success on standard control benchmarks like PushT and TwoRoom, often reaching an 80 –90% success rate. These benchmarks, however, share a common limitation: their environments do not involve any non-trivial physical dynamics, and the core object in the scene moves essentially only in response to the agent’s action. As a result, the reported performance does not faithfully reflect how these methods behave in more realistic settings where the environment itself keeps evolving. To better evaluate the effectiveness of these methods, we therefore consider datasets that carry a persistent world effect, such as gravity, which continues to influence the scene dynamics regardless of the action, and observe how existing methods behave when the next state is shaped not only by the agent’s action but also by this action-invariant world effect. Concretely, we introduce PushT-W , a gravity-perturbed variant of the standard 2D pushing task in which the block keeps sliding under gravity irrespective of the action (its full construction is deferred to Section 5.1), and use it to diagnose LeWM, a representative latent world model trained to convergence under the standard single-target supervision. In the remainder of this section, we first show that this paradigm degrades markedly once a world effect is present, and then show that augmenting the data with pure action-invariant transitions does not remove the degradation. Together, these two findings locate the difficulty in the training signal itself: because a single next-latent target provides no mechanism to tell apart change caused by the agent from change that occurs regardless of it, the two sources of state change must instead be disentangled at the level of the training objective . This is the core design principle of our method in Section 4. 
+
+Monolithic supervision degrades under a world effect. We first ask how a single-target latent world model behaves once the transition contains a non-trivial action-invariant world effect. On standard PushT, where the block barely moves without the agent’s input and the transition is essentially action-driven, LeWM trained under the standard single-target supervision reaches a CEM planning success rate of 94 .0% (Fig. 3, right). On PushT-W, in contrast, gravity continually drags the block regardless of the action, so a substantial share of each transition is action-invariant; the same model, trained to convergence on this variant, only achieves a CEM success rate of 32% . This sharp drop indicates that LeWM does not learn a latent transition that adequately accounts for the world effect: motion produced by gravity rather than by the agent is folded into the same next-latent target as action-driven motion, and the resulting predictor is not accurate enough to support CEM planning. In the remainder of this section we examine whether this shortfall can be attributed to the training data or to the training objective. 5Preprint 
+
+Injecting zero-action data does not separate world from action. A natural hypothesis for the failure above is that it stems from insufficient exposure to purely action-invariant transitions: if the training set rarely contains frames in which the block moves under gravity alone, the model may never see the world effect in isolation and thus never learn to represent it. We test this hypothesis by augmenting the PushT-W training set with a 30% mixture of zero-action frames, in which the block slides under gravity while the agent stays idle, and retrain the same single-target model on this enriched dataset. Despite being explicitly exposed to pure gravity-driven transitions at scale, the retrained model attains a CEM planning success rate of 30% , statistically indistinguishable from the 
+
+32% baseline trained without the additional zero-action data. Exposure alone therefore does not force the model to disentangle the world component from the action-driven one: the two remain fused inside the single next-latent target regardless of how the data is composed. This locates the bottleneck not in data coverage but in the training objective itself, which we address next. 
+
+# 4 DWM: W ORLD /A CTION DISENTANGLEMENT FOR LATENT WORLD 
+
+# MODELS 
+
+Section 3.2 defined the action-invariant component ∆zworld  
+
+> t
+
+and the complementary action-driven residual ∆zaction  
+
+> t
+
+, and Section 3.3 showed that a single next-latent target does not induce this decomposition on its own. We use the identity ∆zt = ∆ zworld  
+
+> t
+
++ ∆ zaction  
+
+> t
+
+as an inductive bias, and reallocate the supervision of the base latent world model so that the two sources of transition are learned by separate prediction paths. Section 4.1 instantiates this decomposition at the level of the predicted next latent, and Section 4.2 introduces the two auxiliary losses that implement it. 4.1 DECOMPOSING THE PREDICTED TRANSITION 
+
+We operationalize Eq. 5 at the level of the model’s predicted next latent. The original prediction head is retained as the pred head : its output ˆz predicts the full next latent zt+1 and remains the only head used at inference. Alongside it, we attach an auxiliary world head to the same predictor state rt; its output ˆz w is regularized to be invariant to the current action at and serves as the model’s readout of the action-invariant component ( ˆz w ≈ zt + ∆ zworld  
+
+> t
+
+in the sense of Eq. 4). The complementary action-driven component is defined as the residual ˆz a := ˆ z − ˆz w, so that ˆz = ˆ z w + ˆ z a mirrors Eq. 5 at the level of the model’s predictions. Figure 2 summarizes the architecture. The LeWM backbone—encoder φ, action-conditioned predic-tor g, and the pred head hp—is kept unchanged; our only structural change is the orange branch: • World head hw: a lightweight MLP attached to rt in parallel to hp, trained by Lwc to be action-invariant. It shares the encoder and predictor with hp, so the auxiliary signal reshapes the representation that hp reads from. • Pred head hp: unchanged; its output ˆz := hp(rt) is the same ˆzt+1 of Section 3.1 (subscript dropped for brevity) and is regressed to zt+1 under LWM . This is the only head used at inference, so the pipeline reduces exactly to LeWM once training is done. The action-driven component is then defined as ˆz a ≜ ˆz − ˆz w, giving the explicit decomposition 
+
+ˆz = ˆ z w + ˆ z a that operationalizes Eq. 5: ˆz w carries what is stable across actions, and ˆz a carries the variation needed to make ˆz action-conditioned. 4.2 LEARNING COMPLEMENTARY WORLD AND ACTION COMPONENTS 
+
+The objective of the original world model, LWM (Section 3.1), is retained without modification and continues to supervise the pred head. Our method adds two terms, highlighted in blue, that impose the world/action separation: 
+
+L = LWM + λwc Lwc + λorth Lorth . (6) The two new terms are: • Lwc : the world-contrastive loss on hw, implemented as an InfoNCE objective (van den Oord et al., 2018; Chen et al., 2020; He et al., 2020) whose positive and negative pairs are constructed from action perturbations of the same state. 6Preprint 
+
+Figure 2: DWM architecture. The upper lane, enclosed by the dashed grey box, is the unchanged 
+
+LeWM baseline : the current observation ot is encoded by φ into zt, the action at is injected through the predictor g to produce the rollout state rt, and the pred head hp reads rt to produce the predicted next latent ˆz := hp(rt) (this is exactly the ˆzt+1 of Section 3.1; the subscript is dropped for brevity). The lower lane encodes the next observation ot+1 with the same encoder φ to produce the target zt+1 , which supervises ˆz through the world-model loss Lwm . Our addition is a single training-time branch (orange) : a world head hw is attached in parallel to the same rt (the first 
+
+representation in which the action at, injected by g, has already been fused with world context), producing ˆz w := hw(rt); the action-driven component is then obtained by subtraction, ˆz a := ˆ z − ˆz w.Two auxiliary losses shape this decomposition: Lwc forces ˆz w to be invariant to at (Section 4.2), and 
+
+Lorth = | cos(ˆ z w, ˆz a)| forces the two components to span independent directions. At inference the orange branch is discarded and the pipeline reduces exactly to LeWM. For each context i in a mini-batch of size B, we additionally sample a second cur-rent action ˜a(i) 
+
+> t
+
+, drawn independently from the empirical action distribution (in prac-tice a random permutation of at within the batch). Passing the two action choices through the shared predictor—while keeping the rest of the context fixed—and then through hw yields two views of the same state: ˆz w, (i) = hw(g(z(i)
+
+> t−h+1: t
+
+, a (i)
+
+> t−h+1: t
+
+)) and 
+
+˜ˆz w, (i) = hw(g(z(i)
+
+> t−h+1: t
+
+, a (i)
+
+> t−h+1: t−1
+
+, ˜a(i) 
+
+> t
+
+)) . Let u(i) and ˜u(i) be their ℓ2-normalized ver-sions. We then take positive pair: (u(i), ˜u(i)), i.e., same state i, different current actions, and negatives: {˜u(j)}j̸ =i, i.e., different states, different actions, and minimize the symmetric InfoNCE 
+
+Lwc = − 12B
+
+> B
+
+X
+
+> i=1
+
+"
+
+log eu(i)⊤ ˜u(i)/τ 
+
+P 
+
+> j
+
+eu(i)⊤ ˜u(j)/τ + log e˜u(i)⊤u(i)/τ 
+
+P 
+
+> j
+
+e˜u(i)⊤u(j)/τ 
+
+#
+
+, (7) with temperature τ = 0 .07 . Intuitively, the positive term forces ˆz w to be invariant to at,while the negative term keeps it discriminative across states so that it does not collapse to a constant. The objective is self-supervised: no external label of the world component is ever used. • Lorth = | cos(ˆ z w, ˆz a)|: an orthogonality constraint that forces ˆz w ⊥ ˆz a, so the action-invariant content of ˆz is aligned with ˆz w instead of being absorbed into an undifferentiated target. Since Lwc acts on the shared encoder and predictor, combining the two losses yields a clean decomposition ˆz = ˆ z w + ˆ z a, which we verify empirically in Section 5. 
+
+# 5 EXPERIMENTS 
+
+5.1 BENCHMARKS AND EXPERIMENTAL SETUP 
+
+To evaluate whether world/action disentanglement matters in settings closer to physical control than idealized flat benchmarks, we pair each of three standard tasks—PushT, Reacher, and TwoRoom— 7Preprint with a W-variant that introduces a persistent action-invariant source of motion (gravity-driven sliding, vertical-plane gravity, or constant environmental drift, respectively). Each W-variant keeps the same goal as its flat counterpart but adds a source of motion that persists even when the agent is idle; the flat counterpart serves as a comparability control. We further evaluate on Ball-in-Cup as an additional real-world setting whose action-invariant component is a state-dependent pendulum-like oscillation rather than a constant or gravitational bias. Full physical parameterizations, dataset sizes, and OOD splits are deferred to Appendix A (Table 5). 
+
+Model and optimization. The encoder φ is instantiated as a ViT-tiny (hidden dimension 192 , 12 
+
+layers, patch size 14 , input resolution 224 2), and the action-conditioned predictor g as a 6-layer Transformer ( 16 attention heads, head dimension 64 , MLP dimension 2048 ) with AdaLN action conditioning; the context length is set to h = 3 (Section 3.1), and observations are subsampled at a stride of 5 frames. The pred head hp and the world head hw (Section 4.1) are each instantiated as a two-layer MLP 192 → 2048 → 192 with BatchNorm. The encoder, predictor, and both heads are initialized randomly and optimized jointly with AdamW ( lr = 5 × 10 −5 across all modules, weight decay 10 −3) under a linear-warmup cosine-annealing schedule applied at the epoch level. We train in bfloat16 on NVIDIA H20 GPUs with batch size 128 . The number of epochs is fixed per task family prior to evaluation: 5 for PushT / PushT-W, 20 for Reacher / Reacher-W, 100 for TwoRoom / TwoRoom-W, and 20 for Ball-in-Cup. This protocol ensures that each task family reaches convergence before evaluation while keeping LeWM and DWM under an identical training budget. 
+
+Evaluation metrics. 
+
+• Prediction quality : pred loss , i.e., the one-step prediction error between ˆzt+1 and zt+1 ,reported both offline on the held-out validation set and under autoregressive rollout. For PushT-W and TwoRoom-W it is the MSE in the latent space; for Reacher-W it is the qpos error (rad) in the physical space in which the task goal is defined. • Disentanglement diagnostics : on each W-variant task we compare how much the world head and the pred head change under controlled action perturbations. A useful decomposition should make the world head nearly action-invariant while preserving action sensitivity in the pred head used for rollout. • OOD gravity : on PushT-W, the cosine similarity of the learned action-driven component 
+
+ˆz a across held-out gravities, together with CEM planning success at gravity settings distinct from the training gravity. • Planning : CEM success rate on a fixed set of start–goal pairs, averaged over 3 CEM planner seeds. Each W-variant task uses a task-specific planning protocol (goal offset, evaluation budget, CEM sample and refinement counts, and success criterion), specified in Appendix A. 5.2 MAIN RESULTS : P LANNING WITH AND WITHOUT WORLD EFFECTS 
+
+The three W-variant tasks are the primary testbed for our claim: they take standard control benchmarks whose action-invariant world effect is negligible and augment each with a persistent source of motion that the agent does not command. This is precisely the regime in which our supervision-level hypothesis is falsifiable—if fusing world and action into a single next-latent target harms planning, the cost should be largest here. We evaluate every model under an identical CEM protocol, holding out the flat counterparts as a comparability control. Full CEM configurations are given per task in Appendix A; all bars in Fig. 3 share the training recipe of Section 5.1 and average over 3 CEM planner seeds with n = 50 start–goal pairs per seed. DWM improves CEM planning success over the LeWM baseline on all three tasks by a large margin (Fig. 3, left): 32 .0% → 44 .0% on PushT-W ( +12 .0 pp), 60 .0% → 70 .7% on Reacher-W ( +10 .7 pp), and 60 .0% → 76 .7% on TwoRoom-W ( +16 .7 pp), for an average absolute improvement of +13 .1 pp. The consistency of these improvements across three qualitatively distinct action-invariant world effects—gravity-driven sliding, vertical-plane gravity, and constant environmental drift—supports our central claim: whenever the transition contains a genuine action-invariant component, explicitly disentangling it from the action-driven component yields more accurate latent dynamics and, through them, better plans. Section 5.3 tightens this claim by showing that the same model also exhibits a 8Preprint PushT-W Reacher-W TwoRoom-W     
+
+> 0
+> 20
+> 40
+> 60
+> 80
+> 100
+> CEM planning success (%)
+> 32.0
+> 60.0 60.0
+> 44.0
+> 70.7
+> 76.7
+> Tasks with world effect
+> PushT Reacher TwoRoom
+> 94.0
+> 82.0
+> 94.0
+> 92.0
+> 82.0
+> 94.0
+> Tasks without world effect
+> LeWM DWM
+
+Figure 3: CEM planning success rate on our benchmark suite. Left: Main results on the three W-variant tasks (with a persistent action-invariant world effect), averaged over 3 CEM planner seeds ( n=50 start–goal pairs per seed); error bars denote across-seed standard deviation. Right: 
+
+Performance on the flat counterparts (tasks without world effect), reported under the same training recipe and CEM evaluation. In both panels we compare the single-projection LeWM baseline against our world/action-decomposed model. Numbers above each bar are mean success rates in percent. clean representational separation, more accurate multi-step rollouts, and robustness of the learned decomposition to out-of-distribution gravity. The right panel of Fig. 3 shows that these gains do not come at the cost of performance in the absence of a world effect. On the flat counterparts of the three W-variant tasks—standard PushT, DMC Reacher, and TwoRoom—DWM remains comparable to the LeWM baseline under the same training recipe and CEM protocol. When the transition is essentially action-driven and no world effect needs to be isolated, the additional supervision imposed by Lwc and Lorth is inert, and the underlying world model behaves as in the single-head baseline; the improvement appears specifically in the regime where a persistent action-invariant component must be predicted for planning. 5.3 DOES DWM L EARN THE INTENDED DECOMPOSITION ?The main results of Section 5.2 show that DWM improves CEM planning across all three W-variant tasks; we now examine whether the intended world/action decomposition emerges inside the model at the level of the learned representation. On each of the three W-variant tasks (PushT-W, TwoRoom-W, and Reacher-W), a useful decomposition should leave the pred head as responsive to at as the original single-head LeWM output, while making the world head essentially unresponsive to at.For each validation window we hold the observation history zt−h+1: t fixed and replace the current action at with K randomly sampled alternatives, obtaining K paired outputs ˆz w of the world head and ˆz of the pred head. From these paired outputs we compute, on each head, the per-sample variance and the maximum–minimum spread across the K action perturbations, averaged over validation windows; we quantify both effects in Table 1. Table 1: Disentanglement diagnostics on the three W-variant tasks. For each validation window the current action at is replaced with K random alternatives while the history is held fixed; we report the per-sample variance and max–min spread of each head across these perturbations, averaged over windows. Since LeWM has no world head, only the pred-head variance column is populated for it. 
+
+Task Pred-head var Pred-head var World-head var World/pred World/pred 
+
+(LeWM) (DWM) (DWM) var ratio ↓ spread ratio ↓
+
+PushT-W 0.847 0.864 0.0017 0.0019 0.0424 
+
+TwoRoom-W 0.1304 0.0847 3.76 e−4 0.0045 0.0783 
+
+Reacher-W 0.0053 0.0072 8e−5 0.0107 0.0909 
+
+9Preprint Table 1 supports two consistent observations across the three W-variants. First, the pred head is not degraded by our auxiliary training: its response to at remains within the same order of magnitude as the single-head LeWM output on every task (e.g., 0.864 vs. 0.847 on PushT-W, and comparable on TwoRoom-W and Reacher-W), which is what allows CEM planning through ˆz to remain well-posed. Second, the world head is close to a constant under action perturbation on all three tasks: its variance is two to three orders of magnitude smaller than the pred head’s, and both the world/pred variance ratio and the world/pred spread ratio stay well below one across tasks. The auxiliary head therefore does not learn to mimic the action-conditioned predictor but instead concentrates on the component of the transition that survives when the current action is varied, i.e., the action-invariant world effect that our objective was designed to isolate. At the level of the learned representation itself, the world/action decomposition posited in Section 4 is realized inside the model that produced the planning gains of Section 5.2. 5.4 MULTI -S TEP PREDICTION AND OOD D YNAMICS GENERALIZATION 
+
+Section 5.3 verified that the decomposition emerges at the representation level. We next ask whether it also manifests in the learned latent dynamics, in two complementary ways: by improving multi-step prediction along the horizon that CEM actually queries, and by remaining stable when the source of the world effect is shifted out of distribution. 
+
+Latent prediction and rollout quality. The planning gains above should be reflected in the latent dynamics that CEM optimizes, rather than only in downstream success rates. We therefore evaluate the predictor on held-out validation windows of each W-variant at two levels: one-step prediction, which tests local transition accuracy, and horizon-20 autoregressive rollout, which tests whether errors remain controlled over the planning horizon. For PushT-W and TwoRoom-W we report the latent-space MSE; for Reacher-W we report the qpos error (rad) in the physical space in which the task goal is defined (Section 5.1). Table 2: Latent prediction quality on the three W-variant tasks. “Offline” reports one-step prediction on the held-out validation set; “Rollout@20” reports autoregressive prediction at horizon 20 on the same set. For PushT-W and TwoRoom-W the error is the latent-space MSE; for Reacher-W it is the qpos error (rad) in the physical space in which the task goal is defined.                                       
+
+> Task Metric LeWM DWM Relative change
+> PushT-W Offline pred loss ↓0.372 0.038 −89 .8%
+> PushT-W Rollout@20 pred loss ↓1.034 0.344 −66 .7%
+> TwoRoom-W Offline pred loss ↓0.317 0.217 −31 .6%
+> TwoRoom-W Rollout@20 pred loss ↓0.382 0.261 −31 .7%
+> Reacher-W Offline qpos error (rad) ↓0.046 0.033 −29 .8%
+> Reacher-W Rollout@20 qpos error (rad) ↓0.299 0.221 −26 .1%
+
+Table 2 reports two complementary quantities on each W-variant task: an offline one-step prediction error, which measures the local accuracy of the learned transition, and a horizon-20 autoregressive rollout error, which measures whether that accuracy is preserved once errors are composed over the horizon that CEM actually queries. On all three tasks and at both horizons, DWM improves over the LeWM baseline. At one step, the prediction error drops by 89 .8% on PushT-W, 31 .6% 
+
+on TwoRoom-W, and 29 .8% on Reacher-W, indicating that the auxiliary training signal shapes the shared representation so that the pred head resolves the local transition more accurately than a single-target predictor, regardless of whether the world effect is a gravity-driven slide, a constant environmental drift, or a vertical-plane gravity. The improvement further survives autoregressive composition: at horizon 20 , DWM reduces the error by 66 .7% , 31 .7% , and 26 .1% on the three tasks respectively, so the one-step advantage is not amplified into a larger downstream error when the model is used recurrently. On PushT-W the effect is particularly pronounced: DWM’s horizon-20 
+
+error ( 0.344 ) is already lower than the LeWM baseline’s one-step error ( 0.372 ), which means that a 
+
+20 -step rollout of the world/action-decomposed model is more accurate than a single-step prediction of the single-projection baseline. Taken together, these results indicate that the planning gains of Section 5.2 are supported by demonstrably more reliable latent dynamics along the horizons queried 10 Preprint by CEM, rather than by a favourable interaction between the CEM proposal distribution and a merely locally accurate predictor. 
+
+OOD gravity generalization. We probe robustness of the learned decomposition on PushT-W, whose world effect is a two-dimensional gravity vector world.gravity and can therefore be varied continuously to produce a well-defined shift in the underlying dynamics while every other planning input is held fixed. We train the model at a single gravity setting, (45 , 25) , and evaluate it at gravity values distinct from training. For each setting we report two quantities: the cosine similarity between the learned action-driven component ˆz a and its in-distribution counterpart, which probes whether the learned decomposition is stable across gravity, and CEM planning success on the same start–goal pairs and CEM budget as in Section 5.2, which probes whether that stability translates into control. ID      
+
+> (45,25)
+> OOD-1
+> (90,0)
+> OOD-2
+> (0,45)
+> OOD
+> pooled
+> 0
+> 10
+> 20
+> 30
+> 40
+> 50
+> 60
+> CEM success (%)
+> 32.0 32.0
+> 28.0 30.0
+> 44.0 44.0 44.0 44.0
+> OOD gravity on PushT-W
+> LeWM
+> DWM
+
+Figure 4: OOD gravity CEM planning suc-cess on PushT-W ( n=50 pairs per gravity); OOD-pooled combines the two OOD grav-ities. Two consistent observations emerge from this evaluation. First, the action-driven component is largely invariant to the tested gravity shifts: pooled over (90 , 0) and (0 , 45) ,the cosine similarity between the out-of-distribution and in-distribution ˆz a attains a mean of 0.9991 , with a mean effect MSE of 0.0015 . This indicates that DWM does not fit to a specific value of world.gravity ; rather, it isolates a direction of action effects that remains sta-ble when the world component varies. Second, this representational stability propagates to downstream con-trol (Fig. 4): the LeWM baseline degrades to 30 .0% 
+
+pooled across the two OOD gravities, while DWM re-tains 44 .0% , yielding a +14 pp improvement that is sta-tistically significant ( p ≈ 0.040 , two-proportion z-test) and no smaller than the gap observed at the training grav-ity. Taken together, these results indicate that the plan-ning gains of Section 5.2 are attributable to the learned world/action decomposition, rather than to overfitting to the training-time world dynamics. 5.5 ABLATION STUDIES 
+
+Sections 5.3 and 5.4 attribute the planning gains to the intended world/action decomposition; it remains to verify that each auxiliary loss in Eq. 6, Lwc and Lorth , is necessary rather than redundant. We probe each weight by setting the other to its default value and reducing it to 0.1 and then to 0,comparing the resulting CEM planning success on PushT-W with our full objective and with the LeWM baseline. All rows in Table 3 are trained from scratch under the protocol of Section 5.2 and evaluated with the same CEM configuration. Table 3: Loss-weight ablation on PushT-W. Each row reports CEM planning success for a single choice of the two auxiliary loss weights (λwc , λ orth ). The row (0 , 0) recovers the LeWM baseline and the row (0 .3, 0.5) is our default; the two other rows in each block reduce one weight while holding the other at its default value. Same scratch training and CEM evaluation as Fig. 3 (left) ( n=50 ). 
+
+λwc 0.0 0.1 0.2 0.3 0.3 0.3
+
+λorth 0.0 0.5 0.5 0.0 0.1 0.5
+
+CEM success 32 .0% 36 .0% 38 .0% 40 .0% 42 .0% 44 .0%
+
+Table 3 yields two observations. First, CEM success is monotonically increasing in λwc along the world-contrastive axis: at fixed λorth = 0 .5, decreasing λwc from 0.3 to 0.2 to 0.1 produces CEM success of 44 .0% , 38 .0% and 36 .0% respectively, so a weaker contrastive signal lets the world head drift away from action-invariance and recovers only about half of the gain over the LeWM baseline. Second, CEM success also degrades along the orthogonality axis when λorth is reduced: at fixed 
+
+λwc = 0 .3, decreasing λorth from 0.5 to 0.1 to 0.0 produces 44 .0% , 42 .0% and 40 .0% , indicating 11 Preprint that a world-invariant head alone does not couple its component into ˆz tightly enough to close the remaining gap. Neither loss reproduces the full +12 pp gain in isolation, so Lwc and Lorth act as complementary rather than redundant terms in Eq. 6. 5.6 BEYOND CONTROLLED WORLD EFFECTS : B ALL -IN -C UP 
+
+The three W-variants in Section 5.2 isolate an action-invariant world effect that is either a constant per-step drift or a static gravitational pull. Real physical environments, however, often exhibit action-invariant dynamics that are neither constant nor state-independent. Ball-in-Cup makes this regime concrete: the ball continues to swing under gravity and string tension even when the cup is held stationary, so the action-invariant component of the transition is a state-dependent oscillation whose direction and magnitude vary with the ball’s current position and velocity. This constitutes a strictly harder test than the W-variants and probes whether the world/action decomposition learned by DWM continues to be useful when the world component is no longer a simple parametric quantity. We train both LeWM and DWM on Ball-in-Cup under the recipe of Section 5.1 and evaluate them with CEM under the protocol of Section 3.1. Because raw latent goal distance is uninformative on Ball-in-Cup, we score CEM rollouts with a learned success head on top of the predicted rollout latents. Since the two models induce different rollout-latent distributions, a single shared success head would systematically favour one of them; to eliminate this confound, we train a dedicated success head for each model on its own rollouts and score each model with its own head, so that any planning gap cannot be attributed to one method being paired with a stronger evaluator. Table 4: Ball-in-Cup CEM planning success and autoregressive rollout prediction loss. Same training recipe as Section 5.1 and same CEM budget across the two rows. 
+
+Model CEM success Rollout pred loss ↓
+
+LeWM 36 .8% 0.671 
+
+DWM 42 .8% 0.089 
+
+Table 4 reports two matched-evaluation quantities on Ball-in-Cup: CEM planning success under the per-model success-head protocol above, and the autoregressive rollout pred loss of the underlying world model over the same horizon used for planning. DWM improves CEM planning success from 
+
+36 .8% to 42 .8% (+6 pp), and simultaneously reduces the rollout pred loss by roughly an order of magnitude, from 0.671 to 0.089 . The two quantities move together, mirroring the mechanistic account of Section 5.3: better latent-dynamics quality translates into better CEM plans. The planning gap is smaller in absolute terms than on the three W-variants, which is expected— Ball-in-Cup exposes a qualitatively harder, state-dependent oscillatory world effect than the ones DWM was designed around, and noise from action sampling and evaluator scoring accumulates over the longer horizons this task requires. Even so, the same objective, unchanged, continues to yield a consistent gain in both prediction and control, indicating that the utility of the world/action decomposition is not confined to the constant or static world effects of the W-variant benchmark. 
+
+# 6 CONCLUSION 
+
+We identified a supervision-level limitation of action-conditioned latent world models: their next-latent transition is treated as a single, undifferentiated target, fusing action-driven and action-invariant components into one learning signal. To address this, we proposed a world/action-decomposed training framework that keeps a single shared encoder and predictor and separates the two components through a world head trained by a world-contrastive objective, a pred head retained as the next-latent predictor, and an orthogonality constraint that disentangles ˆz w from ˆz a. On a benchmark of three flat/W-variant task pairs plus Ball-in-Cup, the resulting objective improves CEM planning success by an average of +13 .1 pp on the W-variant tasks and transfers to Ball-in-Cup, while remaining comparable to the single-head baseline on the flat counterparts. These results suggest that disentangling action-invariant world effects from action-driven change at the level of the training signal is a useful inductive bias for action-conditioned latent world models in physically realistic control settings. 12 Preprint 
+
+# REFERENCES 
+
+Mahmoud Assran, Quentin Duval, Ishan Misra, Piotr Bojanowski, Pascal Vincent, Michael Rabbat, Yann LeCun, and Nicolas Ballas. Self-supervised learning from images with a joint-embedding predictive architecture. arXiv preprint arXiv:2301.08243 , 2023. Adrien Bardes, Quentin Garrido, Jean Ponce, Xinlei Chen, Michael Rabbat, Yann LeCun, Mahmoud Assran, and Nicolas Ballas. Revisiting feature prediction for learning visual representations from video. Transactions on Machine Learning Research , 2024. Mathilde Caron, Hugo Touvron, Ishan Misra, Herv ´e J ´egou, Julien Mairal, Piotr Bojanowski, and Armand Joulin. Emerging properties in self-supervised vision transformers. In ICCV , 2021. Ting Chen, Simon Kornblith, Mohammad Norouzi, and Geoffrey Hinton. A simple framework for contrastive learning of visual representations. In ICML , 2020. Cheng Chi, Siyuan Feng, Yilun Du, Zhenjia Xu, Eric Cousineau, Benjamin Burchfiel, and Shuran Song. Diffusion policy: Visuomotor policy learning via action diffusion. In RSS , 2023. Kurtland Chua, Roberto Calandra, Rowan McAllister, and Sergey Levine. Deep reinforcement learning in a handful of trials using probabilistic dynamics models. In NeurIPS , 2018. Yonathan Efroni, Dipendra Misra, Akshay Krishnamurthy, Alekh Agarwal, and John Langford. Provable rl with exogenous distractors via multistep inverse dynamics. In ICLR , 2022. Stefano Ferraro, Pietro Mazzaglia, Tim Verbelen, and Bart Dhoedt. Focus: object-centric world models for robotic manipulation. Frontiers in Neurorobotics , 19:1585386, 2025. Xiang Fu, Ge Yang, Pulkit Agrawal, and Tommi Jaakkola. Learning task informed abstractions. In 
+
+ICML , 2021. Danijar Hafner, Timothy Lillicrap, Ian Fischer, Ruben Villegas, David Ha, Honglak Lee, and James Davidson. Learning latent dynamics for planning from pixels. In ICML , 2019. Danijar Hafner, Timothy Lillicrap, Jimmy Ba, and Mohammad Norouzi. Dream to control: Learning behaviors by latent imagination. In ICLR , 2020. Danijar Hafner, Timothy Lillicrap, Mohammad Norouzi, and Jimmy Ba. Mastering atari with discrete world models. In ICLR , 2021. Danijar Hafner, Jurgis Pasukonis, Jimmy Ba, and Timothy Lillicrap. Mastering diverse domains through world models. arXiv preprint arXiv:2301.04104 , 2023. Nicklas Hansen, Xiaolong Wang, and Hao Su. Temporal difference learning for model predictive control. In ICML , 2022. Nicklas Hansen, Hao Su, and Xiaolong Wang. Td-mpc2: Scalable, robust world models for continuous control. In ICLR , 2024. Kaiming He, Haoqi Fan, Yuxin Wu, Saining Xie, and Ross Girshick. Momentum contrast for unsupervised visual representation learning. In CVPR , 2020. Thomas Kipf, Elise van der Pol, and Max Welling. Contrastive learning of structured world models. In ICLR , 2020. Francesco Locatello, Dirk Weissenborn, Thomas Unterthiner, Aravindh Mahendran, Georg Heigold, Jakob Uszkoreit, Alexey Dosovitskiy, and Thomas Kipf. Object-centric learning with slot attention. In NeurIPS , 2020. Lucas Maes, Quentin Le Lidec, Damien Scieur, Yann LeCun, and Randall Balestriero. Leworld-model: Stable end-to-end joint-embedding predictive architecture from pixels. arXiv preprint arXiv:2603.19312 , 2026. Vincent Micheli, Eloi Alonso, and Fran c¸ ois Fleuret. Transformers are sample-efficient world models. In ICLR , 2023. 13 Preprint Minting Pan, Xiangming Zhu, Yunbo Wang, and Xiaokang Yang. Isolating and leveraging controllable and noncontrollable visual dynamics in world models. In NeurIPS , 2022. Jan Robine, Marc H ¨oftmann, Tobias Uelwer, and Stefan Harmeling. Transformer-based world models are happy with 100k interactions. In ICLR , 2023. Reuven Y. Rubinstein. Optimization of computer simulation models with rare events. European Journal of Operational Research , 99(1):89–112, 1997. Tankred Saanum, Peter Dayan, and Eric Schulz. Simplifying latent dynamics with softly state-invariant world models. In NeurIPS , 2024. Yuval Tassa, Yotam Doron, Alistair Muldal, Tom Erez, Yazhe Li, Diego de Las Casas, David Budden, Abbas Abdolmaleki, Josh Merel, Andrew Lefrancq, et al. Deepmind control suite. arXiv preprint arXiv:1801.00690 , 2018. Saran Tunyasuvunakool, Alistair Muldal, Yotam Doron, Siqi Liu, Steven Bohez, Josh Merel, Tom Erez, Timothy Lillicrap, Nicolas Heess, and Yuval Tassa. dm control: Software and tasks for continuous control. Software Impacts , 6:100022, 2020. Aaron van den Oord, Yazhe Li, and Oriol Vinyals. Representation learning with contrastive predictive coding. arXiv preprint arXiv:1807.03748 , 2018. Tongzhou Wang, Simon S. Du, Antonio Torralba, Phillip Isola, Amy Zhang, and Yuandong Tian. Denoised mdps: Learning world models better than the world itself. In ICML , 2022. Gaoyue Zhou, Hengkai Pan, Yann LeCun, and Lerrel Pinto. Dino-wm: World models on pre-trained visual features enable zero-shot planning. arXiv preprint arXiv:2411.04983 , 2024. 14 Preprint 
+
+# A TASK AND DATASET DETAILS 
+
+This appendix provides the full physical parameterization, dataset scale, and out-of-distribution (OOD) splits for the tasks introduced in Section 5.1. Table 5 summarizes the resulting benchmark suite; the paragraphs below describe each pair in turn, together with Ball-in-Cup as an additional real-world setting. Table 5: Control tasks used in this paper, grouped into three flat/W-variant pairs (“-W” for world effect , and flat for the counterpart without a world effect) plus Ball-in-Cup as an additional real-world setting. Each W-variant introduces a persistent action-invariant world effect; the flat counterpart shares the same goal but removes that effect. Tasks in the same block share a goal (block pushing, qpos matching, 2D target reaching, catching the ball in the cup). 
+
+Task Action-invariant world effect Physical setting 
+
+PushT None Horizontal table PushT-W Gravity-driven sliding Gravity (45 , 25) , damping 0.92 
+
+Reacher None Standard DMC Reacher Reacher-W Vertical-plane gravity g=−9.81 sin 60 ◦ along z
+
+TwoRoom None ∆p=a · s
+
+TwoRoom-W Constant drift bias ∆p=a · s + b, b=(4 , 2) 
+
+Ball-in-Cup Pendulum-like oscillation Standard DMC Ball-in-Cup 
+
+PushT / PushT-W. Standard PushT (Chi et al., 2023) is a horizontal-table pushing task: the block does not drift under zero action, so action-invariant world effects are weak. Its W-variant counterpart keeps the same pushing objective but includes gravity (45 , 25) in the pymunk space (with damping 
+
+0.92 ), so the block continues to slide even when the agent is idle. We use standard PushT as the flat comparability control, and train PushT-W on tilted pusht train 4x with 3200 episodes ×
+
+200 steps under a random policy; for OOD stress tests, we additionally hold out validation episodes at gravity (60 , 30) , (25 , 60) and (0 , 0) (Section 5.3). CEM planning uses a goal offset of 10 frames, an evaluation budget of 50 environment steps, and a CEM configuration of 300 ×30 ×top30 (300 
+
+samples, 30 refinement iterations, top-30 elite set); an attempt is counted as a success if the block matches the goal configuration at the final step of the budget. 
+
+Reacher / Reacher-W. Standard DMC Reacher (Tassa et al., 2018; Tunyasuvunakool et al., 2020) operates on a horizontal plane, where action-invariant world effects are negligible. Reacher-W keeps the same qpos-matching objective but applies a 60 ◦ scaled-z gravity g = (0 , 0, −9.81 sin 60 ◦) ≈
+
+(0 , 0, −8.50) m/s 2, so the arm is continually pulled downward regardless of the action. Both variants use 10 ,000 episodes × 200 steps, with a held-out validation set of 500 episodes × 200 steps generated under the same physics and policy mix. CEM planning uses a goal offset of 25 frames, an evaluation budget of 200 environment steps, and a CEM configuration of 300 ×10 ×top30 ; an attempt succeeds if the joint configuration reaches within 0.15 rad of the goal qpos at any step within the budget. 
+
+TwoRoom / TwoRoom-W. Standard TwoRoom is a 2D navigation environment with transition 
+
+pt+1 = pt + at · s, so the agent does not drift under zero action and action-invariant world effects are absent. TwoRoom-W keeps the same reach-target objective but adds a persistent environmental drift, 
+
+pt+1 = pt + at · s + b with b = (4 , 2) pixels/step. We train the W-variant on 2000 episodes × 200 steps with a random policy under the same drift, yielding 324 ,498 training windows and a matched validation set of 60 × 100 transitions. CEM planning on TwoRoom-W adopts a longer-horizon CEM-MPC protocol to accommodate the persistent drift: goal offset 90 frames, evaluation budget of 
+
+25 MPC decisions, each planning over a rollout horizon of 5 steps and executing an action block of 5
+
+environment steps before re-planning, with the same 300 ×10 ×top30 CEM budget as Reacher-W; success is declared when the agent reaches the target region within the total budget. 
+
+Ball-in-Cup (real-world setting). The DMC Ball-in-Cup environment (Tassa et al., 2018; Tunya-suvunakool et al., 2020) exhibits pendulum-like contact dynamics: the ball continues to swing under 15 Preprint gravity and string tension even when the cup is held stationary, so the action-invariant component of the transition is neither a constant drift nor a static gravitational pull but a state-dependent oscillation. This makes Ball-in-Cup a substantially harder testbed than the three flat/W-variant pairs above, and we report it separately in Section 5.6 as an additional evaluation beyond the main benchmark. Following the data scale of the original LeWM protocol, the training set consists of 800 episodes 
+
+× 200 steps. 16
