@@ -1,0 +1,69 @@
+{
+  "label": "2026-07-23",
+  "date": "2026-07-23",
+  "generated_at": "2026-07-23T21:35:46",
+  "count": 4,
+  "papers": [
+    {
+      "paper_id": "202607/23/2607.19876v1-kinebench-benchmarking-embodied-world-models-via-idm-free-kinematic-grounding",
+      "section": "deep",
+      "title_en": "KineBench: Benchmarking Embodied World Models via IDM-Free Kinematic Grounding",
+      "authors": "Zeyu Liu, Zhangzhe Zhu, Yang Zhang, Chenyou Fan, Chenjia Bai, Xuelong Li",
+      "date": "2026-07-22",
+      "pdf": "https://arxiv.org/pdf/2607.19876v1",
+      "score": "8.0",
+      "evidence": "针对具身世界模型的物理一致性基准",
+      "tldr": "现有具身世界模型评估依赖逆动力学模型，分布外场景下动作提取不可靠。KineBench提出无IDM闭环基准，通过级联视觉基础模型直接提取6D末端位姿并执行物理模拟，引入SPARC和运动学指标。在20个操作任务上评估前沿模型，发现任务复杂度约束的非线性缩放规律。该基准为具身世界模型的物理一致性评估提供可靠方法。",
+      "tags": "query:video-wam",
+      "abstract_en": "Evaluating the physical consistency of embodied world models(EWMs) is a critical open challenge. While closed-loop evaluation via simulator rollouts offers a more faithful assessment of physical plausibility than open-loop alternatives, existing frameworks almost exclusively rely on Inverse Dynamics Models(IDMs) for action extraction. Due to the intricate mapping from 2D pixel space to 3D kinematic space, the learned IDMs can be brittle to data outside their training distribution, resulting in unreliable action extraction from the generated videos with novel objects and scenarios. This creates an unavoidable attribution ambiguity between world model inaccuracies and extractor errors. To reduce this ambiguity, we present KineBench, an IDM-free closed-loop benchmark for EWMs, built upon an explicit kinematic grounding pipeline. Given a generated video, KineBench employs cascaded visual foundation models to directly extract 6D end-effector poses from individual frames, which are then executed in a physics simulator for closed-loop validation. Beyond execution-based task success, KineBench incorporates two classical 3D kinematic metrics--Spectral Arc Length (SPARC) and the Maruyama Manipulability Index--to characterize trajectory smoothness and kinematic feasibility from a robot-centric perspective. Built on 20 diverse manipulation tasks in ManiSkill3, KineBench evaluates EWMs across four progressive suites: basic execution, task transfer, visual out-of-distribution generalization, and complexity-conditioned scaling. Evaluation across frontier models reveals task-complexity-bounded nonlinear scaling in embodied video generation, providing empirical guidance for future data-scaling strategies.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "paper_id": "202607/23/2607.20175v1-perceptdrive-perception-prior-world-action-modeling-with-adaptive-expert-routing-for-end-to-end-autonomous-driving",
+      "section": "deep",
+      "title_en": "PerceptDrive: Perception Prior World-Action Modeling with Adaptive Expert Routing for End-to-End Autonomous Driving",
+      "authors": "Yushan Liu, Tianxiong Lv, Bohua Wang, Hangqi Fan, Chenxu Zhao, He Zheng, Xuchang Zhong, Yifan Xie, Congyang Zhao, Zhihao Liao, Leigang Luo, Yang Cai, Xiao-Ping Zhang, Wenbo Ding",
+      "date": "2026-07-22",
+      "pdf": "https://arxiv.org/pdf/2607.20175v1",
+      "score": "8.0",
+      "evidence": "面向自动驾驶的感知先验世界动作建模",
+      "tldr": "现有冻结感知模型在端到端驾驶中面临条件接口狭窄和静态融合问题。PerceptDrive提出感知先验世界-动作建模框架，通过自适应专家路由保留并组合多种先验。该方法利用教师蒸馏先验和自监督视频编码输入，训练可路由专家分支，并用软门蒸馏优化轨迹生成。在NAVSIM v1/v2上分别达到90.4和90.2 PDMS，超越先前方法，证明了保留和自适应路由先验对直接规划的有效性。",
+      "tags": "query:video-wam",
+      "abstract_en": "Frozen perception foundation models encode rich geometric, semantic, and dynamic knowledge. Yet narrow conditioning interfaces may attenuate task-relevant cues, while static fusion cannot adjust expert contributions to each scene. We cast this challenge as the prior-to-plan transfer problem and introduce PerceptDrive, a perception prior world-action modeling framework with adaptive expert routing. PerceptDrive feeds teacher-distilled priors from a frozen, driving-adapted provider and dense observation latents from a frozen self-supervised video encoder into a trainable expert-routed world-action model. Expert-specific query branches process these signals, while a prior-retention objective anchors each branch to its prior. A router predicts soft gates from a shared scene representation and combines the expert conditions before trajectory generation. During training, privileged rule-based sub-metric estimates for branch-specific trajectory drafts provide soft-gate distillation targets. The predicted action-free future latent conditions a flow-matching actor. At inference, privileged components are absent; with one front-facing camera, PerceptDrive generates one trajectory per planning step without test-time scoring, reranking, or search. Experiments show that PerceptDrive achieves state-of-the-art performance with 90.4 PDMS on NAVSIM v1 and 90.2 EPDMS on NAVSIM v2, outperforming existing methods. Ablations confirm complementary gains from prior retention and scene-conditioned routing, alongside differential reliance on the three priors. These results demonstrate that preserving and adaptively routing perception priors improves direct planning without test-time candidate selection.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "paper_id": "202607/23/2607.19719v1-koopman-dreamer-spectrally-constrained-latent-dynamics-for-stable-world-model-imagination",
+      "section": "quick",
+      "title_en": "Koopman Dreamer: Spectrally Constrained Latent Dynamics for Stable World-Model Imagination",
+      "authors": "Jiaqi Li, Xinglong Zhang, Haibin Xie, Yixing Lan, Wei Pan, Xin Xu",
+      "date": "2026-07-22",
+      "pdf": "https://arxiv.org/pdf/2607.19719v1",
+      "score": "7.0",
+      "evidence": "具有谱约束潜变量动力学的生成式世界模型用于控制",
+      "tldr": "潜在世界模型存在模态不稳定和长rollout误差累积问题。Koopman Dreamer采用频谱约束的旋转-缩放动力学核心，结合双线性动作项与随机调制，并设计后验条件教师目标与多目标损失。理论分析了误差放大与信息保留的权衡。在连续控制与UAV导航任务中，长视野想象稳定性提升，控制性能更强。",
+      "tags": "query:video-wam",
+      "abstract_en": "Latent world models improve sample efficiency in continuous control by optimizing policies over imagined latent trajectories, but common neural transitions offer limited direct control over modal persistence and error accumulation in long rollouts. We propose Koopman Dreamer, a Dreamer-style world model with a spectrally constrained deterministic latent dynamics core. Its Koopman-inspired backbone uses two-dimensional rotation--scaling blocks with bounded radii to represent damping, rotation, and near-periodic modes. Linear and low-rank bilinear action terms capture global and state-dependent control effects, while stochastic-state modulation supplies local correction information. To reduce the mismatch between posterior-conditioned training and prior-only imagination, the model combines posterior-conditioned EMA teacher targets with one-step consistency, multi-step rollout, and open-loop observation-prediction objectives. We further derive a multi-step rollout-error bound that separates amplification by the spectral backbone and bilinear interaction from the additive effects of stochastic-state mismatch and modeling residuals, clarifying the trade-off between error attenuation and long-term information retention. Experimental results on proprioceptive continuous-control tasks from the DeepMind Control Suite and UAV-LiDAR autonomous navigation demonstrate that Koopman Dreamer improves the stability of long-horizon latent rollouts and achieves stronger closed-loop control performance on tasks that rely on high-quality multi-step imagination.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "paper_id": "202607/23/2607.14635v1-action-qformer-structured-representation-shaping-under-action-supervision-in-vision-language-action-models",
+      "section": "quick",
+      "title_en": "Action QFormer: Structured Representation Shaping under Action Supervision in Vision-Language-Action Models",
+      "authors": "Yufeng Ji, Wenhao Tang, Haoyi Niu, Koushil Sreenath, Yi Wu, Zhongyu Li",
+      "date": "2026-07-16",
+      "pdf": "https://arxiv.org/pdf/2607.14635v1",
+      "score": "6.0",
+      "evidence": "VLA模型中的动作监督塑造表示",
+      "tldr": "视觉-语言-动作模型中的动作监督在塑造多模态表示时具有双重效果：既能形成动作兼容表示，也可能破坏语言与对象定位能力。为解决这一矛盾，本文提出Action QFormer，通过指令条件查询将继承的多模态信息重组为动作导向表示。在零样本仿真到真实导航任务中，该方法将闭环成功率从18.8%提升至56.3%，固定指令动作生成正确率从22.5%提升至75.5%，并几乎消除分布外指令生成。实验表明，结构化表示接口能有效控制动作监督的塑造影响，提示未来VLA模型需更关注表示的选择与组织。",
+      "tags": "query:video-wam",
+      "abstract_en": "Action supervision in vision-language-action (VLA) models is often treated as a downstream objective for learning action prediction. In this paper, we study it instead as a force that shapes inherited multimodal representations. We show that this shaping has a dual effect: it is necessary for forming action-compatible representations, but when action supervision is applied too directly to the inherited multimodal pathway, it can also destabilize representations that support language-side processing and object grounding. To address this tension, we introduce Action QFormer, a query-based action-facing interface that uses instruction-conditioned queries to reorganize inherited multimodal information into action-facing representations before downstream action generation. In zero-shot sim-to-real navigation, Action QFormer improves average closed-loop task success from 18.8% to 56.3%, raises fixed-instruction action-generation correctness from 22.5% to 75.5%, and nearly eliminates out-of-distribution instruction generations. Further analyses show that Action QFormer changes how action supervision shapes inherited multimodal representations, reducing broad upstream rewriting while preserving targeted and sometimes constructive action-supervised adaptation. These results suggest that improving VLA performance requires not only stronger pretrained backbones, but also better ways of selecting and organizing inherited multimodal information while controlling how it is shaped under action supervision.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    }
+  ],
+  "errors": []
+}
