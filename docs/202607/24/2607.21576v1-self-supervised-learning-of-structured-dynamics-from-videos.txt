@@ -1,0 +1,686 @@
+Title: Self-Supervised Learning of Structured Dynamics from Videos
+
+URL Source: https://arxiv.org/pdf/2607.21576v1
+
+Published Time: Fri, 24 Jul 2026 01:16:12 GMT
+
+Number of Pages: 24
+
+Markdown Content:
+# Self-Supervised Learning of Structured Dynamics from Videos 
+
+Lukas Knobel 
+
+Fundamental AI Lab, UTN 
+
+lukas.knobel@utn.de 
+
+Andrew Zisserman 
+
+VGG, University of Oxford 
+
+az@robots.ox.ac.uk 
+
+Yuki M. Asano 
+
+Fundamental AI Lab, UTN 
+
+yuki.asano@utn.de 
+
+## Abstract 
+
+Understanding motion in video is a fundamental challenge for visual learning, as frame-to-frame change entangles two sources of dynamics: camera motion and object motion. This decomposition has remained underexplored in representation learning, partly because these factors are tightly coupled in natural videos and difficult to supervise separately. Yet recovering it is important for learning robust motion representations that separate meaningful object dynamics from camera-induced variation. We study whether such structured motion representations can be recovered from frozen features of a pretrained image vision transformer. We propose the Structured Dynamics Model (SDM), which explicitly separates the dominant source of temporal change from residual dynamics through future-feature prediction, rather than representing video change with a single entangled latent or with unstructured, spatially dense transition tokens. Training combines self-supervised learning on real video with weak supervision of scene dynamics on synthetic Kubric data. We evaluate SDM on ProbeMotion, a new evaluation suite spanning synthetic and real videos with camera motion, object motion, and combined dynamics. SDM outperforms backbone baselines using global CLS or average-pooled features, and compares favorably to strongly supervised repre-sentations such as VGGT on several probes, despite using substantially weaker supervision. These results suggest that pretrained image models can be readily repurposed into structured video-dynamics representations, providing a useful inductive bias for learning and analyzing latent video dynamics. 1
+
+## 1 Introduction 
+
+Recent progress in computer vision has produced strong self-supervised image backbones that capture rich semantic and geometric structure from large-scale image data [ 5 , 11 , 25 , 29 , 32 , 40 , 43 ]. These representations are increasingly used as foundations for 3D perception and reconstruction systems. However, despite building on self-supervised backbones, many successful approaches still rely on substantial supervision during adaptation, for example through 3D annotations, pseudo-ground truth from structure-from-motion pipelines, or other geometric labels [ 20 , 23 , 35 , 38 , 39 ]. VGGT, for instance, trains on 17 annotated datasets [ 35 ]. This limits scalability and leaves open the question of how much scene dynamics can be recovered directly from generic pretrained visual features without relying on dense supervision. Video offers a natural source of supervision for this problem. However, frame-to-frame change entangles the two sources of dynamics, camera motion and object motion. Standard self-supervised prediction objectives can therefore model aggregate change without separating its underlying causes. Recovering such structure is important for learning motion representations organized around inter-pretable physical factors, but remains underexplored in representation learning. In particular, many   
+
+> 1Project page: https://lukasknobel.github.io/projects/StructuredDynamics Preprint. arXiv:2607.21576v1 [cs.CV] 23 Jul 2026 15
+> 2
+> 14
+> 23
+> 14
+> SSv2 -110k
+> 𝐎𝐮𝐫 𝐏𝐫𝐨𝐛𝐞𝐌𝐨𝐭𝐢𝐨𝐧 𝐛𝐞𝐧𝐜𝐡𝐦𝐚𝐫𝐤
+> SDM
+> encoder
+
+ℒSSL 
+
+time  
+
+> residual motion
+> SDM
+> encoder
+
+ℒSSL  
+
+> SDM
+> encoder
+> primary motion
+
+. . .               
+
+> r-token
+> p-token
+> 0.8 0.9
+> 0.4
+> 0.2
+> 0.4
+> Kubric cam .
+> 1.2
+> 1.0
+> 0.3
+> 0.2
+> 0.0
+> Kubric obj .
+> 𝐌𝐨𝐭𝐢𝐨𝐧 𝐜𝐥𝐚𝐬𝐬𝐢𝐟𝐢𝐜𝐚𝐭𝐢𝐨𝐧
+> Accuracy ↑
+> 𝐌𝐨𝐭𝐢𝐨𝐧 𝐫𝐞𝐠𝐫𝐞𝐬𝐬𝐢𝐨𝐧
+> MSE ↓
+> VGGT cam .token
+> DINOv2r CLS token
+> DINOv2r AVG feat
+> DeltaTok
+> our p-token
+> our r-token
+> DL3DV
+> 1.1
+> 1.0
+> 0.7
+> 0.6
+> 0.5
+> 𝐬𝐞𝐥𝐟 -𝐬𝐮𝐩𝐞𝐫𝐯𝐢𝐬𝐞𝐝
+> 𝐬𝐭𝐫𝐨𝐧𝐠𝐥𝐲 𝐬𝐮𝐩𝐞𝐫𝐯𝐢𝐬𝐞𝐝
+
+Figure 1: The Structured Dynamics Model (SDM) remodels frozen image features into struc-tured motion tokens. Left: A frozen image encoder extracts frame features, and a recurrent SDM is trained by self-supervised future-feature prediction. SDM structures temporal change into a primary motion token p for the dominant source of change and a residual motion token r for remaining dynamics. Right: Linear probes on ProbeMotion show that these structured motion tokens outper-form direct frozen-backbone descriptors such as CLS and average-pooled features, and even surpass VGGT probing performance on 3/7 tasks (see Table 2), while showing stronger generalization to motion-adjacent semantic action classification. latent action or world models summarize scene change with a single latent token [ 12 , 19 ], mixing dominant global change with residual object-centric dynamics. Rather than training a video model end-to-end, we ask whether a pretrained image backbone already contains enough information to support an explicit structuring of scene dynamics. To this end, we build a structured dynamics model (SDM) on top of frozen backbone features and train it through future feature prediction. We find that, when combined with weak supervision on synthetic data indicating only whether the camera or the scene is static, SDM organizes temporal change into primary and residual motion components that adapt to the dominant sources of change in each video. We evaluate this setting on an evaluation suite of benchmarks spanning synthetic and real videos with camera motion, object motion, and combined dynamics. We refer to this collective evaluation as ProbeMotion. Across these settings, SDM consistently outperforms naïve baselines based on global 
+
+CLS or average-pooled features and even surpasses VGGT-based probes on 3 out of 7 benchmarks. These results suggest that pretrained image representations can be remodeled into strong structured video-dynamics representations, with only weak synthetic supervision and self-supervised learning on unlabeled real videos. Our contributions are: • We study whether structured motion representations can be extracted from frozen pretrained image features. • We introduce the Structured Dynamics Model (SDM), a simple architecture on top of self-supervised image backbones that learns this structure through future feature prediction, outperforms naïve global-feature baselines, and is competitive with strongly supervised 3D representations on several motion-probing tasks. • We develop ProbeMotion, an evaluation suite spanning synthetic and real videos covering camera motion, object motion, and combined dynamics. 
+
+## 2 Method 
+
+We learn structured motion representations by predicting how frozen visual features change over time. Rather than training a video encoder, we ask whether a simple model, SDM, on top of a pretrained image backbone can organize temporal change into primary and residual motion components, which explain the dominant source of scene change and remaining dynamics. An overview is shown in Figure 2. 22.1 Frozen visual features 
+
+Let E denote a frozen vision transformer. For each frame xt, we extract a spatial feature map: 
+
+ft = E(xt) ∈ RH×W ×D , (1) where H, W are spatial dimensions and D is the feature dimension. SDM predicts the target feature map ft from ft−1 in frozen feature space. The model is autoregressive in its recurrent motion tokens but non-causal, ft is available for extracting the transition token used to predict ft from ft−1.Conditional feature prediction requires information about the target transition. CroCo and SiamMAE use cross-view conditioning [ 15 , 40 ], while latent-action models use compact transition tokens for future prediction [ 12 , 19 ]. A single transition token must explain all sources of change, from appearance-dependent feature variation to low-dimensional motion factors such as camera translation or object direction. We instead follow the intuition that much of the temporal change in videos is governed by lower-dimensional dynamics acting on high-dimensional visual features. This motivates a structured prediction model that organizes temporal change into primary and residual motion tokens. 
+
+2.2 Structured dynamics model 𝑒𝑥𝑡𝑟𝑎𝑐𝑡  𝑐𝑜𝑚𝑝𝑒𝑛𝑠𝑎𝑡𝑒    
+
+> 𝐑𝐞𝐬𝐢𝐝𝐮𝐚𝐥 𝐦𝐨𝐭𝐢𝐨𝐧
+> 𝑒𝑥𝑡𝑟𝑎𝑐𝑡 𝑐𝑜𝑚𝑝𝑒𝑛𝑠𝑎𝑡𝑒
+> 𝐏𝐫𝐢𝐦𝐚𝐫𝐲 𝐦𝐨𝐭𝐢𝐨𝐧
+
+ℰ
+
+𝑥 𝑡 −1
+
+ℰ
+
+𝑥 𝑡 
+
+ℰ
+
+𝑥 𝑡 +1                   
+
+> 𝜓 p
+> 𝜓 p
+> 𝜓 r𝑓 t≫
+> 𝜓 r𝑓 t+1
+> ≫
+> ℒpred =𝑓 t≫−𝑓 𝑡 2
+> 2
+> 𝐌𝐒𝐄 𝐥𝐨𝐬𝐬
+> ℒpred =𝑓 t+1
+> ≫−𝑓 𝑡 +12
+> 2
+> p𝑡 +1
+> 𝐅𝐫𝐨𝐳𝐞𝐧 𝐯𝐢𝐬𝐮𝐚𝐥 𝐟𝐞𝐚𝐭𝐮𝐫𝐞𝐬
+> 𝜙 p
+> 𝜙 p𝜙 r
+> 𝜙 r
+> 𝑓 𝑡 −1𝑓 t>
+> 𝑓 𝑡 +1
+> 𝑓 t𝑓 t+1
+> >
+> p𝑡 −1
+> p𝑡
+> r𝑡 +1
+> r𝑡 −1
+> r𝑡
+> downstream :
+> motion probing
+
+Figure 2: Overview of the structured dynamics model shown for T=3. For each transition, SDM predicts the target frozen feature map ft from the previous one ft−1 through two sequential compensation stages. The primary stage extracts a recurrent motion token pt from the feature pair 
+
+(ft−1, f t) and uses it to produce a primary-compensated feature map f >t , explaining the dominant change. The residual stage extracts rt from the mismatch between f >t and ft, and refines f >t into the final prediction f ≫ 
+
+> t
+
+. The motion tokens are autoregressive but non-causal across time, allowing temporal information to accumulate. Figure 2 gives an overview of SDM. Given consecutive feature maps (ft−1, f t), SDM predicts ft
+
+through two sequential stages. The primary stage consists of a motion extractor ϕp and a feature predictor ψp. The extractor reads the current feature pair (ft−1, f t) and updates the previous primary token pt−1, giving pt. The predictor then uses pt to compensate the source feature map ft−1,producing an intermediate prediction f >t , pronounced ‘f modified once’. The residual stage has the same structure, with modules ϕr and ψr . It estimates a residual token rt from the remaining mismatch between f >t and ft, and uses this token to refine f >t into the final prediction f ≫ 
+
+> t
+
+, pronounced ‘f modified twice’. 
+
+Primary motion extraction. The primary extractor updates a recurrent motion token pt ∈ RD by attending to the current frame pair: 
+
+pt = ϕp(pt−1; ft−1, f t), (2) where p0 is learnable. The recurrence allows the model to integrate motion information over time while each update only compares adjacent frames. The resulting token is then used to compensate the source feature map. 3Primary motion compensation. The predictor ψp uses pt to compensate the source feature map: 
+
+f >t = ψp(ft−1; pt). (3) We interpret f >t as a primary-motion-compensated intermediate representation that serves as input to the residual stage. It is trained to explain the part of the transition from ft−1 to ft that can be captured by the primary source of scene change. 
+
+Residual motion extraction. Given f >t , the remaining discrepancy to ft corresponds to dynamics not explained by the primary component. We capture this with a second latent token rt ∈ RD :
+
+rt = ϕr (rt−1; f >t , f t), (4) where r0 is learnable. Conditioning it on f >t encourages rt to represent only the residual dynamics that remain after the primary component has been accounted for. 
+
+Residual motion compensation. The residual predictor refines the intermediate representation: 
+
+f ≫ 
+
+> t
+
+= ψr (f >t ; rt). (5) The final prediction f ≫ 
+
+> t
+
+is therefore obtained by first compensating for primary and then residual dynamics. The pair (pt, r t) forms the structured motion representation used throughout the paper. 
+
+Extension beyond pairs of frames. SDM naturally extends to longer clips. We apply the same updates at each timestep and carry pt−1 and rt−1 forward. Thus, temporal context is accumulated in the recurrent motion tokens. 
+
+2.3 Training objective 
+
+SDM is trained through feature prediction in the frozen encoder space. To align the architectural decomposition with the intended semantics of primary and residual motion, we use two weak scene-level annotations, static scene and static camera, and selectively apply the loss. 
+
+Unlabeled or dynamic videos. For unlabeled videos and samples with both camera and scene dynamics, we supervise only the final prediction: L = LMSE (f ≫ 
+
+> t
+
+, f t), where LMSE (x, y ) =  
+
+> 1
+> HW D
+
+∥x − y∥22.
+
+Static scenes. For static-scene samples, the primary component should explain the full transition, so we bypass the residual stage and supervise the output of the primary compensation directly: 
+
+L = LMSE (f >t , f t).
+
+Static cameras. If a sample is annotated as having a static camera, there is no camera-induced global change to compensate for. Hence, the primary stage is regularized to leave the source representation unchanged while the residual stage captures scene dynamics: L = LMSE (f ≫ 
+
+> t
+
+, f t) + 
+
+λreg LMSE (f >t , f t−1).
+
+2.4 Implementation details Visual features. We use frozen DINOv2-B/14 with registers [ 8 ] as E and extract patch features from all 12 blocks. Following Mur-Labadia et al. [24] , we concatenate these intermediate features channel-wise and project them with a two-layer MLP to D=768 , matching the hidden dimension of one backbone block, before applying SDM. The model’s predictions are then linearly projected back to the concatenated multi-layer feature space before applying the loss. 
+
+Motion extractor ϕ. Both ϕp and ϕr are 4-block transformer decoders with nreg = 4 learnable registers [ 8]. The motion token and registers self-attend and cross-attend to frame features, using a 3D extension of RoPE [ 1, 30 ] for spatial and temporal positions with a base of 100 [ 17 ]. The initial primary and residual motion tokens are learnable parameters initialized from N (0 , 0.02 2).
+
+Predictor ψ. We parameterize ψp and ψr as shallow 2-block decoders that cross-attend to the corresponding motion tokens. We use 2D RoPE for spatial positions [17]. 4Table 1: ProbeMotion evaluation datasets. Summary of the linear-probe datasets. Numbers given for source videos refer to the samples taken from the corresponding public or generated dataset after clip-length filtering. Dashes indicate that the source dataset does not provide a split suitable for ProbeMotion. For these datasets, we create our own probing splits. Parentheses indicate partial dynamics for SSv2’s camera (see Section B.1). Further details, including split creation for these datasets, are provided in Section A.3.                                                  
+
+> Kubric DL3DV Static Static Camera SSv2-DAVIS2017 YouTubeVOS Bench 110 kSource train videos 15 k3.5k60 3.5k–110 kSource test videos 5k–30 –1k20 kMoving camera ✓✓✗✗✓(✗)Dynamic scene ✓✗✓✓✓✓
+> Num. frames per clip 454457Probing target cam.+obj. cam. obj. obj. cam. motion action motion motion displacement displacement class class
+
+## 3 Experiments 
+
+3.1 Datasets 
+
+We train on a mixture of synthetic and real videos: Kubric [ 14 ], SSv2 [ 13 ], and DL3DV [ 22 ]. Kubric provides weak scene-level labels indicating whether the camera or scene is static, while SSv2 and DL3DV are used without labels. We generate 180 k Kubric sequences, equally split between static-scene and dynamic-scene videos. Static-scene videos use a moving camera, while dynamic-scene videos are further equally split between moving-camera and static-camera settings (see Section A.1 for details). Real-video training uses approximately 170 k SSv2 clips and 4k DL3DV clips. For evaluation, we introduce ProbeMotion, a diverse benchmark suite for probing structured motion representations across Kubric, DL3DV, CameraBench [ 21 ], static-camera subsets of DAVIS2017 [ 26 ]and YouTubeVOS [ 41 , 42 ], and an SSv2 subset denoted SSv2-110 k. Table 1 summarizes the datasets. Split and sampling details are in Section A.3. Kubric evaluates controlled synthetic camera and object motion with disjoint training/test objects and backgrounds as well as randomly sampled motions. DL3DV and CameraBench evaluate real camera motion, while static DAVIS2017 and static YouTubeVOS evaluate 2D object motion under approximately static cameras. We construct the static-camera subsets by filtering clips using VGGT-estimated camera motion and labeling 2D object motion from mask-centroid displacement (see Section A.2 for details). SSv2-110 k evaluates motion-heavy action semantics. 
+
+3.2 Training and evaluation details Training details. Mini-batches mix Kubric, SSv2, and DL3DV with fixed ratios of 0.5/0.25 /0.25 .Kubric samples are drawn from the three controlled settings described above: moving-camera/static-scene, static-camera/dynamic-scene, and moving-camera/dynamic-scene. Consequently, 1/4 of each mini-batch receives static-scene supervision, 1/8 receives static-camera supervision, and the remaining 5/8 is trained only with the standard final-prediction objective. This last group consists of moving-camera/dynamic-scene Kubric samples and all unlabeled real-video samples, for which we do not impose additional structure on the decomposition. We sample 5 frames at 2 fps and resize inputs to 224 ×224 without additional data augmentation. We train all components with AdamW for 
+
+200 k iterations, batch size 128 , learning rate 6.25 ×10 −5 with 1k warmup, weight decay 0.05 , and set the regularization weight to λreg =0 .5. One run takes approximately 11 h on 4 H100 GPUs. 
+
+Evaluation protocol. We evaluate ProbeMotion with linear probes on frozen SDM motion tokens. Unless noted otherwise, we probe p for camera motion in Kubric, DL3DV, and CameraBench, and for object motion in static DAVIS2017/YouTubeVOS, where object motion is the dominant source of change. A VGGT-based analysis indicates low inter-frame camera motion in SSv2-110 k (see Section B.1), so we follow the same reasoning and probe p for action recognition. For Kubric object motion in dynamic-camera scenes, we probe r, and study token swapping in Section 3.4. We report final-timestep performance and standard deviations over 3 seeds. We use linear classifiers for discrete 5labels and linear regressors for continuous motion targets. Kubric and DL3DV use normalized-MSE regression on 6-DoF camera motion, with Kubric object motion evaluated as 3D translation, since the simulated objects do not undergo rotation. Static DAVIS2017 and YouTubeVOS use 2D object-displacement regression from mask-centroid motion. CameraBench and SSv2-110 k use top-1 classification accuracy. Full task definitions are in Table 6 in the appendix. All probes are single linear layers trained on frozen features. Classification sets are class-balanced by downsampling, and regression sets use motion-magnitude subsampling to reduce the number of lower-motion samples. All methods use the same protocol and report the best held-out metric over probe training to reduce sensitivity to probe optimization hyperparameters (see Section A). 
+
+3.3 Comparison to baselines Baselines. Since image backbones produce frame-level representations, we convert consecutive-frame features into motion descriptors using either concatenation or feature differences. We compare against direct frozen-backbone motion descriptors derived from either the CLS token or average-pooled patch features. Based on descriptor ablations (see Section B.2), we use concatenation for 
+
+CLS features and feature differences for AVG-pooled features. Multi-frame variants average these frame-pair descriptors over time to match SDM’s temporal context. We additionally evaluate the self-supervised DeltaTok [ 19 ], which represents frame-to-frame change with a single delta token. Compared with SDM, DeltaTok is trained for 8× more iterations and operates on higher-resolution inputs, making it a strong baseline (see Section A.7). We also compare to strongly supervised 3D and geometry models: VGGT-1B, Depth Anything 3 (DA3) [ 20 ], and Pi3X [ 39 ]. For each model, we report separate rows for descriptors derived from average-pooled feature maps and camera tokens, selecting the better of concatenation and feature differences for each benchmark based on Section B.2. Since Pi3X does not provide camera tokens, we use averaged register tokens as the corresponding descriptor. These models are substantially larger than SDM (roughly 1B parameters each vs . 215 Mparameters, including an 87 M frozen backbone) and are trained with explicit geometric supervision, such as camera pose, depth, or point clouds, and are therefore included to contextualize performance under much stronger supervision. 
+
+SDM outperforms direct frozen-backbone descriptors. Across ProbeMotion, SDM improves over 
+
+CLS and AVG-pool baselines on all tasks except static DAVIS2017, where AVG-pool performs best on 2D object-displacement regression. This exception might reflect the small, curated nature of static DAVIS2017 and the relative simplicity of image-plane displacement prediction. The direct baselines remain substantially weaker on 3D motion probes such as Kubric and DL3DV, suggesting that gains come from structured future-feature prediction rather than strong frozen features alone. This remains true when the direct baselines are given access to multi-layer DINOv2 features from all 12 blocks (see Table 9). The improvement also transfers beyond datasets used for unlabeled SDM training, e.g .static YouTubeVOS improves over AVG-pool by reducing MSE by 0.2.
+
+SDM outperforms DeltaTok across most probes despite a smaller training budget. SDM outperforms DeltaTok on five of seven ProbeMotion tasks, with the largest gains on Kubric object motion ( 0.16 lower MSE) and SSv2-110 k ( 9.6 p.p. higher accuracy). DeltaTok performs better on static DAVIS2017 and CameraBench. Overall, these results suggest that structured latents provide strong performance across a broad range of motion and action probes. 
+
+SDM is competitive with supervised 3D representations on ProbeMotion. Despite using weaker supervision and fewer parameters than the supervised 3D and geometry baselines, SDM approaches supervised-model performance on DL3DV probing while performing similarly on CameraBench. Fur-thermore, SDM performs best on two out of three object-motion probes, improving over the strongest supervised baseline by 0.13 MSE on Kubric object motion and 0.04 MSE on static YouTubeVOS. On static DAVIS2017, SDM is on par with DA3, although VGGT and Pi3X perform better. This suggests that structured feature prediction recovers motion-relevant information not fully captured by supervised descriptors alone. 
+
+Primary tokens generalize to object-centric action prediction. On SSv2-110 k, SDM improves over CLS and AVG-pool by 8.2 and 20 .8 p.p., respectively, exceeds DeltaTok by 9.6 p.p., and remains above the best supervised descriptor, Pi3X average-feature concatenation, by 3.3 p.p. even though the feature concatenation doubles the linear probe’s input dimension compared to SDM’s probe. 6Table 2: Linear probing results on ProbeMotion. We compare SDM against direct frozen-backbone descriptors from DINOv2 with registers, the self-supervised DeltaTok model [ 19 ], and strongly supervised 3D/geometry models. For the direct DINOv2 baselines, we use concatenation for CLS 
+
+features and feature differences for AVG-pooled features. For supervised models, we report separate rows for average-pooled feature-map descriptors and camera-token descriptors. Each entry selects the better of concatenation and feature differences for that row and benchmark based on Section B.2. For Pi3X, which does not provide camera tokens, the second row uses averaged register tokens. For DeltaTok, we directly probe its delta token. SDM outperforms the direct frozen-backbone descriptors across most camera-motion, object-motion, and action probes, and outperforms DeltaTok on five of seven tasks, while remaining competitive with strongly supervised representations despite using substantially weaker supervision and fewer parameters. We report MSE on standardized regression targets and accuracy in % for classification tasks. Best and second-best results among methods without explicit geometric supervision are highlighted in bold and underlined, respectively. 
+
+Method Regression (MSE ↓) Classification (accuracy ↑)Kubric DL3DV Static Static Camera SSv2-110 kcam obj DAVIS2017 YouTubeVOS Bench (action pred.) 
+
+strongly supervised 
+
+VGGT avg. feat. 0.09 ±0.0 0.32 ±0.0 0.56 ±0.0 0.78 ±0.1 0.79 ±0.0 82.9 ±0.0 15.5 ±0.1 
+
+VGGT cam. token 0.03 ±0.0 0.43 ±0.0 0.53 ±0.0 0.71 ±0.0 0.81 ±0.0 88.7 ±0.7 13.5 ±0.1 
+
+DA3 avg. feat. 0.11 ±0.0 0.40 ±0.0 0.55 ±0.0 0.87 ±0.1 0.89 ±0.0 83.3 ±0.4 14.0 ±0.1 
+
+DA3 cam. token 0.04 ±0.0 0.58 ±0.0 0.53 ±0.0 0.87 ±0.0 0.91 ±0.0 84.4 ±1.3 12.2 ±0.4 
+
+Pi3X avg. feat. 0.07 ±0.0 0.38 ±0.0 0.52 ±0.0 0.52 ±0.0 0.75 ±0.0 87.9 ±0.7 19.8 ±0.1 
+
+Pi3X avg. regs. 0.08 ±0.0 0.45 ±0.0 0.53 ±0.0 0.61 ±0.0 0.77 ±0.0 85.7 ±0.4 12.7 ±0.3 
+
+baselines 
+
+DeltaTok 0.29 ±0.0 0.35 ±0.0 0.65 ±0.0 0.69 ±0.0 0.75 ±0.0 89.6 ±0.9 13.5 ±0.2 
+
+AVG-pool 0.96 ±0.0 0.93 ±0.0 1.04 ±0.0 0.78 ±0.0 0.91 ±0.0 67.0 ±1.2 2.3 ±0.0 
+
+CLS 1.16 ±0.0 0.78 ±0.0 1.09 ±0.0 0.90 ±0.1 1.05 ±0.0 68.6 ±0.8 14.9 ±0.2 
+
+SDM 0.16 ±0.0 0.19 ±0.0 0.59 ±0.0 0.87 ±0.1 0.71 ±0.0 85.3 ±1.7 23.1 ±1.3 
+
+3.4 Analysis of SDM Utilizing temporal context. Table 3 evaluates whether SDM can exploit longer temporal context when predicting the final timestep. SDM benefits from additional context on temporally coherent benchmarks. On Kubric, where camera and object motion are linear, increasing context from T = 2 
+
+to T = 4 reduces MSE from 0.26 to 0.16 for camera motion and from 0.22 to 0.19 for object motion. CameraBench, whose camera-motion labels are clip-level, improves from 84 .7% to 85 .3% . The effect is particularly strong on SSv2-110 k, where accuracy increases monotonically from 16 .7% at 
+
+T = 2 to 23 .1% at T = 7 , beyond the training range of T = 5 . The multi-frame baseline based on AVG-pooled feature differences also benefits from additional context, showing that extra frames contain useful motion signal. However, it remains substantially below SDM. The baseline with the maximum temporal context underperforms SDM with a single frame pair ( T = 2 ) on all datasets shown. Thus, the gains of SDM cannot be explained by access to additional frames alone. Additional results in Section B.3 show that gains are less monotonic on datasets with more complex motion. 
+
+Structured motion. A key goal of SDM is to produce structured motion latents whose specialization follows the dominant motion regime. We test this by swapping which token is used for each probing task, and find that the learned roles support the primary/residual interpretation. Results are given in Table 5. On dynamic-camera datasets, p is substantially better than r for camera-motion prediction, while r performs best for Kubric object motion, capturing dynamics left unexplained by the primary component. Under approximately static cameras, object motion becomes dominant, and p performs best on static YouTubeVOS. Similarly, on SSv2-110 k, where our camera-motion analysis indicates low inter-frame camera motion, p performs best for action recognition. Static DAVIS2017 is an exception with high variability across seeds for the residual token ( 0.8 ± 0.15 , see Section B.4). Concatenating the two tokens leads to similar performance, indicating that task-relevant information is primarily encoded in one of the two tokens. A notable exception is Kubric object motion, where predicting object translation in world coordinates can benefit from both the residual object-motion signal and the primary camera-motion component. 7Table 3: SDM utilizes temporal context to aggregate mo-tion information. We compare a single frame pair ( T = 2 )against the maximum context for Kubric and CameraBench, and evaluate on sequences longer than the training range of T = 5 on SSv2-110 k. The baseline is the AVG-pooled feature-difference descriptor averaged over frame pairs. We report MSE on standardized frame-to-frame pose deltas for regression on Kubric and accuracy in % for CameraBench and SSv2-110 k.                                                           
+
+> method Kubric cam. ↓Kubric obj. ↓CameraBench ↑
+> T=2 T=4 T=2 T=4 T=2 T=5 baseline 0.96 0.87 -0.09 0.93 0.72 -0.21 67.1 69.2 +2.1
+> SDM 0.26 0.16 -0.10 0.22 0.19 -0.03 84.7 85.3 +0.6
+> method SSv2-110 k↑
+> T=2 T=3 T=4 T=5 T=6 T=7 baseline 2.4 5.9 +3.5 8.4 +2.5 10.9 +2.5 11.7 +0.8 13.3 +1.6
+> SDM 16.7 18.6 +1.9 20.4 +1.8 21.6 +1.2 22.5 +0.9 23.1 +0.6
+
+Table 4: SDM works across back-bones. We report DL3DV MSE on standardized frame-to-frame pose deltas and CameraBench / SSv2-
+
+110 k accuracy in %. MAE [ 16 ], SigLIP [ 44 ], and DINOv3 [ 29 ] use the base variant with patch size 
+
+16 . DINOv2 with registers [ 8] (DI-NOv2r) uses patch size 14 .                 
+
+> backbone DL3DV ↓Camera SSv2 Bench ↑110 k↑
+> MAE 0.61 87.6 14.1 SigLIP 0.64 85.1 11.6 DINOv3 0.58 86.8 27.0 DINOv2r 0.59 85.3 23.1
+
+Table 5: SDM leads to structured motion representations where p and r specialize in primary and residual motion when the features are used to linearly regress or classify motion or action. We report MSE on standardized regression targets and accuracy in % for classification tasks. Among individual tokens, the best result is shown in bold . Representations and targets that match are highlighted in green. The last row reports an upper-bound probe using the concatenated tokens [p, r ].                                     
+
+> token Regression (MSE ↓)Classification (accuracy ↑)Kubric Kubric DL3DV Static Static Camera SSv2-110 kcamera object DAVIS2017 YouTubeVOS Bench primary p0.16 0.21 0.59 0.87 0.71 85.3 23.1
+> residual r0.28 0.19 0.62 0.80 0.79 81.1 12.0 concat. [p, r ]0.16 0.14 0.56 0.81 0.71 88.0 22.1
+
+3.5 Analysis and Ablation Studies 
+
+We summarize the main ablation findings below, with full component tables in Appendix Table 13 and the backbone ablation in Table 4. 
+
+Weak anchors and sequential extraction promote specialization. Removing either weak scene-level constraint weakens the primary/residual structure, while joint extraction makes the two tokens encode more overlapping motion. 
+
+Intermediate features and real data improve performance. Intermediate encoder features outper-form final-layer features alone and unlabeled real videos improve generalization beyond synthetic training. MSE improves Kubric object-motion probing significantly while L1 is slightly stronger on some real-video probes. 
+
+Static-camera regularization balances probes. Varying λreg reveals a trade-off between Kubric object-motion probing and SSv2-110 k action recognition. We use λreg = 0 .5 as a balanced default. 
+
+SDM works across pretrained backbones. Table 4 shows that SDM can be applied to diverse image encoders. DINOv2/3-based backbones perform best overall. 
+
+3.6 Qualitative evaluation 
+
+We complement probing with qualitative analyses on different test samples, visualizing whether the two prediction stages explain complementary changes and whether motion tokens can be reused beyond the observed transition. 8𝑓 t>
+
+𝑓 t 𝑓 t≫
+
+𝑓 t
+
+Error after 
+
+𝐫𝐞𝐬𝐢𝐝𝐮𝐚𝐥 𝐦𝐨𝐭𝐢𝐨𝐧 
+
+target frame 
+
+t
+
+Error after 
+
+𝐩𝐫𝐢𝐦𝐚𝐫𝐲 𝐦𝐨𝐭𝐢𝐨𝐧 
+
+source frame 
+
+t − 1 𝑓 𝑡 −1𝑓 t
+
+Error without 
+
+any correction Figure 3: Stage-wise structured feature prediction. We visualize feature-map error to the target after primary and residual compensation on a sample from DAVIS2017. Errors are highlighted in red. The primary stage corrects the dominant global change, including the camera-induced movement of the edges of the track. Notably, primary motion compensation increases the error around the independently moving car. The residual stage reduces this localized error. 
+
+Stage-wise feature compensation. Figure 3 shows that the primary stage explains the dominant global transformation, while residual compensation reduces localized errors around the independently moving object. 
+
+Motion extrapolation. Repeatedly applying the last observed motion token yields plausible short-horizon feature extrapolations (Figure 4), but predictions drift over longer horizons. This suggests that the token stably captures local temporal dynamics, but does not support reliable long-range extrapolation without new observations. time            
+
+> Ob servation
+> Extrapolation
+> feature  maps  frames
+> Apply final motion token repeatedly
+> Extract motion tokens using SDM
+> last observed object position
+
+Figure 4: Motion extrapolation. We repeatedly apply the last motion token from the observed frames to predict future feature maps on a sample from the DAVIS2017 test split. Visualization is done by PCA projection to RGB after normalization. Black boxes mark the last observed ground-truth object position, which is repeated for the extrapolated feature maps. The extrapolated object features follow the object’s motion beyond its last observed position over short horizons and drift at longer horizons. 
+
+Latent motion swapping. Applying motion tokens from a source clip to a target clip with a different object induces consistent short-horizon feature-space motion (Figure 5). This indicates that the learned tokens can parameterize local and generalizable transformations across videos, although quality decreases over longer horizons. 
+
+## 4 Related work 
+
+Self-supervised image encoders. Self-supervised image encoders such as DINOv2 [ 25 ], AIM [ 10 ], and MAE [ 16 ] provide strong frozen visual features. Although these image features contain useful 3D cues [ 9 ] and support recent reconstruction systems [ 20 , 23 , 35 , 39 ], they do not directly expose temporal or motion structure. 
+
+Self-supervised video encoders. Self-supervised video encoders learn spatio-temporal representa-tions directly from unlabeled videos, often through masked video modeling [ 7, 31 , 36 , 47 ] or latent 9Predicted features            
+
+> Target  features  Target  frame
+> Initial position
+> Source  clip
+> Apply motion tokens
+> Extract motion tokens using SDM
+> ...
+> Transfer motion tokens
+
+Figure 5: Latent motion swapping. We apply motion tokens from a source clip to the feature map of a target clip with a different object, both from the Kubric test set, and visualize the resulting features by PCA projection to RGB after normalization. Black boxes mark the initial object position. The target feature map follows the transferred motion over short horizons and drifts at longer horizons. predictive objectives [ 1, 3, 24 , 34 ]. These methods learn general video representations, whereas SDM keeps an image backbone frozen and learns explicit primary/residual motion tokens on top. 
+
+Training image encoders on videos. Several works adapt image-pretrained models with video data, for example through temporal feature consistency [ 27 , 28 ] or correspondence learning in SiamMAE [ 15 ]. Others show that long, uncurated videos can train strong image encoders from scratch [ 33 ]. We instead keep the image backbone frozen and learn structured motion tokens on top. 
+
+3D reconstruction models. Models such as DUSt3R [ 38 ], VGGT [ 35 ], and CUT3R [ 37 ] are purpose-built for 3D reconstruction, estimating camera pose, depth, point maps, and related geometry from strong 3D supervision. Recent extensions target dynamic scenes and 4D reconstruction [ 18 , 45 ]. In contrast, SDM does not reconstruct full 3D geometry, but uses much weaker supervision to remodel frozen image features into primary/residual motion tokens. 
+
+Latent action and world models. Latent action and world models learn from video by predicting future frames or pretrained feature representations, avoiding dense annotations and, in feature-space methods, pixel-level generation [ 2 , 12 , 19 ]. Prior work often represents temporal change with spatial future tokens or compact latent actions [ 2, 4 , 12 , 19 , 46 ]. SDM is closest to feature-space future prediction, but explicitly structures motion into primary and residual components rather than encoding change in a single latent action. 
+
+## 5 Conclusion 
+
+We studied whether structured motion representations could be extracted from frozen pretrained image backbones and proposed the Structured Dynamics Model (SDM). SDM learns structured primary/residual motion latents through future-feature prediction, using weak scene-level supervision on synthetic videos together with unlabeled real data. Our results suggest that frozen image backbones can be remodeled into structured video-dynamics representations, enabling interpretable temporal abstractions to emerge without full video pretraining while remaining competitive with substantially larger supervised geometry models. The learned tokens specialize according to scene dynamics. The primary token captures camera motion in dynamic-camera videos and object motion in static-camera videos, while the residual token captures remaining object-centric dynamics when primary motion explains camera-induced change. This mirrors the effectiveness of iterative coarse-to-fine refinement in other domains, from optical flow estimation to diffusion models, and illustrates that residual compensation is a useful inductive bias. 10 Acknowledgments and Disclosure of Funding 
+
+LK is grateful for support through the ELLIS PhD Program. The authors gratefully acknowledge the scientific support and HPC resources provided by the Erlangen National High Performance Computing Center (NHR@FAU) of the Friedrich-Alexander-Universität Erlangen-Nürnberg (FAU) under the BayernKI project v115be . BayernKI funding is provided by Bavarian state authorities. The research is also supported by the UK EPSRC Programme Grant VisualAI (EP/T028572/1) and a Royal Society Research Professorship RSRP \R\241003. 
+
+## References 
+
+[1] Mido Assran, Adrien Bardes, David Fan, Quentin Garrido, Russell Howes, Matthew Muckley, Ammar Rizvi, Claire Roberts, Koustuv Sinha, Artem Zholus, et al. V-jepa 2: Self-supervised video models enable understanding, prediction and planning. arXiv preprint arXiv:2506.09985 ,2025. 4, 10 [2] Federico Baldassarre, Marc Szaffraniec, Basile Terver, Vasil Khalidov, Francisco Massa, Yann LeCun, Patrick Labatut, Maximilian Seitzer, and Piotr Bojanowski. Back to the features: Dino as a foundation for video world models. arXiv preprint arXiv:2507.19468 , 2025. 10 [3] Adrien Bardes, Quentin Garrido, Jean Ponce, Xinlei Chen, Michael Rabbat, Yann LeCun, Mido Assran, and Nicolas Ballas. Revisiting feature prediction for learning visual representations from video. Transactions on Machine Learning Research , 2024. 10 [4] Gabrijel Boduljak, Yushi Lan, Christian Rupprecht, and Andrea Vedaldi. VFMF: World modeling by forecasting vision foundation model features. arXiv preprint arXiv:2512.11225 ,2025. 10 [5] Bingyi Cao, Koert Chen, Kevis-Kokitsi Maninis, Kaifeng Chen, Arjun Karpur, Ye Xia, Sahil Dua, Tanmaya Dabral, Guangxing Han, Bohyung Han, et al. TIPSv2: Advancing vision-language pretraining with enhanced patch-text alignment. arXiv preprint arXiv:2604.12012 ,2026. 1 [6] Joao Carreira, Eric Noland, Chloe Hillier, and Andrew Zisserman. A short note on the kinetics-700 human action dataset. arXiv preprint arXiv:1907.06987 , 2019. 18 [7] João Carreira, Dilara Gokay, Michael King, Chuhan Zhang, Ignacio Rocco, Aravindh Mahen-dran, Thomas Albert Keck, Joseph Heyward, Skanda Koppula, Etienne Pot, et al. Scaling 4d representations. arXiv preprint arXiv:2412.15212 , 2024. 9 [8] Timothée Darcet, Maxime Oquab, Julien Mairal, and Piotr Bojanowski. Vision transformers need registers. In The Twelfth International Conference on Learning Representations , 2024. 4, 8, 18, 24 [9] Mohamed El Banani, Amit Raj, Kevis-Kokitsi Maninis, Abhishek Kar, Yuanzhen Li, Michael Rubinstein, Deqing Sun, Leonidas Guibas, Justin Johnson, and Varun Jampani. Probing the 3d awareness of visual foundation models. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 21795–21806, 2024. 9 [10] Alaaeldin El-Nouby, Michal Klein, Shuangfei Zhai, Miguel Ángel Bautista, Vaishaal Shankar, Alexander T Toshev, Joshua M Susskind, and Armand Joulin. Scalable pre-training of large autoregressive image models. In International Conference on Machine Learning , pages 12371– 12384, 2024. 9 [11] Enrico Fini, Mustafa Shukor, Xiujun Li, Philipp Dufter, Michal Klein, David Haldimann, Sai Aitharaju, Victor G Turrisi da Costa, Louis Béthune, Zhe Gan, et al. Multimodal autoregressive pre-training of large vision encoders. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 9641–9654, 2025. 1 [12] Quentin Garrido, Tushar Nagarajan, Basile Terver, Nicolas Ballas, Yann LeCun, and Michael Rabbat. Learning latent action world models in the wild. arXiv preprint arXiv:2601.05230 ,2026. 2, 3, 10 11 [13] Raghav Goyal, Samira Ebrahimi Kahou, Vincent Michalski, Joanna Materzynska, Susanne Westphal, Heuna Kim, Valentin Haenel, Ingo Fruend, Peter Yianilos, Moritz Mueller-Freitag, et al. The "something something" video database for learning and evaluating visual common sense. In Proceedings of the IEEE international conference on computer vision , pages 5842– 5850, 2017. 5, 24 [14] Klaus Greff, Francois Belletti, Lucas Beyer, Carl Doersch, Yilun Du, Daniel Duckworth, David J Fleet, Dan Gnanapragasam, Florian Golemo, Charles Herrmann, Thomas Kipf, Abhijit Kundu, Dmitry Lagun, Issam Laradji, Hsueh-Ti (Derek) Liu, Henning Meyer, Yishu Miao, Derek Nowrouzezahrai, Cengiz Oztireli, Etienne Pot, Noha Radwan, Daniel Rebain, Sara Sabour, Mehdi S. M. Sajjadi, Matan Sela, Vincent Sitzmann, Austin Stone, Deqing Sun, Suhani Vora, Ziyu Wang, Tianhao Wu, Kwang Moo Yi, Fangcheng Zhong, and Andrea Tagliasacchi. Kubric: a scalable dataset generator. In Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition (CVPR) , 2022. 5, 15, 24 [15] Agrim Gupta, Jiajun Wu, Jia Deng, and Fei-Fei Li. Siamese masked autoencoders. Advances in Neural Information Processing Systems , 36:40676–40693, 2023. 3, 10 [16] Kaiming He, Xinlei Chen, Saining Xie, Yanghao Li, Piotr Dollár, and Ross Girshick. Masked autoencoders are scalable vision learners. In Proceedings of the IEEE/CVF conference on computer vision and pattern recognition , pages 16000–16009, 2022. 8, 9, 24 [17] Byeongho Heo, Song Park, Dongyoon Han, and Sangdoo Yun. Rotary position embedding for vision transformer. In European Conference on Computer Vision , pages 289–305. Springer, 2024. 4 [18] Yu Hu, Chong Cheng, Sicheng Yu, Xiaoyang Guo, and Hao Wang. VGGT4D: Mining motion cues in visual geometry transformers for 4d scene reconstruction. arXiv preprint arXiv:2511.19971 , 2025. 10 [19] Tommie Kerssies, Gabriele Berton, Ju He, Qihang Yu, Wufei Ma, Daan de Geus, Gijs Dubbel-man, and Liang-Chieh Chen. A frame is worth one token: Efficient generative world modeling with delta tokens. arXiv preprint arXiv:2604.04913 , 2026. 2, 3, 6, 7, 10, 18, 24 [20] Haotong Lin, Sili Chen, Junhao Liew, Donny Y Chen, Zhenyu Li, Guang Shi, Jiashi Feng, and Bingyi Kang. Depth anything 3: Recovering the visual space from any views. arXiv preprint arXiv:2511.10647 , 2025. 1, 6, 9, 24 [21] Zhiqiu Lin, Siyuan Cen, Daniel Jiang, Jay Karhade, Hewei Wang, Chancharik Mitra, Tiffany Ling, Yuhan Huang, Sifan Liu, Mingyu Chen, et al. Towards understanding camera motions in any video. arXiv preprint arXiv:2504.15376 , 2025. 5, 24 [22] Lu Ling, Yichen Sheng, Zhi Tu, Wentian Zhao, Cheng Xin, Kun Wan, Lantao Yu, Qianyu Guo, Zixun Yu, Yawen Lu, et al. DL3DV-10k: A large-scale scene dataset for deep learning-based 3d vision. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 22160–22169, 2024. 5, 24 [23] Yihang Luo, Shangchen Zhou, Yushi Lan, Xingang Pan, and Chen Change Loy. 4RC: 4d recon-struction via conditional querying anytime and anywhere. arXiv preprint arXiv:2602.10094 ,2026. 1, 9 [24] Lorenzo Mur-Labadia, Matthew Muckley, Amir Bar, Mido Assran, Koustuv Sinha, Mike Rabbat, Yann LeCun, Nicolas Ballas, and Adrien Bardes. V-JEPA 2.1: Unlocking dense features in video self-supervised learning. arXiv preprint arXiv:2603.14482 , 2026. 4, 10 [25] Maxime Oquab, Timothée Darcet, Théo Moutakanni, Huy V Vo, Marc Szafraniec, Vasil Khalidov, Pierre Fernandez, Daniel HAZIZA, Francisco Massa, Alaaeldin El-Nouby, et al. DINOv2: Learning robust visual features without supervision. Transactions on Machine Learning Research , 2023. 1, 9, 17 [26] Jordi Pont-Tuset, Federico Perazzi, Sergi Caelles, Pablo Arbeláez, Alexander Sorkine-Hornung, and Luc Van Gool. The 2017 davis challenge on video object segmentation. arXiv:1704.00675 ,2017. 5, 24 12 [27] Mohammadreza Salehi, Efstratios Gavves, Cees GM Snoek, and Yuki M Asano. Time does tell: Self-supervised time-tuning of dense image representations. In Proceedings of the IEEE/CVF International Conference on Computer Vision , pages 16536–16547, 2023. 10 [28] Mohammadreza Salehi, Shashanka Venkataramanan, Ioana Simion, Efstratios Gavves, Cees GM Snoek, and Yuki M Asano. MoSiC: Optimal-transport motion trajectory for dense self-supervised learning. In Proceedings of the IEEE/CVF International Conference on Computer Vision , pages 6541–6551, 2025. 10 [29] Oriane Siméoni, Huy V Vo, Maximilian Seitzer, Federico Baldassarre, Maxime Oquab, Cijo Jose, Vasil Khalidov, Marc Szafraniec, Seungeun Yi, Michaël Ramamonjisoa, et al. DINOv3. 
+
+arXiv preprint arXiv:2508.10104 , 2025. 1, 8, 18, 24 [30] Jianlin Su, Murtadha Ahmed, Yu Lu, Shengfeng Pan, Wen Bo, and Yunfeng Liu. Roformer: Enhanced transformer with rotary position embedding. Neurocomputing , 568:127063, 2024. 4 [31] Zhan Tong, Yibing Song, Jue Wang, and Limin Wang. VideoMAE: Masked autoencoders are data-efficient learners for self-supervised video pre-training. Advances in neural information processing systems , 35:10078–10093, 2022. 9 [32] Michael Tschannen, Alexey Gritsenko, Xiao Wang, Muhammad Ferjad Naeem, Ibrahim Al-abdulmohsin, Nikhil Parthasarathy, Talfan Evans, Lucas Beyer, Ye Xia, Basil Mustafa, et al. SigLIP 2: Multilingual vision-language encoders with improved semantic understanding, local-ization, and dense features. arXiv preprint arXiv:2502.14786 , 2025. 1 [33] Shashanka Venkataramanan, Mamshad Nayeem Rizve, Joao Carreira, Yuki M Asano, and Yannis Avrithis. Is imagenet worth 1 video? learning strong image encoders from 1 long unlabelled video. In The Twelfth International Conference on Learning Representations , 2024. 10 [34] Alex N Wang, Christopher Hoang, Yuwen Xiong, Yann LeCun, and Mengye Ren. PooDLe: Pooled and dense self-supervised learning from naturalistic videos. In The Thirteenth Interna-tional Conference on Learning Representations , 2025. 10 [35] Jianyuan Wang, Minghao Chen, Nikita Karaev, Andrea Vedaldi, Christian Rupprecht, and David Novotny. VGGT: Visual geometry grounded transformer. In Proceedings of the Computer Vision and Pattern Recognition Conference , pages 5294–5306, 2025. 1, 9, 10, 19, 24 [36] Limin Wang, Bingkun Huang, Zhiyu Zhao, Zhan Tong, Yinan He, Yi Wang, Yali Wang, and Yu Qiao. VideoMAE v2: Scaling video masked autoencoders with dual masking. In Proceedings of the IEEE/CVF conference on computer vision and pattern recognition , pages 14549–14560, 2023. 9 [37] Qianqian Wang, Yifei Zhang, Aleksander Holynski, Alexei A Efros, and Angjoo Kanazawa. Continuous 3d perception model with persistent state. In Proceedings of the Computer Vision and Pattern Recognition Conference , pages 10510–10522, 2025. 10 [38] Shuzhe Wang, Vincent Leroy, Yohann Cabon, Boris Chidlovskii, and Jerome Revaud. DUSt3R: Geometric 3d vision made easy. In Proceedings of the IEEE/CVF conference on computer vision and pattern recognition , pages 20697–20709, 2024. 1, 10 [39] Yifan Wang, Jianjun Zhou, Haoyi Zhu, Wenzheng Chang, Yang Zhou, Zizun Li, Junyi Chen, Jiangmiao Pang, Chunhua Shen, and Tong He. pi3: Permutation-equivariant visual geometry learning. arXiv preprint arXiv:2507.13347 , 2025. 1, 6, 9, 24 [40] Philippe Weinzaepfel, Vincent Leroy, Thomas Lucas, Romain Brégier, Yohann Cabon, Vaibhav Arora, Leonid Antsfeld, Boris Chidlovskii, Gabriela Csurka, and Jérôme Revaud. CroCo: Self-supervised pre-training for 3d vision tasks by cross-view completion. Advances in Neural Information Processing Systems , 35:3502–3516, 2022. 1, 3 [41] Ning Xu, Linjie Yang, Yuchen Fan, Jianchao Yang, Dingcheng Yue, Yuchen Liang, Brian Price, Scott Cohen, and Thomas Huang. YouTube-VOS: Sequence-to-sequence video object segmentation. In Proceedings of the European conference on computer vision (ECCV) , pages 585–601, 2018. 5, 24 13 [42] Ning Xu, Linjie Yang, Yuchen Fan, Dingcheng Yue, Yuchen Liang, Jianchao Yang, and Thomas Huang. YouTube-VOS: A large-scale video object segmentation benchmark. arXiv preprint arXiv:1809.03327 , 2018. 5, 24 [43] Lihe Yang, Shang-Wen Li, Yang Li, Xinjie Lei, Dong Wang, Abdelrahman Mohamed, Heng-shuang Zhao, and Hu Xu. In pursuit of pixel supervision for visual pre-training. arXiv preprint arXiv:2512.15715 , 2025. 1 [44] Xiaohua Zhai, Basil Mustafa, Alexander Kolesnikov, and Lucas Beyer. Sigmoid loss for language image pre-training. In Proceedings of the IEEE/CVF international conference on computer vision , pages 11975–11986, 2023. 8, 24 [45] Junyi Zhang, Charles Herrmann, Junhwa Hur, Varun Jampani, Trevor Darrell, Forrester Cole, Deqing Sun, and Ming-Hsuan Yang. MonST3R: A simple approach for estimating geometry in the presence of motion. In The Thirteenth International Conference on Learning Representa-tions , 2025. 10 [46] Gaoyue Zhou, Hengkai Pan, Yann Lecun, and Lerrel Pinto. DINO-WM: World models on pre-trained visual features enable zero-shot planning. In International Conference on Machine Learning , pages 79115–79135. PMLR, 2025. 10 [47] Daniel Zoran, Nikhil Parthasarathy, Yi Yang, Drew A Hudson, João Carreira, and Andrew Zisserman. Recurrent video masked autoencoders. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 17744–17755, 2026. 9 14 A Dataset and Evaluation Details 
+
+Table 6: Evaluation tasks. Summary of the probing tasks used for each evaluation dataset.                                                                   
+
+> Kubric DL3DV CameraBench
+> Task
+> target camera / object motion camera motion camera-motion class target format 6-DoF pose / 3D translation 6-DoF pose discrete motion label probe type regression regression classification metric norm. MSE norm. MSE top-1 acc.
+> Representation
+> probed token p/rpp
+> temporal target frame-pair motion frame-pair motion clip-level motion
+> Split and sampling
+> split generated train/test video-level 70/30 video-level 70/30 train sequences / video 131test sequences / video 131balancing motion-mag. subsampling motion-mag. subsampling class downsampling Static DAVIS2017 Static YouTubeVOS SSv2-110 k
+> Task
+> target object displacement object displacement action class target format 2D displacement 2D displacement action label probe type regression regression classification metric norm. MSE norm. MSE top-1 acc.
+> Representation
+> probed token ppp
+> temporal target frame-pair motion frame-pair motion clip label
+> Split and sampling
+> split official train/test video-level 70/30 official train/val train sequences / video 331test sequences / video 331balancing motion-mag. subsampling motion-mag. subsampling class downsampling
+
+For regression tasks, motion-magnitude balancing denotes retaining high-motion samples and sub-sampling low-motion samples as described in Section A.3. 
+
+A.1 Kubric generation 
+
+We generate our synthetic training and evaluation data with Kubric [ 14 ], starting from the MOVi-E setup 2. Each sample is generated from a unique random seed. Additionally, training and evaluation samples use disjoint subsets of objects and backgrounds. We render short clips of 10 frames at 2
+
+fps and resolution 224 × 224 . We use three scene configurations: static scene with moving camera, dynamic scene with static camera, and dynamic scene with moving camera. Static scenes contain no foreground objects, whereas dynamic scenes contain a single moving object. For dynamic scenes, we disable gravity and assign the object a randomly sampled initial velocity. This produces approximately unbiased object motions that are not dominated by falling trajectories. For camera-dynamic scenes, the camera follows a linear trajectory while continuously looking at a fixed point above the world origin. This yields controlled ego-motion while keeping the scene center approximately in view. We apply several pre-rendering validity checks to ensure that dynamic objects are sufficiently visible. First, we require the selected object to have a minimum size of one simulator unit, measured as the shortest side of its 3D bounding box. If the sampled object is too small, we resample the object. If no valid object is found after 100 attempts, the sample is rejected. Second, for all frames, we require at least 50% of the projected 2D bounding box of the object to lie inside the image. Third, 
+
+> 2https://github.com/google-research/kubric/tree/main/challenges/movi
+
+15 (a) Moving camera, static scene. 
+
+> (b) Static camera, dynamic scene.
+> (c) Moving camera, dynamic scene.
+
+Figure 6: Kubric examples. Example sequences from our generated Kubric training data. The three subsets provide weak scene-level supervision for disentangling primary and residual dynamics: moving-camera/static-scene sequences contain only camera-induced motion, static-camera/dynamic-scene sequences contain only object motion, and moving-camera/dynamic-scene sequences combine both sources of motion. Examples are shown at 1 fps. we reject samples in which the object lies behind the camera, i.e., when its maximum depth satisfies 
+
+zmax < 0. These checks are performed before rendering for efficiency. Invalid samples are discarded and regenerated with a new seed. Because of the low resolution, generation can be performed without a GPU and takes approximately 
+
+12 seconds per valid sample. Invalid samples take only 0.3 seconds due to the pre-rendering checks. Approximately 90% of samples with dynamic objects pass the validity checks. 
+
+A.2 Static-camera object-motion benchmarks Inputs. We build a real-world object-motion benchmark with approximately static camera from DAVIS2017 and YouTubeVOS. We start from videos that contain both RGB frames and object annotations, and keep only timestamps for which both modalities are available. For each scene, we summarize the annotation masks by recording per-frame visible object area and image-plane centroid. 
+
+Camera-motion filtering. To identify near-static-camera clips, we estimate camera motion from sampled video frames using VGGT-based camera-pose prediction, which provides per-interval camera rotation and translation estimates. We then construct candidate windows of length T =4 at 2 fps and retain only those windows whose maximum local camera motion across consecutive frame pairs stays below fixed translation and rotation thresholds. Specifically, we require the maximum relative rotation between consecutive frames to be below 2◦ and the maximum translation between camera centers to be below 0.05 .
+
+Object filtering. Among the near-static windows, we further keep only samples containing suffi-ciently large objects, requiring objects to span more than 15 pixels and to move by at least 0.05 in normalized centroid displacement. 16 Motion targets. For each retained window, we compute continuous object motion from the selected object’s mask sequence. We extract the object centroid in each frame and define motion as the frame-to-frame centroid displacement in image coordinates. These displacements are normalized by image width and height, yielding continuous horizontal and vertical motion components in relative image-plane units. 
+
+A.3 Dataset splits and sampling Dataset-specific probing splits. SSv2 uses the official train/validation split filtered by videos that are too short for the required clip sampling. CameraBench is an evaluation benchmark and does not provide a separate training split. We therefore first balance each selected class group and then form a pseudo split with a 70 /30 train/test ratio. For DL3DV, we use the 1K to 7K subsets and form splits at the video level to avoid leakage, assigning 70% of videos to training and 30% to testing. We do not use the official test split because it is too small for our probing setting. To further increase the number of probing samples, we sample three sequences per video for both training and testing. Videos in the probing test split are excluded from unlabeled SDM training. For static YouTubeVOS, we also use a video-level pseudo split because the official test split does not provide object segmentations at sufficient temporal resolution. Similar to DL3DV, we sample three sequences per training and test video. For static DAVIS2017, we use the official train/test split and also sample three sequences per video. For the static-camera object-motion probes, we train on the combined static DAVIS2017 and static YouTubeVOS training sets to increase probe-training data, while reporting evaluation results separately on each benchmark. Kubric uses predefined train and test sets for the moving-camera/dynamic-scene setting. The actual probing splits are further balanced by regression bins, with bin edges computed on the training split and reused on the test split. 
+
+Balancing. All classification probing datasets are class-balanced by downsampling each class to the smallest class count. For regression probing, we downsample low-motion samples by constructing a tail-aware subset. We retain all samples above the 75th percentile of motion magnitude and randomly subsample the remaining lower-motion samples to the same count. This yields equal numbers of high- and lower-motion samples and prevents regression probes from being dominated by near-static examples. 
+
+A.4 Probe targets Regression tasks. For regression, we train one linear probe per probing setting, where each probe jointly predicts the full target vector for that setting. Camera-motion regression predicts the 6D vector 
+
+[vx, v y , v z , yaw , pitch , roll] . This is used for DL3DV and Kubric camera-motion evaluation. Kubric object-motion regression predicts the 3D translation vector [vx, v y , v z ], since objects do not rotate in our Kubric setup. The relative pose is computed between frame t+1 and frame t, expressed in the coordinate system of frame t+1 . Static DAVIS2017 and static YouTubeVOS object-motion regression predicts the 2D image-plane centroid displacement [∆ x, ∆y] in normalized image coordinates. 
+
+Classification tasks. For classification, we train one linear probe for each selected label set. SSv2-
+
+110 k uses full-class action recognition. CameraBench uses separate probes for eight camera-motion groups: speed ( slow , regular , fast ), dolly ( in , out ), pedestal ( up , down ), truck ( left , right ), pan ( left , right ), tilt ( up , down ), roll ( CW , CCW ), and zoom ( in , out ). 
+
+A.5 Probe training 
+
+Our evaluation uses linear probes trained on frozen motion representations. Each probe consists of a single linear layer on top of the corresponding motion token and is trained for 100 epochs with SGD, momentum 0.9, cosine learning-rate decay, and evaluation after every epoch. Following prior work [25], we train probes with multiple learning rates in parallel. Specifically we use: 
+
+lr ∈ { 1, 2, 5} × 10 {− 5,−4,−3,−2,−1} ∪ { 3×10 −1}, (6) which corresponds to the union of the learning rates used in the DINOv2 paper and its official implementation. We linearly scale these learning rates from a reference batch size of 256 to batch size 
+
+16 for CameraBench and batch size 64 for all other datasets. For regression probes, we additionally apply gradient clipping with norm 5 to improve optimization stability. Depending on the task, we 17 probe either the primary motion token p or the residual motion token r. The choice is stated in the corresponding result table. As we train many probes, we improve the efficiency of probe training by using no input augmentations and precomputing the motion features before training the linear probes. 
+
+A.6 Metrics and probe selection 
+
+For classification, we report the top-1 accuracy averaged over the different subtasks. For regression, we report mean squared error on targets normalized with the training-set mean and standard deviation. Throughout, we report the best held-out metric over probe training and across the parallel learning-rate sweep rather than the last-epoch metric of a single probe. This reduces sensitivity to the exact probe optimization hyperparameters when comparing many probes across datasets, targets, and representations. All methods and baselines use the same protocol. 
+
+A.7 DeltaTok evaluation 
+
+We evaluate DeltaTok [ 19 ] as a strong self-supervised baseline using the released Kinetics-700 [ 6]ViT-B model and the same evaluation protocol as for SDM. We follow its inference protocol by resizing frames to 512 ×512 and extracting the final delta token for each clip as its motion descriptor. DeltaTok and SDM are not trained under matched compute or input-resolution budgets. DeltaTok uses 512 ×512 inputs, DINOv3 [ 29 ] features, and is trained for 1.6M iterations with an effective batch size of 1024 . In comparison, SDM uses 224 ×224 inputs, DINOv2-with-registers [ 8] features by default, and is trained for 200 k iterations with batch size 128 . Thus, DeltaTok uses 8× more optimization iterations and an 8× larger effective batch size, in addition to operating at substantially higher spatial resolution. 
+
+A.8 Supervised model evaluation 
+
+We evaluate supervised 3D and geometry-oriented models as frozen feature extractors. For each model, we use its default inference preprocessing, run inference on the same frame sequences as in our probing datasets, and train linear probes using the same protocol as for SDM. We derive motion descriptors from consecutive frames using the same temporal concatenation or difference baselines used for frozen image features. For VGGT, we use VGGT-1B . Frames are converted to RGB, resized to a target width 518 while preserving aspect ratio, rounded to a height divisible by 14 , center-cropped to 518 ×518 , and scaled to [0 , 1] . We use either the camera token or mean-pooled patch tokens from the final aggregated token map. For Depth Anything 3, we use DA3-GIANT-1.1 with the official inference pipeline and extract either camera-token or mean-pooled patch-token features from the final backbone output. For Pi3X, we resize RGB inputs with preserved aspect ratio to the largest resolution with area at most 
+
+255 ,000 pixels and dimensions divisible by 14 , and extract the output features of the decoder. The final descriptor is obtained either by averaging the features of the patch tokens or, as Pi3X does not have a dedicated camera token, by averaging the 5 registers. 
+
+A.9 Sample visualization details 
+
+For qualitative sample visualization, we project dense feature maps to RGB using a sample-specific PCA. For a given sample, we collect the feature tokens from all frames of the sequences being compared, flatten them into a single feature matrix, and normalize them. The PCA is fit jointly on all extracted feature maps. We retain the first three principal components and map them to the three RGB channels. After projection, each component is scaled independently to [0 , 1] using the 1st and 99th percentiles computed on the PCA fit set, and the resulting token grid is reshaped to the spatial feature-map layout and bilinearly upsampled to the image resolution for display. Pixel-wise error maps are the L2 distance between predicted and ground-truth feature maps, computed in the projected space. These distances are normalized with a shared 99th-percentile scale across all compared maps, converted to a heatmap, and overlaid on the corresponding RGB video frames. 18 B Additional results 
+
+B.1 SSv2 camera motion analysis 
+
+To motivate the choice of token to use for SSv2-110 k action recognition probing, we analyze the amount of camera motion in SSv2 clips. We randomly sample 5k SSv2 clips, estimate frame-to-frame camera motion using VGGT [ 35 ] and compute the average per-step camera rotation and translation. To contextualize these values, we apply the same procedure to the CameraBench dataset and aggregate the camera motion separately for samples annotated as slow-speed , regular-speed ,or fast-speed . The slow-speed subset includes not only clips with little camera motion but also all samples with a static camera. Table 7: Camera-motion statistics for SSv2 and CameraBench. We report average frame-to-frame camera motion estimated with VGGT. Rotation is reported in degrees per second while translation is in VGGT’s normalized scene-scale units per second. SSv2 exhibits lower camera motion than regular- and fast-speed CameraBench clips and is closer to the slow-speed subset in rotation.            
+
+> SSv2 CameraBench
+> slow-speed regular-speed fast-speed
+> rotation 3.89 1.57 7.77 32 .89
+> translation 0.08 0.03 0.13 0.62
+
+SSv2 camera motion lies between the slow- and regular-speed CameraBench subsets and is closer to the slow-speed subset in terms of rotation. This suggests that many SSv2 clips contain limited inter-frame camera motion. We therefore follow a similar reasoning as for the static-camera DAVIS2017 and YouTubeVOS object-motion benchmarks (see Section 3.2). When camera-induced change is small, action-related object dynamics are expected to be a dominant source of temporal change, and we probe the primary token p for SSv2 action recognition. 
+
+B.2 Baseline results 
+
+We compare different ways to derive motion descriptors from strongly supervised and baseline models in Tables 8 and 9. We use these ablations to choose between concatenation and feature differences for the direct-feature baselines and supervised-model descriptors reported in the main paper. For single-layer DINOv2 features, the best descriptor depends on the pooling strategy and task. Feature differences of AVG-pooled features perform best overall, especially on regression tasks, while concatenating CLS tokens of consecutive frames works best for classification tasks. For the supervised models, feature-difference descriptors tend to perform best across all benchmarks except SSv2-110 k. On this action recognition benchmark, all three supervised models show the same pattern. Feature differences perform poorly, with the best accuracy reaching only 6.2% , whereas concatenation-based descriptors achieve between 12 .2% and 19 .8% . A possible explanation is that, unlike the other benchmarks, SSv2-110 k uses action labels rather than motion targets, and these labels may depend on semantic information that is reduced when subtracting features. Finally, Table 9 shows that giving direct CLS and AVG-pool baselines access to all 12 DINOv2 blocks improves these baselines but does not close the gap to SDM. Thus, the improvements of SDM are not explained by access to intermediate features alone, but by using structured recurrent prediction to turn these features into motion representations. 
+
+B.3 Temporal context 
+
+Tables 10 and 11 provide the full temporal-context results with standard deviations. SDM benefits most from longer context on temporally coherent benchmarks, such as linear Kubric motion and SSv2-110 k, where performance improves monotonically even beyond 5 frames, the longest context used during training. The same trend holds for the multi-frame baseline based on average-pooled feature differences, which nevertheless remains below SDM even when using longer context. In contrast, SDM remains stable on datasets with less constrained motion, such as DL3DV, static YouTubeVOS, and static DAVIS2017, where the baseline’s performance even deteriorates significantly with increasing temporal context. Overall, additional context is useful when motion is coherent, but not uniformly beneficial for unconstrained real-world videos. 19 Table 8: Baseline descriptor ablations. We compare descriptor choices for frozen DINOv2-with-registers representations and strongly supervised representations. For DINOv2 with registers, we evaluate CLS tokens and average-pooled patch features using either concatenation or feature differences across consecutive frames. Multi-frame variants average frame-pair descriptors over time. For VGGT and Depth Anything 3, we compare average-pooled feature maps and camera tokens using either concatenation or differences across consecutive frames. Since Pi3X does not have a camera token, we use the average of its registers as an alternative and otherwise follow the same setup. We report MSE on standardized regression targets and accuracy in % for classification tasks. The best results for each model and baseline type are highlighted in bold .
+
+Method Regression (MSE ↓) Classification (accuracy ↑)Kubric DL3DV Static Static Camera SSv2-110 kcam obj DAVIS2017 YouTubeVOS Bench 
+
+DINOv2 with registers baselines 
+
+AVG-pool concat 1.05 ±0.0 0.73 ±0.0 1.06 ±0.0 0.96 ±0.03 0.97 ±0.0 68.4 ±1.3 14.1 ±0.1 
+
+AVG-pool concat, multi-frame 0.97 ±0.0 0.69 ±0.0 1.07 ±0.0 0.96 ±0.02 0.95 ±0.01 67.5 ±1.2 14.0 ±0.1 
+
+AVG-pool diff 0.96 ±0.0 0.93 ±0.0 1.04 ±0.0 0.78 ±0.02 0.91 ±0.0 67.0 ±1.2 2.3 ±0.0 
+
+AVG-pool diff, multi-frame 0.87 ±0.0 0.72 ±0.0 1.05 ±0.0 1.02 ±0.00 0.92 ±0.0 69.2 ±0.9 13.3 ±0.0 
+
+CLS concat 1.16 ±0.0 0.78 ±0.0 1.09 ±0.0 0.90 ±0.10 1.05 ±0.01 68.6 ±0.8 14.9 ±0.2 
+
+CLS concat, multi-frame 1.05 ±0.0 0.77 ±0.0 1.09 ±0.0 0.92 ±0.02 0.98 ±0.0 68.7 ±1.1 15.5 ±0.1 
+
+CLS diff 1.09 ±0.0 0.96 ±0.0 1.09 ±0.0 0.90 ±0.01 0.93 ±0.0 67.1 ±1.0 3.0 ±0.0 
+
+CLS diff, multi-frame 0.96 ±0.0 0.80 ±0.0 1.07 ±0.0 1.01 ±0.01 0.93 ±0.0 67.3 ±0.6 12.5 ±0.1 
+
+strongly supervised 
+
+VGGT AVG feat. map concat 0.18 ±0.0 0.42 ±0.0 0.59 ±0.0 0.99 ±0.06 0.95 ±0.0 82.9 ±0.0 15.5 ±0.1 
+
+VGGT AVG feat. map diff 0.09 ±0.0 0.32 ±0.0 0.56 ±0.0 0.78 ±0.10 0.79 ±0.0 82.4 ±0.3 5.6 ±0.0 
+
+VGGT cam. token concat 0.05 ±0.0 0.43 ±0.0 0.53 ±0.0 0.97 ±0.07 0.98 ±0.0 87.5 ±0.3 13.5 ±0.1 
+
+VGGT cam. token diff 0.03 ±0.0 0.44 ±0.0 0.53 ±0.0 0.71 ±0.04 0.81 ±0.0 88.7 ±0.7 4.8 ±0.0 
+
+DA3 AVG feat. map concat 0.28 ±0.0 0.52 ±0.01 0.66 ±0.01 1.89 ±0.20 1.65 ±0.02 83.3 ±0.4 14.0 ±0.1 
+
+DA3 AVG feat. map diff 0.11 ±0.0 0.40 ±0.0 0.55 ±0.0 0.87 ±0.11 0.89 ±0.01 82.9 ±1.1 5.2 ±0.1 
+
+DA3 cam. token concat 0.18 ±0.0 0.72 ±0.01 0.62 ±0.0 3.53 ±1.04 1.66 ±0.06 81.5 ±0.2 12.2 ±0.4 
+
+DA3 cam. token diff 0.04 ±0.0 0.58 ±0.0 0.53 ±0.0 0.87 ±0.04 0.91 ±0.02 84.4 ±1.3 4.6 ±0.1 
+
+Pi3X AVG feat. map concat 0.10 ±0.0 0.44 ±0.0 0.54 ±0.0 0.71 ±0.01 0.86 ±0.0 87.9 ±0.7 19.8 ±0.1 
+
+Pi3X AVG feat. map diff 0.07 ±0.0 0.38 ±0.00 0.52 ±0.0 0.52 ±0.00 0.75 ±0.0 86.8 ±0.8 6.2 ±0.1 
+
+Pi3X avg. registers concat 0.33 ±0.0 0.77 ±0.0 0.65 ±0.0 0.95 ±0.03 0.94 ±0.0 79.8 ±1.6 12.7 ±0.3 
+
+Pi3X avg. registers diff 0.08 ±0.0 0.45 ±0.0 0.53 ±0.0 0.61 ±0.01 0.77 ±0.0 85.7 ±0.4 5.7 ±0.1 
+
+SDM 0.16 ±0.0 0.19 ±0.0 0.59 ±0.0 0.87 ±0.1 0.71 ±0.0 85.3 ±1.7 23.1 ±1.3 
+
+B.4 Structured motion 
+
+Table 12 reports the full structured-motion results with standard deviations. The primary and residual tokens specialize according to the dominant motion source. The primary token performs best for camera motion in dynamic-camera videos, for object motion in approximately static-camera videos, and for SSv2-110 k action prediction, while the residual token is stronger for Kubric object motion. One exception is static DAVIS2017, where the residual token outperforms the primary token. This result is highly variable across seeds and therefore less reliable. The performance of the upper-bound probes based on the concatenated p and r tokens remains close to the best performance achieved with a single token on most benchmarks. This indicates that most of the task-relevant information is encoded in a single token. A large gain appears on Kubric object motion, where predicting object translation in world coordinates can benefit from both the residual object-motion signal and the primary camera-motion component. 
+
+B.5 Ablation 
+
+Table 13 provides the detailed component ablations summarized in Section 3.5. 
+
+Weak supervision and sequential extraction lead to specialization. On Kubric, SDM yields the expected specialization: p is better for camera motion ( 0.16 vs. 0.28 ), while r is better for object motion ( 0.19 vs. 0.21 ). Removing static-scene supervision weakens this structure, making the residual token nearly as predictive of camera motion as the primary token ( 0.21 vs. 0.18 ). Removing 20 Table 9: Multi-layer direct-feature baselines. To control for the use of intermediate DINOv2 features, we evaluate direct CLS and average-pooled patch descriptors extracted from all 12 backbone blocks. Descriptors are averaged across layers and combined across adjacent frames either by concatenation or feature difference. Even with access to multi-layer features, direct descriptors remain substantially below SDM on all datasets except for static DAVIS2017, which is consistent with the results obtained without multi-layer features (see Table 2). This indicates that the gains are not explained by intermediate-feature aggregation alone. We report MSE on standardized regression targets and accuracy in % for classification tasks. Best results are highlighted in bold .                                                                               
+
+> Method Regression (MSE ↓)Classification (accuracy ↑)Kubric DL3DV Static Static Camera SSv2-110 kcam obj DAVIS2017 YouTubeVOS Bench
+> DINOv2 with registers, multi-layer baselines
+> AVG-pool concat 0.94 ±0.0 0.66 ±0.0 1.02 ±0.0 0.81 ±0.01 0.94 ±0.0 67.0 ±1.7 10.6 ±0.2
+> AVG-pool concat, multi-frame 0.91 ±0.0 0.70 ±0.0 1.04 ±0.0 0.89 ±0.02 0.95 ±0.0 66.8 ±0.9 12.6 ±0.1
+> AVG-pool diff 0.88 ±0.0 0.83 ±0.0 1.04 ±0.0 0.65 ±0.02 0.83 ±0.0 65.5 ±0.9 1.9 ±0.0
+> AVG-pool diff, multi-frame 0.82 ±0.0 0.60 ±0.0 1.06 ±0.0 1.01 ±0.01 0.91 ±0.0 70.0 ±0.6 6.9 ±0.0
+> CLS concat 1.05 ±0.0 0.72 ±0.0 1.05 ±0.0 0.93 ±0.02 0.94 ±0.01 68.1 ±0.5 13.6 ±0.3
+> CLS concat, multi-frame 1.01 ±0.0 0.77 ±0.0 1.06 ±0.0 0.94 ±0.0 0.94 ±0.0 67.9 ±0.9 14.5 ±0.4
+> CLS diff 0.98 ±0.0 0.91 ±0.0 1.04 ±0.0 1.00 ±0.01 0.92 ±0.0 65.8 ±3.3 2.0 ±0.1
+> CLS diff, multi-frame 0.88 ±0.0 0.68 ±0.0 1.05 ±0.0 1.02 ±0.0 0.93 ±0.0 68.6 ±2.0 7.5 ±0.0
+> SDM 0.16 ±0.0 0.19 ±0.0 0.59 ±0.0 0.87 ±0.1 0.71 ±0.0 85.3 ±1.7 23.1 ±1.3
+
+Table 10: Additional temporal-context results. SDM and the baseline generally benefit from additional frames on the temporally coherent Kubric and CameraBench benchmarks. On benchmarks with less temporal coherence, our method remains stable with increasing temporal context, while the frame-pair baseline can degrade. We report MSE on standardized regression targets and accuracy in % for classification tasks. 
+
+method Kubric camera ↓ Kubric object ↓ DL3DV ↓
+
+T=2 T=4 T=2 T=4 T=2 T=5 baseline 0.96 ±0.0 0.87 ±0.0 -0.09 0.93 ±0.0 0.72 ±0.0 -0.21 1.04 ±0.0 1.05 ±0.0 +0.01 
+
+SDM 0.26 ±0.03 0.16 ±0.01 -0.10 0.22 ±0.01 0.19 ±0.01 -0.03 0.59 ±0.0 0.59 ±0.0 ±0.0 
+
+method Static DAVIS2017 ↓ Static YouTubeVOS ↓ CameraBench ↑
+
+T=2 T=4 T=2 T=4 T=2 T=5 baseline 0.78 ±0.03 1.02 ±0.0 +0.24 0.91 ±0.0 0.92 ±0.0 +0.01 67.1 ±2.2 69.2 ±0.9 +2.1 
+
+SDM 0.87 ±0.07 0.87 ±0.05 ±0.0 0.70 ±0.01 0.71 ±0.02 +0.01 84.7 ±1.1 85.3 ±1.7 +0.6 
+
+static-camera supervision has a stronger effect on object motion. p becomes more predictive than r
+
+(0.14 vs. 0.38 ), indicating that the static-camera constraint is important for preventing object motion from being absorbed into the primary token. Jointly extracting p and r also weakens specialization, with p becoming more predictive for object than camera motion. 
+
+Intermediate input features help across benchmarks. Using all encoder layers instead of only final-layer features improves performance across all benchmarks, including Kubric camera error from 0.50 to 0.16 , DL3DV error from 0.89 to 0.59 , and SSv2-110 k accuracy from 13 .6% to 23 .1% .Despite increasing the raw feature dimensionality by 12 ×, the fused prediction space keeps training efficient, increasing training time by only 1.2×.
+
+Unlabeled real data improves generalization. Adding unlabeled real videos improves over synthetic-only training on all evaluated real benchmarks: DL3DV error decreases from 0.91 to 0.59 , while CameraBench and SSv2-110 k accuracy increase from 76 .6% to 85 .3% and from 10 .7% to 23 .1% ,respectively. 
+
+MSE improves Kubric object probing. Compared to L1, MSE improves Kubric object-motion error from 0.30 to 0.19 and Kubric camera-motion error from 0.18 to 0.16 . In contrast, L1 performs slightly better on DL3DV ( 0.57 vs. 0.59 ), CameraBench ( 87 .4% vs. 85 .3% ), and SSv2-110 k ( 24 .4% 
+
+vs. 23 .1% ). We use MSE because it significantly improves Kubric object-motion performance. 21 Table 11: Additional temporal-context results on SSv2-110 k. SDM improves monotonically as the number of input frames increases, including beyond the T = 5 sequence length used during training. While the frame-pair baseline also improves with increasing temporal context, even with the maximum number of T = 7 frames it performs worse than SDM on a single pair of frames. Accuracy is reported in %. 
+
+method SSv2-110 kT=2 T=3 T=4 T=5 T=6 T=7 baseline 2.4 ±0.2 5.9 ±0.0 +3.5 8.4 ±0.0 +2.5 10.9 ±0.2 +2.5 11.7 ±0.0 +0.8 13.3 ±0.0 +1.6 
+
+SDM 16.7 ±0.7 18.6 ±0.8 +1.9 20.4 ±1.1 +1.8 21.6 ±1.2 +1.2 22.5 ±1.7 +0.9 23.1 ±1.3 +0.6 
+
+Table 12: Additional structured-motion results. Full results with standard deviations showing that SDM learns specialized primary and residual motion tokens. The primary token captures the dominant motion source, while the residual token captures remaining dynamics. The only exception is static DAVIS2017, where the residual token outperforms the primary token. However, the high variability of this result makes it less reliable. We report MSE on standardized regression targets and accuracy in % for classification tasks. Among individual tokens, the best result is shown in bold .Representations and targets that match are highlighted in green . The last row reports an upper-bound probe using the concatenated tokens [p, r ].
+
+token Regression (MSE ↓) Classification (accuracy ↑)Kubric Kubric DL3DV Static Static Camera SSv2-110 kcamera object DAVIS2017 YouTubeVOS Bench primary 0.16 ±0.01 0.21 ±0.03 0.59 ±0.0 0.87 ±0.05 0.71 ±0.02 85.3 ±1.7 23.1 ±1.3 
+
+residual 0.28 ±0.04 0.19 ±0.01 0.62 ±0.0 0.80 ±0.15 0.79 ±0.01 81.1 ±1.9 12.0 ±0.9 
+
+concat. [p, r ] 0.16 ±0.01 0.14 ±0.01 0.56 ±0.0 0.81 ±0.05 0.71 ±0.00 88.0 ±0.3 22.1 ±1.2 
+
+Static-camera regularization balances object motion and action prediction. We vary λreg , the weight of the static-camera regularization term. Smaller values yield stronger SSv2-110 k performance, while larger values improve Kubric object-motion probing. We use λreg = 0 .5 as a compromise, preserving strong Kubric object-motion performance ( 0.19 ) and SSv2-110 k accuracy ( 23 .1% ). 
+
+B.6 Additional visualization 
+
+Figure 7 shows an additional visualization of the error between predicted and ground-truth feature maps. 𝑓 t>
+
+𝑓 t 𝑓 t≫
+
+𝑓 t
+
+Error after 
+
+𝐫𝐞𝐬𝐢𝐝𝐮𝐚𝐥 𝐦𝐨𝐭𝐢𝐨𝐧 
+
+target frame 
+
+t
+
+Error after 
+
+𝐩𝐫𝐢𝐦𝐚𝐫𝐲 𝐦𝐨𝐭𝐢𝐨𝐧 
+
+source frame 
+
+t − 1 𝑓 𝑡 −1𝑓 t
+
+Error without 
+
+any correction 
+
+Figure 7: Structured feature prediction. We visualize feature-map error to the target after primary and residual compensation of a CameraBench sample. Errors are highlighted in red. Compared to the error without any compensation, the primary-motion-compensated feature map reduces the error significantly for camera-motion-induced differences, particularly in the background. The residual compensation further decreases the residual error and compensates for the error introduced by scene dynamics. 22 Table 13: Detailed component ablations. We ablate weak scene-level supervision, sequential primary/residual extraction, intermediate encoder features, unlabeled real-video training, the feature-prediction loss, and the regularization strength. We report MSE on standardized regression targets and accuracy in % for classification tasks. Blue indicates settings used by SDM. Best performance for each metric is highlighted in bold .                                                                                                                             
+
+> (a) Weak supervision and sequential extraction improve token specialization. Matched token–target pairs are highlighted in green . token SDM no static scene sup. no static camera sup. joint motion extraction Kubric Kubric Kubric Kubric Kubric Kubric Kubric Kubric camera ↓object ↓camera ↓object ↓camera ↓object ↓camera ↓object ↓
+> primary 0.16 0.21 0.18 0.22 0.20 0.14 0.19 0.16 residual 0.28 0.19 0.21 0.20 0.44 0.38 0.23 0.15
+> (b) Intermediate features improve performance.
+> Kubric ↓DL3DV ↓Camera SSv2-camera object Bench ↑110 k↑
+> only final feat. 0.50 0.22 0.89 76.3 13.6 multiple feat. 0.16 0.19 0.59 85.3 23.1
+> (c) Unlabeled real data facilitates real-video generalization.
+> Kubric ↓DL3DV ↓Camera SSv2-camera object Bench ↑110 k↑
+> no real data 0.17 0.11 0.91 76.6 10.7 syn&real data 0.16 0.19 0.59 85.3 23.1
+> (d) MSE loss improves Kubric object probing.
+> Kubric ↓DL3DV ↓Camera SSv2-camera object Bench ↑110 k↑
+> L10.18 0.30 0.57 87.4 24.4
+> MSE 0.16 0.19 0.59 85.3 23.1 (e) Medium static-camera regularization balances object motion and action prediction.
+> Kubric ↓DL3DV ↓Camera SSv2-camera object Bench ↑110 k↑
+> λreg = 0 .10.16 0.41 0.56 86.3 25.1
+> λreg = 0 .25 0.17 0.35 0.56 87.0 24.3
+> λreg = 1 .00.20 0.14 0.59 86.7 17.7
+> λreg = 0 .50.16 0.19 0.59 85.3 23.1
+
+## C Limitations 
+
+While a large portion of our training is fully self-supervised, the decomposition part is also anchored by weak scene-level supervision on synthetic data. Replacing this with fully self-supervised constraints would improve scalability. Finally, ProbeMotion relies on estimated camera motion for constructing static DAVIS2017 and YouTubeVOS, which can introduce filtering noise, and linear probes only measure linearly decodable information. 
+
+## D Information about used assets 
+
+Table 14 lists more detailed information about the pretrained models and datasets used. 
+
+## E Hardware resources 
+
+The experiments were conducted on a local cluster using a single node with 4 NVIDIA H100 GPUs and 128 CPU cores. One SDM training run takes approximately 11 hours on such a node and uses up to 75GB of RAM and 25GB of VRAM per GPU. The evaluation on ProbeMotion takes approximately 
+
+25 minutes. The reported main results use three seeds, for a total of approximately 11h × 4 × 3 = 132 GPU-hours, where 4 is the number of GPUs per node. The 9 ablation runs require approximately 396 GPU-hours. 23 Table 14: Existing assets. Summary of existing datasets and pretrained models used in this paper. 
+
+Asset Use in this paper Version /subset License / terms Citation 
+
+Pretrained models 
+
+DINOv2-reg-B/14 Main frozen image en-coder public checkpoint Apache License 2.0 [8] MAE-B/16 Frozen encoder for backbone ablation public checkpoint Apache License 2.0 [16] SigLIP-B/16 Frozen encoder for backbone ablation public checkpoint Apache License 2.0 [44] DINOv3-B/16 Frozen encoder for backbone ablation public checkpoint DINOv3 License [29] DeltaTok Self-supervised base-line released pretrained checkpoint Apache License 2.0 [19] VGGT-1B Supervised 3D repre-sentation baseline and camera-motion filter-ing for static-camera benchmarks public checkpoint CC BY-NC 4.0 [35] Depth Anything 3 (GIANT-1.1) Supervised 3D repre-sentation baseline public checkpoint CC BY-NC 4.0 [20] Pi3X Supervised 3D repre-sentation baseline public checkpoint CC BY-NC 4.0 [39] 
+
+Datasets 
+
+Kubric / MOVi-E training and evalua-tion Custom generated clips based on MOVi-E setup Apache License 2.0 [14] Something-Something v2 training and evalua-tion Filtered train/validation split license [13] DL3DV training and evalua-tion 
+
+1K –7K sub-sets DL3DV-10K Terms of use [22] CameraBench evaluation Selected camera-motion class groups CC-BY-4.0 [21] DAVIS2017 evaluation Official train/test split after filtering BSD 3-Clause License [26] YouTubeVOS evaluation Video-level pseudo split after filtering CC BY 4.0 (an-notations) / non-commercial research purpose only (data) [41, 42] 
+
+24

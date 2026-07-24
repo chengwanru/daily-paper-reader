@@ -1,0 +1,507 @@
+Title: Ms. Forcing: Efficient Streaming Video Generation with Multi-Scale Patchification and Attention
+
+URL Source: https://arxiv.org/pdf/2607.20940v1
+
+Published Time: Fri, 24 Jul 2026 00:30:48 GMT
+
+Number of Pages: 12
+
+Markdown Content:
+# MS. FORCING : E FFICIENT STREAMING VIDEO GEN -
+
+# ERATION WITH MULTI -S CALE PATCHIFICATION AND 
+
+# ATTENTION 
+
+Zekun Li 1∗ Xiaoyan Cong 1∗ Hongyu Li 1 Zhiyang Dou 2
+
+Chuan Guo 3 Abhay Mittal 3† Sizhe An 3† Srinath Sridhar 1‡
+
+> 1
+
+Brown University 2Massachusetts Institute of Technology 3Meta Tour of an art gallery with many beautiful works of art in different styles.    
+
+> A dry rainbow rose is coming back to life.
+> 22.8 FPS in real -time!
+
+Figure 1: Ms. Forcing is a real-time streaming video generation framework ( 22 .8 FPS) built on rolling diffusion. It combines our novel Multi-Scale Patchification (MSP) and Multi-Scale Self-Attention (MSSA), which adapt the spatial granularity of computation to each state’s noise level in the rolling denoising window, with Homogeneous-Noise-Level DMD (H-DMD), which reduces the mismatch between DMD training sequences and inference-time rollouts. 
+
+## ABSTRACT 
+
+Streaming video diffusion models have made substantial progress toward interac-tive and dynamic world simulation, but the nested autoregressive and denoising loops of conventional next-frame generation hinder real-time deployment. Recent rolling-window methods pipeline denoising across multiple consecutive frames at different noise levels, improving throughput and long-horizon stability. How-ever, they tokenize every state at the same fine spatial granularity, leaving sub-stantial noise-dependent redundancy in the joint denoising window. We propose 
+
+Ms. Forcing , an efficient streaming video generation paradigm that adapts spa-tial granularity to each state’s noise level. Its Multi-Scale Patchification (MSP) assigns coarser patches to noisier states, reducing the active-window token count by 45%, while Multi-Scale Self-Attention (MSSA) matches the density of visible non-sink keys and values to each query scale to further reduce attention cost. Be-cause both schedules are fixed by window position, Ms. Forcing retains a static, hardware-friendly computation graph. We further introduce Homogeneous-Noise-Level DMD (H-DMD), which assembles each fake video from clean predictions sharing a same source noise level, thereby reducing the mismatch between DMD training sequences and inference-time rollouts. The multi-scale design helps off-set the additional training cost of backpropagating through overlapping windows. We include both quantitative and qualitative experiments to show that Ms. Forc-ing reaches 22.84 FPS on a single H200 GPU , 39.6% faster than Rolling Forcing, while significantly improving VBench scores in both short video and long video generation setting. 
+
+> *
+
+Equal contribution. †Joint project leads. ‡Corresponding author. 
+
+1arXiv:2607.20940v1 [cs.CV] 23 Jul 2026 1 INTRODUCTION 
+
+Recent large-scale video diffusion models (Wan et al., 2025; HaCohen et al., 2026; Team et al., 2025) generate realistic videos with intricate dynamics and high visual quality. However, synthesizing a complete clip through iterative bidirectional denoising incurs high latency and precludes on-demand output. Interactive applications such as generative world models (Bruce et al., 2024; Gao et al., 2026) and real-time virtual avatars (Sun et al., 2026; Huang et al., 2026) instead require streaming 
+
+generation: frames must be emitted sequentially with low latency while remaining coherent over long horizons. Delivering real-time throughput without sacrificing visual fidelity, motion quality, or long-horizon stability remains a central challenge. Recent methods enable streaming by distilling slow bidirectional diffusion models into few-step causal autoregressive generators (Yin et al., 2025; Huang et al., 2025). A conventional causal sam-pler nests an inner denoising loop for each new frame inside an outer autoregressive loop. Each frame is finalized before the next is generated, so errors propagate along the autoregressive trajec-tory. Also, inference efficiency constraints will limit the history context length and further exacer-bate long-horizon drift (Huang et al., 2025). Liu et al. (2026) instead introduce Rolling Forcing (RF), which pipelines T denoising steps along the temporal axis through a joint window of T consecu-tive frames at progressively increasing noise levels. Each pass advances all window states by one noise level and emits the clean head frame. Bidirectional attention within the window lets frames re-fine one another before emission, expanding the denoising context and reducing error accumulation while preserving causal output. RF trades nested sampling for a heavier forward pass: all T active states are tokenized at the backbone’s native patch size despite their different noise levels. Pruning or compressing history KVs (Guo et al., 2026; Yang et al., 2026) reduces the cost of past context but does not address this mixed-noise active window. Diffusion denoising is inherently coarse-to-fine, i.e., high-noise states recover low-frequence structure, whereas low-noise states refine high-frequence details (Kim et al., 2026; Jin et al., 2025). In RF, each state’s noise level is fixed a priori by its window position, en-abling a static multi-scale schedule without input-dependent routing. Motivated by the zero-shot probes of redundancy in the joint denoising window in Section 3.2, we propose Multi-Scale Patchi-fication (MSP), which assigns coarser patchification to noisier states, and Multi-Scale Self-Attention 
+
+(MSSA), which matches the density of visible non-sink KVs to each query’s patch granularity while preserving the full-resolution sink frame. Under our 5-step RF schedule, MSP reduces tokens in denoising window by 45% , and MSSA further removes 12 .9% of post-MSP dot-product attention computation. Both are fixed by window position, yielding a static compute graph. The reduced training cost also enables a more faithful construction for Distribution Matching Dis-tillation (DMD; Yin et al., 2024a;b). To control memory, RF builds its fake video from non-overlapping windows by concatenating all T predicted clean states from each selected window. Adjacent frames therefore originate from different rollout noise levels, whereas inference concate-nates head predictions from consecutive windows. This heterogeneity creates a mismatch between DMD training sequences and inference-time emitted rollouts. We propose Homogeneous-noise-level DMD (H-DMD) for joint denoising, which samples one window position per update and gathers its predicted clean state from every consecutive window. All frames in the assembled fake video then share one source noise level, yielding a consistent temporal marginal without changing the DMD objective. Although it requires gradients through overlapping windows, MSP and MSSA make it tractable and remove the need for auxiliary Self-Forcing (Huang et al., 2025) rollout updates. Together, these designs form Ms. Forcing . At 832 ×480 resolution, it reaches 22 .84 FPS on a single H200 GPU ( 39 .6% faster than RF), improves five-second VBench quality and semantic scores over RF by 0.29 and 1.25 , and reduces 60-second quality drift from 2.227 to 1.700 while maintaining competitive quality. Our contributions are: • We introduce Multi-Scale Patchification and Multi-Scale Self-Attention , a static noise-matched schedule that reduces tokens in denoising window by 45% and post-MSP attention computation by a further 12 .9% .• We identify a training–inference mismatch introduced by RF’s heterogeneous DMD as-sembly and propose Homogeneous-Noise-Level DMD , which improves distillation effec-tiveness and generation quality without requiring auxiliary Self-Forcing training. 22 RELATED WORK 
+
+Autoregressive Video Diffusion Models. Large-scale video diffusion models (VDMs) (Wan et al., 2025; HaCohen et al., 2026; Team et al., 2025; Yang et al., 2025; Kong et al., 2024; Seedance et al., 2026; Cong et al., 2026; Du et al., 2026; Li et al., 2026) typically synthesize entire clips using bidirectional attention, making them unsuitable for low-latency streaming. To transform these slow bidirectional VDMs into efficient streaming generators, recent work combines autoregressive mod-eling with iterative diffusion denoising under several formulations (Chen et al., 2024). Most existing streaming video generators (Yin et al., 2025; Huang et al., 2025; Lu et al., 2026) adopt a nested sam-pling process: an outer autoregressive loop generates frames sequentially, while an inner diffusion loop progressively denoises each new frame. A complementary line of work (Ruhe et al., 2024; Kim et al., 2024; Sun et al., 2025; Liu et al., 2026) pipelines the denoising steps along the temporal axis, jointly updating consecutive blocks at progressively increasing noise levels within a rolling window and emitting one clean block per forward pass. To mitigate exposure bias and improve generation quality, recent approaches further apply distribution matching distillation (DMD) to self-generated rollouts, thereby better aligning training with the inference-time distribution (Huang et al., 2025). 
+
+Efficient Video Diffusion. Beyond reducing the number of denoising steps through distillation, complementary acceleration methods eliminate redundant computation or lower the cost of each model evaluation. For efficient and effective streaming inference, sliding-window attention and per-sistent sink frames bound the history context length while retaining critical long-range context (Yang et al., 2026; Shin et al., 2026). Recent methods further reduce history cost through KV-cache token pruning or compression (Guo et al., 2026; Chen et al., 2026; Yi et al., 2026). Other acceleration strategies reuse intermediate features across adjacent denoising steps (Liu et al., 2025b;a), perform staged coarse-to-fine generation (Jin et al., 2025; Ding et al., 2026; Zheng et al., 2026), or use adap-tive patch schedules during denoising (Kim et al., 2026). Most of them rely on runtime importance estimation or adaptive routing, which can introduce input-dependent and irregular execution. More importantly, acceleration within the joint denoising window (Ruhe et al., 2024; Liu et al., 2026) remains largely unexplored. We exploit the deterministic correspondence between window position and noise level to assign noise-matched patch sizes and history receptive fields a priori, yielding a static, hardware-friendly schedule. 
+
+## 3 PRELIMINARY AND MOTIVATION 
+
+3.1 PRELIMINARY : A UTOREGRESSIVE VIDEO DIFFUSION MODELS 
+
+Autoregressive video diffusion factorizes an N -frame sequence x1: N follows p(x1: N ) =
+
+QNi=1 p(xi | x<i ), where each xi may represent a short frame chunk, referred to as a “frame” for simplicity. For efficient streaming computation, recent works (Lu et al., 2026; Yang et al., 2026) organize context tokens as [ sink | recent | now ] under causal attention and generate each new block through few-step denoising (Yin et al., 2025; Huang et al., 2025; Yang et al., 2026). Given a T -step diffusion ( t1 ≤ · · · ≤ tT ) model pθ , the frame i generation can be formulated as 
+
+p(xit0: T | x<i ) = 
+
+> T
+
+Y
+
+> j=1
+
+pθ (xitj−1 | xitj , x<i ) , xitT ∼ N (0 , I) . (1) While they enable consistent sequential generation, their strictly causal frame prediction causes each frame to inherit errors from its predecessors, allowing small imperfections to compound over long horizons and eventually leading to noticeable drift and quality degradation. To this end, Rolling Forcing (RF) pipelines the T denoising steps of each generated frame along the temporal axis via a joint rolling window containing T consecutive frames assigned progressively higher noise levels 
+
+t1 ≤ · · · ≤ tT . Rather than fully denoising each frame before moving to the next, RF expands the denoising context length and allows frames to refine one another through bidirectional attention before finalization, reducing local errors and long-horizon drift while preserving causal streaming. At each rolling, RF jointly denoises frames in the window by one noise level in a single forward pass, sampling from the transition 
+
+pθ
+
+
+
+xi:i+T −1  
+
+> t0: T−1
+
+xi:i+T −1 
+
+> t1: T
+
+, x<i 
+
+, xi+T −1 
+
+> tT
+
+∼ N (0 , I) . (2) 3Position l contains xi+l−1 
+
+> tl
+
+, ordered from the near-clean head at t1 to the near-noise tail at tT . After each pass, RF emits the denoised head frame, advances the remaining frames toward t0, and appends a fresh noise frame xi+TtT ∼ N (0 , I) at the tail, allowing the window to roll forward indefinitely. 3.2 ZERO -S HOT PROBES OF REDUNDANCY IN THE JOINT DENOISING WINDOW 
+
+Diffusion denoising proceeds from coarse to fine: denoising at high noise levels primarily estab-lishes global structure, whereas low-noise steps refine local details. This observation has motivated prior diffusion models to process high-noise states at lower spatial resolutions (Kim et al., 2026; Jin et al., 2025). Unlike conventional denoising inference, which processes inputs at a single noise level during each denoising pass, RF jointly processes a mixed-noise-level input within the bidirectional denoising window. Yet RF patchifies all frames in this joint denoising window at a uniform spatial granularity. We therefore test whether this mixed-noise denoising window can instead be repre-sented as a mixed-granularity input sequence based on the noise schedule. To this end, we adopt two perturbations during pretrained RF rollouts in zero-shot, probing the sensitivity of the hybrid granularity of patchification and self-attention via frame-wise LPIPS (Zhang et al., 2018). 0 20 40 60 80 100 120 140 160 
+
+> pixel frame index
+> 0.00
+> 0.05
+> 0.10
+> 0.15
+> 0.20
+> 0.25
+> 0.30
+> LPIPS Between Baseline (lower = similar)  Multi Scale Spatial Average
+> Multi Scale Self Attention
+
+Figure 2: Zero-shot probes of mixed granular-ity. Frame-wise LPIPS ( ↓) between each per-turbed RF and the original rollout across 177 pixel frames. For 5-step RF, we treat the three highest-noise levels as coarse. Blue: After native patchi-fication, we apply spatial average for frames at these levels; Red: For queries at these lev-els, MSSA spatially subsamples their attention-visible keys and values with a stride of 2.
+
+Probing patchification granularity. Directly applying mixed-granularity patchification in zero-shot is infeasible because each new patch size requires learned patch-embedding and de-embedding layers. We therefore emulate coarse patchification after native tokenization: at se-lected noisy window positions, we partition the spatial token grid into non-overlapping 2 × 2
+
+blocks and replace all four tokens in each block with their mean. Under this proxy, the LPIPS deviation from the paired baseline remains be-low 0.26 throughout over 10-second rollout (blue curve in Fig. 2), suggesting that mixed-granularity patchification layers are learnable within joint denoising windows. 
+
+Probing attention-context granularity. For selected noise levels, we apply multi-scale self-attention (MSSA, Sec. 4.1) by spatially subsam-pling the visible keys and values based on the stride assigned to each noise level. This reduces the spatial density of KV-context for high-noise 
+
+queries . The LPIPS remains below 0.15 throughout the rollout (red curve in Fig. 2), showing stable rollout behavior under the resulting mixed-granularity self-attention of joint denoising window. 
+
+## 4 METHODOLOGY 
+
+4.1 MULTI -S CALE PATCHIFICATION AND SELF -A TTENTION 
+
+In this section, we introduce the Multi-Scale Patchification (MSP) and Multi-Scale Self-Attention 
+
+(MSSA), which are built upon the RF joint denoising schema. As illustrated in Fig. 3, MSP assigns a noise-matched mixed-granularity patch setting within the window, while MSSA matches the spatial density of its attention-visible keys and values to that granularity. The resulting scale tiers are processed jointly by a shared DiT with lightweight tier-specific modules, without dynamic routing. 
+
+Multi-Scale Patchification. In the joint denoising window at forward @k, latent frame xk+l−1
+
+> tl
+
+at position l is assigned a patch size pl under the monotonic schedule p1 ≤ · · · ≤ pT , pl ∈{p, 2p, 4p, · · · } , as shown in Fig. 3. Each patch size defines a tier with a complete scale-specific processing module, comprising patch embedding and de-embedding layers, LoRA adapters, and a latent residual branch. The native p-tier directly reuses the pretrained model’s original pathway and 4𝑡 0|1                                                               
+
+> 𝑡 0|2
+> 𝑡 0|3
+> 𝑡 0|4
+> 𝑡 0|1
+> 𝑡 0|2
+> 𝑡 0|3
+> 𝑡 0|4
+> Forward@k
+> Forward@k+1
+> Joint
+> Denoising
+> Window
+> 𝑡 2
+> 𝑡 3
+> 𝑡 4
+> Clean History Multi Scale
+> Patchification DiT Model
+> Patch  De -Emb.
+> @ Tier  1 Patch  De -Emb.  @ Tier  0
+> Patch  Emb.
+> @ Tier  1 Patch  Emb.  @ Tier  0
+> LoRA @
+> Tier 1
+> Patch Residual
+> @Tier 1
+> MSSA @
+> Tier 1
+> 0123
+> 4567
+> 8910 11
+> 12 13 14 15
+> Query @Tier1
+> 01
+> 23
+> 02
+> 810
+> 13
+> 911
+> 46
+> 12 14
+> 57
+> 13 15
+> Query @Tier0
+> 0123
+> 4567
+> 8910 11
+> 12 13 14 15
+> Key @Tier0
+> =Key @Tier1
+> 01
+> 23
+> Multi Scale Self Attention (MSSA)
+> Denoising
+> Block with
+> DMD Gradient
+> 𝑡 1
+
+Figure 3: Overview of Ms. Forcing. Multi-Scale Patchification (MSP) maps the mixed noise levels in a joint denoising window to static patch-size tiers, which are processed by a shared DiT with lightweight tier-specific modules. Multi-Scale Self-Attention (MSSA) matches the spatial density of attention-visible keys and values to each query tier without changing the attention mask. As the window rolls, each state is re-tokenized from coarse to fine; predicted clean states at a shared noise level form the homogeneous sequence used for DMD training. parameters, whereas each coarser tier has its own separately parameterized module; the underlying DiT backbone remains shared across tiers. To quantify the saving, we compare against RF, which tokenizes all T window states at the native patch size and therefore uses NRF = T HW/p 2 tokens per window. For a latent frame with spatial size H × W , MSP instead uses 
+
+N MSP  
+
+> l
+
+= HW p2
+
+> l
+
+, NMSP =
+
+> T
+
+X
+
+> l=1
+
+N MSP  
+
+> l
+
+, ρtok ≜ NMSP 
+
+NRF 
+
+= 1
+
+T
+
+> T
+
+X
+
+> l=1
+
+ ppl
+
+2
+
+. (3) Here, ρtok is the fraction of tokens retained by MSP in the joint denoising window relative to RF. For the 5-step RF with (p, p, 2p, 2p, 2p) used in our experiments, ρtok = 0 .55 , corresponding to a 
+
+45% token reduction in the joint denoising window. 
+
+Multi-Scale Self-Attention. Motivated by the attention-context granularity probe in Sec. 3.2, MSSA removes the remaining attention redundancy by making each visible non-sink KV context no denser than the query representation, while leaving the attention-sink KVs unchanged (Fig. 3). After MSP, let Csink and Cb denote the KV contexts from the attention sink and the non-sink frame at position b, respectively, and let V(a) be the non-sink frame positions visible to queries at position a
+
+under the original attention mask. For the query tokens at position a, MSSA constructs the attended KV context as 
+
+CMSSA  
+
+> a
+
+=
+
+h
+
+Csink Concat  
+
+> b∈V (a)
+
+Subsample 
+
+
+
+Cb, stride = max 
+
+
+
+1, pa
+
+pb
+
+ i
+
+, (4) To quantify the incremental gain over MSP, define the normalized token fraction ηl = ( p/p l)2 and the two-dimensional spatial stride sab = max(1 , p a/p b). The resulting reduction in dot-product attention computation is 
+
+rMSSA = 1 −
+
+" TX
+
+> a=1
+
+ηa
+
+
+
+1 + X
+
+> b∈V (a)
+
+ηb/s 2
+
+> ab
+
+. TX
+
+> a=1
+
+ηa
+
+
+
+1 + X
+
+> b∈V (a)
+
+ηb
+
+#
+
+. (5) For the 5-step RF layout with one sink frame, one recent-history frame, and five frames in the joint denoising window, substituting the MSP schedule (p,p,2p,2p,2p) into Eq. 5 yields rMSSA ≈ 12 .9% .4.2 HOMOGENEOUS -NOISE -LEVEL ASSEMBLY DISTRIBUTION MATCHING DISTILLATION 
+
+Few-step streaming generators are commonly trained with distribution matching distillation (DMD; Yin et al., 2024b;a) on self-generated rollouts (Huang et al., 2025; Liu et al., 2026) to minimize the reverse KL divergence between real preal (x) and generated distributions pfake (x) across timesteps 5Algorithm 1 Ms. Forcing Training with Homogeneous-noise-level DMD 
+
+Require: Rollout levels {τ0, τ 1, . . . , τ T }; patch sizes p1 ≤ · · · ≤ pT ; sequence length N
+
+Require: Generator Gθ ; fake-score network sϕ; frozen teacher score steacher 
+
+1: loop 
+
+2: Initialize Xθ ← [ ] , KV ← [ ] , and warm up the first T − 1 rolling states 3: Sample j ∼ Uniform {1, . . . , T } ▷ shared rollout level 4: for i = 1 , . . . , N do 
+
+5: Append xi+T −1 
+
+> τT
+
+∼ N (0 , I) to form xi:i+T −1
+
+> τ1: T
+
+6: ˆW(i)0 ← Gθ (xi:i+T −1 
+
+> τ1: T
+
+, τ 1: T , KV ) ▷ MSP and MSSA 7: Xθ .append  πj ( ˆW(i)0 ) ▷ Eq. 8 8: Update KV with sg[ π1( ˆW(i)0 )] 
+
+9: xi+1: i+T −1  
+
+> τ1: T−1
+
+← Ψ
+
+
+
+sg[ π2: T ( ˆW(i)0 )] , τ 1: T −1
+
+
+
+10: end for 
+
+11: Update ϕ with the diffusion denoising loss on sg[ Xθ ]
+
+12: if generator-update step then 
+
+13: Sample DMD timestep t and noise ϵ; set Xt = αtXθ + σtϵ
+
+14: Freeze sϕ and update θ with Eq. equation 6 on Xt
+
+15: end if 
+
+16: end loop 
+
+while reducing the training-inference gap in autoregressive: 
+
+∇θ LDMD ≜ Et(∇θ DKL (pfake ,t (xt)|| preal ,t (xt))) 
+
+≈ − Et
+
+ Z
+
+(sreal (Ψ( Gθ (ϵ), t ), t ) − sfake (Ψ( Gθ (ϵ), t ), t )) dGθ (ϵ)
+
+dθ dϵ
+
+
+
+, (6) where ϵ ∼ N (0 , I), Ψ denotes forward diffusion at timestep t. In diffusion models, the score func-tion is defined as: sreal (xt, t ) = ∇xt log preal ,t (xt) = − xt−αtμreal (xt,t )
+
+> σ2
+> t
+
+, where μreal is the denoised estimate, and αt, σ t are noise schedule parameters (Ho et al., 2020; Nichol & Dhariwal, 2021; Karras et al., 2022). DMD freezes pretrained μreal (teacher) and updates μfake on generator outputs. Rolling Forcing sample a subset of non-overlapping windows to construct the predicted clean video for DMD training where gradient computation is performed only on these selected windows, signif-icantly reducing memory usage while retaining effective supervision. 
+
+ˆx1: N 
+
+> 0,RF
+
+= Concat    
+
+> 1≤i≤Ni≡r(mod T)
+
+Gθ
+
+ xi:i+T −1 
+
+> t1: T
+
+, t 1: T , x<i 
+
+> 0
+
+ , r ∼ Uniform {0, . . . , T − 1}. (7) However, Eq. 7 concatenates clean predictions from different rollout noise levels t1: T , producing a heterogeneous fake sequence with level-dependent temporal marginals. RF mitigates this issue by equally alternating Self-Forcing and Rolling-Forcing updates, but the latter still exposes DMD to variations in clarity and motion that may induce unnatural appearance changes or camera movement. Instead, at each iteration, we propose H-DMD and sample a window position j and collect the corresponding clean prediction from every consecutive rolling window: 
+
+ˆx1: N 
+
+> 0,Our
+
+= N
+
+Concat  
+
+> i=1
+
+πj
+
+ Gθ
+
+ xi:i+T −1 
+
+> t1: T
+
+, t 1: T , x<i 
+
+> 0
+
+ , j ∼ Uniform {1, . . . , T }. (8) Here πj selects the clean prediction associated with noise level tj in each window. Consequently, every assembled clean predicted video is homogeneous in its source noise level. By reducing token and attention computation, MSP and MSSA keep training tractable despite backpropagating the DMD gradient through all overlapping joint-denoising windows. The complete training procedure is summarized in Algorithm 1. 
+
+## 5 EXPERIMENTS 
+
+5.1 IMPLEMENTATION DETAILS 
+
+Model. We implement Ms. Forcing with Wan2.1-T2V-1.3B (Wan et al., 2025) as our base model, which generates 16 FPS videos with a resolution of 832 ×480 . Following Self Forcing (Huang et al., 62025) and Rolling Forcing (Liu et al., 2026), we first initialize the base model with causal attention masking on 16k ODE solution pairs sampled from the base model. 1 Then we use another 6K ODE solution pairs from Causal Forcing (Zhu et al., 2026) to warm up the patch embedding, patch de-embedding, patch residual, and LoRA, using AdamW with a batch size of 8 and learning rate 10 −4
+
+for 800 steps. We set T = 5 and each chunk in the joint denoising window contains 3 latent frames. In DMD stage, the model is trained for 1400 steps with a batch size of 64 and a trained temporal window of 21 latent frames. We use the AdamW optimizer for both the generator Gθ (learning rate 
+
+1.5 × 10 −6) and the fake score sgen (learning rate 4.0 × 10 −7). The generator is updated every 5 steps of fake score updates. Rolling     
+
+> Forcing
+> (Ours)
+> Self
+> Forcing
+> CausVid
+> SkyReels -V2
+> MAGI -1
+> t=0s t=30s t=60s t=90s t=120s
+> Rolling
+> Forcing
+> (Ours)
+> Self
+> Forcing
+> CausVid
+> SkyReels -V2
+> MAGI -1Rolling Forcing Rolling Forcing
+> Ms. Forcing (Ours)
+> Ms. Forcing (Ours)
+
+Figure 4: Qualitative comparison on long-horizon generation. Each row shows frames sampled at increasing time from a 30 s clip. Compared with the baselines, Ms. Forcing retains sharpness, consistent color tone, and prompt adherence in late frames, whereas other methods exhibit exposure drift and high-frequency artifacts. 
+
+Evaluation. Following Reward Forcing (Lu et al., 2026), we evaluate both short-video and long-video generation under the same protocol, excluding its VLM-based scores. For short videos, we generate 5-second clips from the same 946 rewritten official VBench prompts, using five random seeds per prompt, and report the standard VBench total, quality, and semantic scores (Huang et al., 2024). For long videos, we use the first 128 MovieGen benchmark prompts (Polyak et al., 2024) to generate 60-second videos and evaluate subject consistency, background consistency, motion smoothness, dynamic degree, aesthetic quality, and imaging quality. The individual metrics are 
+
+> 1
+
+We use the official ODE init checkpoint provided by Self Forcing. 
+
+7normalized and aggregated using the standard VBench coefficients. All videos are generated at 16 FPS and a resolution of 832 × 480 . Following the same protocol, we quantify long-video quality drift as the standard deviation of imaging-quality scores over 30 non-overlapping 2-second segments of each video, averaged across the evaluation set; lower values indicate more stable visual quality. We report inference throughput in FPS on a single H200 GPU. 5.2 QUALITATIVE RESULTS 
+
+Figure 4 compares Ms. Forcing with the baselines on long-horizon autoregressive generation last-ing over two minutes. Ms. Forcing maintains high visual quality and semantic consistency even in later frames, whereas methods with sparser long-range context suffer from exposure drift and high-frequency artifacts. Additionally, Ms. Forcing achieves the fastest inference speed among the compared methods while incurring substantially lower training costs than Rolling Forcing. 5.3 QUANTITATIVE COMPARISONS AND ABLATIONS 
+
+We compare Ms. Forcing with representative streaming video generators of comparable scale. These include the Diffusion-Forcing-based SkyReels-V2 (Chen et al., 2025; 2024) and the distilled causal models CausVid (Yin et al., 2025), Self Forcing (Huang et al., 2025), LongLive (Yang et al., 2026), and Rolling Forcing (Liu et al., 2026). Rolling Forcing is our direct baseline, while the other methods represent complementary strategies for causal distillation and long-horizon generation. Table 1: Short-video comparison and cumulative ablation. H-DMD, MSP, and MSSA are cumu-latively added to Rolling Forcing. Best and second-best results are bold and underlined, respectively.                                                
+
+> Model Params FPS ↑VBench evaluation scores ↑
+> Total Quality Semantic SkyReels-V2 (Chen et al., 2025) 1.3B 0.43 82.67 84.70 74.53 CausVid (Yin et al., 2025) 1.3B 15.92 82.88 83.93 78.69 Self Forcing (Huang et al., 2025) 1.3B 15.92 83.80 84.59 80.64 LongLive (Yang et al., 2026) 1.3B 19.85 83.22 83.68 81.37
+> Component ablation (cumulative)
+> Rolling Forcing (Liu et al., 2026) 1.3B 16.35 82.88 83.63 79.88 + H-DMD 1.3B 16.35 83.10 83.57 81.22 + MSP 1.3B 21.93 83.89 84.61 81.01 + MSSA (Ms. Forcing) 1.3B 22.84 83.36 83.92 81.13
+
+Short-video quality and efficiency. Table 1 reports the VBench results and cumulative compo-nent ablation on 5-second videos. Compared with baselines, Ms. Forcing is the fastest, while re-maining within 0.44 of the best total score and 0.24 of the best semantic score. The ablation further disentangles the contribution of each component. H-DMD leaves throughput unchanged at 16 .35 
+
+FPS but raises the semantic and total scores by 1.34 and 0.22 , respectively, showing that homo-geneous noise-level improves text–video alignment without additional inference cost. Adding MSP and MSSA yields significant efficiency gains, increasing throughput by 39 .6% to 22 .84 FPS while further improving both quality and semantic scores . These simultaneous gains in efficiency and generation quality suggest that uniformly processing for different noise level state at the same fine spatial granularity introduces redundancy into the joint denoising window, which may in turn hinder autoregressive generation. 
+
+Long-video quality and drift. Table 2 evaluates 60-second generation, where error accumulation becomes more pronounced. H-DMD substantially increases the dynamic degree of Rolling Forcing from 33 .67 to 51 .80 , indicating stronger motion dynamics over long-horizon rollouts. However, this improvement comes with increased quality drift. Removing redundant fine-grained computation from the joint denoising window with MSP and MSSA progressively reduces the drift to 2.582 and 
+
+1.700 , respectively. This stabilization is accompanied by a gradual decrease in dynamic degree, yet the complete Ms. Forcing model remains substantially more dynamic than Rolling Forcing while achieving markedly lower drift. Overall, Ms. Forcing strikes a favorable balance between motion 8Table 2: Long video generation comparison. H-DMD, MSP, and MSSA are cumulatively added to Rolling Forcing. Best and second-best results are bold and underlined, respectively.                                                                           
+
+> Model VBench Long Evaluation Scores ↑Drift ↓
+> Total Subject Background Smoothness Dynamic Aesthetic Imaging Quality
+> Diffusion Forcing
+> SkyReels-V2 (Chen et al., 2025) 75.94 96.43 96.59 98.91 39.86 50.76 58.65 7.315
+> Distilled Causal
+> CausVid (Yin et al., 2025) 77.78 97.92 96.62 98.47 27.55 58.39 67.77 2.906 Self Forcing (Huang et al., 2025) 79.34 97.10 96.03 98.48 54.94 54.40 67.61 5.075 LongLive (Yang et al., 2026) 79.53 97.96 96.50 98.79 35.54 57.81 69.91 2.531
+> Component ablation (cumulative)
+> Rolling Forcing (Liu et al., 2026) 79.38 97.78 96.41 98.73 33.67 60.06 70.66 2.227 + H-DMD 80.67 97.51 95.98 98.67 51.80 60.11 69.72 3.041 + MSP 79.95 97.50 96.07 98.56 48.78 59.06 68.60 2.582 + MSSA (Ms. Forcing) 79.66 97.90 96.58 98.70 41.85 58.89 69.04 1.700
+
+dynamics and long-horizon stability while maintaining competitive generation quality across the remaining metrics and delivering faster streaming inference speed than Rolling Forcing. 
+
+## 6 CONCLUSION 
+
+We presented Ms. Forcing , an efficient streaming video generation paradigm that reduces the fixed-granularity computation of rolling-window denoising. Exploiting the deterministic correspondence between window position and noise level, Multi-Scale Patchification (MSP) assigns coarser patches to noisier states and reduces the number of tokens in the joint denoising window by 45% . Multi-Scale Self-Attention (MSSA) further reduces post-MSP dot-product attention computation by 12 .9% 
+
+by matching the density of the visible non-sink KV context to each query’s patch granularity while preserving a full-resolution attention sink. Both schedules are fixed by window position and there-fore remain static and hardware-friendly. We also introduced Homogeneous-Noise-Level DMD (H-DMD), which replaces RF’s heterogeneous fake-video assembly with sequences whose predictions share a common source noise level, reducing the mismatch with inference-time rollouts without auxiliary Self-Forcing training. At 832 × 480 resolution, Ms. Forcing increases throughput from 
+
+16 .35 to 22 .84 FPS on a single H200 GPU, a 39 .6% improvement over RF. It also improves five-second VBench quality and semantic scores by 0.29 and 1.25 , respectively, and reduces 60-second quality drift from 2.227 to 1.700 , demonstrating a favorable balance between generation quality, long-horizon stability, and efficiency. 
+
+Limitations and future work. First, our current experiments focus on the 1.3B-parameter Wan2.1 backbone at a resolution of 832 ×480 . Extending the training and evaluation of Ms. Forcing to larger models and higher-resolution videos is a natural direction for future work. Second, the KV-cache update at every rolling step (Line 7 in Alg. 1) is necessary for maintaining the autoregressive context, but its current implementation incurs substantial latency. Consequently, the cache-update overhead partially offsets the acceleration gained by reducing DiT computation with MSP and MSSA. Op-timizing this required update could allow the reduction in DiT computation to translate more fully into end-to-end throughput gains. 
+
+## ACKNOWLEDGMENTS 
+
+This research was supported by NSF CAREER Award No. 2143576 and a sponsored research award from Meta Inc. 
+
+## REFERENCES 
+
+Jake Bruce, Michael D Dennis, Ashley Edwards, Jack Parker-Holder, Yuge Shi, Edward Hughes, Matthew Lai, Aditi Mavalankar, Richie Steigerwald, Chris Apps, et al. Genie: Generative inter-active environments. In Forty-first International Conference on Machine Learning , 2024. 9Boyuan Chen, Diego Mart´ ı Mons´ o, Yilun Du, Max Simchowitz, Russ Tedrake, and Vincent Sitz-mann. Diffusion forcing: Next-token prediction meets full-sequence diffusion. Advances in Neural Information Processing Systems , 37:24081–24125, 2024. Guibin Chen, Dixuan Lin, Jiangping Yang, Chunze Lin, Junchen Zhu, Mingyuan Fan, Hao Zhang, Sheng Chen, Zheng Chen, Chengcheng Ma, et al. Skyreels-v2: Infinite-length film generative model. arXiv preprint arXiv:2504.13074 , 2025. Jiayu Chen, Junbei Tang, Wenbiao Zhao, Maoliang Li, Jiayi Luo, Zihao Zheng, Jiawei Yang, Guojie Luo, and Xiang Chen. Pyramid forcing: Head-aware pyramid kv cache policy for high-quality long video generation. arXiv preprint arXiv:2605.13111 , 2026. Xiaoyan Cong, Haotian Yang, Angtian Wang, Yizhi Wang, Yiding Yang, Canyu Zhang, and Chongyang Ma. Viva: Vlm-guided instruction-based video editing with reward optimization. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pp. 34364–34374, 2026. Kaixin Ding, Xi Chen, Sihui Ji, Yuan Gao, Liang Hou, Xin Tao, and Hengshuang Zhao. Surf: Signature-retained fast video generation. In Proceedings of the IEEE/CVF Conference on Com-puter Vision and Pattern Recognition , pp. 9171–9181, 2026. Hongyang Du, Junjie Ye, Xiaoyan Cong, Runhao Li, Jingcheng Ni, Aman Agarwal, Zeqi Zhou, Zekun Li, Randall Balestriero, and Yue Wang. Videogpa: Distilling geometry priors for 3d-consistent video generation. arXiv preprint arXiv:2601.23286 , 2026. Zelin Gao, Qiuyu Wang, Jiapeng Zhu, Jingye Chen, Zichen Liu, Qingyan Bai, Jiahao Wang, Yufeng Yuan, Hanlin Wang, Yichong Lu, et al. Infinite worlds with versatile interactions. arXiv preprint arXiv:2607.07534 , 2026. Hang Guo, Zhaoyang Jia, Jiahao Li, Bin Li, Yuanhao Cai, Jiangshan Wang, Yawei Li, and Yan Lu. Efficient autoregressive video diffusion with dummy head. arXiv preprint arXiv:2601.20499 ,2026. Yoav HaCohen, Benny Brazowski, Nisan Chiprut, Yaki Bitterman, Andrew Kvochko, Avishai Berkowitz, Daniel Shalem, Daphna Lifschitz, Dudu Moshe, Eitan Porat, et al. Ltx-2: Efficient joint audio-visual foundation model. arXiv preprint arXiv:2601.03233 , 2026. Jonathan Ho, Ajay Jain, and Pieter Abbeel. Denoising diffusion probabilistic models. Advances in neural information processing systems , 33:6840–6851, 2020. Lianghua Huang, Zhi-Fan Wu, Yupeng Shi, Wei Wang, Mengyang Feng, Cheng Yu, Chen Liang, Junjie He, Chen-Wei Xie, Yu Liu, et al. Video = world+ event stream. arXiv preprint arXiv:2607.15038 , 2026. Xun Huang, Zhengqi Li, Guande He, Mingyuan Zhou, and Eli Shechtman. Self forcing: Bridging the train-test gap in autoregressive video diffusion. Advances in Neural Information Processing Systems , 38:167283–167308, 2025. Ziqi Huang, Yinan He, Jiashuo Yu, Fan Zhang, Chenyang Si, Yuming Jiang, Yuanhan Zhang, Tianx-ing Wu, Qingyang Jin, Nattapol Chanpaisit, et al. Vbench: Comprehensive benchmark suite for video generative models. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pp. 21807–21818, 2024. Yang Jin, Zhicheng Sun, Ningyuan Li, Kun Xu, Hao Jiang, Nan Zhuang, Quzhe Huang, Yang Song, Yadong Mu, and Zhouchen Lin. Pyramidal flow matching for efficient video generative modeling. In International Conference on Learning Representations , volume 2025, pp. 23378–23402, 2025. Tero Karras, Miika Aittala, Timo Aila, and Samuli Laine. Elucidating the design space of diffusion-based generative models. Advances in neural information processing systems , 35:26565–26577, 2022. Dahye Kim, Deepti Ghadiyaram, and Raghudeep Gadde. Ddit: Dynamic patch scheduling for efficient diffusion transformers. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pp. 11459–11471, 2026. 10 Jihwan Kim, Junoh Kang, Jinyoung Choi, and Bohyung Han. Fifo-diffusion: Generating infinite videos from text without training. In Advances in Neural Information Processing Systems , 2024. Weijie Kong, Qi Tian, Zijian Zhang, Rox Min, Zuozhuo Dai, Jin Zhou, Jiangfeng Xiong, Xin Li, Bo Wu, Jianwei Zhang, et al. Hunyuanvideo: A systematic framework for large video generative models. arXiv preprint arXiv:2412.03603 , 2024. Zekun Li, Rui Zhou, Rahul Sajnani, Xiaoyan Cong, Daniel Ritchie, and Srinath Sridhar. Genhsi: Controllable generation of human-scene interaction videos. In Proceedings of the IEEE/CVF Winter Conference on Applications of Computer Vision , pp. 138–149, 2026. Feng Liu, Shiwei Zhang, Xiaofeng Wang, Yujie Wei, Haonan Qiu, Yuzhong Zhao, Yingya Zhang, Qixiang Ye, and Fang Wan. Timestep embedding tells: It’s time to cache for video diffusion model. In Proceedings of the Computer Vision and Pattern Recognition Conference , pp. 7353– 7363, 2025a. Jiacheng Liu, Chang Zou, Yuanhuiyi Lyu, Junjie Chen, and Linfeng Zhang. From reusing to fore-casting: Accelerating diffusion models with taylorseers. In Proceedings of the IEEE/CVF Inter-national Conference on Computer Vision , pp. 15853–15863, 2025b. Kunhao Liu, Wenbo Hu, Jiale Xu, Ying Shan, and Shijian Lu. Rolling forcing: Autoregressive long video diffusion in real time. In The Fourteenth International Conference on Learning Represen-tations , 2026. URL https://openreview.net/forum?id=IAyzXjbfwo .Yunhong Lu, Yanhong Zeng, Haobo Li, Hao Ouyang, Qiuyu Wang, Ka Leong Cheng, Jiapeng Zhu, Hengyuan Cao, Zhipeng Zhang, Xing Zhu, et al. Reward forcing: Efficient streaming video generation with rewarded distribution matching distillation. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pp. 34385–34397, 2026. Alexander Quinn Nichol and Prafulla Dhariwal. Improved denoising diffusion probabilistic models. In International conference on machine learning , pp. 8162–8171. PMLR, 2021. Adam Polyak, Amit Zohar, Andrew Brown, Andros Tjandra, Ankit Sinha, Ann Lee, Apoorv Vyas, Bowen Shi, Chih-Yao Ma, Ching-Yao Chuang, et al. Movie gen: A cast of media foundation models. arXiv preprint arXiv:2410.13720 , 2024. David Ruhe, Jonathan Heek, Tim Salimans, and Emiel Hoogeboom. Rolling diffusion models. In 
+
+International Conference on Machine Learning , 2024. Team Seedance, De Chen, Liyang Chen, Xin Chen, Ying Chen, Zhuo Chen, Zhuowei Chen, Feng Cheng, Tianheng Cheng, Yufeng Cheng, et al. Seedance 2.0: Advancing video generation for world complexity. arXiv preprint arXiv:2604.14148 , 2026. Joonghyuk Shin, Zhengqi Li, Richard Zhang, Jun-Yan Zhu, Jaesik Park, Eli Shechtman, and Xun Huang. Motionstream: Real-time video generation with interactive motion controls. In 
+
+The Fourteenth International Conference on Learning Representations , 2026. URL https: //openreview.net/forum?id=v1DKz5Vxr7 .Mingzhen Sun, Weining Wang, Gen Li, Jiawei Liu, Jiahui Sun, Wanquan Feng, Shanshan Lao, SiYu Zhou, Qian He, and Jing Liu. Ar-diffusion: Asynchronous video generation with auto-regressive diffusion. In Proceedings of the Computer Vision and Pattern Recognition Conference , pp. 7364– 7373, 2025. Zhiyao Sun, Ziqiao Peng, Yifeng Ma, Yi Chen, Zhengguang Zhou, Zixiang Zhou, Guozhen Zhang, Youliang Zhang, Yuan Zhou, Qinglin Lu, et al. Streamavatar: Streaming diffusion models for real-time interactive human avatars. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pp. 10887–10897, 2026. Meituan LongCat Team, Xunliang Cai, Qilong Huang, Zhuoliang Kang, Hongyu Li, Shijun Liang, Liya Ma, Siyu Ren, Xiaoming Wei, Rixu Xie, et al. Longcat-video technical report. arXiv preprint arXiv:2510.22200 , 2025. 11 Team Wan, Ang Wang, Baole Ai, Bin Wen, Chaojie Mao, Chen-Wei Xie, Di Chen, Feiwu Yu, Haiming Zhao, Jianxiao Yang, et al. Wan: Open and advanced large-scale video generative models. arXiv preprint arXiv:2503.20314 , 2025. Shuai Yang, Wei Huang, Ruihang Chu, Yicheng Xiao, Yuyang Zhao, Xianbang Wang, Muyang Li, Enze Xie, Ying-Cong Chen, Yao Lu, Song Han, and Yukang Chen. Longlive: Real-time interactive long video generation. In The Fourteenth International Conference on Learning Rep-resentations , 2026. URL https://openreview.net/forum?id=nCAODkpsPJ .Zhuoyi Yang, Jiayan Teng, Wendi Zheng, Ming Ding, Shiyu Huang, Jiazheng Xu, Yuanming Yang, Wenyi Hong, Xiaohan Zhang, Guanyu Feng, et al. Cogvideox: Text-to-video diffusion models with an expert transformer. In International Conference on Learning Representations , volume 2025, pp. 83048–83077, 2025. Jung Yi, Wooseok Jang, Paul Hyunbin Cho, Jisu Nam, Heeji Yoon, and Seungryong Kim. Deep forcing: Training-free long video generation with deep sink and participative compression. In 
+
+International Conference on Machine Learning , 2026. Tianwei Yin, Micha¨ el Gharbi, Taesung Park, Richard Zhang, Eli Shechtman, Fredo Durand, and William T Freeman. Improved distribution matching distillation for fast image synthesis. Ad-vances in neural information processing systems , 37:47455–47487, 2024a. Tianwei Yin, Micha¨ el Gharbi, Richard Zhang, Eli Shechtman, Fredo Durand, William T Freeman, and Taesung Park. One-step diffusion with distribution matching distillation. In Proceedings of the IEEE/CVF conference on computer vision and pattern recognition , pp. 6613–6623, 2024b. Tianwei Yin, Qiang Zhang, Richard Zhang, William T Freeman, Fredo Durand, Eli Shechtman, and Xun Huang. From slow bidirectional to fast autoregressive video diffusion models. In Pro-ceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pp. 22963– 22974, 2025. Richard Zhang, Phillip Isola, Alexei A Efros, Eli Shechtman, and Oliver Wang. The unreasonable effectiveness of deep features as a perceptual metric. In Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition , pp. 586–595, 2018. Xingyu Zheng, Xianglong Liu, Yifu Ding, Weilun Feng, Junqing Lin, Jinyang Guo, and Haotong Qin. Multi-resolution flow matching: Training-free diffusion acceleration via staged sampling. 
+
+arXiv preprint arXiv:2607.01642 , 2026. Hongzhou Zhu, Min Zhao, Guande He, Hang Su, Chongxuan Li, and Jun Zhu. Causal forcing: Autoregressive diffusion distillation done right for high-quality real-time interactive video gener-ation. In International Conference on Machine Learning , 2026. 12
