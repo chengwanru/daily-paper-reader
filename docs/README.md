@@ -6,44 +6,47 @@
 </div>
 
 ## 每次日报
-- 最新运行日期：2026-07-24
-- 运行时间：2026-07-24 21:01:25 UTC
+- 最新运行日期：2026-07-25
+- 运行时间：2026-07-25 20:29:24 UTC
 - 运行状态：成功
 - 本次总论文数：8
-- 精读区：4
-- 速读区：4
+- 精读区：0
+- 速读区：8
 
 ### 今日简报（AI）
-今日精选8篇自动驾驶与视频生成研究，其中两项满分工作聚焦世界模型与多智能体扩散。最值得关注方向是GeoWorldAD的几何世界动作模型，以及Streaming Multi-Agent的流式自回归扩散框架。想入门可优先精读这两篇满分论文，理解世界模型在自动驾驶决策中的核心作用。
-- 详情：[/202607/24/README](/202607/24/README)
+1) 今日速读了8篇论文，涵盖物理世界建模、高效视频生成和交互式可控视频生成三大方向。  
+2) 最值得关注：Agentic Real2Sim的视觉语言智能体物理建模，以及SANA-Video 2.0的混合线性注意力残差优化方法。  
+3) 建议优先精读这两篇7分论文，对比其技术细节，并尝试复现关键模块以理解其实际效果。
+- 详情：[/202607/25/README](/202607/25/README)
 
 ### 精读区论文标签
-1. [GeoWorldAD: Geometry World Action Model for Autonomous Driving](/202607/24/2607.17521v2-geoworldad-geometry-world-action-model-for-autonomous-driving)  
-   标签：评分：10.0/10、query:video-wam
-   evidence：面向自动驾驶的几何世界动作模型
-2. [Streaming Multi-Agent Autoregressive Diffusion Model with World State Registers](/202607/24/2607.21594v1-streaming-multi-agent-autoregressive-diffusion-model-with-world-state-registers)  
-   标签：评分：10.0/10、query:video-wam
-   evidence：多智能体世界模型，包含流式扩散与世界状态寄存器
-3. [HyWorldVLA: A Vision-Language-Action Model with Hybrid World Modeling for Autonomous Driving](/202607/24/2607.20988v1-hyworldvla-a-vision-language-action-model-with-hybrid-world-modeling-for-autonomous-driving)  
-   标签：评分：9.0/10、query:video-wam
-   evidence：混合世界建模，融合像素级与潜在表示学习，用于自动驾驶的视频世界模型
-4. [Self-Supervised Learning of Structured Dynamics from Videos](/202607/24/2607.21576v1-self-supervised-learning-of-structured-dynamics-from-videos)  
-   标签：评分：8.0/10、query:video-wam
-   evidence：自监督学习结构化动态用于世界模型分解
+- 本次无精读推荐。
 
 ### 速读区论文标签
-1. [StreamHOI: Interaction-aware Temporal Memory Adaptation for Streaming HOI Video Generation](/202607/24/2607.20174v1-streamhoi-interaction-aware-temporal-memory-adaptation-for-streaming-hoi-video-generation)  
+1. [Agentic Real2Sim: Physics-based World Modeling with Vision-Language Agents](/202607/25/2607.19190v2-agentic-real2sim-physics-based-world-modeling-with-vision-language-agents)  
    标签：评分：7.0/10、query:video-wam
-   evidence：流式视频生成用于人-物交互世界的生成
-2. [Ms. Forcing: Efficient Streaming Video Generation with Multi-Scale Patchification and Attention](/202607/24/2607.20940v1-ms-forcing-efficient-streaming-video-generation-with-multi-scale-patchification-and-attention)  
+   evidence：基于物理的世界建模，用于真实到模拟转换
+2. [SANA-Video 2.0: Hybrid Linear Attention with Attention Residuals for Efficient Video Generation](/202607/25/2607.21553v1-sana-video-20-hybrid-linear-attention-with-attention-residuals-for-efficient-video-generation)  
    标签：评分：7.0/10、query:video-wam
-   evidence：面向世界模拟的高效流式视频生成
-3. [GS-Agent: Creating 4D Physical Worlds With Generative Simulation](/202607/24/2607.21522v1-gs-agent-creating-4d-physical-worlds-with-generative-simulation)  
+   evidence：混合线性注意力实现高效视频生成
+3. [GraphVid: Interactive Graph-Controllable Video Generation](/202607/25/2607.21580v1-graphvid-interactive-graph-controllable-video-generation)  
    标签：评分：7.0/10、query:video-wam
-   evidence：利用生成仿真创建4D物理世界，属于生成式世界模型范畴
-4. [MagicPrompt: Ultra-Lightweight Prompt Tuning for Video Generation](/202607/24/2607.14595v2-magicprompt-ultra-lightweight-prompt-tuning-for-video-generation)  
+   evidence：图可控视频生成实现多对象交互控制，支持世界模型交互预测
+4. [When Physical Preferences Meet Semantic Constraints: Physical and Semantic Direct Preference Optimization for Text-to-Video Generation](/202607/25/2607.16947v1-when-physical-preferences-meet-semantic-constraints-physical-and-semantic-direct-preference-optimization-for-text-to-video-generation)  
    标签：评分：6.0/10、query:video-wam
-   evidence：视频扩散模型的参数高效微调方法，可用于世界模型适配
+   evidence：改进了文本生成视频中的物理合理性，这对世界模型至关重要
+5. [HarmoHOI: Harmonizing Appearance and 3D Motion for Multi-view Hand-Object Interaction Synthesis](/202607/25/2607.17097v1-harmohoi-harmonizing-appearance-and-3d-motion-for-multi-view-hand-object-interaction-synthesis)  
+   标签：评分：6.0/10、query:video-wam
+   evidence：多视角手物交互视频生成
+6. [Keyframe-Anchored Identity Preservation for Sequential-Action Video Generation](/202607/25/2607.17985v1-keyframe-anchored-identity-preservation-for-sequential-action-video-generation)  
+   标签：评分：6.0/10、query:video-wam
+   evidence：保持身份一致性的顺序动作视频生成
+7. [Moving Alphabet: A Controlled Study of Training Data for Text-to-Video Generation](/202607/25/2607.18789v1-moving-alphabet-a-controlled-study-of-training-data-for-text-to-video-generation)  
+   标签：评分：6.0/10、query:video-wam
+   evidence：文本到视频生成训练数据的受控研究，与视频世界模型训练相关
+8. [HeadCast: Casting Attention Heads for Efficient Autoregressive Video Generation](/202607/25/2607.20125v1-headcast-casting-attention-heads-for-efficient-autoregressive-video-generation)  
+   标签：评分：6.0/10、query:video-wam
+   evidence：通过注意力头分配实现高效自回归视频生成
 
 
 <div class="dpr-home-promo-card">

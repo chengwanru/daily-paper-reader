@@ -1,0 +1,291 @@
+Title: Keyframe-Anchored Identity Preservation for Sequential-Action Video Generation
+
+URL Source: https://arxiv.org/pdf/2607.17985v1
+
+Published Time: Tue, 21 Jul 2026 02:16:06 GMT
+
+Number of Pages: 7
+
+Markdown Content:
+# Keyframe-Anchored Identity Preservation for Sequential-Action Video Generation 
+
+# Zhenjie Liu 
+
+University of Science and Technology of China Hefei, China liuzhenjie@mail.ustc.edu.cn 
+
+# Binyan Chen 
+
+University of Science and Technology of China Hefei, China sztn@mail.ustc.edu.cn 
+
+# Hao Chen 
+
+University of Science and Technology of China Hefei, China chhhenhao@mail.ustc.edu.cn 
+
+# Tong Pan 
+
+University of Science and Technology of China Hefei, China pantong@mail.ustc.edu.cn 
+
+# Shangfei Wang ∗
+
+University of Science and Technology of China Hefei, China sfwang@ustc.edu.cn Reference Image 
+
+Global Prompt: A man with a beard sits on a park bench, quietly reading a book in a green sunlit park . He wears a casual sweater 
+
+and jeans and remains relaxed and absorbed, with occasional brief looks away from the pages toward the peaceful surroundings. 
+
+Temporal Prompt: 
+
+0 0.5 0.72 1 
+
+> A bearded man sits on a park bench and reads an open book. The man lifts his gaze from
+> the book toward the park
+> The man lowers his eyes
+> back to the book.
+
+Global Prompt: A young fair-skinned woman stands in front of the Parthenon under a muted sky, wearing a sleeveless mint-green 
+
+lace top with a high collar and black trousers . The ancient stone ruins remain clearly visible behind her as she holds a calm pose 
+
+and makes subtle , natural movements while facing forward. 
+
+Temporal Prompt: 
+
+0 0.42 0.72 1 
+
+> The woman stands facing forward in front of the
+> Parthenon
+> She slowly turns her head
+> slightly to one side She brings her gaze back ahead.
+
+Figure 1: Examples of sequential action identity-preserving text-to-video generation by our framework. The track requires models to generate videos from reference images and structured timeline prompts that specify multiple sub-actions with precise timestamps. Red in the text highlights key elements in instructions. 
+
+> ∗
+
+The corresponding author. Permission to make digital or hard copies of all or part of this work for personal or classroom use is granted without fee provided that copies are not made or distributed for profit or commercial advantage and that copies bear this notice and the full citation on the first page. Copyrights for components of this work owned by others than the author(s) must be honored. Abstracting with credit is permitted. To copy otherwise, or republish, to post on servers or to redistribute to lists, requires prior specific permission and/or a fee. Request permissions from permissions@acm.org. 
+
+MM ’26, Rio de Janeiro, Brazil 
+
+© 2026 Copyright held by the owner/author(s). Publication rights licensed to ACM. ACM ISBN 978-1-4503-XXXX-X/2018/06 https://doi.org/XXXXXXX.XXXXXXX 
+
+## Abstract 
+
+Identity-preserving text-to-video generation aims to synthesize a video that accurately follows a textual description while maintain-ing the recognizability of a user-specified subject throughout. The IPVG26 challenge extends this framework from a single holistic prompt to a temporally structured specification. The model addi-tionally receives a sequence of timestamped action captions and must render the subject performing these actions in the specified order. This temporal structure presents a challenge not encoun-tered in previous identity-preserving generation tasks, as the sub-ject must continuously perform a scripted sequence of distinct arXiv:2607.17985v1 [cs.CV] 20 Jul 2026 MM ’26, November 10-14, 2026, Rio de Janeiro, Brazil Zhenjie Liu, Binyan Chen, Hao Chen, Tong Pan, and Shangfei Wang 
+
+actions while maintaining a consistent identity. However, end-to-end video generators are prone to appearance drift as motion ac-cumulates and the depicted actions change. We address this chal-lenge with a training-free, three-stage pipeline framework. An action-aware prompt polishment stage first rewrites the inputs into image-generation prompts that specify the terminal state of each action. An identity-preserving generation stage then produces the keyframe sequence by conditioning each frame jointly on the refer-ence identity and its predecessor, thereby decoupling time-invariant appearance from time-varying pose. Finally, an identity-aware in-ference enhancement stage synthesizes the intermediate segments using multi-reference guidance and identity-driven noise search-ing, both of which reinforce identity fidelity during sampling. Our method ranked third on the official Track 2 leaderboard, demon-strating competitive performance and strong generality. 
+
+## CCS Concepts 
+
+• Computing methodologies → Computer vision .
+
+## Keywords 
+
+AIGC, Diffusion Model, Keyframe, Identity-Preserving Video Gen-eration, Sequential Action   
+
+> ACM Reference Format:
+> Zhenjie Liu, Binyan Chen, Hao Chen, Tong Pan, and Shangfei Wang. 2026. Keyframe-Anchored Identity Preservation for Sequential-Action Video Gen-eration . In Proceedings of Proceedings of the 34th ACM International Con-ference on Multimedia (MM ’26). ACM, New York, NY, USA, 7 pages. https: //doi.org/XXXXXXX.XXXXXXX
+
+## 1 Introduction 
+
+Diffusion-based generative models have rapidly advanced text-to-video synthesis, and contemporary systems now generate open-domain scenes with convincing motion dynamics and high visual fidelity [ 1, 9 , 24 , 29 , 35 ]. As the quality of raw generation improves, the primary challenge increasingly shifts from whether a model can produce a plausible video to how precisely a user can control the content it depicts, ensuring the output reflects a specific intent rather than a generic prompt. Among the various dimensions of controllability, binding the generated video to a user-specified sub-ject is one of the most critical. Identity-preserving text-to-video generation addresses this need: given a reference image of a subject and a textual description, it synthesizes a video that follows the description while maintaining the subject’s recognizability in ev-ery frame [ 7, 18 , 31 ]. This capability supports applications ranging from personalized content creation to controllable digital humans, where viewers must perceive the same individual throughout the clip rather than someone merely similar. Track 2 of the IPVG26 challenge [ 22 ] advances this setting from a single holistic prompt to a temporally structured specification. In addition to the reference image and a global scene description, the model receives a sequence of timestamped action captions and must render the subject performing these actions in the prescribed order. This temporal structure introduces a challenge that prior identity-preserving generation methods do not address, as the sub-ject must move continuously through a scripted sequence of distinct actions while maintaining a consistent identity. End-to-end video generators are ill-suited for this task, as appearance tends to drift once motion accumulates and the depicted action changes, caus-ing the subject to gradually lose its likeness over the course of a multi-action sequence. We address this challenge with a keyframe-anchored decom-position. Instead of generating the entire video in a single pass, we represent the action sequence as a chain of identity-preserving keyframes, each anchored at the terminal state of an action segment. The video is then synthesized by interpolating between consecu-tive keyframes. This approach is implemented as a training-free, three-stage pipeline that requires no fine-tuning of off-the-shelf models: (1) an action-aware prompt refinement stage rewrites the inputs into image-generation prompts specifying the terminal state of each action; (2) an identity-preserving generation stage pro-duces the keyframe chain by conditioning each frame jointly on the reference identity and its predecessor, thereby decoupling time-invariant appearance from time-varying pose; and (3) an identity-aware inference enhancement stage synthesizes the intervening segments using multi-reference guidance and identity-driven noise searching [ 14 , 19 ], both of which reinforce identity fidelity during sampling. The proposed pipeline ranked third on the official Track 2 leader-board, with its most significant gains concentrated on the heav-ily weighted identity-preservation and temporal-alignment met-rics. This outcome corroborates the effectiveness of the keyframe-anchored design. The main contributions of this work are summa-rized as follows: 
+
+• We propose an Action-Aware Prompt Polishment module that rewrites the global scene description and temporal ac-tion captions into terminal-state image-generation prompts, providing clear and unambiguous spatial targets for keyframe synthesis. 
+
+• We design an ID-Preserving Chained Keyframe Gener-ation stage that conditions each keyframe jointly on the reference identity and the preceding keyframe, effectively decoupling time-invariant identity from time-varying pose, thereby preserving both recognizability and motion conti-nuity. 
+
+• We develop an ID-Aware Inference Enhancement stage that integrates multi-reference guidance, identity-driven noise searching, and a variable-length segment allocation strategy to reinforce identity fidelity during sampling, all without requiring additional training. 
+
+## 2 Related Work 2.1 Identity-Preserving Text-to-Video Generation 
+
+Early identity-preserving text-to-video methods bind a subject by fine-tuning model weights or inserting per-identity modules [ 10 ,20, 27], which must be retrained for every new identity and there-fore scale poorly. To eliminate this per-identity cost, tuning-free approaches attach a dedicated identity branch trained offline on paired data [ 17 , 25 , 30 ]. Recent reference-conditioned video gener-ators further enable open-domain, zero-shot subject generation [ 3,11 , 18 , 26 , 31 , 34 , 36 ]. However, these models rely on large training Keyframe-Anchored Identity Preservation for Sequential-Action Video Generation MM ’26, November 10-14, 2026, Rio de Janeiro, Brazil Stage1: Action-Aware Prompt Polishment Module a    
+
+> Reference Image
+> Global Prompt
+> Temporal
+> Captions #n
+> End State
+> promt #n
+> First Frame
+> Prompt
+> Stage2: ID-Preserving Keyframe Generation b
+> Video Generator
+> DiT
+> cStage3: ID-Aware Inference Enhancement
+> start &end frame
+> sampled noise
+> generated video
+> Sec. 3.4.2 Noise
+> Searching
+> Sec. 3.4.1
+> Multi-Reference Guidance.
+
+Figure 2: The proposed framework consists of three main modules. (a) Action-Aware Prompt Polishment first combines the global scene description with the reference identity image into a first-frame prompt, and then rewrites each temporal caption into an end-frame prompt that defines the terminal state of each action segment. (b) ID-Preserving Keyframe Generation conditions on 𝐼 ref together with the polished prompts to generate a chained sequence of keyframes, maintaining identity and pose continuity across segments. (c) ID-Aware Inference Enhancement synthesizes each segment from its boundary keyframes and temporal caption using Multi-Reference Guidance (section 3.4.1) and Noise Searching (section 3.4.2) schemes, and finally concatenates the segments to produce the final video. 
+
+corpora and costly post-training. Their end-to-end joint optimiza-tion of appearance and motion induces a spatiotemporal trade-off, causing identity drift as motion accumulates. Moreover, they are de-signed for a single holistic prompt rather than a scripted sequence of timed actions. Instead, we adopt a keyframe-decoupled paradigm that separates the time-invariant identity layout from temporal mo-tion, which is cast as interpolation between consecutive keyframes. This separation sidesteps the trade-off and directly accommodates the sequential-action setting. 
+
+## 2.2 Inference-time Enhancement 
+
+Classifier-free guidance [ 8 ] directs sampling toward the text condi-tion but does not provide explicit control over subject identity. This limitation has motivated the development of identity-aware and spa-tiotemporal guidance variants that augment the score function with additional conditioning terms [ 4, 14 ]. Building on this approach, our multi-reference guidance introduces a dual-constraint variant that couples the boundary keyframes with the text prompt, explicitly amplifying the identity-bearing visual condition. A complementary approach treats the initial diffusion noise as a searchable variable rather than a fixed draw, selecting an initialization through short lookahead denoising guided by a reward [ 19 ]. We adapt this con-cept for identity preservation by performing an identity-driven noise search across segments. Both enhancements are training-free and operate solely at sampling time, consistent with the rest of our pipeline. 
+
+## 3 Method 3.1 Overview and Task Formulation 
+
+Given a reference identity image 𝐼 ref , a global scene description 
+
+𝑃 global , and a temporal action sequence {( 𝑠 𝑖 , 𝑒 𝑖 , 𝑐 𝑖 )} 𝑁 𝑖 =1, where 𝑠 𝑖 , 𝑒 𝑖 ∈[0, 1] are normalized timestamps and 𝑐 𝑖 is the action caption for the 𝑖 -th segment, the goal of Track 2 [ 22 ] is to synthesize a video 
+
+𝑉 that simultaneously satisfies three requirements: the subject in 
+
+𝑉 must preserve the identity depicted in 𝐼 ref ; the overall scene semantics must align with 𝑃 global while each temporal segment faithfully reflects its corresponding caption 𝑐 𝑖 ; and the transitions between consecutive segments must remain temporally coherent. We address this task using a three-stage pipeline, illustrated in fig. 2. First, the Action-Aware Prompt Polishment module rewrites 
+
+𝑃 global and each caption 𝑐 𝑖 into descriptions tailored for image gen-eration, emphasizing the terminal state of every action segment (section 3.2). Second, the ID-Preserving Keyframe Generation stage produces a chained sequence of keyframes {𝐾 0, 𝐾 1, . . . , 𝐾 𝑁 } by con-ditioning each frame on 𝐼 ref along with its predecessor, thereby maintaining both identity and motion continuity (section 3.3). Fi-nally, the ID-Aware Inference Enhancement stage synthesizes the out-put video from these keyframes, applying multi-reference guidance and identity-driven noise searching to reinforce identity preserva-tion, while a variable-length strategy allocates the frame budget across segments proportionally to their durations (section 3.4). 
+
+## 3.2 Action-Aware Prompt Polishment 
+
+The textual inputs for Track 2, specifically a global scene description 
+
+𝑃 global and a set of per-segment action captions {𝑐 𝑖 }𝑁 𝑖 =1, are written as video-level narratives and therefore lack the spatial precision and identity specificity required by image generation models. To address this issue, we use a multimodal large language model (LLM) to perform a controlled rewrite of each caption into an image-generation prompt, conditioned on the reference image 𝐼 ref . As illustrated in panel (a) of fig. 2, this refinement process occurs in two stages. In the first stage, 𝑃 global is rewritten into a first-frame prompt 
+
+ˆ𝑃 global that anchors the subject’s identity attributes (face shape, skin tone, hairstyle, and distinctive facial traits) as observed in 𝐼 ref , while MM ’26, November 10-14, 2026, Rio de Janeiro, Brazil Zhenjie Liu, Binyan Chen, Hao Chen, Tong Pan, and Shangfei Wang 
+
+establishing the scene composition, camera framing, and lighting atmosphere. The rewritten prompt is required to depict a plausible opening moment that implies the onset of motion through pose and spatial layout, rather than collapsing into a generic portrait. In the second stage, each temporal caption 𝑐 𝑖 is independently transformed into an end-frame prompt ˆ𝑐 𝑖 that specifies the terminal state of the 𝑖 -th action segment. The instruction explicitly directs the LLM to describe the body pose, hand position, and gaze direction at the moment the segment concludes, while preserving spatial continuity with the preceding frame. The emphasis on terminal states serves a clear functional pur-pose. Since our downstream keyframe generator (section 3.3) pro-duces the ending frame of each segment, the polished prompt must specify the final position of the action rather than its progression over time. This approach provides unambiguous spatial constraints that facilitate chained keyframe generation and promote smooth transitions between segments. The instruction template for tempo-ral caption polishing is summarized below.         
+
+> Inputs
+> 1. Reference identity image 𝐼 ref
+> 2. Temporal caption 𝑐 𝑖 (action description with normalized start/end timestamps)
+> Task
+> Rewrite 𝑐 𝑖 into a single image-generation prompt for the end frame of this segment that (i) preserves the subject’s identity from 𝐼 ref , including face shape, skin tone, age, appearance, and hairstyle; (ii) depicts the resulting state of the action, expressing body pose, hand position, and gaze direction after the segment; (iii) maintains spatial continuity with the body orientation of the previous frame; (iv) reads as a natural, descriptive sentence suitable for image generation.
+> Output
+> A single polished end-frame prompt ˆ𝑐 𝑖 .
+
+## 3.3 ID-Preserving Keyframe Generation 
+
+Given the polished prompts, we generate a sequence of keyframes 
+
+{𝐾 0, 𝐾 1, . . . , 𝐾 𝑁 } with an image generation model in a strictly se-quential, chained manner, as illustrated in panel (b) of fig. 2. We produce the first keyframe 𝐾 0 by conditioning the model on the reference image 𝐼 ref and the polished global prompt ˆ𝑃 global , yielding a scene that depicts the subject in a neutral initial pose before any action unfolds. Each subsequent keyframe 𝐾 𝑖 (𝑖 ≥ 1) is generated from three inputs: the reference image 𝐼 ref , a persistent identity an-chor; the preceding keyframe 𝐾 𝑖 −1, a visual continuity cue; and the polished end-frame prompt ˆ𝑐 𝑖 , which specifies the target terminal state of the 𝑖 -th action segment. We instruct the model to inherit the pose, position, and orientation from 𝐾 𝑖 −1 and modify only the aspects explicitly described by ˆ𝑐 𝑖 , producing a natural progression of motion across the keyframe sequence. This chained conditioning design separates two orthogonal con-straints by assigning each to a distinct input. The reference im-age 𝐼 ref supplies time-invariant identity features, including facial structure, skin tone, and hairstyle, ensuring the subject remains recognizable throughout the sequence despite pose changes. In contrast, the preceding keyframe 𝐾 𝑖 −1 encodes the time-varying spatial state, encompassing body orientation, limb configuration, and scene layout at the end of the previous segment. By supplying both signals simultaneously, the model maintains identity with-out compromising temporal coherence, and each transition reflects only the incremental change dictated by the corresponding action caption. 
+
+## 3.4 Video Generation and ID-Aware Inference Enhancement 
+
+With the keyframe sequence {𝐾 0, 𝐾 1, . . . , 𝐾 𝑁 } established, the video generation stage, shown in panel (c) of fig. 2, synthesizes each ac-tion segment by conditioning a diffusion-based video model on the corresponding pair of boundary keyframes, which serve as the first-frame and last-frame constraints. Because the temporal captions define segments of unequal duration, we adopt a variable-length allocation strategy: the shortest segment is assigned a base frame budget 𝐹 min , and every other segment receives a frame count pro-portional to its normalized duration, rounded to the nearest value that satisfies the temporal VAE constraint of 8𝑘 + 1. The resulting segment videos are concatenated at their shared boundary frames, with the first frame of each non-initial segment discarded to avoid duplication. Beyond this generation pipeline, we introduce two inference-time training-free enhancements that explicitly optimize identity preservation. 
+
+3.4.1 Multi-Reference Guidance. Standard classifier-free guidance (CFG) [ 8 ] directs the denoising process toward text-conditioned predictions but does not provide an explicit mechanism to enforce identity consistency with the reference subject. Inspired by recent work on identity-aware guidance [ 4], we extend the sampling proce-dure with a multi-modal guidance formulation that simultaneously leverages three complementary signals. Let 𝜖 𝜃 (𝑥 𝑡 | C) denote the noise prediction conditioned on the full context C that comprises the text prompt, the boundary keyframes, and the reference identity. The guided prediction at each denoising step takes the form 
+
+˜𝜖 𝜃 (𝑥 𝑡 ) = 𝜖 𝜃 (𝑥 𝑡 | C) + 𝑤 cfg Δcfg + 𝑤 stg Δstg + 𝑤 mod Δmod (1) where Δcfg = 𝜖 𝜃 (𝑥 𝑡 | C) − 𝜖 𝜃 (𝑥 𝑡 | ∅text ) is the standard CFG term that enforces semantic alignment with the text prompt, Δstg =
+
+𝜖 𝜃 (𝑥 𝑡 | C) − 𝜖 perturb  
+
+> 𝜃
+
+(𝑥 𝑡 | C) is a spatiotemporal guidance term obtained by perturbing selected attention layers to encourage tem-poral coherence, and Δmod = 𝜖 𝜃 (𝑥 𝑡 | C)− 𝜖 𝜃 (𝑥 𝑡 | ∅img ) is a modality guidance term that amplifies the influence of the visual condition-ing, namely the boundary keyframes that carry the identity infor-mation. The three scales 𝑤 cfg , 𝑤 stg , and 𝑤 mod control the relative strength of each signal. By explicitly separating the identity-bearing visual condition from the text condition, this formulation guides the sampling trajectory toward identity-faithful outputs. 
+
+3.4.2 Noise Searching. The initial noise 𝑧 𝑇 drawn at the start of the reverse diffusion process significantly influences the identity fidelity of the generated video. Inspired by IC-Init [ 19 ], we introduce an identity-driven noise search procedure that treats the initial noise as a variable to be optimized rather than a fixed random draw. For each video segment, we sample 𝐾 candidate noise tensors 
+
+{𝑧 (1) 
+
+> 𝑇
+
+, . . . , 𝑧 (𝐾 ) 
+
+> 𝑇
+
+} and perform a short lookahead denoising of 𝑇 ′ steps (𝑇 ′ ≪ 𝑇 ) on each candidate to obtain partially denoised latents. We then decode the first frame of each candidate and compute a reward based on the cosine similarity between its face embedding Keyframe-Anchored Identity Preservation for Sequential-Action Video Generation MM ’26, November 10-14, 2026, Rio de Janeiro, Brazil 
+
+Table 1: Quantitative comparison of the two video generation backbones we explored on the IPVG26 Track 2 test set ( 200 
+
+samples). All scores lie in [0, 1] and higher is better ( ↑). The best result in each column is marked in bold. Backbone Identity Global Alignment Temporal Alignment Quality Overall 
+
+Cur ↑ Arc ↑ DINO ↑ ID ↑ CLIP ↑ GME ↑ CLIP ↑ GME ↑ MS ↑ IQ ↑ O.S. ↑
+
+Wan2.1-VACE 0.4503 0.4187 0.1289 0.3861 0.2918 0.6104 0.2549 0.5093 0.9847 0.5921 0.4818 LTX-2.3 0.4731 0.4392 0.1402 0.4055 0.3046 0.6293 0.2654 0.5266 0.9883 0.6078 0.4971 Table 2: Final standings on the official IPVG26 Track 2 leader-board. The reported score is the official ranking metric. Our entry (USTC-AC) is highlighted. Rank Team Score ↓
+
+1 USTC-CMI 1.25 2 WislabGDUT 1.8125 3 USTC-AC (Ours) 2.9375 and that of the reference image 𝐼 ref :
+
+𝑅 (𝑧 (𝑘 ) 
+
+> 𝑇
+
+) = sim 
+
+
+
+𝜙 (𝐷 (𝑧 (𝑘 )   
+
+> 𝑇 −𝑇 ′
+
+)) , 𝜙 (𝐼 ref )
+
+
+
+(2) where 𝐷 (·) denotes the VAE decoder and 𝜙 (·) extracts a face em-bedding. The candidate that attains the highest reward is retained for full denoising. This procedure converts the stochastic noise ini-tialization into a constrained search that favors identity-preserving diffusion trajectories, at the cost of 𝐾 additional short forward passes per segment. 
+
+## 4 Experiments 4.1 Implementation Details 
+
+Models and configuration. Our pipeline integrates three com-ponents. The action-aware prompt polishment stage is imple-mented with Qwen3.6-27B [ 28 ], a multimodal large language model that, conditioned on the reference image, rewrites the global prompt and the temporal captions. The ID-preserving keyframes are syn-thesized by a locally deployed Z-Image [ 32 ] model at a resolution of 1536 × 1024 . For video synthesis , we adopt LTX-2.3 [ 5 , 6] in its keyframe-interpolation mode, conditioning each segment on the corresponding pair of boundary keyframes. Additionally, we consider Wan2.1-VACE [ 15 , 24 ] for first- and last-frame guided generation. Videos are produced at 24 frames per second with 40 
+
+denoising steps. Under the variable-length allocation strategy, the shortest segment is assigned 𝐹 min = 121 frames, while the remain-ing segments are scaled proportionally and rounded to the nearest valid length of the form 8𝑘 + 1. The multi-reference guidance scales are set to 𝑤 cfg = 5.0, 𝑤 stg = 1.5 (perturbing transformer block 29 ), and 𝑤 mod = 3.0.
+
+Evaluation protocol. We evaluate our method on the official Track 2 test set [ 22 ], which is built upon the ReactID dataset [ 16 ] and con-sists of 200 samples. Each sample includes one or more reference images, a category label, a global scene prompt, and a sequence of temporally segmented action captions. Generation quality is assessed across three complementary dimensions. Identity preser-vation is measured using an identity score tailored to the subject 
+
+Table 3: Ablation study of the two inference-time enhance-ments, Multi-Reference Guidance (MRG) and Noise Search-ing (NS), on the Track 2 test set. Each variant removes one component from the full LTX-2.3 model (highlighted). The best score per column is in bold. Variant Identity Alignment Quality Overall                        
+
+> ID ↑G-GME ↑T-GME ↑MS ↑IQ ↑O.S. ↑
+> Full model 0.4055 0.6293 0.5266 0.9883 0.6078 0.4971
+> w/o MRG 0.3520 0.6248 0.5176 0.9870 0.6011 0.4820 w/o NS 0.3853 0.6270 0.5223 0.9879 0.6052 0.4910
+
+category: facial subjects are evaluated with CurricularFace [ 12 ]and ArcFace [ 2 ] embeddings, while object and animal subjects are assessed using DINOv2 [ 21 ] features. Text-video alignment is quantified by CLIP [ 23 ] and GME [ 33 ] similarities computed at both the global and per-segment temporal level; 32 frames are uniformly sampled for the global measurement, and 8 frames are sampled within each segment. Visual fidelity is captured by mo-tion smoothness (MS) and image quality (IQ) [ 13 ]. The overall score aggregates these metrics through a weighted sum, 
+
+𝑆 overall = 0.20 𝑆 id + 0.15 𝑆 ggme + 0.10 𝑆 gclip 
+
++ 0.25 𝑆 tgme + 0.15 𝑆 tclip + 0.075 𝑆 ms + 0.075 𝑆 iq , (3) where the superscripts g and t denote the global and temporal variants of the alignment metrics, respectively. 
+
+## 4.2 Quantitative and Qualitative Analysis 
+
+Quantitative results. During development, we experimented with two candidate video generation backbones within an identical keyframe pipeline: Wan2.1-VACE in first- and last-frame mode, and LTX-2.3 in keyframe-interpolation mode. table 1 presents their performance on the Track 2 test set. LTX-2.3 outperforms Wan2.1-VACE across all seven evaluated metrics, increasing the overall score from 0.4818 to 0.4971 , which motivated us to adopt it as our final backbone. Motion smoothness is already near saturation for both backbones (above 0.98 ), so the discriminative signal primar-ily resides in the identity and alignment metrics, where LTX-2.3 consistently holds an advantage. table 2 reports the final standings on the official Track 2 leaderboard, where our entry ranked third, confirming the effectiveness of the proposed pipeline. 
+
+Qualitative results. fig. 3 presents a representative case study. Across the four chained keyframes and all sampled frames, the man’s facial structure, skin tone, and hairstyle remain consistent with the reference image. Each segment converges on the terminal state described by its temporal caption, progressing from looking MM ’26, November 10-14, 2026, Rio de Janeiro, Brazil Zhenjie Liu, Binyan Chen, Hao Chen, Tong Pan, and Shangfei Wang Reference Image   
+
+> Global Prompt: At an outdoor hillside overlook during golden hour, a sturdy man stands in warm filtered sunlight while
+> preparing a DSLR camera to photograph the rolling hills ahead . He concentrates on adjusting the camera and subtly shifting
+> his posture to refine the framing of the peaceful landscape
+
+Generated Keyframes Temporal Prompts 
+
+> 0-0.3 (121 frames):
+> A man looks out
+> toward the rolling
+> hills.
+> 0.3-0.68 (153 frames):
+> The man adjusts the
+> DSLR camera in his
+> hands.
+> 0.68-1.0 (128 frames):
+> The man steadies his
+> stance for the shot.
+
+Figure 3: Qualitative case study. From the reference identity and the global prompt, our pipeline generates the chained keyframes 𝐾 0–𝐾 3 and synthesizes the three action segments, each shown with its temporal caption and a uniformly sampled frame sequence. 
+
+out toward the hills to adjusting the DSLR in hand, and finally steadying the stance for the shot. This behavior validates our end-frame prompt design, which anchors every keyframe at the point where the action lands rather than how it unfolds over time. Because each keyframe inherits the pose and orientation of its predecessor, the boundaries between consecutive segments are visually continu-ous and free of abrupt jumps. The synthesized content also adheres to the global prompt, faithfully reproducing the golden-hour hillside overlook and the photographic activity it describes. 
+
+## 4.3 Ablation Study 
+
+We ablate the two inference-time enhancements introduced in sec-tion 3.4 by removing each component individually from the full LTX-2.3 model and report the results in table 3. Removing Multi-Reference Guidance causes the most significant degradation, with the identity score dropping from 0.4055 to 0.3520 . This confirms that explicitly amplifying the identity-bearing visual condition is the primary driver of subject consistency, as text and keyframe conditioning alone do not sufficiently steer the sampling trajectory toward the reference appearance. Removing Noise Searching has a milder but consistent effect, lowering the identity score to 0.3853 
+
+and the overall score from 0.4971 to 0.4910 . Serving as a refinement that selects an identity-favorable initialization on top of the guided sampler, it contributes a smaller yet reliable gain. Both components leave motion smoothness and image quality nearly unchanged, indi-cating that their benefits are concentrated on identity preservation. Taken together, these two enhancements are complementary and jointly account for the improvements in the most heavily weighted evaluation dimensions. 
+
+## 5 Conclusion 
+
+We propose a keyframe-anchored approach for identity-preserving video generation in the IPVG26 Track 2 setting, where a subject performs a scripted sequence of timestamped actions while remain-ing recognizable. Instead of synthesizing the entire clip at once, we decompose the action sequence into identity-preserving keyframes anchored at segment endpoints and interpolate between them. Our training-free, three-stage pipeline requires no fine-tuning of off-the-shelf models: (1) an action-aware prompt polishing stage that rewrites global and temporal captions into terminal-state image prompts; (2) a chained keyframe generation stage that conditions each frame on the reference identity and its predecessor, effectively separating appearance from pose; and (3) an identity-aware in-ference enhancement stage that synthesizes intermediate frames using multi-reference guidance and identity-driven noise search-ing. Our entry ranked third on the official leaderboard, excelling in identity preservation and temporal alignment. Ablation studies show that inference-time enhancements, especially multi-reference guidance, drive subject consistency. These results demonstrate that keyframe-anchored decomposition is an effective method for identity-preserving multi-action video generation. Keyframe-Anchored Identity Preservation for Sequential-Action Video Generation MM ’26, November 10-14, 2026, Rio de Janeiro, Brazil 
+
+## Acknowledgments 
+
+This work was supported by the National Natural Science Founda-tion of China 62376255. 
+
+## References 
+
+[1] A. Blattmann, Tim Dockhorn, Sumith Kulal, Daniel Mendelevitch, Maciej Kilian, and Dominik Lorenz. 2023. Stable Video Diffusion: Scaling Latent Video Diffusion Models to Large Datasets. ArXiv abs/2311.15127 (2023). [2] Jiankang Deng, Jia Guo, Niannan Xue, and Stefanos Zafeiriou. 2019. Arcface: Additive angular margin loss for deep face recognition. In Proceedings of the IEEE/CVF conference on computer vision and pattern recognition . 4690–4699. [3] Zhengcong Fei, Debang Li, Di Qiu, Jiahua Wang, Yikun Dou, Rui Wang, Jingtao Xu, Mingyuan Fan, Guibin Chen, Yang Li, et al . 2025. Skyreels-a2: Compose anything in video diffusion transformers. arXiv preprint arXiv:2504.02436 (2025). [4] Jiayi Gao, Changcheng Hua, Qingchao Chen, Yuxin Peng, and Yang Liu. 2025. Identity-Preserving Text-to-Video Generation via Training-Free Prompt, Image, and Guidance Enhancement. Proceedings of the 33rd ACM International Conference on Multimedia (2025). https://api.semanticscholar.org/CorpusID:281079055 [5] Yoav HaCohen, Benny Brazowski, Nisan Chiprut, Yaki Bitterman, Andrew Kvochko, Avishai Berkowitz, Daniel Shalem, Daphna Lifschitz, Dudu Moshe, Eitan Porat, Eitan Richardson, Guy Shiran, Itay Chachy, Jonathan Chetboun, Michael Finkelson, Michael Kupchick, Nir Zabari, Nitzan Bitton Guetta, N. G. Kotler, Ofir Bibi, Ori Gordon, Poriya Panet, Roi Benita, Shahar Armon, V. M. Kulikov, Yaron Inger, Yonatan Shiftan, Zeev Melumian, and Zeev Farbman. 2026. LTX-2: Efficient Joint Audio-Visual Foundation Model. ArXiv abs/2601.03233 (2026). https://api.semanticscholar.org/CorpusID:284512618 [6] Yoav HaCohen, Nisan Chiprut, Benny Brazowski, Daniel Shalem, Dudu Moshe, Eitan Richardson, Eran Levin, Guy Shiran, Nir Zabari, Ori Gordon, Poriya Panet, Sapir Weissbuch, Victor Kulikov, Yaki Bitterman, Zeev Melumian, and Ofir Bibi. 2024. LTX-Video: Realtime Video Latent Diffusion. arXiv preprint arXiv:2501.00103 
+
+(2024). [7] Xuanhua He, Quande Liu, Shengju Qian, Xin Wang, Tao Hu, Ke Cao, Keyu Yan, and Jie Zhang. 2024. Id-animator: Zero-shot identity-preserving human video generation. arXiv preprint arXiv:2404.15275 (2024). [8] Jonathan Ho and Tim Salimans. 2022. Classifier-free diffusion guidance. arXiv preprint arXiv:2207.12598 (2022). [9] Jonathan Ho, Tim Salimans, Alexey Gritsenko, William Chan, Mohammad Norouzi, and David J Fleet. 2022. Video diffusion models. Advances in Neu-ral Information Processing Systems 35 (2022), 8633–8646. [10] Edward J Hu, Yelong Shen, Phillip Wallis, Zeyuan Allen-Zhu, Yuanzhi Li, Shean Wang, Lu Wang, Weizhu Chen, et al . 2022. Lora: Low-rank adaptation of large language models. ICLR 1, 2 (2022), 3. [11] Teng Hu, Zhentao Yu, Zhengguang Zhou, Sen Liang, Yuan Zhou, Qin Lin, and Qinglin Lu. 2025. Hunyuancustom: A multimodal-driven architecture for cus-tomized video generation. arXiv preprint arXiv:2505.04512 (2025). [12] Yuge Huang, Yuhan Wang, Ying Tai, Xiaoming Liu, Pengcheng Shen, Shaoxin Li, Jilin Li, and Feiyue Huang. 2020. Curricularface: adaptive curriculum learning loss for deep face recognition. In proceedings of the IEEE/CVF conference on computer vision and pattern recognition . 5901–5910. [13] Ziqi Huang, Yinan He, Jiashuo Yu, Fan Zhang, Chenyang Si, Yuming Jiang, Yuan-han Zhang, Tianxing Wu, Qingyang Jin, Nattapol Chanpaisit, et al . 2024. Vbench: Comprehensive benchmark suite for video generative models. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition . 21807– 21818. [14] Junha Hyung, Kinam Kim, Susung Hong, Min-Jung Kim, and Jaegul Choo. 2024. Spatiotemporal Skip Guidance for Enhanced Video Diffusion Sampling. arXiv preprint arXiv:2411.18664 (2024). [15] Zeyinzi Jiang, Zhen Han, Chaojie Mao, Jingfeng Zhang, Yulin Pan, and Yu Liu. 2025. Vace: All-in-one video creation and editing. arXiv preprint arXiv:2503.07598 
+
+(2025). [16] Wei Li, Yiheng Zhang, Fuchen Long, Zhaofan Qiu, Ting Yao, Xiaoyan Sun, and Tao Mei. 2026. ReactID: Synchronizing Realistic Actions and Identity in Personalized Video Generation. In International Conference on Learning Representations .[17] Zhen Li, Mingdeng Cao, Xintao Wang, Zhongang Qi, Ming-Ming Cheng, and Ying Shan. 2024. Photomaker: Customizing realistic human photos via stacked id embedding. In Proceedings of the IEEE/CVF conference on computer vision and pattern recognition . 8640–8650. [18] Lijie Liu, Tianxiang Ma, Bingchuan Li, Zhuowei Chen, Jiawei Liu, Gen Li, Siyu Zhou, Qian He, and Xinglong Wu. 2025. Phantom: Subject-consistent video generation via cross-modal alignment. arXiv preprint arXiv:2502.11079 (2025). [19] Zhenjie Liu, Jianzhang Lu, Renjie Lu, Cong Liang, and Shangfei Wang. 2025. Con-sistTalk: Intensity Controllable Temporally Consistent Talking Head Generation with Diffusion Noise Search. arXiv preprint arXiv:2511.06833 (2025). [20] Ze Ma, Daquan Zhou, Xue-She Wang, Chun-Hsiao Yeh, Xiuyu Li, Huanrui Yang, Zhen Dong, Kurt Keutzer, and Jiashi Feng. 2025. Magic-me: Identity-specific video customized diffusion. In European Conference on Computer Vision . Springer, 19–37. [21] Maxime Oquab, Timothée Darcet, Théo Moutakanni, Huy Vo, Marc Szafraniec, Vasil Khalidov, Pierre Fernandez, Daniel Haziza, Francisco Massa, Alaaeldin El-Nouby, et al . 2023. DINOv2: Learning Robust Visual Features without Supervision. 
+
+arXiv preprint arXiv:2304.07193 (2023). [22] Yingwei Pan, Yiheng Zhang, Zhaofan Qiu, Ting Yao, and Tao Mei. 2026. Identity-Preserving Video Generation Challenge. In Proceedings of the 34th ACM Interna-tional Conference on Multimedia .[23] Alec Radford, Jong Wook Kim, Chris Hallacy, Aditya Ramesh, Gabriel Goh, Sandhini Agarwal, Girish Sastry, Amanda Askell, Pamela Mishkin, Jack Clark, et al . 2021. Learning transferable visual models from natural language supervision. In International conference on machine learning . PmLR, 8748–8763. [24] Team Wan, Ang Wang, Baole Ai, Bin Wen, Chaojie Mao, Chen-Wei Xie, Di Chen, Feiwu Yu, Haiming Zhao, Jianxiao Yang, et al . 2025. Wan: Open and advanced large-scale video generative models. arXiv preprint arXiv:2503.20314 (2025). [25] Qixun Wang, Xu Bai, Haofan Wang, Zekui Qin, Anthony Chen, Huaxia Li, Xu Tang, and Yao Hu. 2024. Instantid: Zero-shot identity-preserving generation in seconds. arXiv preprint arXiv:2401.07519 (2024). [26] Yuji Wang, Moran Li, Xiaobin Hu, Ran Yi, Jiangning Zhang, Han Feng, Weijian Cao, Yabiao Wang, Chengjie Wang, and Lizhuang Ma. 2025. Identity-Preserving Text-to-Video Generation Guided by Simple yet Effective Spatial-Temporal De-coupled Representations. Proceedings of the 33rd ACM International Conference on Multimedia (2025). https://api.semanticscholar.org/CorpusID:280150079 [27] Yujie Wei, Shiwei Zhang, Zhiwu Qing, Hangjie Yuan, Zhiheng Liu, Yu Liu, Yingya Zhang, Jingren Zhou, and Hongming Shan. 2024. Dreamvideo: Composing your dream videos with customized subject and motion. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition . 6537–6549. [28] An Yang, Anfeng Li, Baosong Yang, Beichen Zhang, Binyuan Hui, Bo Zheng, Bowen Yu, Chang Gao, Chengen Huang, Chenxu Lv, et al . 2025. Qwen3 technical report. arXiv preprint arXiv:2505.09388 (2025). [29] Zhuoyi Yang, Jiayan Teng, Wendi Zheng, Ming Ding, Shiyu Huang, Jiazheng Xu, Yuanming Yang, Wenyi Hong, Xiaohan Zhang, Guanyu Feng, et al . 2024. Cogvideox: Text-to-video diffusion models with an expert transformer. arXiv preprint arXiv:2408.06072 (2024). [30] Hu Ye, Jun Zhang, Sibo Liu, Xiao Han, and Wei Yang. 2023. Ip-adapter: Text compatible image prompt adapter for text-to-image diffusion models. arXiv preprint arXiv:2308.06721 (2023). [31] Shenghai Yuan, Jinfa Huang, Xianyi He, Yunyang Ge, Yujun Shi, Liuhan Chen, Jiebo Luo, and Li Yuan. 2025. Identity-preserving text-to-video generation by frequency decomposition. In Proceedings of the Computer Vision and Pattern Recognition Conference . 12978–12988. [32] Z-Image Team. 2025. Z-Image: An Efficient Image Generation Foundation Model with Single-Stream Diffusion Transformer. arXiv preprint arXiv:2511.22699 (2025). [33] Xin Zhang, Yanzhao Zhang, Wen Xie, Mingxin Li, Ziqi Dai, Dingkun Long, Pengjun Xie, Meishan Zhang, Wenjie Li, and Min Zhang. 2024. GME: Improving Universal Multimodal Retrieval by Multimodal LLMs. arXiv:2412.16855 [cs.CV] [34] Yunpeng Zhang, Qiang Wang, Fan Jiang, Yaqi Fan, Mu Xu, and Yonggang Qi. 2025. FantasyID: Face Knowledge Enhanced ID-Preserving Video Generation. ArXiv 
+
+abs/2502.13995 (2025). https://api.semanticscholar.org/CorpusID:276482215 [35] Zangwei Zheng, Xiangyu Peng, Tianji Yang, Chenhui Shen, Shenggui Li, Hongxin Liu, Yukun Zhou, Tianyi Li, and Yang You. 2024. Open-Sora: Democratizing Efficient Video Production for All. ArXiv abs/2412.20404 (2024). https://api. semanticscholar.org/CorpusID:275133398 [36] Yong Zhong, Zhuoyi Yang, Jiayan Teng, Xiaotao Gu, and Chongxuan Li. 2025. Concat-ID: Towards Universal Identity-Preserving Video Synthesis. arXiv preprint arXiv:2503.14151 (2025).
