@@ -1,0 +1,24 @@
+{
+  "label": "2026-07-26",
+  "date": "2026-07-26",
+  "generated_at": "2026-07-26T20:56:37",
+  "count": 1,
+  "papers": [
+    {
+      "paper_id": "202607/26/2607.16938v1-what-do-they-see-interpreting-complex-road-scenarios-through-the-eyes-of-vision-language-action-models-for-safe-and-trustworthy-autonomous-vehicle-learning",
+      "section": "quick",
+      "title_en": "What Do They See? Interpreting Complex Road Scenarios Through the Eyes of Vision-Language-Action Models for Safe and Trustworthy Autonomous Vehicle Learning",
+      "authors": "Kalpana Panda, Wesley Maia, Vinti Agarwal, Ross Greer",
+      "date": "2026-07-18",
+      "pdf": "https://arxiv.org/pdf/2607.16938v1",
+      "score": "7.0",
+      "evidence": "使用生成式修补解释驾驶场景中的视觉-语言-动作模型",
+      "tldr": "端到端自动驾驶模型内部逻辑不透明。我们提出反事实消融框架CVAA，通过生成式修补移除图像中的检测物体，评估模型规划行为对每个物体的因果依赖。在nuScenes上构建Counter-nuScenes数据集，发现车辆和行人影响最大，但模型也会对无关物体产生响应。进一步利用机制可解释性分析中间表示，从行为审计走向表示理解，提升系统可解释性。",
+      "tags": "query:video-wam",
+      "abstract_en": "End-to-end autonomous driving models are now able to navigate complex road scenarios, mapping raw sensor observations directly to observed paths for open-loop evaluation and often effective driving in closed-loop evaluation. Yet the internal logic of these safety-critical systems remains largely opaque, due to the complexity of traffic scenes. We propose a counterfactual ablation framework called Counterfactual Vision Action Analysis (CVAA) that systematically removes individual detected objects from front-camera images using photorealistic generative inpainting to prepare counterfactual sets to evaluate the difference in the model's response. This isolates the causal effect of each object's presence on the model's planning behaviour. Applied to the Alpamayo 1 trajectory predictor across 210 nuScenes driving scenes, we create a dataset Counter -nuScenes, using which we see that vehicles and pedestrians within the model's 'path' dominate causal influence as expected, while traffic lights, as expected, exert disproportionate effect relative to their image footprint. However, we also find cases where the model responds strongly to objects a human driver would consider irrelevant. This brings forth a deeper question: does the model itself view the scene as a sum of individual objects influencing the outcome, or does it encode an entirely different set of internal features that do not correspond to human-legible scene elements? To further understand this, we compare intermediate representations of original and inpainted image pairs using mechanistic interpretability techniques and examine the effect of the removal through the various model layers. Together, these two stages offer a path from behavioral auditing to representational understanding, creating explainable driving systems and solidifying human-AI trust.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    }
+  ],
+  "errors": []
+}
