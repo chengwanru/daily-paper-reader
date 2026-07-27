@@ -1,0 +1,69 @@
+{
+  "label": "2026-07-27",
+  "date": "2026-07-27",
+  "generated_at": "2026-07-27T21:09:50",
+  "count": 4,
+  "papers": [
+    {
+      "paper_id": "202607/27/2607.22535v1-robot-factored-world-models-via-robot-rendering",
+      "section": "deep",
+      "title_en": "Robot-Factored World Models via Robot Rendering",
+      "authors": "Byungjun Kim, Taeksoo Kim, Hyunsoo Cha, Hanbyul Joo",
+      "date": "2026-07-24",
+      "pdf": "https://arxiv.org/pdf/2607.22535v1",
+      "score": "8.0",
+      "evidence": "通过机器人渲染实现机器人因子化世界模型",
+      "tldr": "现有动作条件视频世界模型需要学习从动作命令到机器人运动的实现过程，或泄露未来状态，导致泛化性差。本文提出机器人因素化世界模型，将动作实现和机器人渲染移出模型，使用标称轨迹和URDF渲染的机器人几何作为共享视觉界面，结合端效应器与场景深度。该渲染接口在多个操控任务上优于向量条件基线，并能泛化到未见机器人形态，同时可从人类演示生成机器人操作视频。通过显式建模机器人几何，简化了世界模型学习任务，提升了跨视角和跨机器人的一致性。",
+      "tags": "query:video-wam",
+      "abstract_en": "Action-conditioned video world models predict future observations from an initial observation and an action signal. In robotics, actions influence future observations through two distinct processes: they are first realized into robot motion by the robot body and controller, and the scene then responds through contact and object motion. Conditioning directly on action commands asks the world model to learn the realization process itself, while conditioning on logged future states leaks the interaction outcomes it is meant to predict. We propose robot-factored world models, which move two robot-specific factors outside the world model. First, action realization: each command is rolled through the robot's own controller and kinematics into a deployment-available nominal trajectory, a middle signal that avoids both action-realization learning and future-state leakage. Second, robot rendering: this nominal trajectory is rendered through the robot URDF, factoring the robot's geometry, kinematics, and appearance out of the model and into explicit rendered robot geometry. To resolve depth ambiguity, we pair end-effector depth with scene depth, giving geometric cues for contact and occlusion beyond image-plane overlap. Together, camera-aware static RGB/depth context and rendered robot geometry form a shared visual world-model interface that stays consistent across viewpoints and robot embodiments, so the model sees the action only as visible robot geometry and learns how objects respond to it. Our experiments show that the rendered interface outperforms vector-conditioned baselines and generalizes to unseen robot embodiments at inference. We further demonstrate that our model generates robot manipulation videos from human demonstrations by retargeting and rendering the hand motion as robot geometry.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "paper_id": "202607/27/2607.21848v1-closing-the-loop-training-free-revisit-consistency-for-autoregressive-generative-rendering",
+      "section": "quick",
+      "title_en": "Closing the Loop: Training-Free Revisit Consistency for Autoregressive Generative Rendering",
+      "authors": "Wenchao Ma, Changran Liu, Sharon X. Huang, Haomiao Jiang",
+      "date": "2026-07-23",
+      "pdf": "https://arxiv.org/pdf/2607.21848v1",
+      "score": "7.0",
+      "evidence": "解决自回归视频生成中重访一致性问题，用于世界模型渲染",
+      "tldr": "自回归生成式渲染在长视频生成中常因KV缓存溢出导致相机重访时外观不一致。本文提出无需训练的闭环一致性方法，利用3D引擎提供的时间对应检索历史潜在块作为闭环记忆，同时通过空间对应（相机姿态与深度重投影）引导注意力聚焦几何对应区域。在TartanAir等数据集上，该方法在重访一致性上显著优于现有无需训练基线，且不降低视频质量，为3D引擎转逼真视频应用提供了高效解决方案。",
+      "tags": "query:video-wam",
+      "abstract_en": "Recent conditional video generation models have shown promising potentials to transform 3D engine renderings, such as depth maps and untextured geometry, into photorealistic videos for gaming and immersive content creation. These applications require long-horizon auto-regressive generation that continuously synthesizes new frames while preserving a persistent 3D world. Auto-regressive generators synthesize video chunk by chunk with a bounded KV cache, so when the camera revisits a location after its context has been evicted, the model often regenerates inconsistent appearance, even though the conditioning renderings (e.g., depth) remain perfectly aligned with the underlying geometry.We address this revisit inconsistency without any post-training by exploiting correspondences the 3D engine already provides: temporal correspondence retrieves pose-matched historical latent chunks into the KV cache as loop-closure memory, while spatial correspondence from camera pose and depth reprojection biases token-level attention toward geometrically corresponding regions of the retrieved chunks. We demonstrate our method on loop-closure trajectories mined from TartanAir and TartanGround dataset to mirror complicate real-world application scenarios, where it outperforms existing training-free baselines on revisit consistency without losing overall video quality. Project Page: https://wenchao-m.github.io/ClosetheLoop.github.io/",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "paper_id": "202607/27/2607.22530v1-vitacworld-scaling-visuo-tactile-world-models-for-contact-rich-robot-manipulation",
+      "section": "quick",
+      "title_en": "ViTacWorld: Scaling Visuo-Tactile World Models for Contact-Rich Robot Manipulation",
+      "authors": "Yunao Huang, Shiyu Sang, Haotao Lu, Suting Ni, Shijie Wu, Ziyang Guo, Ye Shi, Jingya Wang",
+      "date": "2026-07-24",
+      "pdf": "https://arxiv.org/pdf/2607.22530v1",
+      "score": "7.0",
+      "evidence": "动作条件化视觉-触觉世界模型用于机器人操控",
+      "tldr": "接触丰富机器人操作中，触觉感知对隐蔽接触至关重要，但触觉数据昂贵且依赖硬件，难以扩展。ViTacWorld构建动作条件视觉-触觉世界模型，利用公共真实触觉数据集和仿真环境大规模预训练，再通过真实策略微调以匹配下游行为。模型能够根据动作序列预测同步的视觉观察和触觉反馈，生成视觉-触觉-动作轨迹，并用于策略评估。实验表明，ViTacWorld生成的轨迹物理合理，通过数据增强显著提升下游策略性能，并实现动作条件策略评估。",
+      "tags": "query:video-wam",
+      "abstract_en": "Contact-rich robot manipulation requires physical interaction cues that are often invisible to cameras, making tactile sensing essential for robust control. However, scaling visuo-tactile robot learning remains difficult because real tactile interaction data are expensive to collect, hardware-dependent, and limited in task and scene diversity. We present ViTacWorld, an action-conditioned visuo-tactile world model for scalable contact-rich robot manipulation. ViTacWorld leverages public real tactile datasets and a constructed simulation environment to scale visuo-tactile-action data, exploiting the fact that tactile signals are directly grounded in physical contact and can exhibit a smaller simulation-to-real gap than purely visual observations. The model is first pretrained with large-scale real and simulated visuo-tactile trajectories, and then finetuned with real-world policy rollouts to better match downstream manipulation behaviors. Given robot actions, ViTacWorld predicts temporally aligned visual observations and tactile feedback, enabling visuo-tactile-action rollout generation. To the best of our knowledge, ViTacWorld is the first framework that uses a world model for robot visuo-tactile-action trajectory generation and policy evaluation. It serves two roles: synthesizing rollouts to improve downstream tactile policies, and evaluating policies by predicting action-conditioned visuo-tactile outcomes under controlled action sequences. Experiments on contact-rich manipulation tasks show that ViTacWorld generates physically meaningful rollouts, improves policy performance through scalable data augmentation, and enables action-conditioned policy evaluation. Project page: https://vitacworld.github.io/",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "paper_id": "202607/27/2607.22430v1-on-the-identifiability-of-controlled-world-models",
+      "section": "quick",
+      "title_en": "On the Identifiability of Controlled World Models",
+      "authors": "Xiangteng Zhang, Yang Guan, Bo Zhang, Ya-Qin Zhang, Shengbo Eben Li",
+      "date": "2026-07-24",
+      "pdf": "https://arxiv.org/pdf/2607.22430v1",
+      "score": "6.0",
+      "evidence": "受控世界模型的可辨识性",
+      "tldr": "在基于JEPA的可控世界模型中，潜变量预测的可辨识性长期未解。本文针对非线性观测和高斯行为策略，建立了联合可辨识性理论，提出谱分离与非退化条件动作变异性两个条件。证明满足条件时，JEPA全局最小化解可识别潜状态和转移（正交变换下），并给出近似优化下的定量界。进一步通过扰动分析揭示了有限动作覆盖对反事实预测的代价，实验验证了理论。",
+      "tags": "query:video-wam",
+      "abstract_en": "Learning world models that infer environment dynamics from high-dimensional observations and predict outcomes under candidate actions is central to planning and control. Joint-Embedding Predictive Architectures (JEPAs) provide a compelling framework for learning such models in representation space. Recent action-conditioned extensions perform promisingly in visual control and latent-space planning, but leave a fundamental question unresolved: when does controlled latent prediction identify both the underlying state and the controlled dynamics? This is challenging under nonlinear observations and behavior policies with limited conditional action variation, where state-dependent evolution and action effects can be statistically confounded. We establish a joint identifiability theory for controlled world models with Gaussian latent states under state-dependent Gaussian behavior policies. We identify two policy-dependent conditions: spectral separation of the predictable signal governs representation identifiability, while non-degenerate conditional action variation governs transition identifiability. We prove that when both conditions hold, every global minimizer of the JEPA objective identifies the latent state and controlled transition up to an orthogonal transformation. We further derive quantitative bounds on representation and transition identifiability under approximate optimization. Finally, we construct predictor perturbations along weakly excited action directions whose counterfactual-to-on-policy error ratio is the inverse transition-identifiability margin, revealing the cost of limited action coverage. Experiments across nonlinear observation maps and behavior policies corroborate the theory and demonstrate implications for transition identifiability, counterfactual prediction, and goal-conditioned latent planning.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    }
+  ],
+  "errors": []
+}

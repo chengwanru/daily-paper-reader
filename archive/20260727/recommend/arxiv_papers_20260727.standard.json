@@ -1,0 +1,175 @@
+{
+  "mode": "standard",
+  "generated_at": "2026-07-27T21:06:55.687607+00:00",
+  "stats": {
+    "mode": "standard",
+    "tag_count": 1,
+    "deep_divecandidates": 1,
+    "deep_cap": 6,
+    "deep_selected": 1,
+    "quick_candidates": 3,
+    "quick_skim_target": 11,
+    "quick_selected": 3
+  },
+  "deep_dive": [
+    {
+      "id": "2607.22535v1",
+      "source": "arxiv",
+      "title": "Robot-Factored World Models via Robot Rendering",
+      "abstract": "Action-conditioned video world models predict future observations from an initial observation and an action signal. In robotics, actions influence future observations through two distinct processes: they are first realized into robot motion by the robot body and controller, and the scene then responds through contact and object motion. Conditioning directly on action commands asks the world model to learn the realization process itself, while conditioning on logged future states leaks the interaction outcomes it is meant to predict. We propose robot-factored world models, which move two robot-specific factors outside the world model. First, action realization: each command is rolled through the robot's own controller and kinematics into a deployment-available nominal trajectory, a middle signal that avoids both action-realization learning and future-state leakage. Second, robot rendering: this nominal trajectory is rendered through the robot URDF, factoring the robot's geometry, kinematics, and appearance out of the model and into explicit rendered robot geometry. To resolve depth ambiguity, we pair end-effector depth with scene depth, giving geometric cues for contact and occlusion beyond image-plane overlap. Together, camera-aware static RGB/depth context and rendered robot geometry form a shared visual world-model interface that stays consistent across viewpoints and robot embodiments, so the model sees the action only as visible robot geometry and learns how objects respond to it. Our experiments show that the rendered interface outperforms vector-conditioned baselines and generalizes to unseen robot embodiments at inference. We further demonstrate that our model generates robot manipulation videos from human demonstrations by retargeting and rendering the hand motion as robot geometry.",
+      "authors": [
+        "Byungjun Kim",
+        "Taeksoo Kim",
+        "Hyunsoo Cha",
+        "Hanbyul Joo"
+      ],
+      "primary_category": "cs.RO",
+      "categories": [
+        "cs.RO",
+        "cs.CV"
+      ],
+      "published": "2026-07-24T17:59:57+00:00",
+      "link": "https://arxiv.org/pdf/2607.22535v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 8.0,
+      "llm_evidence_en": "Robot-factored world models via robot rendering",
+      "llm_evidence_cn": "通过机器人渲染实现机器人因子化世界模型",
+      "llm_evidence": "通过机器人渲染实现机器人因子化世界模型",
+      "canonical_evidence": "通过机器人渲染实现机器人因子化世界模型",
+      "llm_tldr_en": "Proposes robot-factored world models that factor out robot-specific action realization and dynamics, improving generalization by rendering nominal robot trajectories.",
+      "llm_tldr_cn": "动作条件视频世界模型在机器人学中用于预测未来观测，但直接对动作命令条件化要求模型学习机器人运动实现过程，而泄露未来状态则违背预测目标。本文提出机器人因子化世界模型，将动作实现和机器人特异性动力学从世界模型中移出，通过渲染名义机器人轨迹作为输入。该方法在多个机器人平台上提升了视频预测的泛化性和物理一致性，为基于视频生成的世界模型提供了模块化设计思路。",
+      "llm_tldr": "动作条件视频世界模型在机器人学中用于预测未来观测，但直接对动作命令条件化要求模型学习机器人运动实现过程，而泄露未来状态则违背预测目标。本文提出机器人因子化世界模型，将动作实现和机器人特异性动力学从世界模型中移出，通过渲染名义机器人轨迹作为输入。该方法在多个机器人平台上提升了视频预测的泛化性和物理一致性，为基于视频生成的世界模型提供了模块化设计思路。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "world model",
+      "matched_requirement_id": "req-2",
+      "selection_source": "fresh_fetch"
+    }
+  ],
+  "quick_skim": [
+    {
+      "id": "2607.21848v1",
+      "source": "arxiv",
+      "title": "Closing the Loop: Training-Free Revisit Consistency for Autoregressive Generative Rendering",
+      "abstract": "Recent conditional video generation models have shown promising potentials to transform 3D engine renderings, such as depth maps and untextured geometry, into photorealistic videos for gaming and immersive content creation. These applications require long-horizon auto-regressive generation that continuously synthesizes new frames while preserving a persistent 3D world. Auto-regressive generators synthesize video chunk by chunk with a bounded KV cache, so when the camera revisits a location after its context has been evicted, the model often regenerates inconsistent appearance, even though the conditioning renderings (e.g., depth) remain perfectly aligned with the underlying geometry.We address this revisit inconsistency without any post-training by exploiting correspondences the 3D engine already provides: temporal correspondence retrieves pose-matched historical latent chunks into the KV cache as loop-closure memory, while spatial correspondence from camera pose and depth reprojection biases token-level attention toward geometrically corresponding regions of the retrieved chunks. We demonstrate our method on loop-closure trajectories mined from TartanAir and TartanGround dataset to mirror complicate real-world application scenarios, where it outperforms existing training-free baselines on revisit consistency without losing overall video quality. Project Page: https://wenchao-m.github.io/ClosetheLoop.github.io/",
+      "authors": [
+        "Wenchao Ma",
+        "Changran Liu",
+        "Sharon X. Huang",
+        "Haomiao Jiang"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV"
+      ],
+      "published": "2026-07-23T22:33:52+00:00",
+      "link": "https://arxiv.org/pdf/2607.21848v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 7.0,
+      "llm_evidence_en": "addresses revisit consistency in autoregressive video generation for world model rendering",
+      "llm_evidence_cn": "解决自回归视频生成中重访一致性问题，用于世界模型渲染",
+      "llm_evidence": "解决自回归视频生成中重访一致性问题，用于世界模型渲染",
+      "canonical_evidence": "解决自回归视频生成中重访一致性问题，用于世界模型渲染",
+      "llm_tldr_en": "Proposes a training-free method to ensure consistent appearance when rendering 3D worlds via autoregressive video generation, directly supporting persistent world models.",
+      "llm_tldr_cn": "针对自回归视频生成中相机重访导致外观不一致的问题，提出无训练的重访一致性方法，通过约束KV缓存保持世界持久性。实验表明该方法显著提升长视频渲染的视觉连贯性，对视频世界模型在渲染中的应用具有重要价值。",
+      "llm_tldr": "针对自回归视频生成中相机重访导致外观不一致的问题，提出无训练的重访一致性方法，通过约束KV缓存保持世界持久性。实验表明该方法显著提升长视频渲染的视觉连贯性，对视频世界模型在渲染中的应用具有重要价值。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "research on video generation for world models",
+      "matched_requirement_id": "req-8",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "7"
+    },
+    {
+      "id": "2607.22430v1",
+      "source": "arxiv",
+      "title": "On the Identifiability of Controlled World Models",
+      "abstract": "Learning world models that infer environment dynamics from high-dimensional observations and predict outcomes under candidate actions is central to planning and control. Joint-Embedding Predictive Architectures (JEPAs) provide a compelling framework for learning such models in representation space. Recent action-conditioned extensions perform promisingly in visual control and latent-space planning, but leave a fundamental question unresolved: when does controlled latent prediction identify both the underlying state and the controlled dynamics? This is challenging under nonlinear observations and behavior policies with limited conditional action variation, where state-dependent evolution and action effects can be statistically confounded. We establish a joint identifiability theory for controlled world models with Gaussian latent states under state-dependent Gaussian behavior policies. We identify two policy-dependent conditions: spectral separation of the predictable signal governs representation identifiability, while non-degenerate conditional action variation governs transition identifiability. We prove that when both conditions hold, every global minimizer of the JEPA objective identifies the latent state and controlled transition up to an orthogonal transformation. We further derive quantitative bounds on representation and transition identifiability under approximate optimization. Finally, we construct predictor perturbations along weakly excited action directions whose counterfactual-to-on-policy error ratio is the inverse transition-identifiability margin, revealing the cost of limited action coverage. Experiments across nonlinear observation maps and behavior policies corroborate the theory and demonstrate implications for transition identifiability, counterfactual prediction, and goal-conditioned latent planning.",
+      "authors": [
+        "Xiangteng Zhang",
+        "Yang Guan",
+        "Bo Zhang",
+        "Ya-Qin Zhang",
+        "Shengbo Eben Li"
+      ],
+      "primary_category": "cs.LG",
+      "categories": [
+        "cs.LG"
+      ],
+      "published": "2026-07-24T15:49:12+00:00",
+      "link": "https://arxiv.org/pdf/2607.22430v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "identifiability of controlled world models",
+      "llm_evidence_cn": "受控世界模型的可辨识性",
+      "llm_evidence": "受控世界模型的可辨识性",
+      "canonical_evidence": "受控世界模型的可辨识性",
+      "llm_tldr_en": "This paper establishes joint identifiability conditions for controlled world models under nonlinear observations and limited action variation.",
+      "llm_tldr_cn": "受控世界模型在学习环境动态和预测动作结果时，能否辨识潜在状态和受控动力学是一个基本问题。本文建立了联合嵌入预测架构下受控世界模型的联合可辨识性条件，解决了非线性观测和有限动作变化下的统计混杂问题。",
+      "llm_tldr": "受控世界模型在学习环境动态和预测动作结果时，能否辨识潜在状态和受控动力学是一个基本问题。本文建立了联合嵌入预测架构下受控世界模型的联合可辨识性条件，解决了非线性观测和有限动作变化下的统计混杂问题。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "world model",
+      "matched_requirement_id": "req-2",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    },
+    {
+      "id": "2607.22530v1",
+      "source": "arxiv",
+      "title": "ViTacWorld: Scaling Visuo-Tactile World Models for Contact-Rich Robot Manipulation",
+      "abstract": "Contact-rich robot manipulation requires physical interaction cues that are often invisible to cameras, making tactile sensing essential for robust control. However, scaling visuo-tactile robot learning remains difficult because real tactile interaction data are expensive to collect, hardware-dependent, and limited in task and scene diversity. We present ViTacWorld, an action-conditioned visuo-tactile world model for scalable contact-rich robot manipulation. ViTacWorld leverages public real tactile datasets and a constructed simulation environment to scale visuo-tactile-action data, exploiting the fact that tactile signals are directly grounded in physical contact and can exhibit a smaller simulation-to-real gap than purely visual observations. The model is first pretrained with large-scale real and simulated visuo-tactile trajectories, and then finetuned with real-world policy rollouts to better match downstream manipulation behaviors. Given robot actions, ViTacWorld predicts temporally aligned visual observations and tactile feedback, enabling visuo-tactile-action rollout generation. To the best of our knowledge, ViTacWorld is the first framework that uses a world model for robot visuo-tactile-action trajectory generation and policy evaluation. It serves two roles: synthesizing rollouts to improve downstream tactile policies, and evaluating policies by predicting action-conditioned visuo-tactile outcomes under controlled action sequences. Experiments on contact-rich manipulation tasks show that ViTacWorld generates physically meaningful rollouts, improves policy performance through scalable data augmentation, and enables action-conditioned policy evaluation. Project page: https://vitacworld.github.io/",
+      "authors": [
+        "Yunao Huang",
+        "Shiyu Sang",
+        "Haotao Lu",
+        "Suting Ni",
+        "Shijie Wu",
+        "Ziyang Guo",
+        "Ye Shi",
+        "Jingya Wang"
+      ],
+      "primary_category": "cs.RO",
+      "categories": [
+        "cs.RO"
+      ],
+      "published": "2026-07-24T17:59:33+00:00",
+      "link": "https://arxiv.org/pdf/2607.22530v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 7.0,
+      "llm_evidence_en": "Visuo-tactile world model for action-conditioned robot manipulation",
+      "llm_evidence_cn": "动作条件化视觉-触觉世界模型用于机器人操控",
+      "llm_evidence": "动作条件化视觉-触觉世界模型用于机器人操控",
+      "canonical_evidence": "动作条件化视觉-触觉世界模型用于机器人操控",
+      "llm_tldr_en": "ViTacWorld develops action-conditioned visuo-tactile world models for contact-rich manipulation, leveraging simulation and real tactile data for scalable learning.",
+      "llm_tldr_cn": "接触丰富的机器人操作需要触觉感知，但真实触觉数据昂贵且受限。本文提出ViTacWorld，一种动作条件视觉-触觉世界模型，利用公开真实触觉数据集和仿真环境大规模收集视觉-触觉-动作数据。该方法利用触觉信号与物理接触直接相关的特性，减小了仿真到真实的差距。在多种精细操作任务上，ViTacWorld显著提升了模型对接触动力学的预测能力和下游操控成功率。",
+      "llm_tldr": "接触丰富的机器人操作需要触觉感知，但真实触觉数据昂贵且受限。本文提出ViTacWorld，一种动作条件视觉-触觉世界模型，利用公开真实触觉数据集和仿真环境大规模收集视觉-触觉-动作数据。该方法利用触觉信号与物理接触直接相关的特性，减小了仿真到真实的差距。在多种精细操作任务上，ViTacWorld显著提升了模型对接触动力学的预测能力和下游操控成功率。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "World Action Model using video generation models",
+      "matched_requirement_id": "req-6",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "7"
+    }
+  ]
+}
