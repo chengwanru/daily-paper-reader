@@ -1,0 +1,471 @@
+Title: FeelWorld: Visuo-Tactile World Model for Hierarchical Contact Prediction and Planning
+
+URL Source: https://arxiv.org/pdf/2607.24267v1
+
+Published Time: Tue, 28 Jul 2026 01:50:04 GMT
+
+Number of Pages: 9
+
+Markdown Content:
+# FeelWorld: Visuo-Tactile World Model for Hierarchical Contact Prediction and Planning 
+
+Wenxuan Ma 1,2, Chaofan Zhang 1,2, Chao Xue 1,2, Yinghao Cai 1, Guocai Yao 3,Shaowei Cui 1,2,3,∗, and Shuo Wang 11Institute of Automation, Chinese Academy of Sciences 
+
+2Imprintx Robotics 
+
+3Beijing Academy of Artificial Intelligence 
+
+Abstract — Humans plan physical interactions by imagining the possible outcomes of candidate actions. However, existing visual world models primarily capture appearance dynamics while overlooking the tactile states that govern contact-rich in-teractions, potentially producing imagined futures that appear visually plausible but violate physical dynamics. We introduce FeelWorld, a hierarchical visuo-tactile world model that jointly predicts future visual latents and three tactile states. FeelWorld organizes these states hierarchically as contact state, a 3D tactile latent that encodes force-related information, and slip state. These states are jointly predicted by a shared latent dynamics model with explicit supervision. To prevent irrelevant tactile signals during free-space motion from degrading visual prediction, we introduce a contact-gated asymmetric attention mechanism that maintains a visual-only prediction pathway be-fore contact and enables joint visuo-tactile dynamics prediction during contact. The model is further trained with autoregressive rollouts and context noise injection to improve robustness to compounding errors. The predicted contact and slip states also support contact-aware CEM planning. Experiments on chip grasping, fruit grasping, and USB insertion show that FeelWorld reduces 10-step LPIPS from 0.084 to 0.058 and maintains an LPIPS that is 61% lower than that of the visual baseline after an 80-step autoregressive rollout. FeelWorld also achieves an average zero-shot planning success rate of 81.7%, providing an effective approach for incorporating tactile sensing into world models. 
+
+I. I NTRODUCTION 
+
+Contact-rich manipulation requires robots to reason about physical interaction. Vision provides global scene context but offers only indirect evidence of contact physics. Tactile sens-ing directly measures force distribution, local deformation, and incipient slip, often capturing events that are occluded or produce negligible visual change [1], [2]. These two modalities are complementary yet asymmetric: vision sup-plies continuous scene information, whereas tactile signals carry physical meaning only during contact. Action-conditioned world models enable planning through imagined rollouts. The Dreamer family [3], [4] learns com-pact latent dynamics for long-horizon imagination. Joint-embedding predictive architectures [5], [6] avoid pixel re-construction by predicting in a learned representation space. Recent visuo-tactile world models [7]–[9] jointly predict visual and tactile futures, demonstrating that tactile ground-ing improves manipulation. However, these methods treat 
+
+> ∗
+
+Corresponding author: shaowei.cui@ia.ac.cn ruit Grasping           
+
+> 25
+> M Success Rate (%)
+> sual WM (w/o Tactile) ive VT (Asymmetric) rs View 1 View 2 Touch 1 Touch 2
+> Vision Encoder Tactile Encoder
+> Action
+> Action Encoder
+> Visuo -Tactile World Model (FeelWorld )
+> …
+> Next Frame Prediction Next Tactile Prediction
+> Contact -rich rollout
+> Time
+> FeelWorld
+> Contact
+> 0/1
+> Slip
+> 0/1
+> Chip Grasping USB Inserting
+
+Fig. 1. Overview of FeelWorld. Left : multi-view visual observations, 3D tactile point clouds, and robot actions are encoded and fused to jointly predict future visual observations and hierarchical tactile states, including contact, 3D tactile latents, and slip. Right : contact-aware CEM planning consistently outperforms vision-only and naive visuo-tactile baselines across all tasks. 
+
+tactile signals as a monolithic prediction target without distinguishing the physical information encoded at different levels of interaction. Dense visual signals can overshadow sparse yet critical tactile information [10]. Without explicit physical structure, tactile signals provide weak supervision for latent dynamics. The open question is how to integrate tactile information hierarchically and selectively, respecting the physical structure of contact and fusing tactile signals only when they carry meaningful evidence. We introduce FeelWorld, a hierarchical visuo-tactile world model. Our central observation is that tactile interaction decomposes into three hierarchical tactile states. Contact state is binary and immediate, indicating whether the robot touches anything. The 3D tactile latent captures local surface deformation, encoding contact area, pressure distribution, and shear direction. Slip state assesses interaction stability, an inherently temporal judgment. We predict these states in the order of contact state, 3D tactile latent, and slip state: the contact state controls visuo-tactile fusion, the 3D tactile latent represents local interaction geometry, and the slip state participates in the CEM planning cost. A second observation motivates our fusion design: tactile signals during free-space motion are sensor noise. We design a contact-gated asymmetric attention mechanism. Visual to-kens retain a visual-only self-attention pathway, preserving arXiv:2607.24267v1 [cs.RO] 27 Jul 2026 an appearance-driven prediction path. Tactile tokens attend to visual tokens, grounding local contact geometry in global scene context. Predicted contact probability gates visuo-tactile cross-attention (visual tokens query tactile features), suppressing modulation when contact is absent and enabling it during contact. We train with a joint objective combining visual and tactile latent prediction, explicit contact and slip supervision, and autoregressive rollout under context noise injection. At inference, a contact-aware Cross-Entropy Method (CEM) planner evaluates action sequences through imagined visuo-tactile rollouts, using predicted contact to transition from visual approach to tactile-grounded interaction. We evaluate on three contact-rich tasks: chip grasping, fruit grasping, and USB insertion. Our contributions are:  
+
+> •
+
+We propose FeelWorld , a hierarchical visuo-tactile world model that jointly predicts future visual latents and three tactile states, grounding imagined futures in contact physics. FeelWorld achieves an LPIPS of 0.058 and F1 scores of 98.1% and 83.4% for contact and slip prediction, respectively, while maintaining stable long-horizon rollouts.  
+
+> •
+
+We introduce a Contact-gated Asymmetric Attention Mechanism , which allows tactile features to modulate visual dynamics only during contact, thus protecting the world model from free-space sensor noise. Removing the gate degrades SSIM from 0.884 to 0.876 and PSNR from 28.89 to 27.52.  
+
+> •
+
+We develop a Contact-aware CEM Planner , which uses the predicted contact state to divide planning into a vision-guided stage and a joint visuo-tactile optimiza-tion stage, achieving an average success rate of 81.7% across three contact-rich tasks and outperforming the vision-only baseline by 32.5 percentage points. II. R ELATED WORK 
+
+A. Action-Conditioned World Models 
+
+World models learn action-conditioned dynamics, enabling robots to plan by imagining the outcomes of candidate ac-tions. The Dreamer family supports long-horizon imagination through compact latent dynamics [3], [4]. Recent robotic world models, such as V-JEPA 2 [6], Ctrl-World [11], and Interactive World Simulator [12], further demonstrate action-conditioned visual imagination for planning, policy evalua-tion and improvement, and interactive simulation. Generative world models such as UniSim [13] and RoboDreamer [14] extend this direction to interactive real-world simulation and compositional robot imagination. VT-WM [15] introduces touch into world models to improve the physical consistency and stability of long-horizon autoregressive rollouts. Con-tactWorld [16] highlights the value of spatially structured and temporally continuous visuo-tactile representations for contact-rich planning. However, most existing world models prioritize visual fidelity or treat touch as an undifferentiated observation, without explicitly modeling the structured con-tact dynamics underlying physical interaction. Consequently, their imagined futures may appear visually plausible yet remain physically inconsistent. FeelWorld addresses this limitation by jointly predicting visual latents and three tactile states with explicit hierarchical supervision and contact-gated fusion, enabling physically consistent prediction and planning. 
+
+B. Visuo-Tactile Representation Learning 
+
+Vision-based tactile sensors such as GelSight [17] and DIGIT [18] capture contact geometry and force distribu-tion through elastomer deformation, while 3D tactile point clouds provide geometric representations of surface inter-action. Building on these sensors, self-supervised tactile pretraining [19], self-supervised visuo-tactile alignment [20], and unified multimodal representation learning [21]–[24] have enabled tactile representations that generalize across sensors and tasks. CLTP [25] further aligns 3D tactile point clouds with contact-aware semantics, while FG-CLTP [26] introduces fine-grained semantic alignment for tactile repre-sentation pretraining. FeelWorld employs the pretrained FG-CLTP encoder to encode 3D tactile point clouds into latents that preserve force-related interaction information and jointly supervises three explicit hierarchical levels: contact state, 3D tactile latent, and slip state. 
+
+C. Visuo-Tactile Manipulation Policies 
+
+Prior visuo-tactile manipulation policies directly integrate tactile observations, force cues, or language-aligned tactile representations into action generation [27]–[31]. More recent studies have begun to exploit predicted tactile or visuo-tactile futures. OmniVTA [32] combines short-horizon multimodal prediction with contact-aware control, while DreamTacVLA, Dream-Tac, VT-WAM, and Tactile-WAM use predicted mul-timodal observations or latent representations to support action generation [7]–[10]. Despite these advances, most policy-oriented methods either map multimodal observations directly to actions or use future predictions mainly for policy generation, without explicitly structuring how contact states evolve under candidate actions. In contrast, our method integrates tactile sensing into an action-conditioned world model that captures the dynamics of contact-rich interac-tions, enabling physically consistent rollouts for future-state prediction and model-based planning. III. M ETHOD 
+
+A. Problem Formulation 
+
+FeelWorld learns an action-conditioned dynamics model that jointly predicts future visual latents and three tactile states. The visual input consists of images It from V views, such as third-person cameras for global scene context and a wrist camera for interaction feedback. A frozen visual encoder produces the visual latent ot = Ev (It). A frozen tactile encoder produces the tactile latent ht = Eτ (Pt).We denote the tactile states at time t by the tuple τt =(ct, h t, s t), comprising the contact state, 3D tactile latent, and slip state. Within the dynamics transformer, zot and zτt
+
+denote the visual and tactile components, respectively, and Visual tokens 
+
+> …
+> Action Conditioning
+
+𝑡 𝑘 +1
+
+> V-jepa
+> Encoder
+> CLTP
+> Encoder
+
+Visual 
+
+> Tactile
+
+Hierarchical Tactile States 
+
+Contact -Gated  Self Attention  
+
+> …
+> Tactile latents
+> Trainable
+> Frozen
+> Self -Attention
+> … …
+> 𝑔 𝑡
+> Action
+
+Visuo -Tactile World Model ( FeelWorld )
+
+> Action
+> MLP
+> Predictor
+> (Transition
+> Model)
+> Contact State
+
+Contact -aware CEM Planning                  
+
+> Joint Prediction Loss
+> Noise injection
+> Tactile Latent
+> Slip State
+> Visual latent
+> 𝐴 𝑡 𝐴 𝑡 +𝐻 −1
+> Planning Cost
+> 𝐽 𝐴 =σ𝑘 =1
+> 𝐻 𝑝 𝒟 𝑣 ො𝑜 𝑡 +𝑘 𝑜 goal +𝑔 𝑘 𝑤 𝜏 𝒟 𝜏 ෠ℎ𝑡 +𝑘 ℎgoal +𝑤 𝑠 𝒟 slip Ƹ𝑠 𝑡 +𝑘
+> 𝑃 (𝜃 )𝑃 (𝜃 )
+
+## …    
+
+> CEM Planner
+> (candidates= N, topk =K, iterations=I)
+> 𝑔 𝑡 𝑔 𝑡 +𝐻 −1
+> Ƹ
+> 𝑧 𝑡 Ƹ𝑧 𝑔
+
+## 在此处键入公式。    
+
+> Visual Latents Future Prediction
+> 𝑧 𝑡 +1
+> 𝑜
+> Ƹ
+> 𝑧 𝑡 +1
+> 𝜏
+> Ƹ
+> 𝑠 𝑡 +1
+> Ƹ
+> 𝑐 𝑡 +1
+
+Fig. 2. Architecture of FeelWorld. Visual observations, tactile observations, and actions are encoded into latent tokens. Hierarchical tactile modeling decomposes touch into explicitly supervised contact states, 3D tactile latents, and slip states. Contact-gated asymmetric attention preserves visual prediction before contact and enables joint visuo-tactile prediction during contact. Autoregressive rollout training with context noise injection improves long-horizon robustness. 
+
+zt = [zot ; zτt ] denotes the fused visuo-tactile latent. The contact gate gt controls tactile-to-visual modulation (Sec. III-C). Given robot proprioception qt and a 7-dimensional action 
+
+at, the dynamics model predicts 
+
+ˆzt+1 = [ˆ zot+1 ; ˆ zτt+1 ] = Wθ (zt, g t, q t, a t). (1) The visual component ˆzot+1 is decoded into the next visual latent ˆot+1 , while the tactile component ˆzτt+1 is decoded into the three tactile states ˆτt+1 = (ˆ ct+1 , ˆht+1 , ˆst+1 ), where 
+
+ˆct+1 , ˆst+1 ∈ [0 , 1] .
+
+B. Hierarchical Tactile Modeling 
+
+We structure tactile prediction hierarchically around three states: contact state, 3D tactile latent, and slip state. Each state serves a distinct role in dynamics modeling and plan-ning. 
+
+Tactile encoding. The 3D tactile point cloud Pt is encoded by a pretrained encoder [26] into a compact latent represen-tation: 
+
+ht = Eτ (Pt) ∈ Rdτ . (2) This latent encodes force-related contact information, in-cluding contact area, pressure distribution, and principal deformation direction. We omit LayerNorm for ht, as nor-malization may remove magnitude information associated with contact intensity. 
+
+Shared tactile prediction. The tactile prediction head de-codes the next-step tactile latent from the predicted tactile component: 
+
+ˆht+1 = Hτ
+
+ ˆzτt+1 
+
+, (3) where Hτ is the tactile prediction head. This readout grounds the tactile component of the fused dynamics in the geometry and deformation measured by the tactile sensor. 
+
+Level 1: Contact state. A two-layer MLP contact head Hc
+
+predicts binary contact probability from the predicted tactile component: 
+
+ˆct+1 = Hc
+
+ ˆzτt+1 
+
+ ∈ [0 , 1] . (4) Contact is supervised with binary cross-entropy loss: 
+
+Lcontact = BCE(ˆ ct+1 , c t+1 ), (5) where ct+1 ∈ {0, 1} is the ground-truth contact label. The predicted contact probability ˆct+1 controls visuo-tactile fusion (Sec. III-C) and activates tactile objectives during planning (Sec. III-E). 
+
+Level 2: 3D tactile latent. The decoded 3D tactile latent 
+
+ˆht+1 encodes local contact geometry and surface deforma-tion. It is directly supervised against the stop-gradient target from the tactile encoder: 
+
+Ltis = ∥ˆht+1 − sg( Eτ (Pt+1 )) ∥1, (6) where sg( ·) denotes stop-gradient to prevent backpropa-gation through the frozen encoder. This L1 loss grounds the predicted dynamics in physically measured deformation patterns. 
+
+Level 3: Slip state. Slip is inherently temporal; detecting incipient slip requires observing how the tactile component changes over time. A causal 1D convolutional head with kernel size K=3 aggregates a temporal window of predicted tactile features: 
+
+ˆst+1 = Hs
+
+ ˆzτt−K+2: t+1 
+
+ ∈ [0 , 1] , (7) where Hs is the slip head. This architecture explicitly models the transition from the 3D tactile latent to the slip state. Slip labels are highly imbalanced (stable contact dominates), so we use binary focal loss [33]: 
+
+Lslip = −αt
+
+ 1 − pt
+
+γ log pt, (8) where pt is the probability assigned to the ground-truth class and αt is its class-balancing weight; we set α=0 .95 for positive (slip) examples and γ=2 .0 to down-weight easy negatives. Because slip is defined only during contact, we compute Lslip only at timesteps where ct+1 =1 . The predicted slip probability ˆst+1 enters the planning cost to penalize unstable interactions. 
+
+Teacher-forcing objective. The visual prediction head de-codes ˆot+1 = Hv (ˆ zot+1 ). Its next-state prediction is super-vised against the stop-gradient target from the visual encoder 
+
+Ev . Both Ev and Eτ are pretrained and frozen, so only the dynamics predictor and prediction heads are trained: 
+
+Ltf vis = ∥ˆot+1 − sg( Ev (It+1 )) ∥1, (9) The joint teacher-forcing objective combines this visual loss with the hierarchical tactile losses: 
+
+Ltf = Ltf vis + λτ Ltis + λcLcontact + λsLslip , (10) where λτ =0 .3, λc=0 .03 , and λs=0 .03 balance the contribu-tion of each tactile level. 
+
+C. Contact-Gated Visuo-Tactile Attention 
+
+The encoded tactile latent ht and visual latent ot are projected into the tactile and visual transformer tokens zτt
+
+and zot , respectively. However, naive concatenation with standard self-attention allows noisy tactile signals during free-space motion to interfere with visual tokens, potentially degrading visual prediction. We therefore introduce contact-gated asymmetric attention. Tactile tokens first attend to visual tokens, grounding local tactile observations in global scene information, such as object pose, robot configuration, and task phase: 
+
+ˆzτt = zτt + CrossAttn( zτt , z ot , z ot ). (11) Conversely, whether visual tokens attend to tactile features is determined by the binary contact gate gt, which is pro-duced by the preceding contact prediction: 
+
+ˆzot = zot + gt CrossAttn( zot , ˆzτt , ˆzτt ). (12) The complete fused feature is ˆzt = [ˆ zot ; ˆ zτt ]. Its visual compo-nent retains a visual prediction pathway while incorporating tactile evidence only during contact. At the initial timestep, the gate uses the ground-truth contact label from the first observation ( g0 = c0). During teacher-forcing training, sub-sequent gates also use ground-truth contact labels ( gt = ct), providing clean supervision for the fusion mechanism. Dur-ing autoregressive rollout and inference, the gate is derived from the predicted contact probability ( gt = I[ˆ ct ≥ 0.5] ). Visuo-tactile cross-attention is then disabled when ˆct < 0.5
+
+and enabled otherwise. 
+
+D. Rollout Training with Context Noise Injection 
+
+The teacher-forcing objective of Eq. (10) trains the model to predict the next state from ground-truth context. At infer-ence, however, the model operates autoregressively, receiving its own predicted latents as input. Prediction errors at each step become input errors at the next. This discrepancy causes errors to compound over long horizons, producing rollouts that diverge from physically plausible futures. We mitigate this by training with multi-step autoregressive rollouts ( R steps) alongside the teacher-forcing objective. Starting from a randomly sampled timestep t, the model predicts forward for R steps using its own fused outputs as context. Additionally, we inject small Gaussian noise into the visuo-tactile context before feeding it into the world model: 
+
+˜zt+r = ˆ zt+r + εz , (13) with εz ∼ N (0 , σ 2I). The noise scale σ approximates the prediction error distribution encountered during inference-time autoregression. Training the model to predict from noisy contexts encourages it to generate high-quality outputs from perturbed inputs, thereby improving robustness during autoregressive rollout. The rollout loss averages over all R steps: 
+
+Lrollout = 1
+
+R
+
+> R
+
+X
+
+> r=1
+
+
+
+Lroll vis ,r + λτ Lroll tis ,r 
+
++ λcLroll contact ,r + λsLroll slip ,r 
+
+
+
+,
+
+(14) where the four terms at each step r denote the corresponding losses evaluated at t+r; Lroll slip ,r is computed only when 
+
+ct+r =1 . The total objective is Ltotal = Ltf + λroll Lrollout .
+
+E. Contact-Aware CEM Planning 
+
+At control step t, the current observation is encoded as xt = (zt, g t, q t), where zt is the fused visuo-tactile latent. Given a candidate action sequence A =(at, a t+1 , . . . , a t+Hp−1), FeelWorld rolls xt forward for Hp
+
+steps and predicts the fused latent together with its visual and tactile readouts, contact probability, and slip probability at every step. The planner can evaluate an action sequence in latent space before executing it on the robot. We use CEM to search for the action sequence A that minimizes the planning cost. The planner maintains a diag-onal Gaussian distribution over action sequences. In each of I iterations, it samples N candidates, evaluates each candidate through an autoregressive model rollout, retains the 
+
+K sequences with the lowest cost, and refits the Gaussian to these elites. After the final iteration, the robot executes the first two actions of the lowest-cost sequence, observes the resulting state, and replans. The planning cost retains visual task progress throughout the rollout and activates tactile interaction terms only after predicted contact:         
+
+> J(A) =
+> Hp
+> X
+> k=1
+> h
+> Dv(ˆ ot+k, o goal )+gk
+>  wτDτ(ˆht+k, h goal ) + wsDslip (ˆ st+k)i
+> ,
+> (15)
+
+Algorithm 1 Contact-Aware CEM Planning                                                                                                           
+
+> Require: Wθ,xt,(ogoal , h goal ),Hp,N,K,I,wτ,ws
+> Ensure: A⋆t:t+1
+> 1: Initialize q(A) = N(μ0, σ 20I)
+> 2: for i= 1 to Ido
+> 3: Sample {A(n)}Nn=1 ∼q(A)
+> 4: for n= 1 to Ndo
+> 5: {[ˆ zot+k; ˆ zτt+k]}Hp
+> k=1 ← W θ(xt, A (n))
+> 6: Decode {ˆot+k}Hp
+> k=1 from {ˆzot+k}Hp
+> k=1
+> 7: Decode {ˆht+k,ˆct+k,ˆst+k}Hp
+> k=1 from {ˆzτt+k}Hp
+> k=1
+> 8: Jn←0
+> 9: for k= 1 to Hpdo
+> 10: if ˆct+k<0.5then
+> 11: Jn←Jn+Dv(ˆ ot+k, o goal )
+> 12: else
+> 13: Jn←Jn+Dv(ˆ ot+k, o goal ) + wτDτ(ˆht+k, h goal ) +
+> wsDslip (ˆ st+k)
+> 14: end if
+> 15: end for
+> 16: end for
+> 17: E ← top-Kwith lowest Jn
+> 18: μ, σ 2←Mean( {A(n)}n∈E ),Var( {A(n)}n∈E )
+> 19: end for
+> 20: return first two actions of A(arg min nJn)
+
+where gk = I[ˆ ct+k ≥ 0.5] is the hard contact gate at future step k, and wτ , w s weight the tactile and slip costs. The visual distance Dv and tactile distance Dτ are both 
+
+L1 distances in their respective latent spaces. Dslip (ˆ st+k) = ˆst+k directly penalizes predicted slip probability. The visual distance Dv remains active over the full horizon. Before pre-dicted contact ( gk = 0 ), tactile and slip costs are suppressed; after contact ( gk = 1 ), the weighted tactile goal distance and slip penalty are added. Each candidate action sequence therefore induces its own contact-conditioned physical cost. Algorithm 1 summarizes one receding-horizon planning step. Tactile goals are physically unreachable before contact. Applying Dτ or Dslip during free-space approach would make CEM optimize an unrealizable physical state and create competing objectives. The contact gate removes this conflict while preserving visual progress throughout the horizon: tac-tile geometry and slip influence planning only after contact becomes reachable. IV. E XPERIMENTS 
+
+We design experiments to answer three questions. Does joint visuo-tactile modeling with hierarchical tactile super-vision improve visual prediction quality over vision-only baselines? Can FeelWorld capture the temporal dynamics of tactile interaction? Does contact-aware planning improve success rates in contact-rich manipulation compared with vision-only and naive joint planning baselines? 
+
+A. Experimental Setup 1) Robot Platform and Dataset: Experiments are con-ducted on an Imeta-Y1 robot equipped with three RGB cameras and DM tactile sensors. We consider three contact-rich manipulation tasks: chip grasping , which involves fragile objects with varying sizes and thicknesses; fruit grasping , which involves objects with diverse geometries Imeta -Y1    
+
+> RealSense D435I RealSense D435I
+> DM -Tac W2 Sensor
+> USB Camera
+> Fig. 3. Robot platform. The Imeta-Y1 robot is equipped with three RGB cameras and DM tactile sensors. FeelWorld uses the left external camera to observe the global state and the wrist-mounted camera to provide local observations. The DM tactile sensor captures 3D tactile point clouds and contact states.
+
+and compliance; and USB insertion , which requires precise contact reasoning under visual occlusion. For each task, we collect 200 training trajectories and 40 test trajectories. All trajectories are recorded at 30 Hz and downsampled to 6 fps for world model training. Contact and slip labels are obtained from the official sensor API. Contact states are approximately balanced, whereas slip events account for only 0.93% of the data, motivating the use of focal loss in Eq. (8). 
+
+2) Implementation Details: FeelWorld adopts V-JEPA 2 [6] as the visual backbone and processes two RGB views at a resolution of 224 ×224 . Features from the two views are independently encoded and concatenated along the sequence dimension before being passed to the dynamics predictor. For a fair comparison, DINO-WM and JEPA-WM are extended to the same multi-view setting using an identical encoding strategy. The 3D tactile point clouds are encoded by a frozen FG-CLTP encoder Eτ [26] without fine-tuning. The dynam-ics predictor is a spatio-temporal transformer conditioned on 7-dimensional robot actions, while contact state is predicted by a two-layer MLP head and slip state by a causal 1D con-volutional head. DINO-WM and JEPA-WM use their official decoders; since V-JEPA 2 provides none, we train a ViT-based decoder for V-JEPA 2, FeelWorld, and its ablations for fair visual comparison and visualization. The pretrained FG-CLTP decoder reconstructs tactile deformation maps. All decoders are used only for evaluation and visualization, not training or planning. The model is trained on 8 H100 GPUs with a batch size of 64. We set λτ =0 .3, λc=0 .03 , λs=0 .03 , λroll =0 .5,
+
+R=4 , and σ=0 .007 . During both training and evaluation, we use a 9-frame context window, corresponding to 1.5 s of observation history at 6 fps. Each zero-shot planning episode spans 50 control steps. At every replanning cycle, CEM samples N =400 candidate action sequences over a planning horizon of Hp=6 , retains the top 8 candidates as elites, and performs 8 optimization iterations. The robot executes the first two actions before replanning. Planning performance is TABLE I 10-STEP ROLLOUT QUALITY ACROSS VISUAL BASELINES AND FEEL WORLD ABLATIONS .Components Visual Prediction Tactile Prediction Method Tac. Hier. Gate PSNR ↑ SSIM ↑ LPIPS ↓ FID ↓ FVD ↓ Chamfer ↓ Contact F1 ↑ Slip F1 ↑
+
+DINO-WM [34] × × × 23.22 0.770 0.138 229.4 843.3 – – –JEPA-WM [5] × × × 23.78 0.781 0.132 204.3 792.1 – – –V-JEPA 2 (visual-only) [6] × × × 24.37 0.819 0.084 106.7 473.5 – – –FeelWorld (w/o hierarchical) ✓ × × 26.71 0.853 0.071 79.14 326.4 0.072 – –FeelWorld (w/o contact gate) ✓ ✓ × 27.52 0.876 0.067 78.03 307.2 0.067 0.973 0.803 
+
+FeelWorld (Ours) ✓ ✓ ✓ 28.89 0.884 0.058 76.45 289.9 0.063 0.981 0.834 t =0  t =3s  t =5s  t =6s  t =8s  t =10s     
+
+> Wrist –view
+> Ground Truth Contact: 0
+> Slip: 0
+> Contact: 1
+> Slip: 0
+> Contact: 0
+> Slip: 0
+> Contact: 1
+> Slip: 0
+> Contact: 1
+> Slip: 0
+> Contact: 1
+> Slip: 0
+> Contact: 1
+> Slip: 0
+> Contact: 1
+> Slip: 1
+> Contact: 0
+> Slip: 0
+> Contact: 0
+> Slip: 0
+
+Fig. 4. Qualitative visualizations of FeelWorld. The model predicts future visual observations together with three tactile states: contact state, 3D tactile latent, and slip state. These tactile states change according to the interaction context and robot action. 
+
+evaluated over 40 real-robot trials for each task. 
+
+B. Visual Prediction Evaluation 
+
+We evaluate the visual prediction quality of FeelWorld against several baselines. Table I shows that the full model performs best across all five visual metrics. It is worth noting that approximately 30% of the trajectories in our dataset are failed episodes, including unsuccessful grasps, object slippage, and failed USB insertions caused by subtle differences. Evaluating these trajectories provides a rigorous assessment of long-horizon prediction accuracy and helps determine whether the model captures fine-grained physical dynamics rather than overfitting to successful demonstra-tions. Compared with the visual-only V-JEPA 2 baseline, FeelWorld consistently improves visual quality and tem-poral consistency, increasing PSNR from 24.37 to 28.89 and SSIM from 0.819 to 0.884, while reducing LPIPS by 31.0% and FVD by 38.8%. The ablation results show that the basic naive visuo-tactile variant, which retains context noise injection and the rollout loss, already outperforms the visual-only model, reducing LPIPS from 0.084 to 0.071, as tactile observations provide complementary information for distinguishing interaction states and predicting the next frame around contact transitions. Explicit hierarchical tactile modeling further reduces LPIPS to 0.067, while asymmetric contact-gated attention achieves the best result of 0.058, with consistent improvements in PSNR and FVD. In particular, the full model preserves the visual prediction quality of the vision-only world model before contact by suppressing irrelevant tactile interference, while incorporating tactile in-
+
+TABLE II VISUAL PREDICTION AROUND CONTACT TRANSITIONS .CONTACT -ONSET ERROR MEASURES THE DEVIATION FROM GROUND -TRUTH ONSET TIME .Method Phase LPIPS ↓ Onset Error (frames) ↓
+
+V-JEPA 2 Free space 0.089 –Contact transition 0.127 1.17 FeelWorld Free space 0.046 –Contact transition 0.055 0.44 
+
+formation during contact for joint visuo-tactile learning and prediction. This selective integration substantially improves prediction consistency and demonstrates the effectiveness of the proposed hierarchical tactile modeling and contact-gated fusion. We then conduct a phase-wise analysis to evaluate pre-diction performance across different interaction stages. As shown in Table II, visual prediction remains relatively reli-able in free space but degrades substantially around contact transitions, where the object may slip, become stuck, or move together with the robot. The LPIPS of V-JEPA 2 increases by 42.7%, from 0.089 to 0.127, indicating that vision alone cannot reliably infer grasp stability or impending slip. In contrast, the LPIPS of FeelWorld increases only from 0.046 to 0.055 and remains 56.7% lower than that of V-JEPA 2 during contact transitions, demonstrating that tactile modeling reduces contact-induced ambiguity and improves prediction consistency. To further quantify the ambiguity of visual observations near contact, we freeze the V-JEPA 20                  
+
+> 24
+> 28
+> 32
+> PSNR  ↑ (dB)
+> (a)
+> +6.70 dB at 80 steps
+> Long-horizon rollout 0.75
+> 0.80
+> 0.85
+> 0.90
+> 0.95
+> SSIM  ↑
+> (b)
+> +0.115 at 80 steps
+> 1510 20 40 80
+> Autoregressive rollout step
+> 0.05
+> 0.08
+> 0.11
+> 0.14
+> 0.17
+> LPIPS  ↓
+> (c)
+> 61% lower at 80 steps
+> 1510 20 40 80
+> Autoregressive rollout step
+> 0.01
+> 0.02
+> 0.03
+> 0.04
+> MAE  ↓
+> (d)
+> 62% lower at 80 steps
+> Vision Only Naive Visuo-Tactile Fusion FeelWorld (Ours)
+
+Fig. 5. Long-horizon autoregressive visual prediction. At step 80, FeelWorld improves PSNR and SSIM over Vision Only by 6.70 dB and 0.115, while reducing LPIPS and MAE by 61% and 62%. The shaded region marks the long-horizon regime. 
+
+2 visual backbone and train only a lightweight contact-prediction head. The resulting contact-onset error is 1.17 frames, compared with only 0.44 frames when tactile features from FeelWorld are used, further highlighting the importance of tactile information for accurately identifying contact tran-sitions. We further evaluate the long-horizon rollout performance of FeelWorld through autoregressive prediction over 1, 5, 10, 20, 40, and 80 steps, where 80 steps correspond to approximately 13.3 s. V-JEPA 2 corresponds to Vision Only, while FeelWorld (w/o hierarchical) corresponds to Naive Visuo-Tactile Fusion. The experimental results show that the visual-only model exhibits substantial drift, which becomes increasingly pronounced as the rollout horizon increases, as shown in Fig. 5. Naive visuo-tactile fusion also drifts over long rollouts because unfiltered tactile signals perturb the visual prediction stream during non-contact phases. By suppressing this pre-contact interference, FeelWorld consis-tently achieves the best prediction performance, indicating that contact-gated attention and joint visuo-tactile modeling enable the model to capture fine-grained physical dynamics while supporting stable long-horizon rollouts. FeelWorld’s LPIPS increases from 0.055 at step 1 to 0.062 at step 80 and remains 61% lower than the visual-only baseline at the longest horizon. 
+
+C. Tactile State Prediction 
+
+We further evaluate the prediction accuracy of the three tactile states. As shown in Table III, FeelWorld predicts contact with 98.6% accuracy and a contact-onset error of only 0.44 frames. The tactile point cloud prediction error reported in Table I is also low, indicating accurate modeling of local contact deformation. Slip metrics are computed over all test frames. Because slip-positive frames constitute only 0.93% of the data, the dominant non-slip class yields a high raw accuracy of 99.7%; F1, precision, and recall are therefore more informative. FeelWorld achieves 83.4% F1, 81.7% precision, and 85.2% recall, demonstrating reliable detection of these rare but critical events. These results show 
+
+TABLE III CONTACT AND SLIP STATE PREDICTION OVER ALL TEST FRAMES .ONSET AND OFFSET ERRORS ARE IN FRAMES AT 6 FPS .
+
+State Classification (%) Onset/Offset Error (frames) ↓
+
+Acc. ↑ F1 ↑ Prec. ↑ Rec. ↑ Onset Offset Contact 98.6 98.1 98.5 97.8 0.44 0.69 Slip 99.7 83.4 81.7 85.2 0.56 –GT AR              
+
+> (a)
+> t=9 s t=1 1s
+> 246810 0.0 0.5 1.0
+> Contact probability
+> (b)
+> Sensor 1 predicted Sensor 1 GT Sensor 2 predicted Sensor 2 GT Gate threshold
+> Tactile visible 260.0 0.5 1.0
+> Slip probability
+> (c)
+> Sensor 1 predicted Sensor 1 GT Sensor 2 predicted Sensor 2 GT
+> Tactile S1 Tactile S2
+> Visuo-tactile attention
+> (d) Free-space (gate cl osed)
+> Tactile S1 Tactile S2
+> V_high 10
+> Contact (gate open)
+> 0.00 0.01 0.02
+> Softmax attention
+> 246810 Rollout time (s)
+> Contact  gate
+> (e)
+> Episode contact-gated rollout
+> t=4 s t=1 s
+> V_ wrist
+> 48
+
+Fig. 6. Visualization of contact-gated prediction during a USB insertion episode. (a) Multi-stage visual rollout. (b) Ground-truth and predicted contact states. (c) Ground-truth and predicted slip states. (d) Gated visuo-tactile cross-attention for the external and wrist camera views. (e) Hard contact-gate activation over time. 
+
+that the fused tactile latent ˆzτ effectively captures contact state, force-related information, and slip, providing essential physical grounding for visuo-tactile fusion. Fig. 6 qualitatively illustrates the gating behavior during a USB insertion episode. Panel (a) shows the multi-stage visual rollout, while panels (b) and (c) compare the ground-truth and predicted contact and slip states. The model cor-rectly identifies the slip risk during USB removal and the mild slip near the end of insertion. Panel (d) visualizes the gated asymmetric attention. Before contact, visuo-tactile cross-attention is suppressed during free-space motion; after contact, tactile information contributes more strongly to the external-view prediction than to the wrist-view prediction, likely because the external camera provides less local in-teraction detail. Panel (e) shows that the hard gate opens only during contact, demonstrating that tactile information is selectively incorporated into visual dynamics prediction during physical interaction. 0 10 20 30 40 Step 0.3 0.4 0.5 0.6 0.7 0.8 Total Loss 0 10 20 30 40 Step 0.10 0.15 0.20 0.25 0.30 0.35 0.40 Tactile Loss     
+
+> Vision Only Naive Visuo-Tactile CEM
+> Contact -Aware CEM
+> Contact Gate IQR Median Contact Gate Vision Only Naive Visuo-Tactile CEM
+> Contact -Aware CEM
+> Contact Gate IQR Median Contact Gate
+
+Fig. 7. CEM planning curves over a 50-step execution. The plots show total loss (left) and tactile loss (right). At each replanning cycle, CEM optimizes a 6-step imagined horizon and executes the first two actions. The dotted line and gray band mark the median and interquartile range of contact-gate activation. TABLE IV ZERO -SHOT CEM PLANNING SUCCESS RATES .Planner Chip Fruit USB Visual-only CEM (w/o Tactile) 40.0 70.0 37.5 Naive Visuo-Tactile CEM 47.5 75.0 50.0 
+
+Contact-aware CEM 82.5 87.5 75.0 
+
+D. Zero-Shot Planning Results 
+
+We evaluate zero-shot planning by specifying a task sub-goal and selecting actions through imagined rollouts, without training a task-specific policy. Each episode runs for 50 control steps. At every replanning cycle, CEM samples 400 candidate action sequences over a planning horizon of Hp=6 
+
+imagined steps, executes the first two actions of the optimal sequence, and then replans. We compare three methods. V-JEPA 2 is the visual world model baseline and optimizes only the visual latent distance to the goal. Naive Visuo-Tactile CEM jointly optimizes visual and tactile objectives throughout the planning horizon. Ours adopts the contact-gated planning objective in Eq. (15). Figure 7 shows the convergence of the planning objectives, while Table IV reports the results of 40 real-robot trials for each task. Our method achieves success rates of 82.5%, 87.5%, and 75.0% on chip grasping, fruit grasping, and USB insertion, respectively. In comparison, V-JEPA 2 achieves 40.0%, 70.0%, and 37.5%, while Naive Visuo-Tactile CEM 
+
+achieves 47.5%, 75.0%, and 50.0%. The results highlight the importance of activating tactile objectives at the appropriate interaction stage. Vision-only CEM can guide the robot toward a visually plausible goal configuration, but visual similarity alone does not ensure stable contact or successful insertion. Naive visuo-tactile CEM improves contact-phase optimization, but optimizing an unreachable tactile goal be-fore contact interferes with free-space approach. In contrast, our contact-gated CEM relies on visual guidance before contact and activates joint visuo-tactile optimization only after contact is predicted. This decomposition avoids pre-contact interference while enabling accurate reasoning about contact geometry, grasp stability, and slip during physical interaction. Consequently, our method consistently achieves the highest success rate across all tasks and improves USB insertion from 37.5% to 75.0% under severe visual occlusion. V. C ONCLUSION 
+
+We introduce FeelWorld, a hierarchical visuo-tactile world model that jointly predicts visual latents and three tactile states. Hierarchical tactile modeling with explicit super-vision enables fine-grained representation of contact dy-namics. The proposed contact-gated asymmetric attention suppresses irrelevant tactile interference during free-space motion while enabling joint visuo-tactile prediction during contact. Compared with the visual-only baseline and naive visuo-tactile fusion, FeelWorld achieves superior 10-step prediction accuracy and long-horizon rollout robustness. It reduces 10-step LPIPS from 0.084 to 0.058. Over an 80-step autoregressive rollout, LPIPS increases to 0.062 and remains 61% lower than that of the visual baseline. FeelWorld also achieves F1 scores of 98.1% and 83.4% for contact and slip prediction, respectively. Furthermore, contact-aware CEM planning achieves an average success rate of 81.7%, exceed-ing the visual-only baseline by 32.5 percentage points. These results demonstrate that hierarchical tactile modeling and contact-gated asymmetric attention enable effective visuo-tactile fusion and contact-state understanding, providing a general framework for incorporating tactile sensing into world models. Despite these results, CEM-based planning remains com-putationally expensive and is not suitable for high-frequency real-time control. Future work could integrate FeelWorld with a policy network to efficiently evaluate candidate roll-outs and iteratively refine the model using real-world inter-action data, thereby providing physically consistent guidance for policy learning and optimization in contact-rich manipu-lation tasks. REFERENCES [1] M. A. Lee, Y. Zhu, P. Zachares, M. Tan, K. Srinivasan, S. Savarese, L. Fei-Fei, A. Garg, and J. Bohg, “Making sense of vision and touch: Learning multimodal representations for contact-rich tasks,” IEEE Transactions on Robotics , vol. 36, no. 3, pp. 582–596, 2020. [2] S. Luo, N. F. Lepora, W. Yuan, K. Althoefer, G. Cheng, and R. Dahiya, “Tactile robotics: An outlook,” IEEE Transactions on Robotics , vol. 41, pp. 5564–5583, 2025. [3] D. Hafner, T. Lillicrap, J. Ba, and M. Norouzi, “Dream to control: Learning behaviors by latent imagination,” in International Conference on Learning Representations (ICLR) , 2020. [4] D. Hafner, J. Pasukonis, J. Ba, and T. Lillicrap, “Mastering diverse control tasks through world models,” Nature , vol. 640, pp. 647–653, 2025. [5] M. Assran, Q. Duval, I. Misra, P. Bojanowski, P. Vincent, M. Rabbat, Y. LeCun, and N. Ballas, “Self-supervised learning from images with a joint-embedding predictive architecture,” in Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , 2023, pp. 15 619–15 629. [6] M. Assran, A. Bardes, D. Fan, Q. Garrido, R. Howes, M. Komeili, M. Muckley, A. Rizvi, C. Roberts, K. Sinha, A. Zholus, S. Arnaud, A. Gejji, A. Martin, F. R. Hogan, D. Dugas, P. Bojanowski, V. Khali-dov, P. Labatut, F. Massa, M. Szafraniec, K. Krishnakumar, Y. Li, X. Ma, S. Chandar, F. Meier, Y. LeCun, M. Rabbat, and N. Ballas, “V-JEPA 2: Self-supervised video models enable understanding, pre-diction and planning,” arXiv preprint arXiv:2506.09985 , 2025. [7] Y. Lou, Y. Ye, Y. Fu, J. Cen, X. Chi, Y. Lyu, P. Jia, S. Han, Z. Lu, and S. Zhang, “Dream-Tac: A unified tactile world action model for contact-rich robot manipulation,” arXiv preprint arXiv:2606.08737 ,2026. [8] S. Tian, Y. Zheng, Y. Zheng, S. Gu, Y. Zang, Y. Qin, W. Li, H. Li, W. Ding, and D. Zhao, “VT-WAM: Visual-tactile world action model for contact-rich manipulation,” arXiv preprint arXiv:2607.02503 ,2026. [9] S. Wu, L. You, J. Zhu, Y. Liu, C. Zhang, J. Liu, W. Wang, Q. Li, J. Li, and H. Zhao, “Tactile-WAM: Touch-aware world action model with tactile asymmetric attention,” arXiv preprint arXiv:2606.26663 ,2026. [10] G. Ye, Z. Zhang, X. Zhao, S. Wu, H. Lu, S. Lu, and H. Liu, “Learning to feel the future: DreamTacVLA for contact-rich manipulation,” arXiv preprint arXiv:2512.23864 , 2025. [11] Y. Guo, L. X. Shi, J. Chen, and C. Finn, “Ctrl-World: A controllable generative world model for robot manipulation,” in The Fourteenth International Conference on Learning Representations , 2026. [12] Y. Wang, R. Syed, F. Wu, M. Zhang, A. Onol, J. Barreiros, H. Nayyeri, T. Dear, H. Zhang, and Y. Li, “Interactive world simulator for robot policy training and evaluation,” in Proceedings of Robotics: Science and Systems , 2026. [13] S. Yang, Y. Du, S. Ghasemipour, J. Tompson, L. Kaelbling, D. Schuur-mans, and P. Abbeel, “Learning interactive real-world simulators,” in 
+
+International Conference on Learning Representations (ICLR) , 2024. [14] S. Zhou, Y. Du, J. Chen, Y. Li, D.-Y. Yeung, and C. Gan, “Robo-Dreamer: Learning compositional world models for robot imagina-tion,” in Proceedings of the 41st International Conference on Machine Learning , ser. Proceedings of Machine Learning Research, vol. 235. PMLR, 2024, pp. 61 885–61 896. [15] C. Higuera, S. Arnaud, B. Boots, M. Mukadam, F. R. Hogan, and F. Meier, “Visuo-tactile world models,” arXiv preprint arXiv:2602.06001 , 2026. [16] Z. Zhang, P. Zhou, K. Zhang, A. Desai, T. Amosa, D. Soleymanzadeh, J. Lei, M. Zheng, and Y. She, “ContactWorld: What matters in vision-tactile world models for contact-rich manipulation,” arXiv preprint arXiv:2606.13877 , 2026. [17] W. Yuan, S. Dong, and E. H. Adelson, “GelSight: High-resolution robot tactile sensors for estimating geometry and force,” Sensors ,vol. 17, no. 12, p. 2762, 2017. [18] M. Lambeta, P.-W. Chou, S. Tian, B. Yang, B. Maloon, V. R. Most, D. Stroud, R. Santos, A. Byagowi, G. Kammerer, D. Jayaraman, and R. Calandra, “DIGIT: A novel design for a low-cost compact high-resolution tactile sensor with application to in-hand manipulation,” 
+
+IEEE Robotics and Automation Letters , vol. 5, no. 3, pp. 3838–3845, 2020. [19] C. Higuera, A. Sharma, C. K. Bodduluri, T. Fan, P. Lancaster, M. Kalakrishnan, M. Kaess, B. Boots, M. Lambeta, T. Wu, and M. Mukadam, “Sparsh: Self-supervised touch representations for vision-based tactile sensing,” in Proceedings of The 8th Conference on Robot Learning , ser. Proceedings of Machine Learning Research, vol. 270. PMLR, 2025, pp. 885–915. [20] J. Kerr, H. Huang, A. Wilcox, R. I. Hoque, J. Ichnowski, R. Calandra, and K. Goldberg, “Self-supervised visuo-tactile pretraining to locate and follow garment features,” in Proceedings of Robotics: Science and Systems , Daegu, Republic of Korea, July 2023. [21] L. Fu, G. Datta, H. Huang, W. C.-H. Panitch, J. Drake, J. Ortiz, M. Mukadam, M. Lambeta, R. Calandra, and K. Goldberg, “A touch, vision, and language dataset for multimodal alignment,” in Proceed-ings of the 41st International Conference on Machine Learning , ser. Proceedings of Machine Learning Research, vol. 235. PMLR, 2024, pp. 14 080–14 101. [22] F. Yang, C. Feng, Z. Chen, H. Park, D. Wang, Y. Dou, Z. Zeng, X. Chen, R. Gangopadhyay, A. Owens, and A. Wong, “Binding touch to everything: Learning unified multimodal tactile representations,” in 
+
+Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , 2024, pp. 26 340–26 353. [23] N. Cheng, J. Xu, C. Guan, J. Gao, W. Wang, Y. Li, F. Meng, J. Zhou, B. Fang, and W. Han, “Touch100k: A large-scale touch-language-vision dataset for touch-centric multimodal representation,” 
+
+Information Fusion , vol. 124, p. 103305, 2025. [24] R. Feng, J. Hu, W. Xia, T. Gao, A. Shen, Y. Sun, B. Fang, and D. Hu, “AnyTouch: Learning unified static-dynamic representation across multiple visuo-tactile sensors,” in The Thirteenth International Conference on Learning Representations , 2025. [25] W. Ma, X. Cao, Y. Zhang, C. Zhang, S. Yang, P. Hao, B. Fang, Y. Cai, S. Cui, and S. Wang, “CLTP: Contrastive language-tactile pre-training for 3D contact geometry understanding,” Biomimetic Intelligence and Robotics , p. 100324, 2026. [26] W. Ma, C. Zhang, Y. Cai, G. Yao, S. Cui, and S. Wang, “FG-CLTP: Fine-grained contrastive language tactile pretraining for robotic manipulation,” IEEE Robotics and Automation Letters , 2026. [27] B. Huang, Y. Wang, X. Yang, Y. Luo, and Y. Li, “3D-ViTac: Learning fine-grained manipulation with visuo-tactile sensing,” in Proceedings of The 8th Conference on Robot Learning , ser. Proceedings of Machine Learning Research, vol. 270. PMLR, 2025, pp. 2557–2578. [28] H. Xue, J. Ren, W. Chen, G. Zhang, Y. Fang, G. Gu, H. Xu, and C. Lu, “Reactive diffusion policy: Slow-fast visual-tactile policy learning for contact-rich manipulation,” in Proceedings of Robotics: Science and Systems , Los Angeles, CA, USA, June 2025. [29] Y. Huang, P. Lin, W. Li, D. Li, J. Li, J. Jiang, C. Xiao, and Z. Jiao, “TaF-VLA: Tactile-force alignment in vision-language-action mod-els for force-aware manipulation,” arXiv preprint arXiv:2601.20321 ,2026. [30] C. Zhang, P. Hao, X. Cao, X. Hao, S. Cui, and S. Wang, “VTLA: Vision-tactile-language-action model with preference learning for insertion manipulation,” Biomimetic Intelligence and Robotics , p. 100333, 2026. [31] Z. Cheng, Y. Zhang, A. Tang, K. Wang, W. Zhang, H. Li, H. Zhang, and L. Song, “OmniVTLA: Vision-tactile-language-action models with semantic-aligned tactile sensing,” IEEE Robotics and Automation Letters , 2026. [32] Y. Zheng, S. Gu, W. Li, Y. Zheng, Y. Zang, S. Tian, X. Li, R. Wu, C. Hao, C. Gao, S. Liu, H. Li, Y. Chen, S. Yan, and W. Ding, “OmniVTA: Visuo-tactile world modeling for contact-rich robotic manipulation,” arXiv preprint arXiv:2603.19201 , 2026. [33] T.-Y. Lin, P. Goyal, R. Girshick, K. He, and P. Dollár, “Focal loss for dense object detection,” in Proceedings of the IEEE International Conference on Computer Vision (ICCV) , 2017, pp. 2980–2988. [34] G. Zhou, H. Pan, Y. Lecun, and L. Pinto, “DINO-WM: World models on pre-trained visual features enable zero-shot planning,” in Proceed-ings of the 42nd International Conference on Machine Learning , ser. Proceedings of Machine Learning Research, vol. 267. PMLR, 2025, pp. 79 115–79 135.

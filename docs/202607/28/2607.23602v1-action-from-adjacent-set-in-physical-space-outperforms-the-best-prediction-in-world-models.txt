@@ -1,0 +1,1118 @@
+Title: Action from Adjacent Set in Physical Space Outperforms the Best Prediction in World Models
+
+URL Source: https://arxiv.org/pdf/2607.23602v1
+
+Published Time: Tue, 28 Jul 2026 01:03:41 GMT
+
+Number of Pages: 26
+
+Markdown Content:
+# Action from Adjacent Set in Physical Space Outperforms the Best Prediction in World Models 
+
+Liangyu Li Qingwen Liu Mingqing Liu Tongji University 
+
+2550703@tongji.edu.cn qliu@tongji.edu.cn clare@tongji.edu.cn 
+
+# Abstract 
+
+Controllers based on sampling and latent world models assign a predicted terminal cost to each candidate action sequence, choose the minimum, execute its first action block, and replan. This rule can fail even when the terminal cost perfectly and accurately reflects the true task objective in the physical world. Residual prediction error can give an infeasible sequence an anomalously low cost, and a larger proposal pool gives such errors more chances to outrank feasible alternatives. We call this conditional failure proposal overgeneration . In Cube can-didate execution audits, increasing the total proposal budget from 72 to 288 reduces the feasibility of selection by minimum latent cost from .375 to .062 for position targets and from .344 to .031 for targets defined by position and yaw, although every larger pool contains a feasible sequence. We introduce Ad-jacent Set Action Reconstruction ( ASAR ). Among proposals with low cost, ASAR identifies an adjacent set using stan-dardized early action prefixes and reconstructs a full action sequence through locally weighted aggregation with a light anchor from the sequence with minimum cost. On a Carry and Release evaluation set of 75 queries, Kernel ASAR im-proves event completion success over matching selection by 28.0, 24.0, and 18.7 percentage points under latent cost and by 18.7, 20.0, and 17.3 points under a trajectory reachability cost at 72, 144, and 288 proposals. Analysis of finite proposal pools characterizes selection risk from the lower tail, separation by a related radius support statistic, and sequence containment under an explicit local feasibility condition. 
+
+# 1 Introduction 
+
+Control based on sampling and latent world models encodes the current and goal observations, predicts the terminal latent state for each candidate action sequence, and ranks the can-didates with a terminal cost. A receding-horizon controller then executes the first action block of the selected sequence and replans. This pattern appears in latent model predictive control and recent world models for visual planning [Hafner et al., 2019, Hansen et al., 2022, 2024, Hafner et al., 2024, Micheli et al., 2023, Pu et al., 2025, Zhou et al., 2024, Assran et al., 2025, Maes et al., 2026b]. Increasing the proposal bud-get improves candidate coverage, and a better terminal cost improves the evaluation of predicted endpoints. Neither oper-ation explicitly uses distances between the action prefixes in the current proposal pool. Figure 1 shows why these relations within the pool can matter. The controller begins with a grasped cube and must transport it to a lower target before release. The sequence with minimum latent cost has an isolated prefix in the full standardized prefix space. After its first action block is chosen at each replan, the cube finishes 21.2 cm from the target. Twelve other sequences with low cost have nearby prefixes. Kernel ASAR reconstructs a weighted full action sequence from that adjacent set and the sequence with minimum cost. The resulting closed-loop execution releases the cube within 3.8 cm of the target from the same initial state and matched proposal draws. The failure begins when the controller minimizes costs computed from predicted terminal states rather than termi-nal states reached after execution. A useful predictor may still assign an infeasible sequence a cost below every feasible al-ternative. When more infeasible sequences are sampled from a comparable conditional distribution, the probability of ob-serving at least one such error in the lower tail increases. Feasible sequence coverage can therefore improve while the fraction of pools with a feasible sequence among the lowest costs decreases. We refer to this budget-induced degradation in candidate ranking under residual model error as proposal overgeneration. We measure this pattern in simulated Cube manipulation with a fixed LeWM checkpoint and CEM controller. In an audit of 192 proposal pools where every candidate is executed independently from the same state, selection by minimum la-tent cost chooses an infeasible sequence in 132 pools. Among these 132 failures, 58 pools, or 43.9%, already contain a fea-sible alternative among the 80 lowest latent costs. A separate evaluation set contains 32 pools for position targets and 32 for targets defined by position and yaw. Increasing the total bud-get from 72 to 288 lowers the fraction of pools with a feasible sequence among the 20 lowest costs from .969 to .656 and .625. A trajectory reachability cost raises the two rates at 288 proposals to .750 and .719, but the mean number of infeasible sequences with lower cost still increases substantially. These results motivate an adjacent-set action reconstruc-tion rule. When a region of low cost in the space of full action sequences has a robust feasible neighborhood, nearby early prefixes provide a proxy available at planning time for that lo-1arXiv:2607.23602v1 [cs.RO] 26 Jul 2026 A Already-grasped start B Carry-and-release goal             
+
+> −20 −15 −10 −5 0510 15 20
+> commanded Δ x
+> −20
+> −15
+> −10
+> −5
+> 0
+> 5
+> 10
+> 15
+> 20
+> commanded Δ z
+> 12 adjacent candidates
+> CEarly-action proposal modes
+> Raw top-1
+> Kernel ASAR
+> DRaw final: failure (21.2 cm) EKernel ASAR: success (3.8 cm)
+
+Figure 1: Carry and Release Cube. (A–B) A cube that is already grasped must be transported to a lower target and released. (C) The red sequence has minimum latent cost but is isolated in the full standardized prefix space. The plot shows only its commanded x and z projection. The twelve green sequences form the adjacent set identified in the full prefix space, and the blue sequence is the action reconstructed by Kernel ASAR . (D–E) Matched closed-loop execution leaves the cube 21.2 cm from the target under minimum cost selection and 3.8 cm away under ASAR . Gray traces show the remaining proposals. cal regularity. ASAR first restricts attention to sequences with low cost. It measures each sequence by the mean distance to its nearest standardized prefixes, identifies an adjacent set around the least isolated prefix, and reconstructs a weighted full action sequence from that set. A light mixture with the sequence of minimum cost retains information from the task objective. The world model, proposal generator, and terminal cost are unchanged. Selecting the least isolated existing se-quence from the same set of sequences with low cost is the matched existing-candidate baseline without reconstruction. Terminal objective quality and residual prediction error oc-cur at different stages. Trajectory Reachability Metrics ( TRM )ask whether terminal latent distance reflects physical task progress when evaluating a predicted endpoint and replace that distance with a metric based on trajectories [Li et al., 2026a]. ASAR begins after a terminal cost has been chosen. It assumes the cost is a meaningful task objective, then ad-dresses cases where residual endpoint prediction error gives one sequence a misleadingly low cost. We therefore use latent distance and TRM as two compatible cost inputs, not as com-peting controllers, and compare minimum cost selection with adjacent-set action reconstruction under each cost. Our contributions are: 1. We identify proposal overgeneration under residual model error. The candidate execution audits separate fea-sible sequence presence from top ranking and show that a larger pool can contain feasible sequences while mini-mum cost selection becomes less reliable. 2. We propose ASAR , which identifies an adjacent set among action prefixes with low cost and reconstructs a full action sequence that need not occur in the sampled pool. 3. We provide an order statistic identity for the lower tail, a concentration result under an explicit gap in radius support, and a conditional containment bound when the selected full sequences lie inside a robust feasible neigh-borhood. 4. Across 72, 144, and 288 proposals, ASAR improves event completion success under both latent distance and a reachability cost aligned with the task. Separate tests show a reconstruction gain of 13.7 percentage points over the least isolated existing sequence and replicate the method with independently trained world model weights. 
+
+# 2 Related Work 
+
+Latent world model control. PlaNet established online planning through learned latent dynamics, while Dreamer and DreamerV3 optimize behavior in imagined trajectories [Hafner et al., 2019, 2020, 2024]. TD-MPC and TD-MPC2 combine compact prediction with receding-horizon control [Hansen et al., 2022, 2024]. IRIS and UniZero study scalable planning in learned latent models [Micheli et al., 2023, Pu et al., 2025]. Recent visual models plan over pretrained or jointly learned embeddings [Zhou et al., 2024, Assran et al., 2025, Maes et al., 2026b,a]. Other work improves the planning interface or the model horizon [Parthasarathy et al., 2025, Du et al., 2026]. We leave the encoder, predictor, and action sam-pler fixed and use only relations among sequences in the final proposal pool. 
+
+MPC and CEM . CEM iteratively samples candidates, re-tains an elite set, and refits its proposal distribution [Rubin-stein, 1999]. It is widely used with learned dynamics be-cause it does not require differentiating through the environ-ment [Chua et al., 2018, Hafner et al., 2019]. iCEM improves sample efficiency through colored noise sampling, elite reuse, and distribution constraints [Pinneri et al., 2021], while MPPI forms action updates weighted by cost [Williams et al., 2017]. DecentCEM maintains several independent search distribu-tions to preserve multimodal structure [Zhang et al., 2022]. Learned action priors, diffusion policies, and generators con-ditioned on subgoals also improve the distribution of candi-date behavior [Chi et al., 2024, Wang et al., 2026, Cheng et al., 2026]. These methods change candidate generation or the it-erative distribution update. ASAR instead processes the final proposal pool, identifies an adjacent set in prefix space, and reconstructs a full action sequence from it. 
+
+Model error, objective quality, and reachability. Learned planners can select actions that exploit model error, and pre-2dictive accuracy under one loss need not imply accuracy for the planning objective [Janner et al., 2019, Lambert et al., 2020]. Choosing the minimum among noisy estimates is also related to the optimizer’s curse [Smith and Winkler, 2006]. Reachability methods replace geometric proximity with evi-dence about controllable progress from replay graphs, latent landmarks, temporal distances, or directed quasimetrics [Ey-senbach et al., 2019, Zhang et al., 2021, Qian et al., 2023, Bae et al., 2024, Myers et al., 2024, 2025]. RC-aux changes world model training through multihorizon reachability su-pervision [Li et al., 2026b], while TRM changes the terminal objective for a predicted endpoint [Li et al., 2026a]. ASAR 
+
+addresses the subsequent residual failure. Given a meaning-ful terminal cost, it uses prefix distances within the pool to identify an adjacent set and reconstruct the sequence passed to receding-horizon execution. 
+
+# 3 Definitions and Control Pattern 
+
+Let xt ∈ X be the physical state at one replanning step and 
+
+ot = g(xt) its observation. An encoder e maps the observation to zt = e(ot) and the goal observation og to zg = e(og ).A candidate action sequence is Ai = ( ai, 0, . . . , ai,H −1) ∈AH , where one model action is an action block of repeated environment actions. The learned predictor produces 
+
+ˆzi,H = ˆfH (zt, Ai). (1) The controller assigns a terminal cost: 
+
+qi = Q(ˆ zi,H , zg ). (2) Lower values are preferred. In the latent cost condition, 
+
+Q(ˆ z, zg ) = ∥ˆz − zg ∥22. In the reachability cost condition, 
+
+Q is the trajectory-based cost from TRM [Li et al., 2026a]. The two costs are inputs to the same reconstruction rule. In either case, qi is computed from candidate i without using the executed outcome of another candidate. For a candidate execution audit, let FH denote the phys-ical transition map for the full horizon. It reaches xexec  
+
+> i,H
+
+=
+
+FH (xt, Ai) and therefore 
+
+zexec  
+
+> i,H
+
+= e g(xexec  
+
+> i,H
+
+) . (3) The predicted terminal latent ˆzi,H and the executed terminal latent zexec  
+
+> i,H
+
+are different objects. The planner uses the former. The audit uses the latter only to label the candidate after an independent execution. In closed-loop control, only the first action block of the selected sequence is executed before a new pool is generated. Let ℓH (x, o g ) include the terminal task conditions used by the audit, including target error and, when required, the release condition. For tolerance ϵ, the feasible set over the full horizon is 
+
+Eϵ(xt, o g ) = {A ∈ A H : ℓH (FH (xt, A), o g ) ≤ ϵ}. (4) For a proposal pool CB = {Ai}Bi=1 , write Yi = 1 when 
+
+Ai ∈ E ϵ. A ranking blocker under Q is an infeasible proposal Table 1: Candidate execution audit of proposal overgenera-tion. Each target family has 32 pools and every candidate is executed independently. At both total budgets, every pool contains at least one feasible sequence. Top-20 exposure is the fraction of pools with a feasible sequence among the 20 lowest costs. Blockers is the mean number of infeasible sequences with cost below that of the feasible sequence with the lowest cost.                               
+
+> Top-20 exposure Mean blockers Target family Cost B= 72 B= 288 B= 72 B= 288
+> Position Latent .969 .656 4.31 16.91 Position Reachability .875 .750 6.66 16.66
+> Position + yaw Latent .969 .625 4.34 18.31 Position + yaw Reachability .906 .719 7.59 17.75
+
+b with 
+
+qb < min  
+
+> i:Yi=1
+
+qi. (5) The blocker count is the number of infeasible proposals with cost below that of the feasible proposal with the lowest cost. It is a diagnostic for selection by minimum cost, not a claim that every reconstruction rule is blocked by each such proposal. In receding-horizon CEM , three fixed action noise scales produce a shared proposal pool. The world model predicts every candidate, and the elite set with the lowest costs up-dates the sampling distribution. After the last iteration, the controller executes the first action block of the selected se-quence, observes the next image, and replans. We use total proposal budget for the number of action sequences in one pool. A query is one closed-loop evaluation from a start state to a goal state, which contains several replanning pools. 
+
+# 4 Proposal Scaling under Model Error 
+
+At total proposal budget B, let PB be the event that at least one feasible sequence is present in the pool. Let TB,k be the event that at least one feasible sequence has rank at most k
+
+under q. The top-k feasibility event satisfies 
+
+Pr( TB,k ) = Pr( PB ) Pr( TB,k | PB ). (6) The first factor measures proposal coverage. The second mea-sures whether a feasible sequence remains near the top after scoring. The identity is exact; the empirical question is how the two factors change with B, Q, and k.We test this decomposition in a separate candidate execution evaluation set with 32 pools for each target family. Every candidate in each pool is executed independently from the same initial state to obtain Yi. The two cost rules are then applied to the identical candidates. Table 1 and Figure 2 show that the reachability cost improves top-20 coverage at the larger budget, while infeasible sequences with lower cost remain. The same pattern appears in closed-loop selection by min-imum cost. From 72 to 288 total proposals, the feasibility of the selected sequence falls from .375 to .062 for position targets and from .344 to .031 for targets defined by position and yaw under latent cost. Under the reachability cost, the 324 72 288   
+
+> total proposals
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> fraction of proposal pools
+> Feasible sequence remains in top 20
+> Position, latent
+> Position, reachability
+> Position + yaw, latent
+> Position + yaw, reachability
+> 24 72 288
+> total proposals
+> 5
+> 10
+> 15
+> mean ranking blockers
+> Infeasible sequences ranked ahead
+
+Figure 2: Proposal scaling in the candidate execution audit. The fraction of pools with a feasible sequence among the 20 candidates with the lowest costs declines from 72 to 288 total proposals, although feasible presence is already one at both budgets. Mean counts of ranking blockers increase in the same comparison. The reachability cost changes the level of the curves but does not remove the effect of the larger pool. corresponding rates are .281 to .188 and .281 to .156. These three budgets are evidence for a non-monotone effect in this proposal distribution, rather than a claim that every increase in budget is harmful. The mechanism in a finite pool can be stated for a condi-tional score distribution. Condition on n− infeasible proposals and let F−(t) = Pr( qb ≤ t | Yb = 0) . Under conditional in-dependence, 
+
+Pr 
+
+
+
+min  
+
+> b:Yb=0
+
+qb ≤ t
+
+
+
+= 1 − (1 − F−(t)) n− . (7) For any 0 < F −(t) < 1, the probability increases strictly with n−. The identity says that the chance of sampling a low-cost infeasible sequence grows; it does not say that the score error of an individual sequence grows. A better cost can reduce F−(t), while residual probability in that tail remains relevant at larger n−. The supplement gives an expectation expression for blocker counts that does not require conditional independence. The candidate execution audit connects this ranking pattern to physical outcomes. In 58 of 132 failures under latent cost, a feasible sequence is already among the 80 candidates with the lowest costs. In a separate diagnostic with 48 pools, replacing predicted terminal latents with latents encoded after indepen-dent execution raises minimum cost selection from .292 to .500, while ranking by the true terminal physical loss reaches .542. These are diagnostic upper bounds for selection over one horizon, not information available to the controller. Full accounting and the control with shuffled reachability costs appear in the supplement. 
+
+# 5 Adjacent Set Action Reconstruction 
+
+5.1 Adjacent Set Identification 
+
+The terminal cost evaluates candidates separately. ASAR adds one relation that is available only after the current pool has been generated: whether a prefix with low cost has nearby prefixes from other candidates. The intended setting is a lo-cally regular action region, where small changes in a prefix are likely to preserve the same behavior over a short horizon. Let RM (Q) be the M candidates with lowest terminal cost. For each candidate, vectorize the first h model action blocks into an action prefix pi and robustly standardize each coordi-nate inside RM . Define the local prefix isolation score as the mean distance to the K nearest other prefixes, 
+
+ui = 1
+
+K
+
+X 
+
+> j∈N K(i)
+
+∥pi − pj ∥2. (8) The neighborhood excludes i. Smaller ui means that the prefix is less isolated in the competitive pool. We refer to this quantity as a local prefix density proxy. It is not a feasibility label and does not use executed outcomes. The proxy has a related finite-sample interpretation. Define radius support Sr (i) as the fraction of other prefixes within radius r of pi. Suppose, conditional on the proposal source distributions, a feasible candidate e has ESr (e) ≥ p+ and an infeasible ranking blocker b has ESr (b) ≤ p−, with p+ > p −.For n comparisons, Hoeffding’s inequality [Hoeffding, 1963] gives 
+
+Pr( Sr (e) ≤ Sr (b)) ≤ 2 exp 
+
+
+
+− n(p+ − p−)2
+
+2
+
+
+
+. (9) The probability that the radius support statistic reverses this ordering is therefore bounded under the stated support gap. This result concerns a radius count. The implemented method uses KNN distance in Eq. 8. The radius count and KNN dis-tance both measure local prefix concentration, but they are distinct statistics and are analyzed separately. 
+
+5.2 Full Action Sequence Reconstruction 
+
+Selecting the least isolated existing sequence uses the proxy but cannot produce a sequence between sampled candidates. Kernel ASAR instead chooses the candidate c with smallest 4ui, identifies an adjacent set S around its prefix, and assigns 
+
+wi ∝ exp 
+
+
+
+− ∥pi − pc∥22
+
+τd
+
+− λ˜qi
+
+
+
+, i ∈ S , (10) where ˜qi is the robustly standardized terminal cost. Let 
+
+AQ = arg min i qi be the sequence with minimum cost in the eligible pool. The reconstruction operator produces a full action sequence 
+
+Arec = (1 − α) X
+
+> i∈S
+
+wiAi + αAQ. (11) The first term is a weighted local sequence and the second is a light anchor from the sequence with minimum cost. The anchor can help when the sequence with minimum cost is already useful, while the local term reduces reliance on an isolated sequence. The reconstruction is valid only when the action parameterization permits this coordinatewise interpo-lation. Figure 3 shows the operation in a two-dimensional visualization of prefix space. The reconstructed sequence has a conditional containment property. Suppose every full sequence in S is within radius R
+
+of a full-sequence center Ac in a specified sequence norm and let D = ∥AQ − Ac∥. Nonnegative normalized weights give 
+
+∥Arec − Ac∥ ≤ (1 − α)R + αD. (12) If every full sequence in the ball {A : ∥A − Ac∥ ≤ γ} is feasible and the right-hand side is at most γ, the reconstructed sequence is feasible. The adjacent-set identification rule does not by itself verify this full-sequence condition. The supple-ment gives the proof, exact parameter choices, a medoid vari-ant, and the scalar support re-ranking diagnostic. The result is a local condition on the selected sequence neighborhood and does not extend to arbitrary proposal pools. 
+
+# 6 Experiments 
+
+We ask three questions. First, does residual prediction error degrade the minimum cost selection as the proposal budget grows? Second, does full action sequence reconstruction im-prove over selecting an existing candidate using the same pre-fix density proxy? Third, do the gains persist across proposal budgets and independently trained world model weights, and where do they stop? 
+
+Environment and controller. We use simulated Cube ma-nipulation from OGBench [Park et al., 2024] with a fixed pretrained LeWM encoder, predictor, and CEM generator. The generator draws equally from action-noise scales 1.0, 1.5, and 2.0. Total proposal budgets are 72, 144, and 288. The controller has 40 environment steps. Each model action rep-resents a block of five environment actions, and the controller replans after each block. Kernel ASAR retains the 80 lowest-cost sequences, computes from the first model action with , takes the 12 nearest sequences around the least isolated center within the 32 least isolated candidates, and uses α = .10 .These parameters are fixed across reported evaluations. At evaluation time, no method observes the executed outcomes of candidates in the current pool. 
+
+Matched comparison of terminal costs. The Carry and Re-lease evaluation set contains 75 queries defined by start and goal states from 44 evaluation seeds. Some seeds contribute more than one query, so confidence intervals resample seeds as clusters. Query membership is defined from the associ-ated expert trajectory before planner outcomes are inspected. Contact is present at the start and absent at the goal, and the cube is lowered by more than 3 cm. We compare two terminal costs, latent distance and TRM reachability, with three ways to produce the next sequence. minimum cost selection and selection of the least isolated sequence each return an exist-ing candidate. Kernel ASAR reconstructs a new full action sequence. All six combinations use matched random proposal draws. The reachability head uses 100,000 trajectory pairs and excludes every episode represented in this evaluation set or the candidate execution scaling audit. 
+
+Outcomes and additional evaluation sets. The primary outcome for Carry and Release is event completion success. It requires the environment success indicator and a final con-tact state consistent with release. Other Cube evaluations re-port the environment success indicator. A rescue is a query where ASAR succeeds and its stated baseline fails; a loss is the reverse. Confidence intervals are 95% bootstrap intervals clustered by seed from 10,000 resamples. A separate targeted test contains 73 queries from 54 new evaluation seeds. Its predefined rule uses translation between the start and goal, yaw change, and the maximum kernel weight in the initial pool. The rule selects cases where the reconstruction weight is spread across several adjacent candi-dates. This set is used to compare reconstruction with selection of the least isolated existing candidate, not to estimate perfor-mance over the full query distribution. We also report two Cube evaluations with 512 queries, including one with inde-pendently trained world model weights. Exact selection rules, episode exclusions, hyperparameter provenance, transfer tests, and all secondary controls appear in the supplement. 
+
+# 7 Results 
+
+7.1 Adjacent-Set Reconstruction Improves un-der Both Terminal Costs 
+
+Table 2 and Figure 4 compare two terminal costs and three output rules. Under latent cost, Kernel ASAR improves event completion success over minimum cost selection by 28.0 percentage points at 72 proposals, 24.0 points at 144, and 18.7 points at 288. The corresponding 95% intervals are 
+
+[16 .0, 40 .0] , [14 .3, 34 .2] , and [6 .8, 31 .2] points. Using the reachability cost gives gains of 18.7, 20.0, and 17.3 points with intervals [9 .6, 28 .0] , [10 .7, 30 .1] , and [6 .8, 27 .1] .5candidate  
+
+> sequence
+> Ai
+> fi xed
+> predictor
+> terminal
+> latent ̂
+> zi,H
+> terminal
+> cost
+> qi
+> Adjacent Set Action Reconstruction (ASAR) reconstructs a complete
+> action sequence from the adjacent set to recover from prediction errors.
+
+(a) One predicted cost per sequence 
+
+standardized pre fi x coordinate 1 
+
+> standardized pre fi x coordinate 2
+> 10% cost anchor
+
+(b) Reconstruct full sequence from adjacent set 
+
+> other low-cost sequences
+> adjacent set
+> lowest-cost sequence
+> adjacent set center
+> ASAR sequence
+
+Figure 3: Adjacent Set Action Reconstruction. (a) A fixed predictor maps each candidate action sequence to one terminal prediction and task cost. The cost may be latent distance or a trajectory reachability cost. (b) Among candidates with low cost, 
+
+ASAR uses standardized prefix distances to identify an adjacent set. It reconstructs a new full action sequence by weighted averaging and adds a 10% anchor from the sequence with minimum cost. The plotted coordinates are a two-dimensional visualization of the prefix features, not the full action space. Table 2: Event completion success on the same 75 Carry and Release queries from 44 evaluation seeds. Columns compare selection of an existing candidate with Kernel ASAR under two terminal costs. All methods use matched proposal draws. 
+
+Total Latent cost Reachability cost proposals Minimum Least isolated Kernel ASAR Minimum Least isolated Kernel ASAR 
+
+72 .067 .187 .347 .147 .187 .333 
+
+144 .053 .213 .293 .133 .227 .333 
+
+288 .133 .147 .320 .133 .213 .307 72 144 288 
+
+> total proposals
+> 0.0
+> 0.1
+> 0.2
+> 0.3
+> 0.4
+> 0.5
+> success rate
+
+(a) Event-complete success     
+
+> Latent cost, minimum Reachability cost, minimum
+> Latent cost + ASAR Reachability cost + ASAR
+> 72 144 288
+> total proposals
+> 0.0
+> 0.1
+> 0.2
+> 0.3
+> 0.4
+> paired success gain
+
+(b) ASAR gain over matching minimum  
+
+> Latent cost Reachability cost
+
+Figure 4: Carry and Release results across total proposal budgets. (A) Event completion success for minimum cost selection and Kernel ASAR under latent and reachability costs. (B) Paired Kernel ASAR gain over the matching baseline based on minimum cost. Error bars are 95% bootstrap intervals that resample the 44 evaluation seeds. The baseline that selects the least isolated sequence controls for using the same prefix-density proxy without reconstructing a new sequence. Under reachability cost, Kernel ASAR ex-ceeds this baseline by 14.7 points at 72 proposals with interval 
+
+[3 .9, 25 .0] , and by 10.7 points at 144 with interval [1 .3, 21 .1] .At 288, the gain is 9.3 points with interval [−3.0, 20 .3] . Thus the first two budgets give direct evidence for reconstruction beyond selection of an existing candidate, while the larger-budget comparison remains uncertain. The reachability cost addresses terminal objective quality. The consistent ASAR 
+
+gains over its matching baseline based on minimum cost show that residual prediction failures remain a separate control prob-lem. 
+
+7.2 Reconstruction Improves beyond Selection of an Existing Candidate 
+
+The targeted 73-query test compares two rules built from the same 80 sequences with low cost and the same prefix dis-tances. Selecting the least isolated existing sequence reaches 6.493 environment success. Reconstructing a full action se-quence with Kernel ASAR reaches .630, a gain of 13.7 per-centage points with 95% interval [1 .9, 23 .8] . The correspond-ing mean errors in cube position, target position, and yaw errors change from .154, .071, and .843 to .135, .047, and .762. Table 3 reports this comparison beside the aggregate and evaluation with an independent model with each outcome and baseline stated explicitly. With independently trained world model weights, the least isolated existing sequence reaches .717 and Kernel ASAR 
+
+reaches .738 at 72 proposals. Their paired difference is 2.1 points with interval [1 .0, 3.5] . This directly replicates the re-construction advantage without relying on the original model weights. Figure 1 provides a physical example of the same distinction between returning a sampled sequence and recon-structing a new full action sequence. 
+
+7.3 Where Adjacent-Set Reconstruction Helps 
+
+On the 75 Carry and Release queries at 288 proposals, Kernel 
+
+ASAR rescues 19 queries that fail under selection by mini-mum latent cost and loses 5 queries that the baseline solves. The remaining 51 outcomes are unchanged. A separate 512-query evaluation gives success under selection by minimum latent cost .711 and Kernel ASAR success .742, a paired gain of 3.1 points with interval [1 .0, 5.5] . On the 42 queries whose expert segment contains grasp, lift, transport, lower, and re-lease within one interval from start to goal, however, success under selection by minimum latent cost is .119 and Kernel 
+
+ASAR success is .048. A single adjacent prefix set does not supply the several distinct behaviors missing from these longer queries. Ordinary elite averaging reaches .721 on the same 512-query set. Kernel ASAR is 2.15 points higher with interval 
+
+[0 .0, 4.3] , and its continuous position errors also improve with intervals above zero. The supplement tests other explanations using terminal state density, action index penalties, filtering based only on the graph, and random filters matched to the graph retention rate. None matches the Kernel point estimate on that evaluation set. Portfolio ASAR is also evaluated on two different do-mains. On Reacher, its success is .796 compared with .800 for the standard CEM mean, with interval clustered by seed 
+
+[−.064 , . 044] . On Push-T, success under latent cost changes from .273 to .280 with interval [−.080 , . 100] ; under a true state hybrid cost it changes from .413 to .393. These results show that the Cube prefix metric is not a universal action-space metric. The positive Cube result appears when feasible sequences with low cost occupy a locally dense prefix region that is suitable for interpolation. 
+
+# 8 Discussion and Limitations 
+
+Increasing a proposal budget changes both coverage and se-lection risk. Added candidates may improve CEM distribution estimation and expose new feasible regions. When predicted costs retain a lower tail for infeasible sequences, minimum cost selection also receives more opportunities to choose one of those errors. Reporting feasible presence, top-k feasible coverage, and mean ranking-blocker count separates these ef-fects more clearly than reporting candidate count alone. 
+
+TRM and ASAR modify different parts of the controller’s decision rule. TRM changes the terminal cost assigned to each predicted endpoint [Li et al., 2026a], whereas ASAR 
+
+reconstructs the action sequence after the candidates have been scored. They can therefore be combined within the same controller. Three conditions explain the scope of ASAR . The terminal cost must define a useful candidate set with low costs. Feasible candidates should be less isolated in the chosen prefix met-ric than the ranking blockers. Reconstructed full sequences should remain inside a locally robust feasible neighborhood. If infeasible sequences form a dense cluster, prefix density favors the wrong region. If the only feasible sequence is iso-lated, density can reject it. If a query requires several distinct behaviors that are absent from one local neighborhood, aver-aging that neighborhood cannot create the missing sequence. A medoid avoids interpolation, graph filtering limits mixing across clusters, and a bounded controller mixture can test sev-eral fixed reconstruction variants in resettable settings. These variants address different failure cases rather than removing the three conditions. The closed-loop evidence uses two independently trained models within one simulated Cube domain. Carry and Re-lease begins from states in which the cube is already grasped, and the unchanged method is neutral on Reacher and neutral or negative on Push-T. The radius support result assumes a local probability gap. The containment result additionally as-sumes closeness of full sequences and a robust feasible ball, neither of which follows automatically from prefix KNN dis-tance. Hardware evaluation should therefore measure sensing noise, failure recovery, and the cost of executing alternative controllers from a safe reset state. 
+
+# 9 Conclusion 
+
+A controller that selects the minimum predicted terminal cost can become less reliable when a larger proposal pool contains more prediction errors with low cost. ASAR identifies an adja-cent set among action prefixes with low cost and reconstructs a weighted full action sequence, then executes its first action block in the usual receding-horizon loop. Candidate execution audits identify the ranking failure, matched closed-loop com-parisons show gains under two terminal costs, and the targeted reconstruction test separates the new sequence from selection of an existing dense candidate. Proposal sets are useful not only for finding a low predicted cost, but also for estimating whether that candidate belongs to an adjacent set of other plausible actions. 7Table 3: Closed-loop comparisons across Cube evaluation sets. Each row states its outcome and baseline, so rates and paired differences are interpreted only within that row. The row with an independent model uses 72 total proposals and the other rows use 288. 
+
+Evaluation set Outcome N Baseline rule Baseline Kernel ASAR ∆ [95% CI] Cube aggregate Environment 512 Latent minimum .723 .762 +.039 [+.016,+.065] Independent model Environment 512 Latent minimum .703 .738 +.035 [+.014,+.057] Targeted reconstruction Environment 73 Least isolated .493 .630 +.137 [+.019,+.238] Carry-and-Release Event complete 75 Latent minimum .133 .320 +.187 [+.069,+.310] 
+
+8A Appendix Overview 
+
+This supplement expands the diagnosis, method, theory, and experimental protocol in the main paper. It first distinguishes terminal objective quality from residual prediction error. It then specifies each ASAR reconstruction variant, states the finite proposal pool results, records the Cube protocol and run provenance, and reports the candidate execution audits and matched closed-loop comparisons. Later sections provide replication with independently trained world model weights, joint latent and action neighborhood controls, a targeted re-construction evaluation, a bounded mixture of controllers, Reacher and Push-T transfer results, and the claim and evi-dence map. Cube is the main method setting because its low cost pro-posal pools contain both ranking blockers and locally dense action prefixes. Reacher and Push-T test the unchanged Cube reconstruction rule when this prefix geometry differs. The the-ory mirrors this scope. The lower tail identity concerns costs in a finite pool. The radius support result requires an explicit local probability gap. The reconstruction bound additionally requires closeness of the selected full sequences and a robust feasible neighborhood around their center. Physical value is measured through paired closed-loop execution. 
+
+# B Relationship to Trajectory Reacha-bility Metrics 
+
+Trajectory Reachability Metrics ( TRM ) study whether termi-nal latent distance is a suitable objective for physical task progress when evaluating a predicted endpoint [Li et al., 2026a]. They learn a scalar cost based on trajectories and use it to rank existing candidates. ASAR starts after this cost has been defined. It assumes that the terminal objective is meaningful, then addresses residual predictor errors that can make an infeasible sequence appear unusually inexpensive. It uses distances among action prefixes in the current pool and can output a full sequence that was not sampled. The matched comparison crosses two terminal costs, latent distance and TRM reachability, with three sequence-output rules. Minimum-cost selection and least isolated selection re-turn existing candidates. Kernel ASAR reconstructs a new full action sequence. The model checkpoint, proposal generator, evaluation queries, and random proposal draws are matched across these combinations. This design treats latent distance and TRM reachability as alternative terminal costs and evalu-ates ASAR after candidate scoring, where residual prediction errors can still affect the reconstructed action sequence. Sec-tion G lists the shared and paper-specific assets. 
+
+# C Notation and Physical Execution 
+
+Let xt ∈ X be the physical state at one replanning step and let ot = g(xt) be the corresponding observation. The encoder 
+
+e produces zt = e(ot) and the goal latent zg = e(og ). A candidate action sequence is 
+
+Ai = ( ai, 0, . . . , ai,H −1) ∈ A H . (13) One model action ai,h is an action block that represents five environment actions in Cube. An action prefix contains the first h model actions of the full sequence. The learned predic-tor maps the current latent and action sequence to a predicted terminal latent, 
+
+ˆzi,H = ˆfH (zt, Ai). (14) In a candidate execution audit, FH denotes counterfactual physical execution of the full sequence. The terminal state and its encoded observation are 
+
+xexec  
+
+> i,H
+
+= FH (xt, Ai), zexec  
+
+> i,H
+
+= e g(xexec  
+
+> i,H
+
+) . (15) Equations 14 and 15 name different objects. The planner ranks 
+
+ˆzi,H . The audit obtains zexec  
+
+> i,H
+
+only after executing candidate 
+
+i from the same stored initial state. Closed-loop control does not execute FH for every candidate. It executes only the first action block of the selected sequence, observes the next image, and replans. A terminal cost maps the predicted endpoint and goal to one scalar, 
+
+qi = Q(ˆ zi,H , zg ). (16) Lower values are preferred. Latent distance and TRM reach-ability are the two evaluated instances of Q. All subsequent prefix operations condition on this cost-ranked pool. Let ℓH include the full-horizon terminal conditions used by an audit, including target error and release state when required. For tolerance ϵ, the feasible sequence set is 
+
+Eϵ(xt, o g ) = {A : ℓH (FH (xt, A), o g ) ≤ ϵ}. (17) Inside a finite proposal pool CB , let Yi = 1 indicate Ai ∈ E ϵ.A ranking blocker under Q is an infeasible proposal b whose cost is lower than every feasible cost, 
+
+Yb = 0 , qb < min  
+
+> i:Yi=1
+
+qi. (18) The total proposal budget B counts action sequences in one replanning pool. A query denotes one start-goal closed-loop evaluation and may contain several replanning pools. 
+
+# D Detailed ASAR Implementations 
+
+D.1 Candidate Pool and Terminal Cost 
+
+At each replan, the fixed world model receives the current image, the goal image, and a shared pool of action sequences 9{Ai}Ni=1 , where Ai ∈ RH×da . It predicts terminal latent states ˆzi. The terminal-cost rule assigns 
+
+qi = Q(ˆ zi, zg ). (19) For latent cost, qi = ∥ˆzi −zg ∥22. For reachability cost, Q is the learned temporal head described in Section G. All output rules compared under one cost use the same initial state, goal, fixed world model, proposal generator, matched proposal noise, and execution budget. For the Cube evaluations, the proposal generator produces 96 sequences at each of three variance scales 1.0, 1.5, 2.0, for 288 candidates per replan. The ASAR reconstruction variants first retain the 80 candidates with lowest terminal cost. This restriction preserves goal competitiveness while excluding ob-viously poor proposals. 
+
+D.2 Local Prefix Isolation Score 
+
+Let pi be the vectorized first model action of candidate i. For Cube this prefix contains one action block, corresponding to five environment actions. Each prefix coordinate is robustly standardized within the current eligible pool using the median and interquartile range, falling back to the standard deviation when the interquartile range is degenerate. For each eligible candidate, the implementation computes the mean Euclidean distance to its k = 3 nearest other stan-dardized prefixes, 
+
+ui = 1
+
+k
+
+X 
+
+> j∈N k(i)
+
+∥pi − pj ∥2. (20) Smaller distance means that a prefix is less isolated in the eligible pool. The distances are robustly standardized again before use. Sorting by ui defines the prefix-density order. The least isolated baseline returns the existing candidate at the head of this order. The two main ASAR variants instead reconstruct a full action sequence from an adjacent set. This statistic is available at planning time and serves as a density proxy and does not by itself establish physical feasibility. 
+
+D.3 Kernel ASAR Sequence Reconstruction 
+
+The kernel implementation is identified in the released eval-uator as action_prefix1_k3_top80_kernel_tau0p75_ raw0p35_anchor10_m12 . The legacy identifier retains 
+
+raw0p35 . In the matched terminal-cost comparison, this term uses the standardized terminal cost. Its fixed parameters are summarized in Table 4. The least isolated candidate supplies the prefix center. Among the first 32 candidates in prefix-density order, the method identifies the 12 prefixes nearest to this center as the adjacent set. Let D be the prefix feature dimension, let 
+
+¯d2 
+
+> i
+
+= ∥pi − pc∥22/D , and let ˜qi denote the robustly standard-ized terminal cost. The unnormalized weight is 
+
+˜wi = exp 
+
+
+
+−
+
+ ¯d2
+
+> i
+
+0.75 + 0 .35˜ qi
+
+ 
+
+. (21)            
+
+> Item Value Eligible low-cost candidates 80 Prefix steps 1KNN neighbors 3Prefix-density candidate pool 32 Adjacent set size 12 Kernel temperature τ0.75 Terminal-cost energy weight 0.35 Minimum-cost anchor α0.10
+
+Table 4: Fixed Kernel ASAR parameters used in the confir-matory runs. After normalization, the sequence reconstructed from the ad-jacent set is 
+
+Aker = X
+
+> i∈S 12
+
+wiAi. (22) The output retains the sequence with minimum cost AQ:
+
+Aout = 0 .90 Aker + 0 .10 AQ. (23) No executed outcome, success label, or physical state obtained from the simulator enters the reconstruction operator. 
+
+D.4 Portfolio ASAR Sequence Reconstruction 
+
+The portfolio implementation is action_prefix1_k3_ top80_portfolio_gate_rawanchor10_25_top7 . It iden-tifies the seven least isolated candidates as an adjacent set E.In robustly standardized prefix space, define 
+
+ρ = ∥pQ − ¯pE ∥21
+
+> |E|
+
+P 
+
+> i∈E
+
+∥pi − ¯pE ∥2 + ϵ . (24) The fixed branch rule is: 
+
+• Close, ρ ≤ 1.0: use the elite arithmetic mean and anchor from the sequence with minimum cost α = 0 .25 .
+
+• Middle, 1.0 < ρ < 1.75 : use the elite medoid in prefix space and anchor from the sequence with minimum cost 
+
+α = 0 .15 .
+
+• Far, ρ ≥ 1.75 : use the geometric median of the full elite action sequences and anchor from the sequence with minimum cost α = 0 .10 .For representative Arep , the output is always 
+
+Aout = (1 − α)Arep + αAQ. (25) The medoid branch outputs an original sampled candidate. The mean and geometric median branches reconstruct a se-quence from the adjacent set. Proposition 5 states the ad-ditional local conditions under which the reconstructed se-quence remains inside the feasible set. 10 D.5 Joint Latent and Action Neighborhood Re-construction 
+
+The joint neighborhood extension first filters the 80 lowest cost candidates before applying the same Portfolio ASAR rule. For each candidate, robustly standardized predicted terminal latent features are concatenated with the robustly standardized action prefix containing one model action. The joint features are reduced to at most 16 principal components. An 8-nearest neighbor undirected graph is then formed. The five nodes with the smallest mean neighbor distance de-fine the dense neighborhood seeds. Multi-source shortest-path distance from these seeds is computed for all eligible candi-dates. The method retains the lower 50% of these distances, subject to a minimum of 16 and a maximum of 48 candidates. With 80 eligible candidates, the retained neighborhood con-tains 40 candidates. The Portfolio ASAR prefix density order, elite set, branch ratio, representative, and minimum cost an-chor are recomputed inside this retained neighborhood. The anchor is the candidate with minimum cost * inside the neigh-borhood* , not the global cost minimum. The random control matched to the retention rate uses the same retained size and is calibrated to match the joint neigh-borhood method’s empirical rate of filtering out the candidate with minimum cost. It therefore tests whether the result fol-lows from generic pruning rather than filtering based on the joint latent and action neighborhood. 
+
+D.6 Optional Bounded Mixture of Controllers 
+
+The Mixture of Controllers (MoC ) is a supplementary bounded verification extension rather than part of the single execution ASAR method. It treats uncertainty across recon-struction variants as a bounded verification problem. For each query it executes a fixed controller order: Portfolio ASAR ,Kernel ASAR , anchored adjacent-prefix mean, and adjacent-prefix mean. If an earlier branch succeeds within the 40-step Cube budget, evaluation stops. If it fails, the next branch is run from the same initial state and goal. Thus, the protocol allo-cates a bounded branch budget across controller families and evaluates them sequentially, stopping at the first successful branch. The four concrete output rules are: 1. action_prefix1_k3_top80_portfolio_gate_ rawanchor10_25_top7 ;2. action_prefix1_k3_top80_kernel_tau0p75_ raw0p35_anchor10_m12 ;3. action_prefix1_k3_top80_elite_mean_ rawanchor25_top5 ;4. action_prefix1_k3_top80_elite_mean_top5 .The verifier never inspects later outcomes before deciding to continue. In the current protocol, failed branches reset to the same initial state. This matches repeatable simulation and resettable control settings. Irreversible deployment requires a safe state recovery mechanism in place of reset. 
+
+D.7 Planning Procedure 
+
+At each replan, ASAR performs the following operations using information available at planning time: 1. Sample candidates at the fixed proposal scales and roll them through the fixed world model. 2. Compute the terminal cost and retain its 80 lowest cost candidates. 3. Extract the first action block, robustly standardize the prefixes, and compute the k = 3 nearest-neighbor prefix isolation score. 4. For the kernel variant, restrict to the 32 least isolated candidates, take the nearest 12, and apply Eqs. 21–23. For the portfolio, take seven adjacent-prefix candidates and apply Eqs. 24–25. The graph extension first filters to the retained joint latent and action neighborhood neigh-borhood and then applies the same portfolio rule. 5. Execute the first five environment actions, observe the next image, and repeat until success or the 40-step Cube budget is exhausted. All operations use only the current proposal pool, predicted latent rollouts, terminal costs, and action sequences. 
+
+MoC wraps four complete instances of this planner. It eval-uates them in the fixed order given above, stops on the environ-ment success signal, and resets to the same stored initial state only after a failed branch. The controller order and branch limit do not depend on outcomes from later controllers. 
+
+# E Finite Proposal Pool Results and Proofs 
+
+The controller chooses from a finite proposal pool at each replan. The statements below analyze that decision object di-rectly using proposal costs, adjacent prefix sets, and recon-structed action sequences. This pool level view also accom-modates contact transitions where the physical map is not globally continuous. 
+
+E.1 Growth of Lower Tail Ranking Errors 
+
+Proposition 1 (risk from lower tail overgeneration). Con-dition on n− infeasible proposals. Suppose their terminal costs are conditionally independent with lower tail distribution 
+
+F−(t) = Pr( qb ≤ t | Yb = 0) . Then 
+
+Pr 
+
+
+
+min  
+
+> b:Yb=0
+
+qb ≤ t
+
+
+
+= 1 − (1 − F−(t)) n− . (26) For any threshold with 0 < F −(t) < 1, the probability is strictly increasing in n−.11 Proof. The event min b qb > t requires every infeasible proposal to have score greater than t. Conditional inde-pendence gives Pr(min b qb > t ) = (1 − F−(t)) n− . Tak-ing the complement proves Eq. 26. Its one-step increase is 
+
+F−(t)(1 − F−(t)) n− > 0. □
+
+The independence model makes the lower tail mechanism explicit. The expected blocker count does not need this as-sumption. Condition on the best feasible score TB and define 
+
+Ij = 1[qj < T B ] for each infeasible proposal. Linearity of expectation gives 
+
+E[MB | TB ] = 
+
+> NB
+
+X
+
+> j=1
+
+Pr( qj < T B | TB ). (27) Under conditionally identical tails, this becomes NB F−(TB ).Correlation changes the count distribution but not the interpre-tation that a larger pool exposes more lower tail opportunities. 
+
+Proposition 2 (presence and top-k retention). At budget 
+
+B, let PB be the event that the proposal pool contains at least one feasible sequence. Let TB,k be the event that at least one feasible sequence appears among the k lowest-cost proposals. Since TB,k ⊆ PB ,
+
+Pr( TB,k ) = Pr( PB ) Pr( TB,k | PB ). (28) 
+
+Proof. The set identity TB,k = TB,k ∩ PB and the multipli-cation rule give Eq. 28. □
+
+The two factors distinguish candidate generation from cost-based retention. When Pr( PB ) is already high, a reduction in Pr( TB,k | PB ) can lower the probability that a feasible sequence is available to a top-k output rule. 
+
+E.2 Concentration of Local Prefix Support 
+
+For a radius r, define the support of proposal i among n other proposals by 
+
+Sr (i) = 1
+
+n
+
+> n
+
+X
+
+> j=1
+
+1[ρ(pi, pj ) ≤ r]. (29) 
+
+Proposition 3 (local support separation). Let e be a fea-sible candidate and let b be a ranking blocker. Suppose the radius-neighbor indicators for each candidate are condition-ally independent and satisfy 
+
+E[Sr (e)] ≥ p+, E[Sr (b)] ≤ p−, p+ > p −. (30) Then 
+
+Pr( Sr (e) ≤ Sr (b)) ≤ 2 exp 
+
+
+
+− n(p+ − p−)2
+
+2
+
+
+
+. (31) 
+
+Proof. Let m = ( p+ +p−)/2 and ∆ = p+ −p−. If Sr (e) ≤
+
+Sr (b), then either Sr (e) ≤ m or Sr (b) ≥ m. Hoeffding’s inequality gives 
+
+Pr( Sr (e) ≤ m) ≤ exp( −n∆2/2) , (32) 
+
+Pr( Sr (b) ≥ m) ≤ exp( −n∆2/2) . (33) The union bound proves Eq. 31. □
+
+The radius count makes the finite-sample argument trans-parent. The implemented statistic in Eq. 20 instead measures the distance needed to reach k neighbors. Both summarize lo-cal prefix density, with opposite numerical directions: larger 
+
+Sr and smaller ui indicate a less isolated prefix. The candidate execution audit in Section M evaluates the exact KNN statistic used by the controller. 
+
+E.3 Existing Candidate Reranking by Prefix Isolation 
+
+Proposition 4 (condition for pairwise reranking). Let e
+
+be a feasible candidate and b a ranking blocker with qb < q e.Let ui be the observable prefix isolation score from Eq. 20, and define si = qi + βu i with β > 0. Then 
+
+ub − ue > qe − qb
+
+β (34) if and only if se < s b.
+
+Proof. Multiplying Eq. 34 by β and rearranging gives qe +
+
+βu e < q b +βu b. This is exactly se < s b. Reversing the algebra proves the converse. □
+
+Proposition 4 describes an existing candidate re-ranking rule. The audit in Section M measures its premise with exe-cuted candidates. Kernel ASAR and Portfolio ASAR use the same local geometry to reconstruct a new full action sequence, whose outcome is measured through paired closed-loop exe-cution. 
+
+E.4 Containment of Reconstructed Full Se-quences 
+
+Proposition 5 (containment of a reconstructed sequence). 
+
+Let S be an adjacent set identified by prefix geometry, and let 
+
+Ac be a reference full sequence. Suppose ∥Ai − Ac∥ ≤ R for every i ∈ S , the weights satisfy wi ≥ 0 and P 
+
+> i
+
+wi = 1 , and the sequence with minimum cost obeys ∥AQ − Ac∥ = D.For 
+
+Aout = (1 − α) X
+
+> i∈S
+
+wiAi + αAQ, (35) we have 
+
+∥Aout − Ac∥ ≤ (1 − α)R + αD. (36) If the closed ball {A : ∥A − Ac∥ ≤ γ} lies inside Eϵ and the right-hand side of Eq. 36 is at most γ, then Aout ∈ E ϵ.
+
+Proof. The triangle inequality and convexity of the norm give 
+
+∥Aout − Ac∥ ≤ (1 − α) X
+
+> i
+
+wi(Ai − Ac)
+
++ α∥AQ − Ac∥ (37) 
+
+≤ (1 − α) X
+
+> i
+
+wi∥Ai − Ac∥ + αD (38) 
+
+≤ (1 − α)R + αD. (39) 12 The final statement follows from containment in the robust feasible ball. □
+
+Proposition 5 formalizes the two reconstruction terms. A compact reconstruction set reduces R, while the anchor from the sequence with minimum cost contributes according to its displacement D. Here R, D, and γ are measured in the space of complete action sequences. Prefix proximity selects the reconstruction set but does not by itself imply this full sequence bound. The bound therefore states the additional local condition under which weighted reconstruction remains inside a robust feasible neighborhood. 
+
+E.5 Separation of Proposal Neighborhoods 
+
+Proposition 6 (separation of proposal clusters). Suppose a proposal pool is partitioned into clusters and every cross-cluster pair is separated by more than δ in the graph metric. If graph edges connect only pairs at distance at most ϵ < δ ,then no connected component contains proposals from two clusters. 
+
+Proof. An edge between different clusters would require a cross-cluster pair at distance at most ϵ, contradicting the as-sumed separation. Any path that crosses clusters must contain such an edge. □
+
+The medoid of a component is one of its sampled proposals. Selecting that medoid therefore introduces no interpolation beyond the original candidate set. Proposition 5 gives the cor-responding local condition for a weighted mean with a score anchor. The medoid branch remains available when recon-struction outside the sampled set is undesirable. Proposition 6 concerns separation in the observed proposal graph and does not assign a physical regime label to a component. 
+
+E.6 Optional Bounded Mixture of Controllers 
+
+Proposition 7 (success union and expected branch count). 
+
+Let Sj be the success event for controller j from the shared initial query, and let MoC execute controllers in a fixed order, stopping at the first verified success. Then 
+
+Pr( MoC succeeds ) = Pr 
+
+
+
+> J
+
+[
+
+> j=1
+
+Sj
+
+ . (40) If L is the number of executed branches, then 
+
+E[L] = 
+
+> J
+
+X
+
+> j=1
+
+Pr 
+
+ \
+
+> ℓ<j
+
+Scℓ
+
+ . (41) 
+
+Proof. The verifier returns success exactly when at least one branch succeeds, which proves Eq. 40. Branch j is executed exactly when all earlier branches fail. Since L = PJj=1 1[L ≥
+
+j], linearity of expectation gives Eq. 41. □
+
+The result requires no independence among controller out-comes. It states the benefit and branch cost measured by vali-dation from the same initial state on 768 new queries. 
+
+# F Cube Evaluation Protocol 
+
+This section fixes the matched closed-loop protocol used for every Cube method comparison and records the disjoint seed blocks and persistent artifacts. ASAR receives only quanti-ties visible to the planner; executed candidate outcomes are reserved for evaluation and the separate diagnostic audits. 
+
+F.1 Closed-Loop Evaluation Configuration F.2 Data Splits and Run Provenance F.3 Method Development and Confirmatory Evaluation Protocol 
+
+The final Cube reconstruction variants were specified before the canonical s888–951 evaluation, and no development seed is reused for its confidence intervals. The 80-candidate eligible set and k = 3 were selected on prefix-density development seeds s352–415 . The 0.25 local-mean anchor was selected on s480–511 , and the portfolio elite size 7, ratio thresh-olds 1.0/1.75, and anchors 0.25/0.15/0.10 on s576–639 , then checked unchanged on s672–735 . Kernel values (32 least iso-lated candidates, adjacent set size 12, τ = 0 .75 , terminal-cost weight 0.35, anchor 0.10) were selected on s816–879 , before the first canonical seed. The joint neighborhood rule was de-veloped on s1132–1163 and used without modification on the separate s1164–1195 control evaluation. The seven out-put rules were recorded before execution on seeds 129272– 135572. Primary intervals resample the 64 evaluation seeds and compare Kernel with latent elite and minimum-anchored elite averaging. The independent model replication fixes the final epoch-32 multi-task Cube checkpoint before an eight-seed eligibility pilot. The formal seeds 210272–273272, two proposal budgets, three outputs, and promotion rule were recorded before the pilot outcomes. The Cube reconstruction rule is unchanged. The MoC controller order was recorded after the negative router audit and before execution on seeds 154872–164372. Its primary comparison is MoC success ver-sus Portfolio-first execution under same-initial-state branch attempts. Table 7 summarizes the comparisons that produced the final reconstruction variants. The anchor study evaluated weights 0, . 10 , . 25 , . 35 , . 50 . It identified light anchor from the sequence with minimum costing as the useful regime and showed that weights .35 and .50 attenuate the prefix-density effect. The remaining parameters were selected on the devel-opment blocks listed above and held fixed for every confirma-tion evaluation. 13 Item Fixed setting Environment and data ogbench/cube_single_expert [Park et al., 2024]; fixed pretrained cube/lewm encoder and dynamics. Queries 8 paired queries per seed; identical start and goal for every method within a query. Goal offset and budget Goal offset 40 environment steps; evaluation budget 40 environment steps. Model horizon 8 model actions, each representing an action block of 5 environment actions. Replanning Execute 5 environment actions, then replan; at most 8 replans. Proposal pool 96 candidates at each variance scale 1.0, 1.5, 2.0, giving 288 candidates per replan. Eligible sequences 80 lowest terminal costs; prefix length 1; k = 3 nearest-neighbor isolation score. Execution Every reconstructed sequence is executed in the same environment loop as the minimum-cost sequence. No executed-all oracle is used by the method. Statistics Paired success wins/losses; primary intervals resample evaluation seeds as clusters with 10,000 bootstrap repetitions. Paired-query intervals are retained as sensitivity analyses. Continuous improvements are baseline minus method so positive is better. 
+
+Table 5: Cube closed-loop evaluation protocol.                                               
+
+> Purpose Scale Seed block Durable artifact Overgeneration training/analysis 12 blocks s234–245 lewm_overgeneration_collapse_evidence_ledger_20260609. md
+> Overgeneration held-out 4 blocks s246–249 Held-out Site-A rows recorded in the same evidence ledger Overgeneration replication 4 blocks s250–253 Independent Site-B rows and blocker-survival analysis Canonical Cube evaluation I 256 queries s888–919 artifact_runs/receding_asar_confirm_s888_919_20260615_ v1
+> Canonical Cube evaluation II 256 queries s920–951 artifact_runs/receding_asar_confirm_s920_951_20260615_ v1
+> Final-pool reconstruction controls 512 queries 129272–135572 asar_baseline_confirm_s1292_1355_20260711_v1
+> Graph discovery block 256 queries 113272–116372 graph_component_selector_s1132_1163_20260619_v1
+> Graph replication/control 256 queries 116472–119572 graph_component_controls_s1164_1195_20260620_v1
+> Candidate-gap discovery 96 pools 23072–23772 candidate_level_support_gap_20260711_v1
+> Candidate-gap held-out 96 pools 23872–24572 Same fixed-beta audit root Independent-model replication 2×512 queries 210272–273272 asar_cross_model_formal_20260722_v1
+> Reacher unchanged-parameter transfer 250 episodes 42–46 reacher_asar_20260711_v1/formal_main
+> Push-T unchanged-parameter transfer 2 costs ×150 paired episodes 3072–3074 pusht_asar_portfolio_20260711_v1
+> MoC validation 768 queries 154872–164372 v66_family_diversity_slate_fresh_s1548_1643_20260714_v1
+
+Table 6: Experimental split and artifact provenance. Every new run root contains env.sh , env_snapshot.txt , and 
+
+pip_freeze.txt .
+
+Component Development comparison Confirmatory setting Eligible set and local geometry Minimum-cost competitiveness, prefix density, terminal density, and full-sequence controls 80 lowest costs, prefix 1, k = 3 
+
+Minimum-cost anchor 0, . 10 , . 25 , . 35 , . 50 on development pools .10 for Kernel and .25/.15/.10 by Portfolio branch Portfolio representative Local means, medoids, robust centers, and elite-size variants Seven elites with ratio thresholds 1.0 and 1.75 Kernel ASAR Local kernel centers, adjacent-set sizes, terminal-cost weights, and anchors Pool 32, set 12, τ = .75 , cost weight .35, anchor .10 Graph neighborhood Latent, action, and joint graphs with random and filter-rate-matched controls PCA 16, graph k = 8 , five core seeds, median core-distance retention 
+
+Table 7: Development choices and the settings used unchanged in confirmatory evaluations. 14 G Matched Evaluation of Terminal Costs and Output Rules 
+
+Evaluation set. The set contains 75 Carry and Release queries grouped into 44 evaluation seeds. Query member-ship was recorded before the matched comparison using the same rule, defined independently of outcomes, as in the main paper. The associated expert segment begins in contact, ends without contact, and lowers the cube by more than 3 cm. The query definition file records the dataset row, episode, start and goal steps, evaluation seed, and query identifier for every case. 
+
+Episode exclusion. The temporal head is trained on the pub-lic ogbench/cube_single_expert trajectories [Park et al., 2024] after excluding 102 episodes. This union contains all 73 episodes represented by the Carry and Release evaluation set and all 32 episodes in the independent Site-B candidate exe-cution set. Three episodes occur in both sets. The exclusion-list SHA-256 is 60ff037aed46ab53e6e1d33c34da14e2c 97fd37ebfee6926f60e791cbe7d67f4 .
+
+Temporally Supervised and Shuffled-Label Heads. Both heads use the same pairwise architecture, 100,000 training pairs, 10,000 validation pairs, temporal range 1 to 40, target scale 40, optimizer schedule, and pair split. The temporal head learns within episode time separation. The control permutes only the training labels. The best validation RMSE is 8.97 for temporal supervision and 11.62 for shuffled supervision. Head training encodes 125,785 unique dataset rows and uses no evaluation episode. 
+
+Six matched controllers. For each terminal cost, latent dis-tance or TRM reachability, the controller uses one of three out-put rules. Minimum-cost selection returns the existing candi-date with minimum qi. Least-isolated selection returns the ex-isting candidate with the smallest prefix isolation score among the 80 lowest-cost candidates. Kernel ASAR uses the same el-igible set and prefix geometry, then reconstructs the anchored full sequence in Eq. 23. Proposal budgets are 24, 48, and 96 per source, or 72, 144, and 288 in total. The six controllers use matched evaluation seeds and proposal noise in one batched environment call. 
+
+Analysis. Event completion success requires the environ-ment success indicator and final contact error at most 0.1. Contrasts are paired at the query level. Confidence intervals resample the 44 seeds as clusters with replacement for 10,000 bootstrap draws. The main contrasts compare Kernel ASAR 
+
+with minimum cost selection and with least isolated exist-ing sequence selection under each terminal cost. The differ-ence between reconstruction gains estimates the interaction between terminal cost and output rule. The shuffled head run is evaluated at the largest proposal budget. 
+
+# H Complete Proposal Overgeneration Results 
+
+H.1 Candidate Execution Diagnosis 
+
+The first audit executes candidates from 192 fixed proposal pools. It records whether the latent cost minimum succeeds and whether any successful candidate is already present among the 80 lowest latent costs. The second diagnostic uses 48 separate proposal pools and compares selection under pre-dicted terminal latent distance, executed terminal latent dis-tance, and executed terminal task loss.                  
+
+> 192-pool accounting Pools Rate Latent minimum succeeds 60 .313 Latent minimum fails, top-80 success exists 58 .302 Latent minimum fails, no top-80 success 74 .385 48-pool selection cost Success ∆predicted Predicted terminal latent .292 –Executed terminal latent .500 +.208 Physical terminal loss .542 +.250
+
+Table 8: Candidate execution diagnosis. The 192-pool ac-counting and 48-pool terminal state comparison use separate fixed candidate sets. Among the 132 pools where selection by minimum latent cost fails, 58 contain a successful candidate among the 80 lowest latent costs. This is 43.9% of failures under selection by minimum latent cost. In these pools the candidate has been generated, but predicted latent cost ranks it behind a failed candidate. The separate 48-pool result shows that this order changes substantially when the terminal latent is encoded after execution. 
+
+H.2 Replication across Proposal Budgets 
+
+Table 9 reports the independent Site-B replication. The posi-tion and yaw targets reach complete feasible presence at 24 candidates per source, while top-20 feasible coverage falls sharply at 96. The Cube-state target behaves differently be-cause its useful candidates appear later and across a broader range of proposal scales.                                            
+
+> Target Budget/source Present Top-20 Top-1 Blockers Position 8.906 .906 .469 2.03 Position 24 1.000 .969 .375 4.31 Position 96 1.000 .656 .062 16.91 Position + yaw 8 .906 .906 .500 1.48 Position + yaw 24 1.000 .969 .344 4.34 Position + yaw 96 1.000 .625 .031 18.31 Cube 8.625 .562 .062 7.70 Cube 24 .969 .656 .062 15.97 Cube 96 1.000 .562 .094 29.81
+
+Table 9: Independent overgeneration replication on 
+
+s250–253 . Blockers are infeasible candidates ranked below the lowest cost of any feasible candidate. 15 Split Target Peak budget Peak top-20 Full top-20 Full blockers Held-out A Position 24 .875 .500 23.66 Held-out A Position + yaw 24 .844 .594 20.38 Replication B Position 24 .969 .656 16.91 Replication B Position + yaw 24 .969 .625 18.31 
+
+Table 10: Replication of the non-monotone top-20 feasible coverage pattern. Feasible presence is already one at the bud-get with highest top-20 coverage. 
+
+H.3 Residual Lower Tail Errors under TRM 
+
+The independent Site-B candidate execution set is rescored with the temporal head and the matched shuffled-label head. Feasibility labels continue to come only from executing the fixed candidates. Table 11 reports the two target families used in the main paper. Temporal TRM retains more useful can-didates in the top 20 at the largest budget than latent cost or the shuffled head, but its blocker count still grows by roughly ten per pool. The executed top-1 rates from 72 to 288 total proposals fall from .375 to .062 and from .344 to .031 under latent cost. Under the reachability cost, they fall from .281 to .188 and from .281 to .156.                      
+
+> Top-20 exposure Mean blockers Target Cost 24 72 288 24 72 288 Position Latent .906 .969 .656 2.03 4.31 16.91 Position Reachability .875 .875 .750 2.55 6.66 16.66 Position Shuffled reach. .875 .844 .625 3.97 9.16 22.03 Position + yaw Latent .906 .969 .625 1.48 4.34 18.31 Position + yaw Reachability .875 .906 .719 2.79 7.59 17.75 Position + yaw Shuffled reach. .875 .875 .594 4.34 6.94 23.41
+
+Table 11: Proposal scaling under latent, reachability, and shuf-fled label reachability costs. Column headings give total pro-posals across three sources. Each row contains 32 indepen-dently executed pools. 
+
+# I Complete Closed-Loop Cube Results 
+
+I.1 Matched Evaluation of Terminal Costs and Output Rules 
+
+Table 12 reports all six controllers. Kernel ASAR has the highest event completion success under both terminal costs at every tested budget. Reachability cost improves minimum cost selection at 72 and 144 proposals, while the two rules based on minimum cost are equal at 288. Relative to reachability selection by minimum cost, Ker-nel records 15/1, 16/1, and 16/3 paired rescues/losses as the proposal budget grows. Relative to the reachability least iso-lated rule, the counts are 15/4, 10/2, and 14/7. The terminal-cost by Kernel interaction is −.093 [ −.189 , . 000] , −.040 [−.146 , . 068] , and −.013 [ −.179 , . 139] . We therefore report the paired Kernel gain under each cost directly rather than infer a super-additive interaction. The matched shuffled-label head provides a second control at 288 proposals. Its event completion success under mini-
+
+Total proposals Output rule Latent cost Reachability cost 72 Minimum cost .067 .147 72 Least isolated .187 .187 72 Kernel ASAR .347 .333 
+
+144 Minimum cost .053 .133 144 Least isolated .213 .227 144 Kernel ASAR .293 .333 
+
+288 Minimum cost .133 .133 288 Least isolated .147 .213 288 Kernel ASAR .320 .307 
+
+Table 12: Event completion success for the matched terminal cost and output rule comparison. Each budget uses the same 75 queries and 44 evaluation seeds.                                  
+
+> Total Contrast ∆[95% CI] 72 Reachability minimum minus latent minimum +.080 [.000,.156] 72 Latent-cost Kernel minus matching minimum +.280 [.160,.400] 72 Reachability-cost Kernel minus matching minimum +.187 [.096,.280] 72 Latent-cost Kernel minus matching least isolated +.160 [.054,.264] 72 Reachability-cost Kernel minus matching least isolated +.147 [.039,.250] 144 Reachability minimum minus latent minimum +.080 [.000,.156] 144 Latent-cost Kernel minus matching minimum +.240 [.143,.342] 144 Reachability-cost Kernel minus matching minimum +.200 [.107,.301] 144 Latent-cost Kernel minus matching least isolated +.080 [-.043,.200] 144 Reachability-cost Kernel minus matching least isolated +.107 [.013,.211] 288 Reachability minimum minus latent minimum +.000 [-.099,.100] 288 Latent-cost Kernel minus matching minimum +.187 [.068,.312] 288 Reachability-cost Kernel minus matching minimum +.173 [.068,.271] 288 Latent-cost Kernel minus matching least isolated +.173 [.066,.290] 288 Reachability-cost Kernel minus matching least isolated +.093 [-.030,.203]
+
+Table 13: Paired event completion success contrasts with 95% bootstrap intervals clustered by seed. mum cost selection is .187 and Kernel reaches .240, a paired gain of +.053 [ −.053 , +.167] with 11 rescues and 7 losses. Temporal TRM at the same budget gives a Kernel gain of 
+
++.173 [+ .068 , +.271] . The shuffled head does not reproduce the positive interval obtained with temporal supervision. 
+
+Method Success Wins/Losses Cube pos. Replans Latent minimum .723 – .1172 2.95 Least isolated .744 17/6 .1161 2.82 Kernel ASAR .762 26/6 .1061 2.70 Portfolio ASAR .766 27/5 .1064 2.69 
+
+Table 14: Cube evaluation over 64 seeds and 512 paired queries. Wins and losses compare each method with selec-tion by minimum latent cost. The success intervals clustered by seed relative to selection by minimum latent cost are [.0039,.0391] for least isolated selection, [.0156,.0645] for Kernel ASAR , and [.0215,.0664] for Portfolio ASAR . Kernel ASAR and Portfolio ASAR also have positive cube position and target position intervals. Exact values are retained in the released bootstrap summary. Kernel ASAR and Portfolio ASAR are close but not iden-tical. Kernel ASAR succeeds on 26 queries that fail under selection by minimum latent cost and fails on 6 queries that this baseline solves. Portfolio ASAR succeeds on 27 queries 16 Method Success ∆ minimum W/L minimum Cube-pos. imp. Latent minimum .7109 – – –Latent elite mean .7207 +.0098 15/10 .0054 Minimum-anchored elite mean .7168 +.0059 11/8 .0067 Adjacent-prefix mean .7324 +.0215 21/10 .0078 Anchored adjacent-prefix mean .7344 +.0234 21/9 .0070 Kernel ASAR .7422 +.0312 24/8 .0116      
+
+> Portfolio ASAR .7383 +.0273 24/10 .0098
+
+Table 15: Final proposal pool reconstruction controls on 512 paired queries. Continuous improvement is the error under selection by minimum latent cost minus the method error, so positive is better.      
+
+> Comparison Success Cube pos. Target pos. vs. latent minimum .0312 [.0098,.0547] .0116 [.0069,.0167] .0106 [.0061,.0151] vs. latent elite mean .0215 [.0000,.0430] .0063 [.0019,.0106] .0032 [.0003,.0062] vs. anchored elite mean .0254 [.0059,.0449] .0049 [.0010,.0089] .0044 [.0013,.0074]
+
+Table 16: Kernel ASAR paired differences with 95% intervals clustered by seed. The success interval versus elite mean under latent cost touches zero. Both continuous error intervals are positive. that fail under selection by minimum latent cost and fails on 5 queries that this baseline solves. In direct comparison with Kernel ASAR, Portfolio ASAR succeeds alone on 10 queries and fails alone on 8. Their success union is .781. Held-out scalar routers did not reliably realize this union, so the paper reports fixed reconstruction variants rather than a learned test set switch. 
+
+I.2 Controls for Reconstruction from the Final Proposal Pool 
+
+This evaluation holds the model, proposal pools, execution budget, and seven output rules fixed over 64 new seeds and 512 paired queries. It tests whether adjacent-set reconstruction improves beyond generic averaging of low cost candidates. Latent cost elite averaging gains roughly one point, while the Kernel ASAR gain over selection by minimum latent cost is 3.1 points. Kernel ASAR also leads elite averaging un-der latent cost by 2.15 points, with an interval whose lower endpoint is zero, and improves both continuous errors with positive intervals. We use Kernel ASAR as the main recon-struction variant and Portfolio ASAR as a robustness variant. 
+
+I.3 Carry and Release Phase Analysis 
+
+The second 512-query evaluation also supports an analysis by physical task phase. The subset rules were recorded before the outcomes were inspected and use only the expert segment associated with each start and goal. The main outcome is event completion success. It requires environment success and a final gripper contact value within .1 of the goal contact value. Kernel ASAR improves Carry and Release event success by .187 over selection by minimum latent cost with an interval of [+.069,+.310] obtained by resampling seeds and 19 res-cues against 5 losses. Its environment success gain over elite mean under latent cost is .133 with interval [+.025,+.247].     
+
+> Query subset Expert-segment rule Release transition Start contact above .5 and goal contact below .1 Carry-and-Release Release transition with cube height decreasing by more than 3 cm Full pick-place Start and goal height below 4 cm, maximum height above 7 cm, contact above .5, and XY displacement above 3 cm
+
+Table 17: Phase definitions specified independently of out-comes. Carry and Release begins from an already grasped cube and ends at a released goal. The broader release transition shows the same direction. Full pick and place queries still require the controller to compose grasp, lift, transport, lower, and release within one start and goal interval. Kernel ASAR reduces target position error there but does not improve event completion success. The deterministic cases in Figure 5 provide the physical reading of the fresh aggregate. They begin after grasp forma-tion, so the controller must preserve contact during transport and then match a released goal. The long-horizon boundary is reported separately through the full pick-place row in Table 18. 17 Query subset Method (N) Event success Environment success Target-pos. error Release transition Latent minimum 91 .154 .198 .186 Latent elite mean 91 .242 .253 .138 Kernel ASAR 91 .308 .352 .128 
+
+Portfolio ASAR 91 .297 .341 .134 Carry-and-Release Latent minimum 75 .133 .147 .191 Latent elite mean 75 .213 .213 .137 Kernel ASAR 75 .320 .347 .125 
+
+Portfolio ASAR 75 .320 .333 .134 Full pick-place Latent minimum 42 .119 .119 .184 Latent elite mean 42 .071 .071 .187 Kernel ASAR 42 .048 .071 .177 
+
+Portfolio ASAR 42 .024 .071 .178 
+
+Table 18: Outcomes by physical task phase on the second 512-query evaluation. Target position error is final object to goal distance and lower is better. A Carry and release: initial B Kernel ASAR highest lift C Goal observation D Raw final: failure E Kernel ASAR final: success          
+
+> FHigh release: initial GKernel ASAR highest lift HGoal observation IRaw final: failure JKernel ASAR final: success
+
+Figure 5: Carry and Release executions from the matched paired evaluation. (A-E) A grasped cube is transported to a lower goal. Kernel ASAR lifts the cube, places it near the target, and releases it, while selection by minimum latent cost releases far from the goal. (F-J) A second high release case shows the same physical transition. Every panel is a simulator observation from the executed trajectory. 
+
+I.4 Carry and Release Results across Proposal Budgets 
+
+We rerun the same 75 initial states with 24, 48, and 96 propos-als per source. All evaluations share the 201,000-row dataset, model checkpoints, metadata for the evaluation queries, con-troller definitions, and 40-step budget. The row audit matches seed, query identifier, dataset row, episode, start step, and goal step. Pools are regenerated per budget, so the sweep mea-sures closed-loop performance rather than survival within one nested pool. Kernel ASAR improves selection by minimum latent cost at every budget with intervals [+.186,+.408], [+.145,+.338], and [+.089,+.348]. The selection by minimum latent cost improves from budget 48 to 96 by .080 with interval [+.013,+.153], so this Carry and Release set does not reproduce the degradation in the candidate execution audit. The position and yaw candi-date sets provide the direct proposal overgeneration evidence. 
+
+Budget/source Latent minimum Latent elite Kernel ASAR Portfolio ASAR 
+
+24 .067 .147 .360 .347 48 .053 .253 .293 .347 
+
+96 .133 .213 .347 .307 
+
+Table 19: Event completion success in matched Carry and Release evaluations across proposal budgets. Total proposal counts are 72, 144, and 288. 18 24 48 96 
+
+> Proposal budget per source
+> 0.00
+> 0.05
+> 0.10
+> 0.15
+> 0.20
+> 0.25
+> 0.30
+> 0.35
+> Event-complete success
+
+A  
+
+> Raw
+> Raw elite mean
+> Kernel ASAR
+> Portfolio ASAR
+> 24 48 96
+> Proposal budget per source
+> 0.0
+> 0.1
+> 0.2
+> 0.3
+> 0.4
+> Paired gain over Raw
+
+B
+
+> Kernel ASAR
+> Portfolio ASAR
+
+Figure 6: Carry and Release performance across proposal budgets. (A) Fixed controller outcomes. (B) Paired gains over selection by minimum latent cost with 95% intervals clustered by seed. Kernel ASAR improves that baseline by .293, .240, and .213 as the total proposal count increases from 72 to 288. 
+
+# J Cube Results Stratified by Task Con-ditions 
+
+We separate static and moving targets to locate the aggre-gate Cube gain. The strata use fixed start and goal geometry from the evaluation query, without method outcomes in the bin definitions. Confidence intervals resample the 64 seeds as clusters, while ordinary confidence intervals paired at the query level are retained in the released CSV artifacts. All 512 query keys are paired across the four selectors, and every goal remains inside the same 201-step dataset episode at offset 40. The stratified results show that the aggregate gain comes from the 170 object-motion queries rather than the 342 static queries, which both methods solve. All 27 successes unique to Portfolio ASAR and all 5 successes unique to selection by min-imum latent cost occur in the object-motion group. Goals with changed contact show the clearest benefit. The larger transla-tion half is a difficult regime: selection by minimum latent cost succeeds on 3/85 and Portfolio ASAR on 0/85, although Port-folio ASAR still improves mean cube position, target position, and yaw errors by .0159, .0036, and .1403. Thus adjacent-set reconstruction often makes progress on long moves but does not provide the missing final placement behavior needed to cross the success threshold. 
+
+Targeted Reconstruction Evaluation. The broader contact-motion evaluation did not separate action recon-                                        
+
+> Query stratum NLatent minimum Portfolio ∆Seed-cluster CI All queries 512 .723 .766 +.043 [+.021,+.066] Static object target 342 1.000 1.000 .000 [.000,.000] Any object motion 170 .165 .294 +.129 [+.063,+.195] Smaller moving half 85 .294 .588 +.294 [+.176,+.411] Larger moving half 85 .035 .000 -.035 [-.076,.000] Stable target contact 400 .897 .905 +.007 [-.005,+.020] Changed target contact 112 .098 .268 +.170 [+.087,+.248]
+
+Table 20: Post hoc Cube stratification using outcome-independent query geometry. Static means object displace-ment at most 10 −8. The 170 moving queries are split at their median XY displacement, 0.1200.                                       
+
+> Method Success Cube pos. Target pos. Yaw Latent minimum .425 .167 .090 .844 Least isolated .493 .154 .071 .843 Latent elite mean .466 .152 .062 .868 Minimum-anchored elite mean .507 .145 .059 .816 Adjacent-prefix mean .603 .127 .050 .614 Anchored adjacent-prefix mean .603 .136 .053 .737 Kernel ASAR .630 .135 .047 .762 Portfolio ASAR .658 .128 .048 .665
+
+Table 21: Targeted reconstruction evaluation. The subset rule uses only start and goal geometry and a planner trace fea-ture from the first replanning step, recorded before outcome inspection. Kernel ASAR improves over least isolated exist-ing sequence selection by .137 in success, with an interval of [+.019,+.238] obtained by resampling seeds, and reduces all three continuous errors. struction from least isolated existing-sequence selection. We therefore recorded a more selective rule before a second evaluation: nonzero yaw change, moderate nonzero object translation, and replan-0 kernel_max_weight at most 0.1470682648. This selects cases where the reconstruction weight is spread across several candidates rather than concentrated on one neighbor. On 96 new seeds the rule selects 73 queries across 54 seeds. 
+
+J.1 Cube Contact Transition Visualization 
+
+The cube contact transition example provides a visualization from the targeted reconstruction setting. The object target re-quires nonzero translation and yaw change. The initial end-effector contact configuration can also make a single early commitment unreliable. The displayed proposal set uses the same 96 sequences from each of the three fixed proposal scales. Gray curves are cumulative commanded XY action traces. The latent cost minimum is red, the adjacent set is green, and the full sequence reconstructed by Kernel ASAR 
+
+is blue. Camera images and top views come from simulator execution rather than the latent rollout. The preselected example set contains six fixed examples. Three are failures under selection by minimum latent cost 19 Protocol Success ∆ CI Branches Portfolio first .7279 – – 1.00     
+
+> MoC .7565 +.0286 [+.0169,+.0417] 1.77
+
+Table 22: MoC Validation of the Mixture of Controllers over 96 new seeds and 768 queries. The comparison is against the first branch, Portfolio ASAR in the same sequential evaluator. 
+
+MoC rescues 22 Portfolio ASAR failures, loses none, and has a 95th percentile of 4.0 executed branches. repaired by Kernel ASAR in the targeted reconstruction eval-uation set. One is an agreement success, one is a long motion case where all reconstruction variants fail, and one comes from the independent overgeneration replication. Selection within each category follows deterministic geometry and error im-provement rules. The accompanying video shows every case with the candidate trajectories, execution under selection by minimum latent cost, adjacent prefix set, and Kernel ASAR 
+
+execution under the same initial state. 
+
+Reconstruction Gains and Mixture of Controllers Verifica-tion. Kernel ASAR and Portfolio ASAR succeed on partly different queries. However, a router based only on start-goal geometry and reconstruction traces available before execu-tion does not reliably choose between them. On all 768 new queries, leave-one-seed-out routing collapses to fixed Ker-nel ASAR (.7448 versus .7396 for Portfolio ASAR); on the 73-query targeted set, it trails Portfolio ASAR (.6301 versus .6575). Successful branches are distributed as 559 Portfolio ASAR, 12 Kernel ASAR, 8 anchored adjacent-prefix mean, and 2 adjacent-prefix mean. The remaining 187 queries have no suc-cessful branch among the four controllers. The 22 rescues span 19 distinct seeds. A fixed sequence of four controllers turns this complementarity into a 2.86-point gain when verification with reset is available. 
+
+# K Replication with an Independently Trained World Model 
+
+This experiment changes the world model weights and keeps the Cube environment, query sampler, action normal-ization, proposal generator, execution budget, and ASAR 
+
+parameters unchanged. The model is trained with seed 3072 for 100,000 optimization steps on balanced sam-ples from single, double, triple, quadruple, and octuple Cube play data. We use the final available epoch, 32, rather than selecting a checkpoint from control outcomes. Its SHA-256 is 7c0cba50f432a279a7ec03ad20e836d6 e5181e5be9ceae476f8a39995814a9c4 . Evaluation uses the separate ogbench/cube_single_expert dataset [Park et al., 2024]. The eligibility pilot contains eight fixed seeds and 64 queries at each budget. Selection by minimum latent cost has 47 successes and 17 failures at 288 total proposals, and Kernel ASAR reconstruction is active in every pool. The predefined                           
+
+> Total proposals Latent minimum Least isolated Kernel ASAR
+> 72 .703 .717 .738
+> 288 .701 .713 .727
+> Total Contrast ∆[95% CI] W/L 72 Kernel minus latent minimum +.035 [+.014,+.057] 21/3 72 Kernel minus least isolated +.021 [+.010,+.035] 11/0 288 Kernel minus latent minimum +.025 [+.006,+.047] 20/7 288 Kernel minus least isolated +.014 [-.004,+.031] 13/6
+
+Table 23: Replication with independently trained world model weights over 64 seeds and 512 paired queries per budget. Intervals resample evaluation seeds 10,000 times. evaluation then uses 64 disjoint seeds and eight queries per seed. Both budgets contain the same 512 queries with iden-tical start and goal states. Each source contributes 24 or 96 proposals, giving 72 or 288 proposals in total. At 72 proposals, reconstruction has positive intervals against both predefined baselines. Its margin over least iso-lated selection shows that returning one existing sequence is insufficient on this evaluation. Kernel ASAR also improves target position error over least isolated selection by .0034 [.0017,.0052]. Cube position error is unchanged and yaw fa-vors least isolated selection, locating the gain in success and target placement rather than every state coordinate. At 288 proposals, Kernel ASAR remains better than selec-tion by minimum latent cost in success, cube position error, target position error, and yaw error. Relative to least isolated selection, its success interval crosses zero, while all three continuous error improvements remain positive. Success un-der selection by minimum latent cost remains stable across budgets, changing from .703 to .701 with a paired difference between the large and small budgets of -.002 [-.020,.016]. Adjacent-set reconstruction therefore transfers across inde-pendently trained weights. The different budget trends across checkpoints suggest that the effect of proposal scaling depends on the model’s residual prediction errors. The audit matches all 64 predefined evaluation seeds to the recorded set. Both budgets have 512 identical pool keys and zero mismatches in dataset row, episode, start, goal, seed, or query identifier. Every pool contains one output from selection by minimum latent cost, one from least isolated selection, and one from Kernel ASAR. All 128 run records contain the same checkpoint path and hash, and all reported metrics are finite. 
+
+# L Joint Latent and Action Neighbor-hood Results and Controls 
+
+This section tests whether a joint latent and action neighbor-hood can preserve a coherent proposal cluster before Portfolio ASAR reconstruction. The first evaluation is used to develop the joint neighborhood rule. The second applies the recorded rule together with random filtering controls matched to the retention rate. 20 A Initial contact-switch scene     
+
+> −20 −10 010 20
+> commanded Δ x
+> −20
+> −15
+> −10
+> −5
+> 0
+> 5
+> 10
+> 15
+> 20
+> commanded Δ y
+> Raw rank 1 / 288
+
+B Raw latent shortcut     
+
+> −20 −10 010 20
+> commanded Δ x
+> −20
+> −15
+> −10
+> −5
+> 0
+> 5
+> 10
+> 15
+> 20
+> commanded Δ y
+> 12 adjacent candidates
+
+C Adjacent contact set    
+
+> 0.3 0.4 0.5 0.6
+> world x
+> −0.4
+> −0.3
+> −0.2
+> −0.1
+> 0.0
+> world y
+
+D Executed top view     
+
+> Raw
+> Kernel ASAR
+> −20 −10 010 20
+> commanded Δ x
+> −20
+> −15
+> −10
+> −5
+> 0
+> 5
+> 10
+> 15
+> 20
+> commanded Δ y
+> best positive rank 1
+> 0 blockers
+
+E Proposal budget = 8/source     
+
+> −20 −10 010 20
+> commanded Δ x
+> −20
+> −15
+> −10
+> −5
+> 0
+> 5
+> 10
+> 15
+> 20
+> commanded Δ y
+> best positive rank 1
+> 0 blockers
+
+F Proposal budget = 24/source     
+
+> −20 −10 010 20
+> commanded Δ x
+> −20
+> −15
+> −10
+> −5
+> 0
+> 5
+> 10
+> 15
+> 20
+> commanded Δ y
+> best positive rank 31
+> 30 blockers
+
+G Proposal budget = 96/source       
+
+> 0.2 0.3 0.4 0.5 0.6 0.7 0.8
+> world x
+> −0.3
+> −0.2
+> −0.1
+> 0.0
+> 0.1
+> 0.2
+> 0.3
+> world y
+
+H Second repaired query 
+
+> Raw
+> Kernel ASAR
+
+Figure 7: Cube contact transition visualization. (A-D) A failure under selection by minimum latent cost repaired by Kernel 
+
+ASAR . The minimum cost sequence has an isolated prefix, and the executed top view shows the resulting paths. (E-G) The predetermined proposal budget case from the independent replication. The best feasible position and yaw sequence has latent cost rank 1 at 8 and 24 candidates per source, then falls to rank 31 behind 30 blockers at 96 candidates per source. (H) A second failure under selection by minimum latent cost repaired by Kernel ASAR .                                                 
+
+> Method Success ∆latent min. W/L Cube pos. Target pos. Yaw Latent minimum .6797 .0000 –.0000 .0000 .0000 Latent elite mean .7188 .0391 12/2 .0142 .0134 .0716 Anchored adjacent-prefix mean .7227 .0430 12/1 .0123 .0130 .0648 Portfolio ASAR .7188 .0391 11/1 .0121 .0114 .0723 Graph-filtered latent minimum .6836 .0039 6/5 -.0045 .0006 -.0629 Graph-filtered anchored mean .7109 .0312 10/2 .0077 .0103 .0229 Graph-filtered Portfolio ASAR .7305 .0508 15/2 .0091 .0096 .0435
+
+Table 24: Development evaluation of joint neighborhood fil-tering with 256 paired queries. 
+
+Method Success ∆ latent min. W/L Cube pos. Target pos. Yaw Latent minimum .7344 .0000 – .0000 .0000 .0000 Anchored adjacent-prefix mean .7344 .0000 5/5 .0083 .0055 .0528 Portfolio ASAR .7383 .0039 6/5 .0055 .0041 .0433 Graph-Filtered Portfolio ASAR .7422 .0078 6/4 .0066 .0032 .0743 Random-filter Portfolio ASAR .7305 -.0039 5/6 .0042 .0020 .0510 Matched random .7305 -.0039 5/6 .0054 .0024 .0611 
+
+Table 25: Confirmatory evaluation of joint neighborhood fil-tering and matched controls with 256 paired queries. 
+
+Filter Latent filtered Size Latent core Selected core Graph component .6001 40 3.8432 .5797 Random component .4995 40 3.8942 2.1078 Matched random .5933 40 3.8842 2.0743 
+
+Table 26: Control for joint neighborhood filtering. The random filter matched to the retention rate reproduces the filtering rate but not joint neighborhood centrality or the associated success gain. Graph-core filtering is effective when coupled to adjacent-set reconstruction on the development evaluation. On the sec-ond evaluation, latent-minimum success is .7344, Portfolio ASAR .7383, Graph-Filtered Portfolio ASAR .7422, and both random controls .7305. The graph increment over Portfolio ASAR is +.0039 , so graph projection is a proposal cluster diagnostic rather than the primary method. 
+
+# M Prefix Density Audit at the Candi-date Level 
+
+The audit instantiates Proposition 4 using executed candidate pools. The ranking blocker is the failed candidate with min-imum latent cost inside the 80 lowest-cost candidates. The primary feasible candidate is the successful candidate with smallest latent cost in the same pool. The secondary feasible candidate is the successful candidate with the smallest prefix isolation score. The score is the exact prefix-1, k = 3 , robustly standardized kNN distance. The calibration coefficient is se-lected on discovery seeds as the 0.75 quantile of the required correction and then fixed for held-out seeds and controls. For the latent-minimum pairing, the prefix positive-gap rate is .548 and the within the pool random-assignment test gives 
+
+p = .3605 . Fixed-β coverage is .419 with p = .2585 . For the least isolated feasible-candidate pairing, these values rise to .774 ( p = .0032 ) and .613 ( p = .0002 ). Successful low-isolation neighborhoods are therefore common, while the clos-est successful candidate in latent cost order need not be less isolated than the blocker. 21 Pairing and feature Positive gap Fixed-β coverage Latent-minimum failed, Prefix-1 .548 [.387,.710] .419 [.258,.581] Latent-minimum failed, terminal latent .742 [.581,.871] .516 [.355,.677] Latent-minimum failed, full sequence .484 [.323,.645] .323 [.161,.484] Latent-minimum failed, rolled prefix .548 [.387,.710] .194 [.065,.323] Least-isolated feasible, Prefix-1 .774 [.613,.903] .613 [.452,.774] Least-isolated feasible, terminal latent .677 [.516,.839] .419 [.258,.581] Least-isolated feasible, full sequence .645 [.484,.806] .484 [.323,.645] Least-isolated feasible, rolled prefix .581 [.419,.742] .258 [.129,.419] 
+
+Table 27: Held-out prefix density audit at the candidate level. Each row has 31 pairs, and brackets report 95% intervals. This distinction matches the method design. ASAR recon-structs a full action sequence anchored to the minimum cost sequence and formed from an adjacent set. It does not rely on scalar pairwise correction alone, and Proposition 4 explains only the reranking part of the mechanism. 
+
+# N Reacher Transfer Evaluation 
+
+The cross-task test uses the official Reacher checkpoint and 
+
+dmc/reacher_random . The Cube Portfolio parameters are used unchanged: 80 lowest-cost candidates, prefix length 1, 
+
+k = 3 , elite size 7, ratio thresholds 1.0/1.75, and anchor from the sequence with minimum costs 0.25/0.15/0.10. No Reacher threshold or prefix-density parameter is tuned. Each of five seeds evaluates 50 unique paired episodes with goal offset 25, budget 50, and CEM configured with 300 samples, 30 itera-tions, and 30 elites. The supplementary prefix_roll1 con-trol cyclically permutes prefix feature rows before computing KNN isolation. It preserves the candidate pool and compu-tation while breaking the alignment between each candidate and its prefix features.                          
+
+> Method Success (rate) ∆W/L CEM mean 200/250 (.800) .000 –Latent minimum 199/250 (.796) -.004 28/29 Permuted-prefix control 198/250 (.792) -.008 26/28 Portfolio ASAR 199/250 (.796) -.004 21/22 Method Episode CI Seed-cluster CI CEM mean [.000,.000] [.000,.000] Latent minimum [-.064,.056] [-.036,.024] Permuted-prefix control [-.064,.048] [-.064,.048] Portfolio ASAR [-.056,.048] [-.064,.044]
+
+Table 28: Reacher transfer with unchanged Cube parameters. The exact paired test gives p = 1 .0 for Portfolio ASAR against CEM mean. 
+
+Seed CEM mean Latent min. Permuted prefix Portfolio 42 .84 .88 .76 .88 43 .76 .70 .82 .78 44 .78 .78 .74 .66 45 .82 .80 .76 .80 46 .80 .82 .88 .86 
+
+Table 29: Reacher success rates for each seed. Portfolio ASAR reaches .796 on Reacher compared with .800 for standard CEM mean, with an interval of [-.064,.044] obtained by resampling seeds. The Reacher candidate pools do not yield the Cube improvement under the same prefix geometry. We next test the same reconstruction rule on Push-T, a task with frequent contact and a nonzero fixed LeWM 
+
+baseline. 
+
+# O Push-T Transfer Evaluation 
+
+Push-T uses the official fixed LeWM checkpoint and 
+
+pusht_expert_train . The final CEM pool contains 64 can-didates after 10 iterations with eight elites. The Cube portfolio is copied without tuning: prefix length 1, k = 3 , elite size 7, ratio thresholds 1.0/1.75, and anchor from the sequence with minimum costs 0.25/0.15/0.10. Three seeds each evaluate 50 paired episodes at goal offset 50 and budget 50. The protocol and decision rule were recorded before the outcomes, and the reported evaluation uses those settings unchanged.                 
+
+> Cost Mean Portfolio ASAR W/L Episode CI Distance ∆
+> Latent .273 .280 6/5 [-.040,.053] +1.95 True hybrid .413 .393 6/9 [-.073,.027] -5.84
+
+Table 30: Push-T transfer with unchanged Cube parameters over 150 paired episodes per cost. Positive distance ∆ means Portfolio ASAR reduces final task distance. Under latent cost, CEM mean reaches .273 and Port-folio ASAR reaches .280 with interval [-.040,.053]. The three paired seed rates are .30/.30, .22/.32, and .30/.22 for CEM mean/Portfolio ASAR. Under true-hybrid cost, Portfo-lio ASAR loses two points in every seed (.44/.42, .34/.32, and .46/.44) and worsens final distance by 5.84; the episode-bootstrap distance CI is [−9.72 , −2.41] . The latent exact sign-test p-value is 1.0 and its success CI clustered by seed is 
+
+[−.080 , . 100] ; the corresponding true-hybrid values are .607 and [−.020 , −.020] . Portfolio ASAR remains active, using 52 compact, 88 intermediate, and 160 dispersed branches under true-hybrid cost. Contact richness alone does not reproduce the Cube prefix geometry. A transferred prefix metric must also match the task’s proposal distribution. 
+
+# P Alternative Diagnostics and Con-trols 
+
+The comparisons in Table 31 trace the route from latent struc-ture to the final planner intervention. They show which sig-nals are descriptive, which survive closed-loop evaluation, and which component is needed to convert prefix density into task success. The 512-query final-pool evaluation gives .711 for latent selection by minimum cost, .721 for latent elite mean, .717 for minimum-anchored elite mean, .732 for adjacent-prefix mean, .734 for anchored adjacent-prefix mean, .742 for Kernel ASAR, and .738 for Portfolio ASAR. Latent elite av-eraging has a smaller gain than Kernel ASAR, although the 22 Kernel ASAR success interval against that baseline touches zero.      
+
+> Alternative Outcome and interpretation Static task rowspace Variables are decodable, but top-1 success changes only from .323 to .328. Terminal latent density Diagnostic structure does not match action-prefix reconstruction in closed loop. Index and prefix penalties Blocker exposure is reproduced without reliable receding-horizon gain. Latent tangent metrics Some continuous errors improve, while success trails Kernel ASAR and Portfolio ASAR. Learned candidate rankers Held-out gains vanish under shuffled and composition controls. Kernel/Portfolio ASAR router The variants are complementary, but learned switches do not reliably beat the best fixed method. Graph filtering alone Latent-top selection is nearly flat. Gains require graph projection followed by reconstruction. Minimum-cost-anchor controls Alternative anchors retain a partial gain. All effective variants retain adjacent-set reconstruction.
+
+Table 31: Diagnostic alternatives and their planning outcomes. 
+
+# Q Implementation and Reproducibil-ity 
+
+Software Entry Points. The exact Cube reconstruction rules are defined in research_3d_lewm/scripts/eval_ cube_native_proposal_pool_selectors.py . Closed-loop execution uses research_3d_lewm/scripts/eval_ cube_receding_proposal_pool_selectors_fast.py .The independent model evaluation reuses this evalu-ator. Its launcher and paired analysis are mapped by the release manifest. Graph launchers and their exact command lines are recorded in the artifact manifest for the two graph seed blocks. The Reacher evaluator is scripts/analysis/run_reacher_asar_eval.py .The Push-T implementation is in stable_worldmodel/ solver/cem.py , with paired evaluation and aggregation in scripts/analysis/run_pusht_pair_head_eval.py 
+
+and scripts/analysis/analyze_pusht_asar_ portfolio.py .
+
+Execution Environment. The confirmation runs use the environment summarized in Table 32. Before seed jobs launch, each run writes env.sh , env_snapshot.txt , and 
+
+pip_freeze.txt . These snapshots record the Python exe-cutable, import paths, package versions, CUDA visibility, and GPU state at launch. 
+
+Run and Analysis Directories. The graph roots are 
+
+artifact_runs/graph_component_selector_s1132_ 1163_20260619_v1 and artifact_runs/graph_ component_controls_s1164_1195_20260620_v1 .The Reacher formal root is artifact_runs/ reacher_asar_20260711_v1/formal_main . The Push-T formal roots and preregistration artifacts are under artifact_runs/pusht_asar_portfolio_ 20260711_v1 . Local synchronized analyses are under 
+
+artifact_analysis/lewm_latent_mech_20260614 .
+
+Result verification. Seed jobs are considered complete only when each seed directory contains a nonempty CSV with se-lected rows. Aggregation scripts preserve paired seed/query keys, verify finite numeric fields, and compute paired confi-dence intervals. The Reacher audit additionally verifies that all four methods use identical dataset rows, episode IDs, start steps, goal steps, evaluation seeds, and solver seeds. The Push-T aggregator verifies identical paired keys for standard CEM mean and Portfolio ASAR, reports episode and bootstrap in-tervals clustered by seed, and preserves histories of the branch choice, minimum cost anchor and branch ratio at each replan. 
+
+Artifact release. The public release will include the reconstruction-rule implementations, launchers, analysis scripts, recorded configurations, seed tables, aggregate CSV files, and environment snapshots used for the paper. The re-lease package uses public run aliases. The release manifest maps every table to its source script and run root. 
+
+# R Claim and Evidence Map 
+
+Table 33 closes the appendix by linking each paper claim to the experiment that carries it. This separation keeps the replicated mechanism, Cube method result, reconstruction analysis, and transfer behavior independently inspectable. Each reported result can be traced from its claim and proto-col to a recorded seed block, analysis script, and environment snapshot in the release manifest. 
+
+# References 
+
+Mido Assran, Adrien Bardes, David Fan, Quentin Garrido, Russell Howes, Mojtaba Komeili, et al. V-JEPA 2: Self-supervised video models enable understanding, prediction and planning. arXiv preprint arXiv:2506.09985 , 2025. URL https://arxiv.org/abs/2506.09985. Junik Bae, Kwanyoung Park, and Youngwoon Lee. TLDR: Unsupervised goal-conditioned reinforcement learning via temporal distance-aware representations. arXiv preprint arXiv:2407.08464 , 2024. URL https://arxiv.org/abs/2407. 08464. Letian Cheng, Qi Zhang, and Yisen Wang. SAGE: Subgoal-conditioned action generation for latent world model plan-ning. arXiv preprint arXiv:2607.17973 , 2026. URL https://arxiv.org/abs/2607.17973. Cheng Chi, Zhenjia Xu, Siyuan Feng, Eric Cousineau, Yilun Du, Benjamin Burchfiel, Russ Tedrake, and Shuran Song. Diffusion policy: Visuomotor policy learning via action diffusion. arXiv preprint arXiv:2303.04137 , 2024. URL https://arxiv.org/abs/2303.04137. Kurtland Chua, Roberto Calandra, Rowan McAllister, and Sergey Levine. Deep reinforcement learning in a handful of trials using probabilistic dynamics models. Advances 
+
+23 Item Recorded setting Operating system Ubuntu 22.04.5 LTS, Linux 5.4, x86-64 CPU and memory Two AMD EPYC 7763 processors, 256 hardware threads, 503 GiB system memory Accelerators Two NVIDIA RTX 6000 Ada GPUs with 48 GiB each; driver 570.133.07 and CUDA 12.8 Core software Python 3.10.20, PyTorch 2.10.0+cu128, NumPy 1.24.4, SciPy 1.15.3, scikit-learn 1.7.2, pandas 2.3.3, MuJoCo 3.8.1, OGBench 1.2.1 Randomness Each evaluation seed initializes the environment, proposal generator, and solver. Paired methods reuse the same query and proposal-pool keys. Bootstrap generators use fixed analysis seeds. 
+
+Table 32: Compute environment for the confirmatory evaluations. Full package lists are stored with each run. 
+
+Claim Primary evidence Measured range Proposal overgeneration lowers top-k feasible coverage in the tested budget sweep Held-out Site-A and independent Site-B feasible presence, top-k coverage, and blocker counts Latent, reachability, and shuffled-label reachability costs Ranking blockers occur in executed candidate pools 192-pool accounting and the 48-pool predicted-versus-executed terminal diagnostic Two fixed Cube candidate sets Kernel ASAR and Portfolio 
+
+ASAR improve latent minimum-cost Cube planning Two disjoint 512-query evaluations with paired seed-cluster intervals Fixed LeWM checkpoint and canonical Cube protocol Full-sequence reconstruction adds value beyond returning one low-isolation candidate Targeted 73-query test and matched output-rule comparison Three proposal budgets on moderate contact-motion Cube queries Reconstruction adds value after reachability-based terminal scoring Reachability-cost Kernel versus matching minimum-cost and least-isolated rules Positive interval against minimum-cost selection at every tested budget Reconstruction transfers across model weights Independently trained multi-task Cube checkpoint with 512 paired queries at two budgets Positive Kernel interval versus latent minimum at both budgets and versus least isolated at 72 Reconstruction variants retain complementary successes Supplementary 96-seed MoC evaluation with 22 rescues and 1.77 mean branches Same-initial-state bounded verification Prefix density is structured but pairwise separation is incomplete Held-out candidate-level prefix-density audit and graph controls Executed Cube candidate pools Transfer depends on task proposal geometry Reacher and Push-T with the unchanged Cube reconstruction rule Reacher .796 versus .800, latent Push-T .280 versus .273, and true-hybrid Push-T .393 versus .413 Finite-pool analysis follows explicit assumptions Propositions 1–7 and the held-out premise audit Lower-tail risk, prefix density, ranking, proposal-cluster separation, full-sequence containment, and bounded controller verification 
+
+Table 33: Direct correspondence between the paper’s claims and evidence. 
+
+in Neural Information Processing Systems , 31, 2018. URL https://arxiv.org/abs/1805.12114. Tianqi Du, Qi Zhang, Yifei Wang, and Yisen Wang. Beyond the next step: Variable-length latent world models for long-horizon planning. arXiv preprint arXiv:2606.21775 , 2026. URL https://arxiv.org/abs/2606.21775. Benjamin Eysenbach, Ruslan Salakhutdinov, and Sergey Levine. Search on the replay buffer: Bridging planning and reinforcement learning. In Advances in Neural In-formation Processing Systems , volume 32, 2019. URL https://arxiv.org/abs/1906.05253. Danijar Hafner, Timothy Lillicrap, Ian Fischer, Ruben Ville-gas, David Ha, Honglak Lee, and James Davidson. Learn-ing latent dynamics for planning from pixels. In Pro-ceedings of the 36th International Conference on Ma-chine Learning , volume 97 of Proceedings of Machine Learning Research , pages 2555–2565. PMLR, 2019. URL https://proceedings.mlr.press/v97/hafner19a.html. Danijar Hafner, Timothy Lillicrap, Jimmy Ba, and Moham-mad Norouzi. Dream to control: Learning behaviors by latent imagination. International Conference on Learn-ing Representations , 2020. URL https://arxiv.org/abs/1912. 24 01603. Danijar Hafner, Jurgis Pasukonis, Jimmy Ba, and Timo-thy Lillicrap. Mastering diverse domains through world models. arXiv preprint arXiv:2301.04104 , 2024. URL https://arxiv.org/abs/2301.04104. Nicklas Hansen, Xiaolong Wang, and Hao Su. Temporal difference learning for model predictive control. In Pro-ceedings of the 39th International Conference on Ma-chine Learning , volume 162 of Proceedings of Machine Learning Research , pages 8387–8406. PMLR, 2022. URL https://proceedings.mlr.press/v162/hansen22a.html. Nicklas Hansen, Hao Su, and Xiaolong Wang. TD-MPC2: Scalable, robust world models for continuous control. In In-ternational Conference on Learning Representations , 2024. URL https://openreview.net/forum?id=Oxh5CstDJU. Wassily Hoeffding. Probability inequalities for sums of bounded random variables. Journal of the American Sta-tistical Association , 58(301):13–30, 1963. doi: 10.1080/ 01621459.1963.10500830. Michael Janner, Justin Fu, Marvin Zhang, and Sergey Levine. When to trust your model: Model-based policy optimization. In Advances in Neural In-formation Processing Systems , volume 32, 2019. URL https://papers.nips.cc/paper_files/paper/2019/hash/ 5faf461eff3099671ad63c6f3f094f7f-Abstract.html. Nathan Lambert, Brandon Amos, Omry Yadan, and Roberto Calandra. Objective mismatch in model-based reinforce-ment learning. In Proceedings of the 2nd Conference on Learning for Dynamics and Control , volume 120 of Pro-ceedings of Machine Learning Research , pages 761–770. PMLR, 2020. URL https://proceedings.mlr.press/v120/ lambert20a.html. Liangyu Li, Shengzhi Wang, and Qingwen Liu. Beyond euclidean proximity: Repairing latent world models with horizon-matched trajectory reachability metrics. arXiv preprint arXiv:2605.22164 , 2026a. URL https://arxiv.org/ abs/2605.22164. Wenyuan Li, Guang Li, Keisuke Maeda, Takahiro Ogawa, and Miki Haseyama. Predictive but not plannable: RC-aux for latent world models. arXiv preprint arXiv:2605.07278 ,2026b. URL https://arxiv.org/abs/2605.07278. Lucas Maes, Quentin Le Lidec, Luiz Facury, Nassim Mas-saudi, Ayush Chaurasia, Francesco Capuano, Richard Gao, Taj Gillin, Dan Haramati, Damien Scieur, Yann LeCun, and Randall Balestriero. stable-worldmodel: A platform for reproducible world modeling research and evalua-tion. arXiv preprint arXiv:2605.21800 , 2026a. URL https://arxiv.org/abs/2605.21800. Lucas Maes, Quentin Le Lidec, Damien Scieur, Yann LeCun, and Randall Balestriero. LeWorldModel: Stable end-to-end joint-embedding predictive architecture from pixels. arXiv preprint arXiv:2603.19312 , 2026b. URL https://arxiv.org/ abs/2603.19312. Vincent Micheli, Eloi Alonso, and Francois Fleuret. Trans-formers are sample-efficient world models. arXiv preprint arXiv:2209.00588 , 2023. URL https://arxiv.org/abs/2209. 00588. Vivek Myers, Chongyi Zheng, Anca Dragan, Sergey Levine, and Benjamin Eysenbach. Learning temporal distances: Contrastive successor features can provide a metric struc-ture for decision-making. In Proceedings of the 41st Inter-national Conference on Machine Learning , volume 235 of 
+
+Proceedings of Machine Learning Research , pages 37076– 37096. PMLR, 2024. URL https://proceedings.mlr.press/ v235/myers24a.html. Vivek Myers, Bill Chunyuan Zheng, Benjamin Eysenbach, and Sergey Levine. Offline goal-conditioned reinforcement learning with quasimetric representations. arXiv preprint arXiv:2509.20478 , 2025. URL https://arxiv.org/abs/2509. 20478. Seohong Park, Kevin Frans, Benjamin Eysenbach, and Sergey Levine. OGBench: Benchmarking offline goal-conditioned RL. arXiv preprint arXiv:2410.20092 , 2024. URL https: //arxiv.org/abs/2410.20092. Arjun Parthasarathy, Nimit Kalra, Rohun Agrawal, Yann Le-Cun, Oumayma Bounou, Pavel Izmailov, and Micah Gold-blum. Closing the train-test gap in world models for gradient-based planning. arXiv preprint arXiv:2512.09929 ,2025. URL https://arxiv.org/abs/2512.09929. Cristina Pinneri, Shambhuraj Sawant, Sebastian Blaes, Jan Achterhold, Joerg Stueckler, Michal Rolinek, and Georg Martius. Sample-efficient cross-entropy method for real-time planning. In Proceedings of the 2020 Conference on Robot Learning , volume 155 of Proceedings of Machine Learning Research , pages 1049–1065. PMLR, 2021. URL https://proceedings.mlr.press/v155/pinneri21a.html. Yuan Pu, Yazhe Niu, Zhenjie Yang, Jiyuan Ren, Hongsheng Li, and Yu Liu. UniZero: Generalized and efficient plan-ning with scalable latent world models. arXiv preprint arXiv:2406.10667 , 2025. URL https://arxiv.org/abs/2406. 10667. Zhifeng Qian, Mingyu You, Hongjun Zhou, Xuanhui Xu, and Bin He. Goal-conditioned reinforcement learning with disentanglement-based reachability planning. arXiv preprint arXiv:2307.10846 , 2023. URL https://arxiv.org/ abs/2307.10846. Reuven Y. Rubinstein. The cross-entropy method for com-binatorial and continuous optimization. Methodology and Computing in Applied Probability , 1(2):127–190, 1999. James E. Smith and Robert L. Winkler. The optimizer’s curse: Skepticism and postdecision surprise in decision analysis. 
+
+Management Science , 52(3):311–322, 2006. doi: 10.1287/ mnsc.1050.0451. 25 Yuhai Wang, Jiawei Xia, Rongxuan Zhou, Xiao Hu, Yongliang Shi, Jing Du, and Yang Ye. PRISM: PRior-guided imagination sampling in world models. arXiv preprint arXiv:2606.07974 , 2026. URL https://arxiv.org/abs/2606. 07974. Grady Williams, Andrew Aldrich, and Evangelos A. Theodorou. Model predictive path integral control: From theory to parallel computation. Journal of Guidance, Con-trol, and Dynamics , 40(2):344–357, 2017. doi: 10.2514/1. G001921. Lunjun Zhang, Ge Yang, and Bradly C. Stadie. World model as a graph: Learning latent landmarks for planning. In Pro-ceedings of the 38th International Conference on Machine Learning , volume 139 of Proceedings of Machine Learn-ing Research , pages 12611–12620. PMLR, 2021. URL https://proceedings.mlr.press/v139/zhang21x.html. Zichen Zhang, Jun Jin, Martin Jagersand, Jun Luo, and Dale Schuurmans. Decentralized cross-entropy method for model-based reinforcement learning. In International Conference on Learning Representations , 2022. URL https://openreview.net/forum?id=yql6px0bcT. Gaoyue Zhou, Hengkai Pan, Yann LeCun, and Lerrel Pinto. DINO-WM: World models on pre-trained vi-sual features enable zero-shot planning. arXiv preprint arXiv:2411.04983 , 2024. URL https://arxiv.org/abs/2411. 04983. 26
