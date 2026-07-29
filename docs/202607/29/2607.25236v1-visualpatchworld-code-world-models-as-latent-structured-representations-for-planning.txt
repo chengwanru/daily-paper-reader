@@ -1,0 +1,1517 @@
+Title: VisualPatchWorld: Code World Models as Latent Structured Representations for Planning
+
+URL Source: https://arxiv.org/pdf/2607.25236v1
+
+Published Time: Wed, 29 Jul 2026 00:27:09 GMT
+
+Number of Pages: 17
+
+Markdown Content:
+# VisualPatchWorld: Code World Models as Latent Structured Representations for Planning 
+
+## Jiaxin Bai 
+
+Hong Kong Baptist University Hong Kong, China baijiaxin@hkbu.edu.hk 
+
+## Jiaxuan Xiong 
+
+Hong Kong Baptist University Hong Kong, China 
+
+Abstract 
+
+Different research lines use the term world model in different ways, yet they share a common aim: to capture how the world evolves under action in a form that supports perception, simulation, and planning. Two prominent realizations are neural predictors that learn dynamics in continuous vector spaces, and hand-built physics engines that expose explicit state and physical laws. Neural predic-tors scale from data but leave the form of the dynamics implicit; physics engines are inspectable and editable but difficult to con-struct at scale. We introduce VisualPatchWorld (VPW), which rep-resents world dynamics as code. VPW first selects a qualitative dynamical form with short active probes, then fits that form’s free parameters from recorded state–action traces by minimizing multi-step prediction error. The resulting programs can be rolled forward like a simulator, inspected in source form, and used inside model-predictive control; image-derived scene graphs can supply the live state at replan time. Across comparisons with prior code-based world models, VPW attains 69 .0% mean planning success and ex-ceeds the strongest code baseline by 23 .5 points. The largest gains arise when choosing the correct qualitative dynamics is essential. Under the same planner, the induced models approach ground-truth engine success on navigation and grasp-rich control; a residual gap remains for contact-rich pushing, and checking a shortlist of promising plans in the engine closes most of that gap. These re-sults establish a practical route toward automatically constructed code world models that are useful for planning. Code is available at https://github.com/HKBU-KnowComp/VisualPatchWorld/. 
+
+1 Introduction 
+
+Different research lines attach different meanings to the term world model, but they share a common goal, illustrated in Figure 1. Follow-ing the functional taxonomy of Li [ 12 ], a useful world model should help an agent produce observations, maintain an explicit account of what is happening in the world, and decide what action to take next. Li refers to these roles as rendering, simulation, and planning. They are different projections of the same underlying knowledge of how the world works. Simulation is central: an explicit account of state and dynamics makes both visual appearance and action consequences computable. Hand-built physics engines approximate this ideal most closely, yet they remain difficult to scale because each new environment still requires a human-authored model of how the world changes. A complementary line of work learns world models with neural networks. Methods such as Dreamer and LeWM [ 8, 13 ] train from interaction data and represent future evolution in continuous vector spaces. These models are data-driven, scalable, and effective for choosing actions from learned representations, but they leave the World Models: Shared Goal , Different Realizations                
+
+> Agent Action World State Observation
+> Shared nature of a world model
+> Neural latent
+> world models
+> ...
+> Vector latent space
+> • Learn from data
+> • Dynamics in vector space
+> • Structure implicit
+> VisualPatchWorld
+> (ours)
+> {
+> for tin range (T):
+> objs =sense ()
+> objs =update (objs ,a_t )
+> render (objs )
+> }
+> Executable program
+> • Code as structured latent
+> • Data -driven induction
+> • Simulator -style &
+> planner -ready
+> From interaction trajectories
+> Render observations Simulate state Plan actions
+> Three functional roles of a world model (Li, 2026)
+> Curated
+> simulators
+> Explicit physics engine
+> • Explicit state & physics
+> • Inspectable / editable
+> • Hard to build at scale
+> Bridge Bridge
+
+Figure 1: World models share one agent–environment loop, but take different forms. VisualPatchWorld represents dy-namics as code, bridging neural latent models and hand-built simulators [12]. 
+
+form of the dynamics implicit. When a predicted future is wrong, there is no editable equation or program that a human or algorithm can inspect and repair. Another line writes the dynamics in code. Methods such as PatchWorld, WorldCoder, and PoE-World [ 1, 15 ,19 ] recover executable programs and move closer to a physics-engine style world model. They often train for accurate next-step prediction, however, so a program may fit local transitions while still choosing poor actions over longer horizons. Existing approaches thus either learn scalable but opaque neu-ral dynamics, or write executable programs without ensuring that the recovered dynamics have the right qualitative form and are arXiv:2607.25236v1 [cs.CL] 28 Jul 2026 Bai and Xiong 
+
+useful for action selection. This raises three questions. How can simulator-style dynamics be recovered automatically from interac-tion trajectories? How can a method choose the correct qualitative form of the dynamics, instead of fitting parameters of a wrong form? How can the recovered model rank candidate action sequences so that a short-horizon planner can optimize them, and what remains missing relative to a ground-truth physics engine? VisualPatchWorld (VPW) addresses these questions by repre-senting world dynamics as code. Code serves as a structured latent representation: rather than storing dynamics in neural activations, VPW writes an executable transition program that can be rolled for-ward like a simulator, inspected in source form, and used to evaluate candidate actions. Every environment follows the same two-level induction process in Figure 3. Level 1 selects a qualitative sketch with short active probes over a small candidate family—contact forces, linear navigation, grip-gated object motion, or joint-space arm kinematics—and Level 2 fits that sketch from offline state– action traces under multi-step rollout loss. For planning, the fitted program scores candidate action sequences inside model-predictive control, while image-derived scene graphs can supply the live state at replan time. These design choices yield strong closed-loop gains. Under a shared planner that already succeeds at least 90% of the time with the ground-truth physics engine, VPW attains 69 .0% mean success across four control domains, exceeding the strongest code baseline by 23 .5 points. The largest improvements appear where qualitative structure is decisive: arm reaching rises from 8% to 72% , cube ma-nipulation reaches 86% , and pushing improves from near zero for prior code methods to 22% . Relative to the ground-truth engine, induced scoring is near ceiling on navigation and grasp-rich con-trol; a larger gap remains on contact-rich pushing, and re-scoring a shortlist of promising plans in the engine closes most of that gap. 
+
+Contributions. 
+
+• Two-level program induction for code world mod-els. We cast simulator-style world-model recovery as a staged problem and present VisualPatchWorld, which in-duces executable transition programs on every domain by first selecting a dynamical sketch through active probing and then fitting its parameters under multi-step rollout loss for planning. 
+
+• Planner-facing scoring with the induced program. 
+
+VPW evaluates candidate action sequences with the in-duced code world model under receding-horizon control and separates image-based state estimation at replan time from search-time scoring. 
+
+• Evidence against code baselines and a physics engine. 
+
+On four control domains, VPW improves over program-matic code-world-model baselines under a shared planner. Relative to a ground-truth physics engine, induced scor-ing is near ceiling on navigation and grasp-rich control, while contact-rich pushing benefits from selective engine re-scoring of a short candidate list. 
+
+2 Problem Definition 
+
+We study the problem of recovering simulator-style world models from interaction data. Given trajectories of observations and actions, the goal is to produce an executable transition program that humans and algorithms can inspect, edit, and roll forward in time. The long-term visual setting takes as input a dataset of image observations and actions, D = {( 𝑜 (𝑖 ) 
+
+> 𝑡
+
+, 𝑎 (𝑖 ) 
+
+> 𝑡
+
+, 𝑜 (𝑖 )
+
+> 𝑡 +1
+
+)} 𝑖,𝑡 , and outputs a program 𝑓 𝜃 
+
+over structured scene descriptions. Here we factor that pipeline: dynamics are induced from structured state–action traces, and image-derived scene graphs provide the live state for closed-loop replanning. 
+
+Mining task. Let 𝑔 𝑡 = 𝜙 (𝑜 𝑡 ) denote an object-centric scene de-scription extracted from an observation. The mining task is to learn an executable program such that 𝑔 𝑡 +1 = 𝑓 𝜃 (𝑔 𝑡 , 𝑎 𝑡 ) over multi-step horizons. Because 𝑓 𝜃 consumes structured state rather than raw pixels, the problem naturally splits into visual abstraction 𝜙 and dynamics induction over triples (𝑔 𝑡 , 𝑎 𝑡 , 𝑔 𝑡 +1). This separation sup-ports controlled evaluation: oracle state removes perception error from the dynamics question, whereas image-derived state measures how much perception noise degrades planning. 
+
+Executable world model. We require 𝑓 𝜃 to satisfy a simulator-style contract. The program must accept structured state, update that state under a candidate action, roll forward over action sequences, and expose its transition law in a form that can be inspected and edited. This requirement distinguishes a mined code world model from a neural latent predictor: when a rollout fails, the transition law itself can be examined and revised, instead of being retrained as an opaque embedding. 
+
+Evaluation criteria. We evaluate a mined world model by whether it supports closed-loop control on held-out start and goal pairs. Receding-horizon model-predictive control serves as a downstream application test, not as the training loss itself. Starts and goals differ from the training episodes, but remain within the same domains unless an explicit out-of-distribution test is stated. Accurate one-step prediction on D is necessary but not sufficient for planner-usable dynamics. 
+
+Evaluation questions. A single planning score is difficult to in-terpret because failure can arise at several stages. We organize evaluation around the questions posed in the introduction: whether the recovered program behaves like a simulator-style world model under multi-step rollouts; whether it uses the correct qualitative form of the dynamics; and whether its scoring of candidate action sequences supports planning relative to a ground-truth physics engine. In practice, we localize errors with controlled splits over perception source, hypothesis class, rollout fidelity, and planning protocol, as detailed in Section 5. We study this problem on four LeWM domains [ 13 ] covering navigation, contact manipulation, and low-dimensional continuous control. 
+
+3 Related Work 
+
+Latent visual world models. Latent world models learn dynamics directly from pixels for planning and control. Joint-embedding and model-based approaches such as JEPA and Dreamer encode envi-ronment evolution in continuous embeddings [ 8, 13 ]. LeWM [ 13 ], DINO-WM [ 24 ], and PLDM [ 17 ] are the primary latent references in Table 1, while GCBC, GCIQL, and GCIVL [ 5, 10 , 14 ] provide offline VisualPatchWorld: Code World Models as Latent Structured Representations for Planning 
+
+goal-conditioned policy baselines. Recent work adds more struc-ture inside the latent: Dyn-O and FIOC-WM learn object-centric dynamics and interactions [ 4 , 20 ], and causal world models cou-ple learned causal variables to language agents for planning [ 6 ]. RLVR-World shows that optimizing world models for verifiable prediction metrics improves downstream utility [21]. These meth-ods are strong and scalable, but a failed rollout does not expose an editable transition law. 
+
+Executable code world models and visual abstraction. A com-plementary line induces executable transition programs. Patch-World [ 1 ] recovers Python dynamics from symbolic trajectories via counterexample-guided search; WorldCoder [ 19 ] learns monolithic Python models from interaction; GIF-MCTS [ 3] searches over code edits on the Code World Models Benchmark; Curtis et al. [ 2 ] induce low-complexity probabilistic programs for POMDP components; PoE-World [ 15 ] composes weighted programmatic experts from brief demonstrations; OneLife [ 9] synthesizes conditionally acti-vated programmatic laws under a tight exploration budget; and Lehrach et al. [ 11 ] synthesize game-playing code world models for (IS)MCTS. These methods typically assume structured state is already available and optimize next-step or trajectory fit. Object-centric scene descriptions bridge images to such programs by ex-posing positions, orientations, and relations in units a transition program can consume. VPW uses this bridge as a planning interface: oracle state isolates the dynamics question, image-derived state measures perception cost at replan time, and a VLM baseline tests whether semantic recognition alone is metric enough for planning. 
+
+Structure selection and contact-aware planning. Choosing the right dynamical form is also central in scientific law discovery. LLM-SR and LaSR cast equation discovery as program search guided by language models [ 7, 16 ], while NewtonBench [ 22 ] shows that static regression fails on complex systems and that discriminating probes help identify the correct law class. VPW applies a restricted form of this idea in robot control: active probes select among a small environment-specific family of dynamical forms, after which the chosen form is fit. Differentiable simulators offer another exe-cutable template, but stiffer contact models can harm CEM planning even when one-step metrics improve [ 23 ]. This observation moti-vates VPW’s use of smoother induced contact laws, together with optional engine-based verification during search. 
+
+4 Method 
+
+VisualPatchWorld turns interaction trajectories into an executable code world model in four stages, summarized in Figure 2 and Al-gorithm 6. First, each observation is converted into a structured scene description that records object poses and relations. Second, paired before/after descriptions are exported as transition records for learning. Third, an executable Python program is induced by the shared two-level process in Figure 3: Level 1 selects a dynamical 
+
+sketch by active probing, and Level 2 fits the free parameters of that sketch under multi-step rollout loss. Fourth, the induced program is tested inside a receding-horizon planner, with an optional check of promising plans in the ground-truth physics engine. Separating sketch selection from parameter fitting is essential. Open-ended code generation can produce programs that parse and fit local transitions while still encoding the wrong dynamical form, and parameter fitting alone can achieve low one-step error with-out recovering contact or kinematic structure needed for control, as shown in Section 5.4. VPW therefore runs the same two-level induction process across domains, changing only the small sketch family per environment, and evaluates the fitted program under the planner’s own objective. The remainder of this section details the four stages. 
+
+4.1 Stage 1: Visual abstraction 
+
+The first stage replaces raw pixels with a structured representation that preserves the geometric and relational cues that dynamics depend on. We call this representation a scene graph : a text descrip-tion containing environment metadata, object poses, and relational attributes such as distance, near-contact flags, and relative direction. All abstraction paths emit the same schema, so later differences reflect perception quality rather than format mismatch. We implement three interchangeable extractors, ordered by how much perception error they remove. The oracle path reads simulator state directly and removes perception error, isolating the dynam-ics question. The tool path applies computer-vision heuristics to RGB frames and is our default image-observation interface when environment-specific extractors exist. The VLM path uses a vision-language model over RGB frames with Qwen/Qwen3.5-397B-A17B ;it recovers semantics but not reliable metric coordinates, so we use it as a semantic baseline, illustrated in Figure 6 and Appendix B. Figure 5 contrasts tool-extracted and oracle graphs on live frames. Collision geometry used by the tool path, such as polygon vertices and agent radius, is detected from pixels rather than read from simulator source code. The tool path is an engineered perception module, not an end-to-end pixel learner; its segmentation, orienta-tion, calibration, and smoothing steps are specified in Algorithm 1 of Appendix A. 
+
+4.2 Stage 2: Trajectory export 
+
+The second stage converts recorded rollouts into symbolic transition records for program induction. Each record is a triple (𝑔 𝑡 , ˜𝑎 𝑡 , 𝑔 𝑡 +𝛿 )
+
+containing the scene description before the action, the action itself, and the scene description after a frame stride 𝛿 . We refer to the resulting file as a simulator-state trace when the scene descriptions come from oracle/simulator state. A critical requirement is that action discretization matches the frame stride 𝛿 . If macro-actions are misaligned with the exported transitions, one-step prediction can look strong while multi-step rollouts degrade. The export procedure is given in Algorithm 2 of Appendix A. 
+
+4.3 Stage 3: Two-level program induction 
+
+The third stage learns an executable Python transition program 
+
+𝑓 𝜃 such that 𝑔 𝑡 +1 = 𝑓 𝜃 (𝑔 𝑡 , 𝑎 𝑡 ). On every domain, VPW uses the two-level induction process in Figure 3. Level 1 selects a qualitative form of the dynamics, which we call a dynamical sketch . Level 2 then fits the free parameters of that sketch under multi-step rollout loss. This separation keeps structure choice and parameter estima-tion separable: the procedure is shared across domains, while the Bai and Xiong 1 Visual Abstraction             
+
+> Perception RMSE
+> 2Transition Export
+> Action Discretization
+> 3Two -Level Program Induction
+> Hypothesis Class
+> 4CEM -MPC Planning
+> Scoring Landscape
+> Oracle Tool (CV) VLM
+> Abstract State
+> (agent: [ x,y ], block : [ x,y,θ ])
+> "before ": {
+> "agent ": [ x,y ],
+> "block ": [ x,y,θ ]
+> },
+> "action ": [ dx,dy ],
+> "after ": { ... }
+> Sampled Trajectories
+> L1: Active Probing
+> L2: Rollout Fit
+> Loss
+> Rollout Horizon
+> def step(state, action):
+> ...
+> Start
+> Top -30 %
+> Simulation
+> Verificatio n
+> Induced
+> Rollouts
+
+Figure 2: VisualPatchWorld pipeline. Level 1 selects a dynamical sketch by active probing; Level 2 fits its parameters from structured state traces under multi-step rollout loss. Image-derived scene graphs supply live state for replanning. The fitted program is evaluated with model-predictive control and optional engine verification. 
+
+compact hypothesis family is domain-specific, with instantiations in Section 5.1. 
+
+Level 1: Sketch selection by active probing. Before fitting constants, VPW chooses the sketch by active probing : it runs short discrimi-nating experiments through black-box environment reset and step calls, and retains the candidate that best explains the observed outcomes, as in Algorithm 3. Each domain provides a compact hy-pothesis family over qualitative alternatives, for example contact versus free motion, linear versus nonlinear transport, grip-gated versus always-coupled object motion, or joint-space versus Carte-sian kinematics. Probing commits to one sketch; Level 2 then fits its free parameters on the offline state traces shared with the code baselines. 
+
+Level 2: Parameter identification. Once the sketch ℎ★ is fixed, VPW instantiates it as a Python template with unknown constants and estimates those constants by multi-step rollout error—the ac-cumulated prediction error over the planner horizon—as in Algo-rithm 4. This objective penalizes models that fit a single step but drift over longer rollouts. In practice, we run multiple restarts of differentiable optimization on the training rollout loss and keep the restart with the lowest held-out rollout error. Contact-rich tem-plates may additionally use collision-geometry features such as contact point, normal, and lever arm. The output is an executable transition program that plugs directly into the Stage 4 planner. 
+
+Optional acquisition loop. After a sketch is fixed, an optional loop can gather additional transitions and revise parameters inside that sketch. Headline models use a single Level 1 plus Level 2 pass. The full induction-and-planning loop appears in Algorithm 6 of Appendix A. 
+
+4.4 Stage 4: Planning protocol 
+
+The fourth stage tests whether the mined program supports goal-directed control. Low one-step error does not guarantee usable search. We therefore plan with receding-horizon model-predictive control optimized by the cross-entropy method (CEM-MPC). At each replan step, the planner samples candidate action sequences, rolls them forward under a scoring model, retains the best samples, updates the sampling distribution, and executes the first 𝑟 actions before re-observing the state, as in Algorithm 5 of Appendix A. Every planning condition is defined by two independent choices, detailed in Section 5.1. The first is the replan observation : whether the planner’s current state comes from the tool path over live images or from oracle simulator state. The second is the scoring model used to rank imagined futures during search. We consider three scoring settings. Under induced scoring, the mined program evaluates every candidate; this is the pure executable-model planner. Under hybrid 
+
+scoring, the mined program still scores all 𝑁 samples, after which the ground-truth engine re-scores the top 30% shortlist and the planner chooses among those re-checked plans. Under simulator 
+
+scoring, the ground-truth engine scores every candidate and the induced model is not used in search; this setting is the physics ceiling. We freeze the planner horizon, receding step, frame skip, and CEM budget for each environment; budgets appear in Appendix Table 9 and Section 5.1. All conditions execute actions in the true simulator. Separating what is observed at replan time from what scores imagined futures lets us attribute failures to perception, dynamics, or scoring, as reported in Table 1. 
+
+5 Experiments 
+
+An executable world model is useful for planning when it recovers both appropriate dynamical structure and a scoring landscape that a planner can optimize. We evaluate VPW on the LeWM four-task VisualPatchWorld: Code World Models as Latent Structured Representations for Planning Two -Level Program Induction 
+
+Level 1: Active Probing (Structure Discovery)           
+
+> Black -box simulator
+> No source code, no parameters.
+> reset(state) step(action)
+> 1Step -response test
+> (agent law)
+> PD (second -order) vs
+> memoryless (first -order)
+> 2Momentum test
+> (block law)
+> Quasi -static vs momentum
+> 3Contact test
+> (actuation)
+> Contact -driven vs
+> action -driven
+> Axis A
+> (Agent law)
+> Axis B
+> (Block law) Axis C
+> (Actuation law)
+> PD memoryless quasi -static momentum contact -driven action -driven
+
+3 independent binary decisions → 8 hypothesis sketches 
+
+Level 2: Parameter Identification          
+
+> model_template.py
+> # PD agent + quasi -static block + contact
+> scale =?
+> kp =?
+> kv =?
+> def step(state, action):
+> ...
+> Collect rollouts
+> Active probing
+> experiments
+> Optimize Parameters
+> Minimize prediction
+> error
+> Validate
+> Goodness -of -fit on
+> held -out rollouts
+
+Identified parameters 
+
+scale*,  kp *,  kv *
+
+Model reproduces simulator behavior 
+
+Figure 3: Two-level program induction (shared across domains), illustrated on a contact-push example. Level 1 selects a dynamical sketch by active probing over a small hypothesis family. Level 2 fits the corresponding Python template by multi-step rollout optimization with multi-restart selection. Per-environment families and recovered sketches are in Section 5.1 and Table 5; Figure 7 shows induced programs after fitting. 
+
+suite in Table 2, asking three questions: whether it outperforms programmatic code baselines under shared frozen planners; how close induced-only CEM comes to a MuJoCo ceiling; and whether selective hybrid verification closes remaining contact gaps. Compo-nent ablations appear in Section 5.4; additional perception analysis is in Appendix C. 
+
+5.1 Experimental Setting 
+
+Environments. We use the same four environments as LeWM [ 13 ], with the expert HDF5 trajectories and planning protocol from LeWM Appendix F.1. Table 2 summarizes the domains. Each evalu-ation uses 50 starts with a goal sampled 25 steps ahead. We freeze one planner per environment so that MuJoCo ground-truth success is at least 90%; budgets appear in Appendix Table 9. Two-room and Reacher use CEM with a 300 ×10 budget, PushT uses CEM-MPC with a 600 ×15 budget, and Cube uses library shooting. Neural ref-erence rates follow LeWM Fig. 6; re-running the released LeWM checkpoints yields 87%, 86%, 96%, and 74% on Two-room, Reacher, PushT, and Cube. 
+
+Per-environment sketch families. The Stage 3 procedure in Sec-tion 4.3 is shared across domains; each domain supplies a compact Level 1 hypothesis family. PushT recovers contact-driven PD con-trol with a quasi-static block. Two-room recovers linear navigation. Cube recovers grip-gated contact. Reacher recovers joint-space dynamics with forward kinematics. Table 5 reports the recovered dynamics and planning success for these outcomes. 
+
+Training data and planning interface. All executable methods learn from the same offline simulator-state traces: structured transi-tions 𝑔 𝑡 , 𝑎 𝑡 , 𝑔 𝑡 +1 exported from simulator ground truth as in Stage 2 of Section 4. At planning time the induced program reads live state. 
+
+Tool rows extract scene graphs from pixels, while Oracle rows read simulator state. Under Hybrid scoring, CEM scores every candidate with the induced model and MuJoCo re-scores the top 30% before plan selection, following Stage 4. The mined program remains the search engine. Tool+Induced uses LeWM’s RGB in-terface at replan time; dynamics are still trained on simulator-state traces. Tool extractors are environment-specific; see Appendix B. 
+
+Models and backends. All LLM-facing programmatic baselines share Qwen/Qwen3-Coder-480B-A35B-Instruct-Turbo with a common API client and call budget. Port details appear in Appen-dix D. VPW does not use that coder for reported dynamics: Level 1 probing and Level 2 rollout fitting instantiate Python templates without open-ended LLM synthesis. A VLM path with Qwen/Qwe n3.5-397B-A17B is a semantic baseline for Stage 1; the tool and oracle extractors in the main planning rows are non-LLM. 
+
+Reporting conventions. Main-table cells are single-run point es-timates on a shared 50-start seed-42 set, so code baselines and VPW see identical starts. For VPW Oracle+Induced we also report five-seed means over seeds 42–46 in Appendix F, where the suite mean is 67 .5±1.5% . We report four VPW conditions by pairing Tool or Oracle replan with Induced or Hybrid scoring, together with MuJoCo+CEM as the physics ceiling. Hybrid and MuJoCo rows Bai and Xiong 
+
+Table 1: Main planning comparison, success % with 𝑛 =50 and seed 42. Upper block: RGB or latent references from LeWM Fig. 6. Lower block: executable comparison under shared sim-state training and the frozen planner of Section 5.1 with induced-only CEM scoring. 
+
+Method Type Train data Replan obs. Planner/scorer Two-room Reacher PushT Cube Mean 
+
+Neural/policy references 
+
+LeWM [13] Neural RGB RGB/latent Latent WM 87 86 96 74 85.8 DINO-WM [24] Neural RGB RGB/latent Latent WM 100 79 74 86 84.8 DINO-WM +𝑝 Neural RGB+proprio. RGB/latent Latent WM 100 — 92 — —PLDM [17] Neural RGB RGB/latent JEPA WM 97 78 78 65 79.5 GCBC [5] Policy RGB RGB/latent Policy 100 — 75 84 —GCIQL [10] Policy RGB RGB/latent Policy 100 — 20 64 —GCIVL [14] Policy RGB RGB/latent Policy 100 — 33 56 —
+
+Executable code world models (frozen planner, induced-only) 
+
+PatchWorld [1] Program. Sim-state traces Oracle state Induced code 98 8 0 66 43.0 WorldCoder [19] Program. Sim-state traces Oracle state REx pool 60 6 0 74 35.0 POMDP-Coder [2] Program. Sim-state traces Oracle state Prob. program 98 18 0 66 45.5 PoE-World [15] Program. Sim-state traces Oracle state PoE experts 6 18 0 84 27.0 GIF-MCTS [3] Program. Sim-state traces Oracle state MCTS code 6 20 0 66 23.0 CWM-Game [11] Program. Sim-state traces Oracle state Tree CWM 2 30 2 66 25.0 VPW Tool+Induced Program. Sim-state traces RGB tool Induced only 96 60 22 66 61.0 
+
+VPW Oracle+Induced Program. Sim-state traces Oracle state Induced only 96 72 22 86 69.0 
+
+Table 2: Four LeWM environments span navigation, contact manipulation, 3D rearrangement, and continuous control.           
+
+> Env Domain Primary challenge PushT 2D contact push Contact law, timing Two-room 2D navigation Walls, goals Cube 3D manipulation Multi-object 3D Reacher DMC continuous Low-dim joints
+
+Table 3: Code baselines versus VPW on Reacher and PushT under the shared CEM planner with 𝑛 =50 and seed 42; see Ta-ble 1. Reacher reports mean open-loop fingertip error over a 12-step rollout and CEM success. PushT reports summed one-step block displacement on a contact episode, with ground truth 140 .4, and CEM success. Asterisks mark unstable jumps clipped in Figure 4.                                       
+
+> Reacher PushT Method open-loop err ↓CEM succ. %↑Í|Δ𝑏 |(diag.) CEM succ. %↑
+> PatchWorld 0.86 80.0 0WorldCoder 0.86 64722 ∗0POMDP-Coder 0.23 18 0.0 0PoE-World 0.11 18 0.0 0GIF-MCTS 0.23 20 4722 ∗0CWM-Game 0.13 30 27.8 2
+> VPW Oracle+Ind. 0.04 72 16.2 22
+
+analyze remaining contact and scoring gaps relative to the induced-only baseline comparison. Per-cell protocols appear in Appendix Table 10, with additional Reacher analysis in Appendix E.4 and E.5. 
+
+Table 4: Oracle Hybrid cost versus Induced and MuJoCo with 
+
+𝑛 =50 and seed 42. Sim queries count physics rollouts per plan call. CEM rows for Two-room, Reacher, and PushT use top-30% re-scoring at 0.3𝑁 . Cube uses library shooting, so hybrid queries equal the verified shortlist size. 
+
+Success % Sim queries / plan Env Ind. Hyb. MuJoCo Ind. Hyb. MuJoCo Two-room 96 100 100 0 900 3000 Reacher 72 100 100 0 900 3000 PushT 22 96 96 0 2700 9000 Cube 86 84 94 0 120 ∼800 
+
+5.2 Baselines 
+
+Table 1 has two blocks. The upper block reproduces neural latent world models and offline goal-conditioned policies from LeWM Fig. 6 [ 13 ], including LeWM [ 13 ], DINO-WM [ 24 ], PLDM [ 17 ], GCBC [ 5], GCIQL [ 10 ], and GCIVL [ 14 ]. These RGB or latent refer-ences indicate task difficulty under a different supervision regime. The lower block is the executable comparison. We evaluate six programmatic ports, PatchWorld [ 1], WorldCoder [ 19 ], POMDP-Coder [ 2 ], PoE-World [ 15 ], GIF-MCTS [ 3], and CWM-Game [ 11 ], against VPW under identical sim-state traces, oracle replan state, and induced-only CEM scoring. Each port emits a deterministic transition program with the shared coder; implementations are detailed in Appendix D. Hybrid and MuJoCo ceilings are reported separately in Section 5.6. VisualPatchWorld: Code World Models as Latent Structured Representations for Planning 0 2 4 6 8 10 12      
+
+> step
+> 0.00
+> 0.05
+> 0.10
+> 0.15
+> 0.20
+> 0.25
+> 0.30
+> 0.35
+> 0.40
+> error
+> (a) Reacher open-loop error
+> 246810 12
+> step
+> 0
+> 10
+> 20
+> 30
+> 40
+> (b) PushT block motion (px, ep 19)
+> Ground truth
+> VPW
+> PatchWorld
+> WorldCoder
+> POMDP
+> PoE
+> GIF-MCTS
+> CWM-Game
+
+Figure 4: Rollout analysis for code baselines versus VPW, paired with Table 3. Panel (a) shows Reacher fingertip prediction error, lower better. Panel (b) shows PushT predicted block motion against simulator ground truth; values near zero indicate missing contact. Details appear in Appendix D.1. Table 5: Recovered dynamics after two-level induction (Ora-cle+Induced; budgets in Table 9). 
+
+Env Recovered dynamics Plan (%) PushT Contact PD, quasi-static block 22 Two-room Linear navigation 96 Cube Grip-gated contact 86 Reacher Joint dynamics + forward kinematics 72 
+
+Table 6: PushT structure ablation on identical graphs. Dash cells were not evaluated under the PushT CEM-MPC protocol. 
+
+Method 1-step ↓ 𝐾 =8↓ Plan (%) ↑
+
+PatchWorld (LLM) >100 px — 0Linear template 4.9 px — —Collision-gated 2.4 px 11.8 px —
+
+VPW (L1+L2) 1.0 px 10.0 px 22 
+
+5.3 Comparison against code baselines 
+
+Under the frozen planners of Section 5.1, VPW Oracle+Induced 
+
+attains a 69.0% four-task mean. This exceeds the strongest program-matic baseline, POMDP-Coder at 45.5%, by 23.5 points, and exceeds PatchWorld at 43.0% by 26.0 points, under identical starts and plan-ner settings. Relative to PatchWorld in Table 1, gains concentrate on Reacher, where frame-level CEM raises success by 64 points, and on Cube, where grip-gated contact adds 20 points. PushT improves by 22 points over near-zero success for prior code methods, while Two-room remains near ceiling for both VPW and the strongest ports. 
+
+Structure choice explains the gap. Code baselines and VPW share training traces, oracle replan state, and the frozen CEM planner. They differ in hypothesis class. The LLM ports synthesize free-form transition programs for replay fit. VPW instead probes a small sketch family on every domain, commits to the recovered template, and fits its constants. The recovered forms are joint kine-matics with forward kinematics on Reacher, contact-driven PD control on PushT, linear navigation on Two-room, and grip-gated contact on Cube. Table 3 and Figure 4 compare all ports on the same rollouts. On Reacher, PatchWorld and WorldCoder fail un-der Cartesian fingertip updates, and the remaining ports stay far from VPW’s joint-space tracker, with planning success between 6% and 30% versus 72% for VPW. On PushT, several ports predict a frozen block or unstable jumps. VPW recovers contact-driven motion ( Í |Δ𝑏 |=16 .2 versus ground truth 140 .4), enough to raise induced-only planning from 0–2% for the ports to 22%; hybrid scor-ing closes most of the remaining gap in Section 5.6. On Cube, the grip-gated latch raises VPW to 86%, above WorldCoder at 74% and slightly above PoE-World at 84%. Gains concentrate on Reacher executability, Cube grasping, and PushT structure selection. With shared simulator-state traces and a shared CEM planner, choosing the correct dynamical class closes the planning gap where that class matches the domain. 
+
+5.4 Ablation of structure selection 
+
+Table 5 summarizes the two-level outcomes. All four programs parse; planning success tracks whether the recovered class matches the domain. Table 6 then isolates PushT on identical graphs. Parse success alone is not enough: free-form PatchWorld plans at 0% ,a linear template remains misspecified, and only L1+L2 reaches 
+
+22% planning success. Remaining PushT gains come from hybrid scoring in Section 5.6. Bai and Xiong 
+
+Table 7: Simulator-assisted scoring under the same planners as Table 1. Induced rows repeat that table. Hybrid scores all 𝑁 
+
+candidates with the induced model and re-scores the top 30% in MuJoCo. MuJoCo+CEM is the full physics ceiling.                                                       
+
+> Method Type Train data Replan obs. Planner/scorer Two-room Reacher PushT Cube Mean VPW Tool+Induced Program. Sim-state traces RGB tool Induced only 96 60 22 66 61.0 VPW Oracle+Induced Program. Sim-state traces Oracle state Induced only 96 72 22 86 69.0 VPW Tool+Hybrid Program. Sim-state traces RGB tool Induced+top-30% MuJoCo 100 70 88 78 84.0 VPW Oracle+Hybrid Program. Sim-state traces Oracle state Induced+top-30% MuJoCo 100 100 96 84 95.0 MuJoCo+CEM Program. —Simulator state MuJoCo only 100 100 96 94 97.5
+
+5.5 When induced CEM is enough 
+
+We next ask whether induced-only scoring is enough once the plan-ner is strong. Under the frozen protocols of Section 5.1, Table 1 reports Oracle+Induced success and Table 7 reports the matching MuJoCo ceiling. Relative to that ceiling, induced scoring recov-ers 0.96 of MuJoCo success on Two-room, 0.91 on Cube, 0.72 on Reacher, and 0.23 on PushT. On Two-room and Cube, the recov-ered dynamical class already produces a ranking landscape that CEM can optimize, so induced scoring is near the engine ceiling. On Reacher, frame-level CEM yields a 100% MuJoCo ceiling with induced success at 72% , while coarser macro-MPC settings remain much weaker, as shown in Appendix E.5; planner granularity is therefore first-order [ 23 ]. On contact-rich PushT, structure recov-ery is necessary but not sufficient: contact events are sparse and load-bearing, so small ranking errors at the moment of contact dis-card plans that would succeed under the engine. Planning utility is accordingly not monotonic in one-step fidelity. The next subsection tests a planner-aware remedy that keeps the induced model as the search engine. Appendix Table 9 lists the same comparison with per-environment budgets. 
+
+5.6 Hybrid scoring for contact gaps 
+
+Hybrid scoring keeps the induced program as the search engine. It scores all 𝑁 CEM candidates, and MuJoCo re-scores the top 30% before the plan is chosen, as in Algorithm 5. Each CEM itera-tion therefore uses 𝑁 induced rollouts plus 0.3𝑁 MuJoCo rollouts, against 𝑁 MuJoCo rollouts for full simulator CEM. This yields a 70% reduction in physics queries while retaining induced search over the full candidate pool. Table 7 reports the simulator-assisted ladder, and Table 4 reports the query budget. For CEM environ-ments, hybrid uses 0.3𝑁 physics queries; Cube library shooting verifies a shortlist of size independent of 𝑁 .Hybrid matters most where induced scoring fails. PushT rises from 22% to 88% under Tool+Hybrid and to 96% under Oracle+Hybrid. Two-room Hybrid reaches 100%, matching MuJoCo. On Cube Or-acle, Hybrid at 84% is within one trial of Induced at 86% on 𝑛 =50 :when induced ranking is already near the ceiling, hybrid need not help. Hybrid is therefore a selective contact check: the induced pro-gram proposes candidates, and the engine verifies only a shortlist. Oracle+Hybrid at 95.0% nearly matches MuJoCo+CEM at 97.5%. 
+
+6 Discussion 
+
+Why structured code works for planning. Executable programs provide a stable planning interface: CEM can roll out predictions, score goal distance, and replan with fresh observations. Once the dynamical sketch matches the domain, planning improves sharply over free-form code generation, and the transition law remains inspectable, as shown in Table 3 and Section 5.4. The shared two-level procedure matters as much as the final constants: Level 1 commits to a qualitative form, Level 2 fits that form for multi-step prediction, and the planner then optimizes under the recovered scoring landscape. 
+
+What remains versus the engine. Under strong controllers, in-duced scoring recovers most of the MuJoCo ceiling on Two-room and Cube, reaches 72% on Reacher against a 100% engine ceiling, and leaves a large PushT contact gap, as reported in Tables 1 and 7. Selective hybrid verification, using 0.3𝑁 physics queries per CEM iteration as in Table 4, closes most of that contact gap while keeping the induced program as the search engine. In short, code world mod-els already suffice for many control domains; contact-rich ranking is where a light engine check still pays off. 
+
+Implications. These results suggest a practical division of labor. Structure selection and parameter fit yield editable, planner-ready dynamics from interaction traces. Image-derived scene graphs can supply live state at replan time without changing the induction pipeline. When induced ranking saturates, hybrid verification is an optional refinement rather than a requirement for every task. Future work can push further toward visual end-to-end induction, larger sketch libraries, and real-robot deployment while retaining the same planner-facing interface. 
+
+Scope and setup. The primary executable comparison is the lower block of Table 1; neural rows are RGB or latent difficulty references. Dynamics are fit from structured state traces; Tool+Induced uses image-derived scene graphs at replan time. Each domain supplies a compact Level 1 sketch family under a shared induction procedure. Frozen planners are chosen so MuJoCo ground-truth success is at least 90%, following Section 5.1. Reacher success depends on replan granularity; see Appendix E.4. 
+
+7 Conclusion 
+
+VisualPatchWorld learns world dynamics as inspectable code. It selects a qualitative transition form by active probing, fits its param-eters from state–action traces, and uses the resulting program for model-predictive control with optional image-based replan state. Across comparisons with prior code world models, VPW improves the strongest baseline by 23.5 mean success points and approaches a ground-truth physics engine on navigation and grasp-rich control; VisualPatchWorld: Code World Models as Latent Structured Representations for Planning 
+
+contact-rich pushing remains harder under induced-only scoring. Selecting the right dynamics sketch and fitting it for multi-step prediction yields planners that are both competitive and editable. Future work should induce these programs from visual scene-graph trajectories, broaden the sketch families, and test out-of-distribution and real-robot settings. Bai and Xiong 
+
+References 
+
+[1] Jiaxin Bai, Yue Guo, Yifei Dong, Jiaxuan Xiong, Tianshi Zheng, Yixia Li, Tianqing Fang, Yufei Li, Yisen Gao, Haoyu Huang, Zhongwei Xie, Hong Ting Tsang, Zihao Wang, Lihui Liu, Jeff Z. Pan, and Yangqiu Song. 2026. PatchWorld: Gradient-Free Optimization of Executable World Models. arXiv:2605.30880 [cs.AI] https: //arxiv.org/abs/2605.30880 [2] Aidan Curtis, Hao Tang, Thiago Veloso, Kevin Ellis, Joshua B. Tenenbaum, Tomás Lozano-Pérez, and Leslie Pack Kaelbling. 2025. LLM-Guided Probabilistic Pro-gram Induction for POMDP Model Estimation. In Proceedings of The 9th Con-ference on Robot Learning (Proceedings of Machine Learning Research, Vol. 305) ,Joseph Lim, Shuran Song, and Hae-Won Park (Eds.). PMLR, Seoul, Korea, 3137– 3184. https://proceedings.mlr.press/v305/curtis25a.html [3] Nicola Dainese, Matteo Merler, Minttu Alakuijala, and Pekka Marttinen. 2024. Generating Code World Models with Large Language Models Guided by Monte Carlo Tree Search. In Advances in Neural Information Processing Sys-tems . arXiv:2405.15383 [cs.AI] [4] Fan Feng, Phillip Lippe, and Sara Magliacane. 2025. Learning Interactive World Model for Object-Centric Reinforcement Learning. In Advances in Neural Infor-mation Processing Systems . arXiv:2511.02225 [cs.LG] [5] Dibya Ghosh, Abhishek Gupta, Ashwin Reddy, Justin Fu, Coline Devin, Benjamin Eysenbach, and Sergey Levine. 2021. Learning to Reach Goals via Iterated Supervised Learning. In International Conference on Learning Representations .arXiv:1912.06088 [cs.LG] [6] John Gkountouras, Matthias Lindemann, Phillip Lippe, Efstratios Gavves, and Ivan Titov. 2025. Language Agents Meet Causality: Bridging LLMs and Causal World Models. In International Conference on Learning Representations .arXiv:2410.19923 [cs.LG] [7] Arya Grayeli, Atharva Sehgal, Omar Costilla-Reyes, Miles Cranmer, and Swarat Chaudhuri. 2024. Symbolic Regression with a Learned Concept Library. In 
+
+Advances in Neural Information Processing Systems . arXiv:2409.09359 [cs.LG] [8] Danijar Hafner, Jurgis Pasukonis, Jimmy Ba, and Timothy Lillicrap. 2025. Mas-tering diverse control tasks through world models. Nature 640 (2025), 647–653. doi:10.1038/s41586-025-08744-2 [9] Zaid Khan, Archiki Prasad, Elias Stengel-Eskin, Jaemin Cho, and Mohit Bansal. 2026. One Life to Learn: Inferring Symbolic World Models for Stochastic Envi-ronments from Unguided Exploration. In International Conference on Learning Representations . arXiv:2510.12088 [cs.AI] [10] Ilya Kostrikov, Ashvin Nair, and Sergey Levine. 2022. Offline Reinforcement Learning with Implicit Q-Learning. In International Conference on Learning Rep-resentations . arXiv:2110.06169 [cs.LG] [11] Wolfgang Lehrach, Daniel Hennes, Miguel Lázaro-Gredilla, Xinghua Lou, Carter Wendelken, Zun Li, Antoine Dedieu, Jordi Grau-Moya, Marc Lanctot, Atıl Işcen, John R. Schultz, Marcus Chiam, Ian Gemp, Piotr Zielinski, Satinder Singh, and Kevin P. Murphy. 2025. Code World Models for General Game Playing. arXiv preprint arXiv:2510.04542 (2025). [12] Fei-Fei Li. 2026. A Functional Taxonomy of World Models: Renderers, Simulators, Planners, and the Loop That Connects Them . World Labs blog, Substack. https: //drfeifei.substack.com/p/a-functional-taxonomy-of-world-models [13] Lucas Maes, Quentin Le Lidec, Damien Scieur, Yann LeCun, and Randall Balestriero. 2026. LeWorldModel: Stable End-to-End Joint-Embedding Predictive Architecture from Pixels. arXiv:2603.19312 [cs.LG] https://arxiv.org/abs/2603.1 9312 [14] Seohong Park, Kevin Frans, Benjamin Eysenbach, and Sergey Levine. 2025. OG-Bench: Benchmarking Offline Goal-Conditioned RL. In International Conference on Learning Representations . arXiv:2410.20092 [cs.LG] [15] Wasu Top Piriyakulkij, Yichao Liang, Hao Tang, Adrian Weller, Marta Kryven, and Kevin Ellis. 2025. PoE-World: Compositional World Modeling with Products of Programmatic Experts. In Advances in Neural Information Processing Systems .arXiv:2505.10819 [cs.AI] [16] Parshin Shojaee, Kazem Meidani, Shashank Gupta, Amir Barati Farimani, and Chandan K. Reddy. 2025. LLM-SR: Scientific Equation Discovery via Program-ming with Large Language Models. In International Conference on Learning Representations . arXiv:2404.18400 [cs.LG] [17] Vlad Sobal, Wancong Zhang, Kyunghyun Cho, Randall Balestriero, Tim G. J. Rudner, and Yann LeCun. 2025. Learning from Reward-Free Offline Data: A Case for Planning with Latent Dynamics Models. In Advances in Neural Information Processing Systems . arXiv:2502.14819 [cs.LG] [18] Hao Tang, Keya Hu, Jin Peng Zhou, Sicheng Zhong, Wei-Long Zheng, Xu-jie Si, and Kevin Ellis. 2024. Code Repair with LLMs gives an Exploration-Exploitation Tradeoff. In Advances in Neural Information Processing Systems .arXiv:2405.17503 [cs.SE] [19] Hao Tang, Darren Yan Key, and Kevin Ellis. 2024. WorldCoder, a Model-Based LLM Agent: Building World Models by Writing Code and Interacting with the Environment. In Advances in Neural Information Processing Systems .arXiv:2402.12275 [cs.LG] [20] Zizhao Wang, Kaixin Wang, Li Zhao, Peter Stone, and Jiang Bian. 2025. Dyn-O: Building Structured World Models with Object-Centric Representations. In 
+
+Advances in Neural Information Processing Systems .[21] Jialong Wu, Shaofeng Yin, Ningya Feng, and Mingsheng Long. 2025. RLVR-World: Training World Models with Reinforcement Learning. In Advances in Neural Information Processing Systems . arXiv:2505.13934 [cs.LG] [22] Tianshi Zheng, Kelvin Kiu-Wai Tam, Newt Hue-Nam K. Nguyen, Baixuan Xu, Zhaowei Wang, Jiayang Cheng, Hong Ting Tsang, Weiqi Wang, Jiaxin Bai, Tian-qing Fang, Yangqiu Song, Ginny Y. Wong, and Simon See. 2026. NewtonBench: Benchmarking Generalizable Scientific Law Discovery in LLM Agents. In Inter-national Conference on Learning Representations . arXiv:2510.07172 [cs.AI] [23] Yaofeng Desmond Zhong, Jiequn Han, and Georgia Olympia Brikis. 2022. Dif-ferentiable Physics Simulations with Contacts: Do They Have Correct Gradi-ents w.r.t. Position, Velocity and Control? arXiv:2207.05060 [cs.LG] https: //arxiv.org/abs/2207.05060 [24] Gaoyue Zhou, Hengkai Pan, Yann LeCun, and Lerrel Pinto. 2025. DINO-WM: World Models on Pre-trained Visual Features Enable Zero-shot Plan-ning. In Proceedings of the 42nd International Conference on Machine Learn-ing (Proceedings of Machine Learning Research, Vol. 267) . PMLR, 79115–79135. arXiv:2411.04983 [cs.RO] VisualPatchWorld: Code World Models as Latent Structured Representations for Planning 
+
+A Pipeline Algorithms 
+
+This appendix supplies implementation detail and extended evi-dence for the main claims. Appendix A presents Stage 1–4 algo-rithms; Appendix B shows representative scene graphs and induced programs; Appendix C reports perception audits; Appendix D doc-uments matched baseline ports and failure modes; Appendix E records planner protocols and scoring analyses; and Appendix F reports multi-seed confidence intervals. 
+
+Algorithm 1 Scene-graph extraction (Stage 1) 
+
+Require: Frame 𝑜 𝑡 ; path 𝜋 ∈ { oracle , tool , vlm }; shared schema S
+
+Ensure: Scene graph 𝑔 𝑡 conforming to S 
+
+> 1:
+
+if 𝜋 = oracle then  
+
+> 2:
+
+Read simulator/HDF5 state; emit object poses, pairwise dis-tances, near-contact flags, relative direction  
+
+> 3:
+
+else if 𝜋 = tool then  
+
+> 4:
+
+Color-segment 𝑜 𝑡 to object masks {𝑀 𝑖 } 
+
+> 5:
+
+Centroid 𝑐 𝑖 ← mean (𝑀 𝑖 ); orientation 𝛼 𝑖 ← PCA (𝑀 𝑖 ) 
+
+> 6:
+
+If available, apply affine calibration 𝑐 𝑖 ↦ →𝑊 𝑐 𝑖 + 𝑏  
+
+> 7:
+
+Temporally smooth (𝑐 𝑖 , 𝛼 𝑖 ) across recent frames  
+
+> 8:
+
+Detect collision geometry (polygon vertices, agent radius) from pixels  
+
+> 9:
+
+Emit relational fields ∥𝑐 𝑖 − 𝑐 𝑗 ∥2, near-contact, relative direc-tion  
+
+> 10:
+
+else  
+
+> 11:
+
+Prompt VLM with 𝑜 𝑡 (𝜋 = vlm ); parse object identities and qualitative relations  
+
+> 12:
+
+Leave metric coordinate fields empty when VLM outputs are uncalibrated  
+
+> 13:
+
+end if  
+
+> 14: 15:
+
+return 𝑔 𝑡 under schema S
+
+Algorithm 2 PatchWorld JSONL trajectory export (Stage 2) 
+
+Require: HDF5 rollout 𝑅 = {( 𝑜 𝑡 , 𝑎 𝑡 )} 𝑇 −1 
+
+> 𝑡 =0
+
+; path 𝜋 ; frame stride 𝛿 ;discretizer Disc (·) 
+
+Ensure: JSONL line 𝐸 of transitions {( 𝑔 𝑡 , ˜𝑎 𝑡 , 𝑔 𝑡 +𝛿 )}  
+
+> 1:
+
+𝐸 ← [ ] ; 𝑡 ← 0 
+
+> 2:
+
+while 𝑡 + 𝛿 < 𝑇 do  
+
+> 3:
+
+𝑔 𝑡 ← SceneGraph (𝑜 𝑡 , 𝜋 ) {Alg. 1}  
+
+> 4:
+
+˜𝑎 𝑡 ← Disc (𝑎 𝑡 , . . . , 𝑎 𝑡 +𝛿 −1) 
+
+> 5:
+
+𝑔 𝑡 +𝛿 ← SceneGraph (𝑜 𝑡 +𝛿 , 𝜋 ) 
+
+> 6:
+
+Append (𝑔 𝑡 , ˜𝑎 𝑡 , 𝑔 𝑡 +𝛿 , meta ) to 𝐸  
+
+> 7:
+
+𝑡 ← 𝑡 + 𝛿  
+
+> 8:
+
+end while  
+
+> 9: 10:
+
+return 𝐸 as one JSONL line (one episode per line) 
+
+Algorithm 3 Sketch selection by active probing (Stage 3, Level 1) 
+
+Require: Black-box simulator with reset /step only; hypothesis sketches H = {ℎ1, . . . , ℎ 𝐾 } (on PushT, 3 binary choices ⇒
+
+𝐾 =8); discriminating probes P = {𝑝 1, . . . , 𝑝 𝑀 }
+
+Ensure: Selected sketch ℎ★ ∈ H  
+
+> 1:
+
+for 𝑗 = 1, . . . , 𝑀 do  
+
+> 2:
+
+reset () ; 𝑦 𝑗 ← step (𝑝 𝑗 ) 
+
+> 3:
+
+for 𝑘 = 1, . . . , 𝐾 do  
+
+> 4:
+
+ˆ𝑦 𝑘 𝑗 ← ℎ𝑘 (𝑝 𝑗 ) 
+
+> 5:
+
+𝑠 𝑘 𝑗 ← ⊮[ ˆ𝑦 𝑘 𝑗 ≈ 𝑦 𝑗 ] 
+
+> 6:
+
+end for  
+
+> 7:
+
+end for  
+
+> 8:
+
+ℎ★ ← argmax ℎ𝑘 
+
+Í𝑀 𝑗 =1 𝑠 𝑘 𝑗  
+
+> 9: 10:
+
+return ℎ★
+
+Algorithm 4 Multi-restart differentiable rollout fit (Stage 3, Level 2) 
+
+Require: Template 𝑇 ℎ★ (· ; 𝜃 ) with free constants 𝜃 ; train trajecto-ries Dtr ; held-out set Dval ; restarts 𝑅 ; rollout horizon 𝐾 ; learn-ing rate 𝜂 , steps 𝐿 
+
+Ensure: Fitted parameters 𝜃 ★ 
+
+> 1:
+
+for 𝑟 = 1, . . . , 𝑅 do  
+
+> 2:
+
+Initialize 𝜃 (0) 
+
+> 𝑟
+
+from restart prior  
+
+> 3:
+
+for ℓ = 1, . . . , 𝐿 do  
+
+> 4:
+
+L( 𝜃 ) ← Í(𝑔 0,𝑎 0: 𝐾 −1 ) ∈ D tr 
+
+Í𝐾 −1 
+
+> 𝑡 =0
+
+ˆ𝑔 𝑡 (𝜃 ) − 𝑔 𝑡 2 
+
+> 5:
+
+ˆ𝑔 𝑡 +1 ← 𝑇 ℎ★ ( ˆ𝑔 𝑡 , 𝑎 𝑡 ; 𝜃 ) 
+
+> 6:
+
+𝜃 (ℓ ) 
+
+> 𝑟
+
+← 𝜃 (ℓ −1) 
+
+> 𝑟
+
+− 𝜂 ∇𝜃 L 
+
+> 7:
+
+end for  
+
+> 8:
+
+end for  
+
+> 9:
+
+𝜃 ★ ← argmin 𝜃 (𝐿 )
+
+> 𝑟
+
+RolloutErr  𝜃 (𝐿 ) 
+
+> 𝑟
+
+; Dval , 𝐾  
+
+> 10: 11:
+
+return 𝜃 ★Bai and Xiong 
+
+Algorithm 5 Receding-horizon CEM-MPC with optional hybrid scoring (induced search, then top-𝑝 MuJoCo check) 
+
+Require: Induced model 𝑓 𝜃 ★ ; goal G; replan source 𝜔 ∈{tool , oracle }; scoring 𝜎 ∈ { induced , hybrid , sim }; verify frac-tion 𝑝 (e.g. 0.3); horizon ℎ; receding step 𝑟 ; CEM samples 𝑁 ,iterations 𝐼 , elite quantile 𝑞 
+
+Ensure: Executed action trajectory  
+
+> 1:
+
+𝑡 ← 0 
+
+> 2:
+
+while not at G and 𝑡 < 𝑇 max do  
+
+> 3:
+
+𝑔 𝑡 ← SceneGraph (𝑜 𝑡 , 𝜔 ) {Alg. 1}  
+
+> 4:
+
+Initialize CEM distribution N ( 𝜇 0, Σ0) over ℎ-step action se-quences  
+
+> 5:
+
+for 𝑖 = 1, . . . , 𝐼 do  
+
+> 6:
+
+A ← sample 𝑁 sequences from current distribution  
+
+> 7:
+
+for each candidate 𝐴 ∈ A do  
+
+> 8:
+
+if 𝜎 = sim then  
+
+> 9:
+
+𝐽 (𝐴 ) ← GoalDist  Rollout (MuJoCo , 𝑔 𝑡 , 𝐴, ℎ ), G 
+
+> 10:
+
+else  
+
+> 11:
+
+𝐽 (𝐴 ) ← GoalDist  Rollout (𝑓 𝜃 ★, 𝑔 𝑡 , 𝐴, ℎ ), G 
+
+> 12:
+
+if 𝜎 = hybrid and 𝐴 in top-𝑝 by 𝐽 (𝐴 ) then  
+
+> 13:
+
+𝐽 (𝐴 ) ← GoalDist  Rollout (MuJoCo , 𝑔 𝑡 , 𝐴, ℎ ), G 
+
+> 14:
+
+end if  
+
+> 15:
+
+end if  
+
+> 16:
+
+end for  
+
+> 17:
+
+Re-fit (𝜇, Σ) to elite {𝐴 : 𝐽 (𝐴 ) ≤ 𝑞 } 
+
+> 18:
+
+end for  
+
+> 19:
+
+𝐴 ★ ← argmin 𝐴 ∈ A 𝐽 (𝐴 ) 
+
+> 20:
+
+Execute 𝐴 ★ 
+
+> 0: 𝑟
+
+in real simulator; observe 𝑜 𝑡 +𝑟  
+
+> 21:
+
+𝑡 ← 𝑡 + 𝑟  
+
+> 22:
+
+end while Algorithm 6 End-to-end induction and planning loop  
+
+> 1:
+
+Stage 1–2: export via Alg. 1–2 (reported dynamics use simulator-state traces; tool/VLM exports support perception analysis)  
+
+> 2:
+
+Level 1: active probing (Alg. 3) → dynamical sketch ℎ★ 
+
+> 3:
+
+Level 2: multi-restart rollout fit (Alg. 4) → executable model 
+
+𝑓 𝜃 ★ 
+
+> 4:
+
+Optional acquisition rounds with planning-gated acceptance  
+
+> 5:
+
+Stage 4: CEM-MPC (Alg. 5); optional hybrid mode scores all candidates with 𝑓 𝜃 ★ and re-scores the top-𝑝 fraction in MuJoCo 
+
+B Scene Graphs and Induced Models 
+
+Figures 5–7 illustrate Stage 1 scene graphs and Stage 3 programs on all four LeWM environments. 
+
+RGB-replan tool scene graphs. Figure 5 shows the tool extractor used by the Tool+Induced and Tool+Hybrid conditions in Sec-tion 5.1. Color segmentation, PCA orientation, and optional affine calibration map live RGB frames to PatchWorld scene graphs. As summarized in Table 8, the resulting graphs recover oracle geome-try with accuracy sufficient for replanning. 
+
+Table 8: Held-out perception audits. After calibration, tool extraction matches oracle geometry on PushT, Two-room, and Cube, while VLM metric coordinates remain misaligned (236 px on PushT). On Reacher, fingertip and target localiza-tion is accurate, but arm joints are not recoverable from a single blob.                     
+
+> Environment Oracle RMSE Tool RMSE VLM RMSE P/R PushT 1.9 px 1.8 px 236 px 1.00 Two-room —0.19 —1.00 Cube —0.08 —0.67 Reacher —0.12 —1.00
+
+VLM scene-graph baseline (PushT).. Figure 6 shows PushT scene graphs produced by the VLM baseline Qwen/Qwen3.5-397B-A1 7B . Object identities and qualitative relations are typically correct, yet metric coordinates remain uncalibrated (236 px RMSE). We therefore treat VLM graphs as a semantic reference and use the calibrated tool extractor for RGB replanning (Section 5; Table 1). 
+
+Induced executable world models. Figure 7 shows the induced transition programs. Level 1 selects the dynamical sketch reported in Table 5; Level 2 fits that template on the simulator-state split used at planning time. These programs are the executable models underlying the perception analysis in Appendix C and the Ora-cle+Induced rows of the main table. 
+
+C Induction and Perception Analysis 
+
+This section provides perception evidence for the claim that plan-ning gains arise from recovering the correct qualitative dynamics and fitting its parameters, rather than from open-ended LLM repair alone. 
+
+Visual abstraction. Table 8 reports object precision/recall and position RMSE on held-out perception audits, measured in pixels on PushT and in normalized world coordinates elsewhere. VLM coordinate error is reported for PushT only. 
+
+Two-level induction and PushT ablation. Tables 5 and 6 appear in Section 5.4. Planner budgets for the Plan columns are listed in Table 9. 
+
+D Baseline Ports and Failure Modes 
+
+The programmatic baselines in Table 1 share the same simulator-state training split and the same per-environment frozen planners as VPW Oracle+Induced (Table 9; settings in Table 10). All LLM ports use Qwen/Qwen3- Coder- 480B- A35B- Instruct- Turbo 
+
+(Section 5.1). We report planning success in percent, write 0 when CEM completes with no successes, write 0∗ when no loadable model is produced, and write — for unevaluated cells. 
+
+PatchWorld. We adapt counterexample-guided repair to LeWM oracle traces and evaluate under the same CEM-MPC shell as VPW (𝑛 =50 , seed 42). The port retains contrastive transition selection, LLM synthesis, formal replay validation, and beam-patched repair until convergence or a round budget [1]. VisualPatchWorld: Code World Models as Latent Structured Representations for Planning PushT · example RMSE=2.36 
+
+Tool 
+
+Goal: move block to the target T pose 
+
+Objects: 
+
+- agent:circular_pusher 
+
+x=285.785 y=193.846 vx=0.000 vy=0.000 
+
+conf=1.000 
+
+- block:t_block 
+
+x=192.331 y=334.624 angle=2.938 
+
+conf=1.000 
+
+Relations: 
+
+- agent distance_to block = 168.974 
+
+- agent near block = 0.000 
+
+- agent relative_direction_to block =
+
+Oracle 
+
+Goal: move block to the target T pose 
+
+Objects: 
+
+- agent:circular_pusher 
+
+x=288.902 y=194.876 vx=-152.721 vy=51.785 conf=1.000 
+
+- block:t_block 
+
+x=192.671 y=335.157 angle=2.948 conf=1.000 
+
+Relations: 
+
+- agent distance_to block = 170.115 
+
+- agent near block = 0.000 
+
+- agent relative_direction_to block = up 
+
+Aggregate (tool vs oracle): n=99; RMSE=1.845; recall=1.00; 
+
+precision=1.00; per-object agent=2.308, block=1.724 
+
+Pipeline: color/mask heuristics, PCA orientation, temporal 
+
+smoothing. 
+
+Two-room · example RMSE=75.69 
+
+Tool 
+
+Goal: navigate agent to target 
+
+Objects: 
+
+- agent:navigator 
+
+x=140.482 y=77.964 conf=1.000 
+
+- target:goal 
+
+x=154.050 y=195.653 conf=1.000 
+
+Relations: 
+
+- agent distance_to target = 118.468 
+
+- agent near target = 0.000 
+
+Oracle 
+
+Goal: navigate agent to target 
+
+Objects: 
+
+- agent:navigator 
+
+x=140.400 y=77.962 conf=1.000 
+
+- target:goal 
+
+x=140.927 y=89.324 conf=1.000 
+
+Relations: 
+
+- agent distance_to target = 11.374 
+
+- agent near target = 1.000 
+
+Aggregate (tool vs oracle): n=200; RMSE=0.187; recall=1.00; 
+
+precision=1.00; per-object agent=0.153, target=0.452 
+
+Pipeline: color/mask heuristics, PCA orientation, temporal 
+
+smoothing. 
+
+Cube · example RMSE=0.08 
+
+Tool 
+
+Goal: move block to goal pose 
+
+Objects: 
+
+- block:cube 
+
+x=0.420 y=-0.182 conf=1.000 
+
+- effector:gripper 
+
+x=0.419 y=-0.141 conf=1.000 
+
+- goal:goal_pose 
+
+x=0.417 y=-0.089 conf=1.000 
+
+Relations: 
+
+- block distance_to goal = 0.092 
+
+- block near goal = 0.000 
+
+- effector distance_to block = 0.491 
+
+Oracle 
+
+Goal: move block to goal pose 
+
+Objects: 
+
+- block:cube 
+
+x=0.359 y=-0.202 conf=1.000 
+
+- effector:gripper 
+
+x=0.359 y=-0.206 conf=1.000 
+
+- goal:goal_pose 
+
+x=0.359 y=-0.205 conf=1.000 
+
+Relations: 
+
+- block distance_to goal = 0.003 
+
+- block near goal = 1.000 
+
+- effector distance_to block = 0.007 
+
+Aggregate (tool vs oracle): n=200; RMSE=0.082; recall=0.67; 
+
+precision=1.00; per-object block=0.065, effector=0.121 
+
+Pipeline: color/mask heuristics, PCA orientation, temporal 
+
+smoothing. 
+
+Reacher · example RMSE=1.37 
+
+Tool 
+
+Goal: match finger to target 
+
+Objects: 
+
+- arm:joint_state 
+
+x=-2.765 y=0.973 conf=1.000 
+
+- finger:end_effector 
+
+x=-0.138 y=-0.161 conf=1.000 
+
+- target:goal 
+
+x=-0.033 y=-0.194 conf=1.000 
+
+Relations: 
+
+- finger distance_to target = 0.110 
+
+- finger near target = 0.000 
+
+Oracle 
+
+Goal: match finger to target 
+
+Objects: 
+
+- arm:joint_state 
+
+x=-2.352 y=0.258 conf=1.000 
+
+- finger:end_effector 
+
+x=-0.145 y=-0.189 conf=1.000 
+
+- target:goal 
+
+x=-0.013 y=0.077 conf=1.000 
+
+Relations: 
+
+- finger distance_to target = 0.296 
+
+- finger near target = 0.000 
+
+Aggregate (tool vs oracle): n=200; RMSE=1.413; recall=1.00; 
+
+precision=1.00; per-object arm=2.654, finger=0.115, target=0.130 
+
+Pipeline: color/mask heuristics, PCA orientation, temporal 
+
+smoothing. 
+
+Figure 5: Tool-extracted scene graphs versus oracle graphs on four LeWM environments. Extraction preserves object recall with sub-pixel to few-pixel error on PushT, Two-room, and Cube. Reacher arm-joint estimates are noisier, but fingertip and target geometry remain usable for joint-space dynamics. 
+
+WorldCoder (REx port). We retain the offline REx candidate pool and omit online optimism and live environment interaction. Candi-dates are scored by one-step held-out accuracy, and the LLM repairs from counterexamples [18, 19]. 
+
+POMDP-Coder (Curtis et al. port). We keep the generate–test– refine loop, but emit deterministic PatchWorld-style transition pro-grams for CEM on oracle graphs. The resulting numbers are adapted to the shared LeWM planning interface rather than reproduced from the original POMDP suite [2]. Bai and Xiong PushT clip 0031 
+
+VLM 
+
+Goal: move block to the target T pose 
+
+Objects: 
+
+- agent:circular_pusher 
+
+x=38.000 y=118.000 vx=0.000 vy=0.000 
+
+conf=1.000 
+
+- block:t_block 
+
+x=105.000 y=135.000 angle=45.000 
+
+conf=1.000 
+
+Relations: 
+
+- agent distance_to block = 69.123 
+
+- agent near block = 0.000 
+
+- agent relative_direction_to block =
+
+Oracle 
+
+Goal: move block to the target T pose 
+
+Objects: 
+
+- agent:circular_pusher 
+
+x=54.815 y=294.103 vx=-68.017 vy=70.437 conf=1.000 
+
+- block:t_block 
+
+x=192.544 y=335.350 angle=1.813 conf=1.000 
+
+Relations: 
+
+- agent distance_to block = 143.773 
+
+- agent near block = 0.000 
+
+- agent relative_direction_to block = right 
+
+Example RMSE=198.9px vs oracle. VLM coordinates are not 
+
+metrically calibrated. 
+
+PushT clip 0033 
+
+VLM 
+
+Goal: move block to the target T pose 
+
+Objects: 
+
+- agent:circular_pusher 
+
+x=42.000 y=156.000 vx=0.000 vy=0.000 
+
+conf=1.000 
+
+- block:t_block 
+
+x=128.000 y=162.000 angle=-2.350 
+
+conf=1.000 
+
+Relations: 
+
+- agent distance_to block = 86.209 
+
+- agent near block = 0.000 
+
+- agent relative_direction_to block =
+
+Oracle 
+
+Goal: move block to the target T pose 
+
+Objects: 
+
+- agent:circular_pusher 
+
+x=47.620 y=308.396 vx=-9.396 vy=56.416 conf=1.000 
+
+- block:t_block 
+
+x=192.544 y=335.350 angle=1.813 conf=1.000 
+
+Relations: 
+
+- agent distance_to block = 147.409 
+
+- agent near block = 0.000 
+
+- agent relative_direction_to block = right 
+
+Example RMSE=169.5px vs oracle. VLM coordinates are not 
+
+metrically calibrated. 
+
+PushT clip 0078 
+
+VLM 
+
+Goal: move block to the target T pose 
+
+Objects: 
+
+- agent:circular_pusher 
+
+x=216.000 y=336.000 vx=0.000 vy=0.000 
+
+conf=1.000 
+
+- block:t_block 
+
+x=235.000 y=295.000 angle=-0.780 
+
+conf=1.000 
+
+Relations: 
+
+- agent distance_to block = 45.188 
+
+- agent near block = 0.000 
+
+- agent relative_direction_to block =
+
+Oracle 
+
+Goal: move block to the target T pose 
+
+Objects: 
+
+- agent:circular_pusher 
+
+x=177.889 y=374.092 vx=8.336 vy=11.156 conf=1.000 
+
+- block:t_block 
+
+x=192.212 y=321.447 angle=0.866 conf=1.000 
+
+Relations: 
+
+- agent distance_to block = 54.559 
+
+- agent near block = 0.000 
+
+- agent relative_direction_to block = down 
+
+Example RMSE=52.1px vs oracle. VLM coordinates are not metrically 
+
+calibrated. 
+
+PushT clip 0098 
+
+VLM 
+
+Goal: move block to the target T pose 
+
+Objects: 
+
+- agent:circular_pusher 
+
+x=620.000 y=420.000 vx=0.000 vy=0.000 
+
+conf=1.000 
+
+- block:t_block 
+
+x=380.000 y=600.000 angle=110.000 
+
+conf=1.000 
+
+Relations: 
+
+- agent distance_to block = 300.000 
+
+- agent near block = 0.000 
+
+- agent relative_direction_to block =
+
+Oracle 
+
+Goal: move block to the target T pose 
+
+Objects: 
+
+- agent:circular_pusher 
+
+x=344.198 y=178.304 vx=-233.986 vy=42.321 conf=1.000 
+
+- block:t_block 
+
+x=192.671 y=335.157 angle=2.948 conf=1.000 
+
+Relations: 
+
+- agent distance_to block = 218.090 
+
+- agent near block = 0.000 
+
+- agent relative_direction_to block = up 
+
+Example RMSE=346.2px vs oracle. VLM coordinates are not 
+
+metrically calibrated. 
+
+Figure 6: VLM PushT scene graphs versus oracle graphs. Semantic structure is recovered, but metric coordinates are misaligned, which motivates the calibrated tool extractor used by Tool+Induced in Table 1. 
+
+PoE-World (product-of-experts port). We run Steps 1–3 of the paper on simulator-state traces—expert synthesis, L-BFGS weight fitting, and prune-and-wrap—and omit hierarchical Atari planners and online expert debugging [15]. 
+
+GIF-MCTS.. We search over Generate/Improve/Fix edits with MCTS. Node value is held-out transition accuracy; selection uses UCT with action-type balancing; and each environment is allotted 50 LLM calls [3]. 
+
+CWM-Game (Lehrach et al. port). We retain tree-search CWM synthesis with Thompson sampling and unit-test feedback, replace (IS)MCTS with CEM-MPC, and use 50 retries (scaled from the pa-per’s 500). Value-function synthesis, hidden-state inference, and VisualPatchWorld: Code World Models as Latent Structured Representations for Planning PushT 
+
+Scene graph (oracle) 
+
+Goal: move block to the target T pose 
+
+Objects: 
+
+- agent:circular_pusher 
+
+x=288.902 y=194.876 vx=-152.721 
+
+vy=51.785 conf=1.000 
+
+- block:t_block 
+
+x=192.671 y=335.157 angle=2.948 
+
+conf=1.000 
+
+Relations: 
+
+- agent distance_to block = 170.115 
+
+- agent near block = 0.000 
+
+- agent relative_direction_to block =
+
+Induced dynamics 
+
+Induced rules 
+
+• Structure sketch (active probing): pd, quasi_static, 
+
+contact_driven. 
+
+• Agent follows proportional-derivative control toward scaled 
+
+action target (KP~92, KV~26, SCALE~98). 
+
+• Block is quasi-static: pushed only through swept agent-T-block 
+
+contact with normal/tangential springs. 
+
+Example transition 
+
+Action: 
+
+move_down[dx=0.1400,dy=-0.2500,speed=0.2865] 
+
+Before → After: agent=(423.000, 182.000) → agent=(427.139, 
+
+174.608) 
+
+Two-room 
+
+Scene graph (oracle) 
+
+Goal: navigate agent to target 
+
+Objects: 
+
+- agent:navigator 
+
+x=140.400 y=77.962 conf=1.000 
+
+- target:goal 
+
+x=140.927 y=89.324 conf=1.000 
+
+Relations: 
+
+- agent distance_to target = 11.374 
+
+- agent near target = 1.000 
+
+Induced dynamics 
+
+Induced rules 
+
+• Linear scaffold-fit on agent and target coordinates with 
+
+pairwise distance features. 
+
+• Wall and door constraints inferred from metadata door_coords; 
+
+motion clipped at room boundaries. 
+
+• Target object is static; agent position updates from fitted 
+
+linear transition matrix. 
+
+Example transition 
+
+Action: 
+
+move_left[dx=-0.6046,dy=-0.1035,speed=0.6134] 
+
+Before → After: agent=(169.432, 65.934) → agent=(154.318, 63.347) 
+
+Model: GeneralScaffoldFitWorldModel 
+
+Cube 
+
+Scene graph (oracle) 
+
+Goal: move block to goal pose 
+
+Objects: 
+
+- block:cube 
+
+x=0.359 y=-0.202 conf=1.000 
+
+- effector:gripper 
+
+x=0.359 y=-0.206 conf=1.000 
+
+- goal:goal_pose 
+
+x=0.359 y=-0.205 conf=1.000 
+
+Relations: 
+
+- block distance_to goal = 0.003 
+
+- block near goal = 1.000 
+
+- effector distance_to block = 0.007 
+
+Induced dynamics 
+
+Induced rules 
+
+• Linear scaffold-fit on effector, block, and goal coordinates 
+
+(6-D state). 
+
+• 5-D act[] control vector mapped through ridge-regression 
+
+coefficients. 
+
+• Goal pose is static; block and effector positions updated 
+
+jointly from fitted deltas. 
+
+Example transition 
+
+Action: 
+
+act[a0=-0.4797,a1=0.2010,a2=-0.3361,a3=-0.2949,a4=-... 
+
+Before → After: effector=(0.425, -0.000) → effector=(0.376, 
+
+0.021) 
+
+Reacher 
+
+Scene graph (oracle) 
+
+Goal: match finger to target 
+
+Objects: 
+
+- arm:joint_state 
+
+x=-2.352 y=0.258 conf=1.000 
+
+- finger:end_effector 
+
+x=-0.145 y=-0.189 conf=1.000 
+
+- target:goal 
+
+x=-0.013 y=0.077 conf=1.000 
+
+Relations: 
+
+- finger distance_to target = 0.296 
+
+- finger near target = 0.000 
+
+Induced dynamics 
+
+Induced rules 
+
+• Joint-angle dynamics: qpos_{t+1} = qpos_t + B·action from ridge 
+
+fit on oracle trajectories. 
+
+• Fingertip position from analytic forward kinematics on (q1, 
+
+q2). 
+
+• Target is static; success when finger-target distance < 0.05. 
+
+Example transition 
+
+Action: 
+
+move_right[dx=0.1868,dy=-0.0779,speed=0.2024] 
+
+Before → After: arm=(-1.491, 2.099) → arm=(-1.320, 1.986) 
+
+Model: ReacherJointFitWorldModel 
+
+Figure 7: Induced executable world models. Each panel pairs a frame and oracle scene graph with induced rules, one symbolic transition, and the recovered model class (Level 1 sketch and Level 2 fit). 
+
+OpenSpiel imperfect-information play are omitted so that evalua-tion matches the shared LeWM planning interface [11]. 
+
+Neural and offline-RL reference rows. The upper block of Table 1 reproduces the LeWM Fig. 6 rates [ 13 ] under the LeWM Appen-dix F.1 protocol, including LeWM, DINO-WM / DINO-WM +𝑝 [ 24 ], PLDM [ 17 ], GCBC [ 5], GCIQL [ 10 ], and GCIVL [ 14 ]. These pixel and latent rows provide reference context; they are not matched structured-code baselines. 
+
+D.1 Baseline failure case studies 
+
+Table 3 and Figure 4 in the main text quantify the comparison. The qualitative cases below illustrate why structure choice dominates planning outcomes on Reacher and PushT. Bai and Xiong 
+
+Table 9: Frozen-planner ranking ( 𝑛 =50 , seed 42) for Section 5.5. Ind. denotes Oracle+Induced.                                   
+
+> Env Planner Budget MuJoCo Ind. Ratio Two-room CEM ℎ=𝑟 =fs =5,300 ×10 100 96 0.96 Reacher CEM frame; ℎ=𝑟 =fs =1,300 ×10 ; fin-ger 100 72 0.72 PushT CEM-MPC 𝑎𝑏 =ℎ=𝑟 =5,600 ×15 96 22 0.23 Cube Library ℎ=𝑟 =1,fs =5, 400 macros, 𝐵 =100 94 86 0.91
+
+Reacher: wrong kinematics class. PatchWorld and WorldCoder treat the fingertip as a free Cartesian particle: 
+
+# PatchWorld / WorldCoder Reacher (fair plan 8% / 6%) finger.x += dx; finger.y += dy arm.x += 0.5*dx; arm.y += 0.5*dy # PatchWorld heuristic 
+
+POMDP-Coder, PoE-World, GIF-MCTS, and CWM-Game avoid the most severe instability, yet still lack a fitted joint-space law with forward kinematics (open-loop mean error 0.11 –0.23 versus 0.04 for VPW; planning success 18 –30% versus 72% ). VPW updates joints and reconstructs the fingertip through fitted forward kinematics: 
+
+# VPW Reacher (fair plan 72%) q <- q + B * [1, dx, dy] # fitted joint Delta-q finger <- FK(q) # fitted FK features 
+
+PushT: missing or unstable contact. PatchWorld, POMDP-Coder, and PoE-World leave the block frozen ( Í |Δblock |=0). WorldCoder and GIF-MCTS produce unstable multi-hundred-pixel jumps. CWM-Game moves the block weakly ( 27 .8) but still plans at 2%: 
+
+# PatchWorld PushT (fair plan 0%) agent.x += dx; agent.y += dy # block unchanged 
+
+VPW recovers a contact-driven PD sketch with quasi-static block response and fits the corresponding PD and contact gains: 
+
+# VPW PushT (fair plan 22% induced-only) a <- PD(agent, SCALE*action; KP, KV) block <- quasi_static_push(a, contact_springs) 
+
+Induced-only contact ranking remains imperfect (22% versus Mu-JoCo 96%). Hybrid verification raises Tool+Induced PushT success to 88% (Section 5.6). 
+
+E Planner Protocols and Scoring 
+
+This section details the frozen planners and scoring analyses behind Sections 5.5–5.6. 
+
+E.1 Fair frozen-planner ranking 
+
+Table 9 freezes, for each environment, a planner whose MuJoCo ground-truth success is at least 90% , then evaluates Oracle+Induced 
+
+under the same settings. The reported ratio is induced success di-vided by MuJoCo success. Cube uses the same expert-macro library for both MuJoCo and induced scoring. 
+
+E.2 Planner protocol for main-table cells 
+
+Table 10 lists the observation source and success rate for each main-table cell under the frozen settings of Table 9. Under induced scoring, candidates are ranked with induced code only; under hybrid scoring, the top 30% are re-scored in MuJoCo for CEM environments; under 
+
+sim scoring, ranking uses MuJoCo alone. Code baselines use the Oracle+Induced planner settings with induced scoring. 
+
+Table 10: Observation source and scoring mode for each main-table success rate. Planner settings match Table 9.                         
+
+> Condition Two-room Reacher PushT Cube Tool+Induced (tool / ind.) 96 60 22 66 Tool+Hybrid (tool / hyb.) 100 70 88 78 Oracle+Induced (oracle / ind.) 96 72 22 86 Oracle+Hybrid (oracle / hyb.) 100 100 96 84 MuJoCo+CEM (sim / sim) 100 100 96 94
+
+E.3 Cube planning ladder ( 𝑛 =50 , seed 42) 
+
+Table 11 decomposes Cube performance under the frozen library-shoot planner. Planning rates match the corresponding cells of Table 1. 
+
+Table 11: Cube performance under frozen library shooting (𝑛 =50 , seed 42). Planning rates match Table 1; tool RMSE is measured with the calibrated extractor used at replan time.              
+
+> Condition Succ. Tool RMSE LeWM (RGB) 74 —Tool+Induced (fair library) 66 0.08 Tool+Hybrid 78 0.08 Oracle+Induced 86 —Oracle+Hybrid 84 —MuJoCo+CEM 94 —
+
+E.4 Reacher: fingertip versus joint-angle success 
+
+The main-table Reacher protocol uses frame CEM with finger_match 
+
+(fingertip-to-target distance below 0.05 ). Table 12 reports a coarser macro-MPC sensitivity analysis on the same 𝑛 =50 starts (seed 42). Under ℎ=𝑟 =fs =5, both metrics remain low. 
+
+Table 12: Reacher macro-MPC sensitivity under coarse re-planning ( ℎ=𝑟 =fs =5). The main-table frame-CEM protocol appears in Table 13.              
+
+> Condition finger_match qpos_match
+> Tool+Induced 42Tool+Hybrid 60Oracle+Induced 88Oracle+Hybrid 14 4MuJoCo+CEM 16 4LeWM (RGB, latent goal image) 86 (LeWM suite)
+
+E.5 Reacher: frame MPC multi-seed results 
+
+Table 13 pools five frame-MPC seeds under the main-table settings. 
+
+Tool+Induced attains 61.2% [55.0, 67.0] and Tool+Hybrid attains 74.4% [68.6, 79.4], compared with macro-MPC means near 6% in Table 12. 
+
+Table 13: Five-seed frame-CEM results for the Reacher main-table protocol. Brackets denote pooled Wilson 95% intervals.                       
+
+> Condition Mean ±SD Pooled 95% CI Tool+Induced 61.2 ±5.2 [55.0, 67.0] Tool+Hybrid 74.4 ±4.8 [68.6, 79.4] Oracle+Induced 76.0 ±3.2 [70.3, 80.9] Oracle+Hybrid 100.0 ±0.0 [98.5, 100.0] MuJoCo+CEM (frame, warm) 100.0 —VisualPatchWorld: Code World Models as Latent Structured Representations for Planning
+
+E.6 Two-room scoring landscape 
+
+We illustrate the scoring-landscape analysis of Section 5.5 with a single-environment case. The Two-room induced model is a lin-ear ridge map Δ𝑠 = 𝑊 [1, 𝑎, 𝑠, {∥ 𝑠 𝑖 − 𝑠 𝑗 ∥2 }] with no wall, door, or collision term. Imagined trajectories therefore pass through walls, and the induced score varies smoothly with actions. Mu-JoCo scoring instead exhibits a near-discontinuity at walls through clamping and penalties, which macro rollout ( ℎ=5, frameskip 5)amplifies. Under the matched CEM shell ( 300 ×10 , seed 42, 𝑛 =50 ), 
+
+MuJoCo+CEM reaches 100% and Oracle+Induced reaches 96% (mean goal distance 4.8; success radius 16 .0); both Oracle+Hybrid and Tool+Hybrid reach 100%. Hybrid scoring yields similar gains in contact domains elsewhere, raising PushT from 22% to 88% and Cube from 66% to 78%. 
+
+F Reproducibility and Multi-Seed Intervals 
+
+Release. Code, configuration files, and evaluation scripts will be released with the camera-ready version. Evaluation uses the frozen planners in Table 9, with 50 starts per seed, seed 42 for the main table, and the multi-seed intervals below. 
+
+Multi-seed confidence intervals. Main-table cells are seed-42 point estimates ( 𝑛 =50 ) so that VPW and the code baselines share evalua-tion starts. Table 14 reports five-seed results under the same frozen planners. Oracle+Induced attains a suite mean of 67 .5±1.5% (seed-42 suite mean 69 .0% ); PushT remains near 20% under induced-only scoring and rises to 95 .2±5.0% under hybrid scoring. Mean ±SD is computed across seeds; Wilson 95% intervals pool 250 trials per row. Corresponding Reacher frame Tool/Hybrid intervals appear in Appendix E.5. 
+
+Table 14: Five-seed results under the frozen protocol of Ta-bles 1–9 (seeds {42 , . . . , 46 }, 𝑛 =50 each). Top: Oracle+Induced robustness (suite mean 67 .5±1.5% versus seed-42 69 .0% ). Bot-tom: Tool/Hybrid conditions.

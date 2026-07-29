@@ -1,0 +1,2437 @@
+Title: MXAttention: Data-Free Optimal Scaling and Pre-Normalization Quantization for MXFP4 Attention
+
+URL Source: https://arxiv.org/pdf/2607.24377v1
+
+Published Time: Tue, 28 Jul 2026 01:56:58 GMT
+
+Number of Pages: 28
+
+Markdown Content:
+# MXAttention: Data-Free Optimal Scaling and Pre-Normalization Quantization for MXFP4 Attention 
+
+Jianlin Yu, Jing Lin, Linghui Kong, Aiyue Chen, Weiyi Sun, Chenyu Zeng, Wangli Lan, Jinxi Li Zhuo Zheng, Ziyang Yue, Danning Ke, Fei Yi, Tianchi Hu, Yuan Ding, Yiwu Yao, Junsong Wang ∗
+
+Huawei Technologies Co., Ltd. July 28, 2026 
+
+Abstract 
+
+The quadratic cost of attention is a major bottleneck in diffusion-based video generation models. MXFP4 attention offers a promising path toward lower-cost inference, but directly applying stan-dard MXFP4 quantization to attention often degrades generation quality. We attribute this degra-dation primarily to two numerical failure modes: power-of-two shared scaling creates a clipping– underflow trade-off within MXFP4 blocks, while direct MXFP4 quantization in the softmax loop breaks row-wise normalization, so the induced attention weights no longer sum to one after quanti-zation. To address these issues, we propose MXAttention , a data-free post-training quantization framework for MXFP4 attention that achieves near-lossless generation quality through two key components. First, Universal Optimal Scaling (UOS) leverages the periodic structure induced by power-of-two microscaling to minimize a global MXFP4 quantization-error objective, deriving the closed-form, distribution-independent scaling boundary Qmax = 7 .25 without calibration or per-layer search. Second, Pre-Normalization Quantization (PNQ) quantizes unnormalized softmax exponentials before the row-wise summation, guaranteeing that the induced attention probabilities sum to one exactly and preventing row-sum errors from accumulating in the attention output. As a fully data-free method, MXAttention requires neither calibration nor QAT. Empir-ically, across Wan2.2 and HunyuanVideo, MXAttention closes at least 95% of the VBench Imaging Quality gap between vanilla OCP MXFP4 and FP16, while substantially improving frame-level similarity. It preserves FP16-level generation quality with less than 0.01 absolute degradation on all reported VBench metrics and achieves performance competitive with strong NVFP4-based baselines with negligible overhead when fused into the attention pipeline. The implementation of MXAttention has been integrated into the main branch of MindIE-SD and is publicly available at 
+
+https://gitcode.com/Ascend/MindIE-SD/tree/master/mindiesd .
+
+# 1 Introduction 
+
+Video diffusion Transformers process spatiotemporal token sequences whose length grows with spatial resolution and video duration [1, 2, 3]. At every denoising step, the model performs a full forward pass through its Transformer blocks. Although fast samplers, distillation, and caching reduce the number of model evaluations or reuse intermediate computation [4, 5, 6, 7], the cost of each executed forward pass remains substantial. Attention computation is therefore a key target for low-precision acceleration: its two dominant operations, QK ⊤ and P V , are GEMMs that can directly exploit native FP4 throughput when Q, K, V , and the softmax-path values can be quantized with sufficiently low error [8, 9]. Native FP4 GEMM support and standardized microscaling formats have made 4-bit attention increasingly practical. MXFP4, defined by the OCP MX specification, is an open standard format supported across multiple accelerator families, including NVIDIA Blackwell GPUs, AMD Instinct MI350 series, and Ascend 950 series [10, 11, 12, 13]. It represents E2M1 values in 32-element blocks using a shared E8M0 power-of-two scale. Alongside this open standard, NVIDIA introduced NVFP4, 
+
+> ∗Corresponding author.
+
+1arXiv:2607.24377v1 [cs.LG] 27 Jul 2026 which adopts a finer 16-value block granularity with E4M3 block scales and an additional tensor-level scale [14, 15]. MXFP4 reduces scale metadata overhead and enables simpler scale handling in low-precision GEMMs, but its coarser block granularity and power-of-two scaling restriction make accurate attention quantization challenging. Directly applying standard MXFP4 quantization to attention can therefore cause substantial degradation in generated video quality. Recent work has explored low-bit attention from several directions. Rotation-based PTQ methods such as QuaRot and SpinQuant use orthogonal transformations, including Hadamard transforms, to suppress activation outliers and have become widely used in low-bit quantization pipelines [16, 17]. These techniques improve the numerical distributions of Q and K, but do not directly address the format-specific scaling behavior of MXFP4, which can limit their effectiveness for MXFP4 attention. Attention-specific kernels such as the SageAttention series demonstrate the practicality of low-bit attention through smoothing, scaling, and kernel-level optimization [18, 19, 20, 8]. Quantization-aware training (QAT) further improves FP4 attention by adapting the model during training [9]. Recent MXFP4 quantization methods improve block quantization through overflow-aware scaling, adaptive scale selection, and metadata augmentation [21, 22, 23]. These methods improve quantization accuracy through block-dependent decisions, empirical optimization, or additional format flexibility, whereas MXAttention derives a fixed, data-free MXFP4 scaling boundary. Video-diffusion quantization methods also exploit spatiotemporal structure to quantize model weights and activations, but generally do not address the numerical constraints inside the fused attention softmax loop [24]. MXAttention instead targets a fully data-free PTQ method for MXFP4 attention, without calibration, QAT, or per-layer search. We characterize two numerical failure modes in directly quantized MXFP4 attention. First, power-of-two shared scaling creates a clipping–underflow trade-off within each MXFP4 block. A smaller shared scale preserves the resolution of smaller values but exposes larger values to saturation, whereas a larger shared scale reduces clipping at the cost of increased rounding and underflow. Second, directly inserting MXFP4 quantization into the FlashAttention online-softmax loop breaks row-wise normal-ization [25, 26, 27]. In this setting, the unnormalized softmax exponential tile is quantized for the output-accumulator update, while the row-wise sum is accumulated from its unquantized counter-part. Because the two updates use different representations, the induced attention weights no longer necessarily sum to one. To address these issues, we propose MXAttention , a data-free post-training quantization frame-work for MXFP4 attention. First, Universal Optimal Scaling (UOS) identifies a periodic structure induced by power-of-two microscaling and shows that it makes the optimal scaling boundary indepen-dent of the block-maximum distribution. Based on this observation, UOS derives the closed-form boundary Qmax = 7 .25 without calibration or per-layer search. Second, Pre-Normalization Quan-tization (PNQ) quantizes the unnormalized softmax exponentials before both the row-wise sum and output-accumulator updates. By using the same quantized values in both updates, PNQ preserves row-wise normalization by construction and avoids the additional scaling error caused by inconsis-tent quantization paths. Figure 1 provides an overview of MXAttention, which integrates Universal Optimal Scaling (UOS) and Pre-Normalization Quantization (PNQ) into the FlashAttention pipeline. Our main contributions are: 
+
+• We characterize two numerical failure modes that arise when MXFP4 quantization is directly applied to attention: the clipping–underflow trade-off induced by power-of-two block scaling and the row-wise normalization error caused by inconsistent quantization in the online-softmax loop. 
+
+• We identify a periodic structure induced by power-of-two microscaling and show that it makes the optimal MXFP4 scaling boundary independent of the block-maximum distribution. Based on this observation, Universal Optimal Scaling (UOS) derives a single fixed boundary Qmax = 7 .25 for selecting the shared power-of-two scale of each MXFP4 block and proves that it globally minimizes the proposed quantization-error objective without calibration or per-layer search. 
+
+• We introduce Pre-Normalization Quantization (PNQ) , which uses the same quantized soft-max exponential tiles for both the row-wise sum and output-accumulator updates, preserving row-wise normalization by construction and avoiding the additional scaling error introduced by mixing quantized and unquantized paths. 
+
+• We evaluate MXAttention on Wan2.2 and HunyuanVideo. Across both models, MXAttention closes at least 95% of the VBench Imaging Quality gap between vanilla OCP MXFP4 and FP16, 2𝑸 
+
+𝑲  UOS Quantization     
+
+> 𝐄𝟖𝐌𝟎 𝐒𝐜𝐚𝐥𝐞
+> =𝟐 𝐥𝐨𝐠 𝟐 𝑴
+> 𝟕 .𝟐𝟓
+
+෡𝑸 
+
+> ෡𝑲
+> ෡𝑽
+> Hadamard
+> Rotation
+> 𝑸
+
+𝑲    
+
+> 𝑽
+> FP16 FP16 MXFP4
+> FP4MM &
+> Online
+> Softmax
+> ෩𝑷 ෡𝑷
+> UOS
+> FP16
+> PNQ: Row Sum
+> PNQ: Output
+> ෡𝑷 𝟏
+> ෡
+
+𝑷 ෡𝑽 
+
+> 𝑶
+> MXFP4
+
+Figure 1: Overview of MXAttention. MXAttention integrates Universal Optimal Scaling (UOS) and Pre-Normalization Quantization (PNQ) into the FlashAttention pipeline. A fixed Hadamard rotation is applied to Q/K for outlier suppression. UOS applies the distribution-independent MXFP4 scaling boundary Qmax = 7 .25 to all MXFP4-quantized attention tensors. During the online-softmax loop, PNQ quantizes the unnormalized softmax tile and reuses the same quantized tile for both row-wise sum and output-accumulator updates, preserving row-wise normalization by construction. substantially improves frame-level similarity, and preserves FP16-level generation quality, re-maining within 0.01 of or exceeding FP16 on every reported VBench metric. It also achieves performance competitive with strong NVFP4-based baselines with negligible algorithmic over-head and a fusion-friendly design. 
+
+# 2 Preliminaries 
+
+Attention and FlashAttention. Given query, key, and value matrices Q, K, and V , scaled dot-product attention computes 
+
+S = QK ⊤
+
+√d , P = Softmax( S), O = P V, (1) where every row of P satisfies P 
+
+> j
+
+Pij = 1. A conventional implementation materializes the score matrix 
+
+S and probability matrix P , whose sizes grow quadratically with sequence length. FlashAttention avoids writing these matrices to HBM by partitioning Q, K, and V into blocks and evaluating attention through an online-softmax recurrence in on-chip memory [25, 26, 27]. For the recurrence below, we use the FlashAttention-2 form, which maintains an unnormalized output accumulator and applies the final normalization after all key/value blocks have been processed. We reserve P for the final normalized attention matrix, denote the unnormalized softmax exponential tile by ePij , and denote the in-loop unnormalized output accumulator by eO(j) 
+
+> i
+
+.For query block Qi and key/value blocks Kj , V j , define 
+
+Sij = QiK⊤
+
+> j
+
+√d . (2) FlashAttention maintains a row-wise running maximum m(j) 
+
+> i
+
+, a row-wise sum of exponentials ℓ(j) 
+
+> i
+
+, and an unnormalized output accumulator eO(j) 
+
+> i
+
+. Starting from m(0)  
+
+> i
+
+= −∞ , ℓ(0)  
+
+> i
+
+= 0, and eO(0)  
+
+> i
+
+= 0, it updates 
+
+m(j) 
+
+> i
+
+= max 
+
+
+
+m(j−1)  
+
+> i
+
+, rowmax( Sij )
+
+
+
+, (3) 
+
+α(j) 
+
+> i
+
+= exp 
+
+
+
+m(j−1)  
+
+> i
+
+− m(j)
+
+> i
+
+
+
+, (4) 
+
+ePij = exp 
+
+
+
+Sij − m(j) 
+
+> i
+
+1⊤
+
+> Bc
+
+
+
+, (5) 
+
+ℓ(j) 
+
+> i
+
+= α(j) 
+
+> i
+
+⊙ ℓ(j−1)  
+
+> i
+
++ ePij 1Bc , (6) 
+
+eO(j) 
+
+> i
+
+= Diag 
+
+
+
+α(j)
+
+> i
+
+ eO(j−1)  
+
+> i
+
++ ePij Vj . (7) 3Here, ePij contains the unnormalized softmax exponentials and enters the second attention GEMM; it is not the final normalized probability tile. After all Tc key/value blocks have been processed, 
+
+Oi = Diag 
+
+
+
+ℓ(Tc)
+
+> i
+
+−1 eO(Tc) 
+
+> i
+
+. (8) FlashAttention therefore computes the normalized output from the row-wise sum ℓ(Tc) 
+
+> i
+
+and the un-normalized output accumulator eO(Tc) 
+
+> i
+
+, without materializing the full probability matrix P . Materi-alizing P for quantization would reintroduce quadratic intermediate storage and memory traffic. AFlashAttention-compatible low-bit implementation must instead integrate quantization into the tiled online-softmax loop. 
+
+MXFP4 Block Quantization. MXFP4 is a microscaling format defined by the OCP MX specifi-cation [10, 28]. Each block contains B = 32 E2M1 elements that share an E8M0 power-of-two scale 
+
+σ = 2 e. The E2M1 grid is 
+
+GE2M1 = {0, ±0.5, ±1, ±1.5, ±2, ±3, ±4, ±6}. (9) For an element v, we write MXFP4 quantization as 
+
+Qσ (v) = σ ΠGE2M1 
+
+ vσ
+
+
+
+, (10) where Π GE2M1 denotes round-to-nearest projection onto the finite E2M1 grid, with out-of-range values saturated at ±6. Let M = max v∈B |v| be the maximum magnitude of a nonzero block B. The standard MX conver-sion rule computes 
+
+eOCP = ⌊log 2 M ⌋ − eelem max , σOCP = 2 eOCP , (11) where eelem max is the exponent of the largest power-of-two value in the element format [28]. For E2M1, 
+
+eelem max = 2, corresponding to the grid value 4. We express different scale-selection rules through a common boundary Qmax :
+
+efloor (Qmax ) = 
+
+
+
+log 2
+
+ MQmax 
+
+ 
+
++ 1 , σfloor (Qmax ) = 2 efloor (Qmax ), (12) 
+
+eceil (Qmax ) = 
+
+
+
+log 2
+
+ MQmax 
+
+ 
+
+, σceil (Qmax ) = 2 eceil (Qmax ). (13) The exact OCP rule used in our experiments is efloor (8), which maps the normalized block maximum into [4 , 8). Because 8 is not representable in E2M1, normalized block maxima above 7 fall into an overflow-rounding region and are saturated to 6. TetraJet’s Truncation-Free Scaling (TFS) corresponds to eceil (6), giving 3 < Mσceil (6) ≤ 6, (14) which avoids overflow of the block maximum but can increase rounding and underflow errors for smaller values [29]. The floor- and ceiling-based forms agree except when M/Q max is an exact power of two; this measure-zero endpoint distinction does not affect the continuous analysis in Section 4.1. Our UOS method adopts the ceiling-based scaling rule and derives a fixed boundary Qmax = 7 .25 by minimizing a global MXFP4 quantization-error objective that captures the trade-off between clipping large values and preserving smaller values. It requires neither calibration nor per-layer search. For an all-zero block, we set σ = 1 and quantize every element to zero. 
+
+# 3 Failure Modes of Standard MXFP4 Attention 
+
+Directly applying standard MXFP4 quantization to the attention pipeline can substantially degrade generated video quality. We trace this degradation to two distinct numerical failure modes: the clipping–underflow trade-off induced by block scaling and the normalization mismatch introduced in the online-softmax loop. 4Clipping–Underflow Trade-off. Under the standard OCP conversion rule, the normalized block maximum xmax = M/σ OCP lies in the interval [4 , 8) [10, 28]. However, the largest finite E2M1 value is 6. Under round-to-nearest conversion followed by finite-range saturation, normalized maxima in (7 , 8) fall into the overflow-rounding region: their unconstrained rounded value is 8, which is not representable in E2M1, and they are therefore saturated to 6. Under the uniform wrapped-phase approximation discussed in Appendix D, xmax has density 
+
+p(x) = 1
+
+x ln 2 over [4 , 8). The probability that the block maximum enters this region is therefore Pr( xmax ≥ 7) = 
+
+Z 87
+
+1
+
+x ln 2 dx = log 2
+
+87 = 1 − log 2
+
+74 ≈ 19 .27% . (15) Truncation-Free Scaling (TFS) avoids this overflow by using Qmax = 6 [29]. When the OCP-normalized maximum exceeds 6, TFS doubles the shared scale and consequently halves the normalized magnitude of every value in the block. Although this prevents saturation of the largest values, it reduces the effective resolution avail-able to smaller values and increases their probability of rounding to zero. OCP scaling and TFS therefore represent opposite ends of the same trade-off: the former better preserves small values but permits overflow saturation, whereas the latter removes saturation at the cost of increased rounding and underflow. 
+
+Normalization Mismatch in Online Softmax. FlashAttention computes attention through a tiled online-softmax recurrence without materializing the full probability matrix [25, 26, 27]. In the direct MXFP4 baseline considered in this work, the unnormalized exponential tile is quantized for the output-accumulator update, while its unquantized counterpart is used for the row-wise sum update. Let bPij = Q⋆( ePij ) denote the quantized exponential tile. The two update paths become 
+
+ℓ(j) 
+
+> i
+
+= α(j) 
+
+> i
+
+⊙ ℓ(j−1)  
+
+> i
+
++ ePij 1Bc , (16) 
+
+beO 
+
+> (j)
+> i
+
+= Diag 
+
+
+
+α(j)
+
+> i
+
+ beO 
+
+> (j−1)
+> i
+
++ bPij bVj . (17) The row-wise sum and output accumulator are therefore updated from different representations of the same softmax exponentials. Let eP eff  
+
+> i
+
+and bP eff  
+
+> i
+
+denote the corresponding effective exponential rows after accounting for online rescaling factors. The induced attention weights satisfy 
+
+bP direct  
+
+> i
+
+= Diag 
+
+ eP eff  
+
+> i
+
+1
+
+−1 bP eff  
+
+> i
+
+, bP direct  
+
+> i
+
+1 =
+
+ bP eff  
+
+> i
+
+1
+
+
+
+⊘
+
+ eP eff  
+
+> i
+
+1
+
+̸
+
+= 1 . (18) This mismatch is not an unavoidable consequence of element-wise quantization; it arises because the row-wise sum and output-accumulator updates use inconsistent representations of the same softmax exponentials. Zeroing, saturation, and rounding all perturb the quantized exponential mass. As quantified in Section 5.5.2, the induced row sums of the direct online MXFP4 baseline on Wan2.2 have an overall mean of 0 .9336 across five denoising steps, two prompts, and 40 attention layers. All ten step–prompt groups have mean row sums below one, although individual rows range from 0 .7181 to 1.1127. The resulting row-dependent scaling error perturbs the magnitude of the attention output and propagates through subsequent Transformer blocks and denoising steps. 
+
+# 4 MXAttention 
+
+This section presents MXAttention , which addresses MXFP4 quantization errors at two complemen-tary stages of the attention pipeline. First, Universal Optimal Scaling (UOS) derives the closed-form, data-free optimal scaling boundary Qmax = 7 .25 by minimizing a global MXFP4 quantization-error objective. Second, Pre-Normalization Quantization (PNQ) quantizes the unnormalized softmax exponentials before both normalizer accumulation and output-accumulator updates, ensuring that the induced attention probabilities remain row-normalized by construction. Together, UOS and PNQ reduce block-level quantization error and eliminate the normalization mismatch introduced by direct MXFP4 quantization in online softmax. 54.1 Universal Optimal Scaling 
+
+Under the ceiling-based scaling rule introduced in the Preliminaries, let q = Qmax and let M be the maximum magnitude of a nonzero block. The shared-scale exponent and normalized block maximum are 
+
+eq (M ) = 
+
+
+
+log 2
+
+ Mq
+
+ 
+
+, Xq = M
+
+2eq (M ) ∈
+
+ q
+
+2 , q 
+
+i
+
+. (19) We analyze nonzero blocks and assume that eq (M ) lies within the E8M0 exponent range. The cases 
+
+M = 0, for which log 2 M is undefined, and exponents outside this range are handled by the MXFP4 conversion routine and do not affect the derivation of q. For a fixed block maximum M , increasing 
+
+q can select a smaller shared scale. This increases all normalized magnitudes, reducing rounding and underflow for small values while moving the block maximum closer to the upper end of the E2M1 range. Decreasing q has the opposite effect. UOS formulates this trade-off as an optimization over q.
+
+Data-Free Quantization-Error Objective. Because the E2M1 grid is symmetric, it is sufficient to analyze nonnegative magnitudes. Let Π G+ denote round-to-nearest projection onto the nonnegative finite E2M1 grid 
+
+G+ = {0, 0.5, 1, 1.5, 2, 3, 4, 6}, (20) with saturation at 6 [10, 28]. We define the cumulative projection error and its normalized form as 
+
+E(x) = 
+
+Z x
+
+> 0
+
+ v − ΠG+ (v)2 dv, D(x) = E(x)
+
+x3 . (21) Equivalently, 
+
+D(x) = 1
+
+x2
+
+ 1
+
+x
+
+Z x
+
+> 0
+
+ v − ΠG+ (v)2 dv 
+
+
+
+. (22) Thus, D(x) is the mean squared projection error over [0 , x ], divided by x2. The factor 1 /x 2 removes the overall magnitude scale, making D(x) a dimensionless relative-error measure. It is a data-free analytical measure determined by the E2M1 grid rather than the empirical MSE of a particular block. Let gq (x) denote the density of Xq . We define the global MXFP4 quantization-error objective as 
+
+J (q) = E[D(Xq )] = 
+
+Z qq/ 2
+
+D(x)gq (x) dx. (23) 
+
+Log-Periodic Boundary Relation. A direct optimization of Eq. (23) appears to require knowledge of the block-maximum distribution, which can vary across tensors, layers, and models. We next show that power-of-two scaling imposes an exact log-periodic relation that removes this distribution dependence from the derivative sign. Recall that M is the block maximum, and let U = log 2 M have an arbitrary absolutely continuous density fU . Appendix A shows that, within the support of Xq ,
+
+gq (x) = g(x) = H(log 2 x)
+
+x ln 2 , H(t) = X
+
+> k∈Z
+
+fU (t + k), (24) Here, H is the periodized density of U , obtained by summing the integer shifts of fU [30, 31]. It has period one, meaning H(t + 1) = H(t). The parameter q selects the interval ( q/ 2, q ], but does not otherwise change the density within that interval. The periodized density has unit mean over one period. Under standard Fourier-convergence con-ditions [32], it can be written as 
+
+H(t) = 1 + X
+
+> n̸=0
+
+cnei2πnt , (25) where the constant term corresponds to a uniform wrapped phase, or a log-uniform density in the linear domain, and the nonzero modes describe distribution-specific harmonics. These harmonics are not assumed to be small. The endpoints q/ 2 and q differ by exactly one power-of-two scale interval. After taking log 2, they are one unit apart, exactly the period of H:log 2(q/ 2) = log 2 q − 1. (26) 6Consequently, every harmonic takes the same value at the two endpoints: 
+
+ei2πn log 2(q/ 2) = ei2πn (log 2 q−1) = ei2πn log 2 q , n ∈ Z. (27) 
+
+Lemma 1 (Boundary Density Ratio) . For almost every q > 0, the density of the normalized block maximum satisfies 
+
+g
+
+ q
+
+2
+
+
+
+= 2 g(q). (28) 
+
+Proof. For almost every q, periodicity gives 
+
+H
+
+
+
+log 2
+
+q
+
+2
+
+
+
+= H(log 2 q − 1) = H(log 2 q). (29) Substituting this identity into Eq. (24) gives 
+
+g
+
+ q
+
+2
+
+
+
+= H(log 2 q)(q/ 2) ln 2 = 2 g(q). (30) 
+
+■
+
+Since D(x)g(x) is locally integrable, J is absolutely continuous; Appendix C.1 justifies the differ-entiation below. Differentiating Eq. (23) with respect to q using the Leibniz integral rule and applying Lemma 1 yields, for almost every q,
+
+J ′(q) = D(q)g(q) − 12 D
+
+ q
+
+2
+
+
+
+g
+
+ q
+
+2
+
+
+
+(31) = g(q)
+
+h
+
+D(q) − D
+
+ q
+
+2
+
+i 
+
+. (32) All dependence on the block-maximum distribution is contained in the nonnegative factor g(q). This factor can change the magnitude of the derivative and the shape of the objective, but it cannot reverse the sign determined by D(q) − D(q/ 2). The location of the optimum is therefore determined by the E2M1 grid rather than by the block-maximum distribution. Wherever g(q) > 0, the condition J ′(q) = 0 requires 
+
+D(q) = D
+
+ q
+
+2
+
+
+
+, (33) or equivalently, 
+
+E(q) = 8 E
+
+ q
+
+2
+
+
+
+. (34) Appendix D provides the complete Fourier interpretation and additional wrapped-distribution analy-sis [30, 31]. Neither a Gaussian nor a log-uniform prior is required for the UOS result. 
+
+Closed-Form E2M1 Solution. Equation (32) reduces the optimization to the grid-dependent dif-ference D(q) − D(q/ 2). We now evaluate this difference exactly for E2M1. We first evaluate it over 
+
+q ∈ [6 , 8]. The endpoints recover TFS at q = 6 [29] and the ceiling-based counterpart of OCP at q = 8, which explains the choice of interval. Define ∆( q) = E(q) − 8E
+
+ q
+
+2
+
+
+
+. (35) Since 
+
+D(q) − D
+
+ q
+
+2
+
+
+
+= ∆( q)
+
+q3 , (36) the sign of ∆( q) determines the direction of J (q). Exact integration over the E2M1 decision intervals gives ∆( q) = 
+
+
+
+− 18 , 6 ≤ q ≤ 7,
+
+(4 q − 29)(4 q − 27) 8 , 7 ≤ q ≤ 8.
+
+(37) 76.00 7.00 7.25 8.00     
+
+> Scaling boundary q
+> 0
+> 1
+> 2
+> 3
+> 4
+> 5
+> 6
+> Increase over the UOS optimum (%)
+> TFS
+> +3.1%
+> OCP
+> +5.9%
+> UOS optimum q⋆= 7.25
+
+(a) Objective under a log-uniform density 6.00 7.00 7.25 8.00      
+
+> Scaling boundary q
+> 0
+> 1
+> 2
+> 3
+> 4
+> 5
+> 6
+> 7
+> 8
+> Increase over each distribution's optimum (%)
+> Shared optimum q⋆= 7.25
+> Log-uniform
+> First harmonic
+> Two harmonics
+> Concentrated
+
+(b) Objectives under wrapped densities 
+
+Figure 2: UOS objective under different wrapped distributions. (a) Percentage increase in the objective relative to its value at q = 7 .25 under a log-uniform density. (b) The same quantity under representative nonuniform wrapped densities. Distribution-specific harmonics change the curve shapes, but all cases share the minimum q = 7 .25. The first branch is negative. In the second branch, the factor 4 q − 27 vanishes at q = 27 /4 = 6 .75, outside its valid interval [7 , 8]. The only admissible sign change is therefore 
+
+q⋆ = 29 4 = 7 .25 . (38) Within [6 , 8], the objective is nonincreasing before q⋆ and nondecreasing afterward; the inequalities are strict wherever g(q) > 0. Appendix C extends this sign analysis to the complete domain q > 0. 
+
+Theorem 1 (Global Optimality of UOS) . Consider nonzero blocks for which the required E8M0 shared-scale exponent is representable. Under the ceiling-based scale family in Eq. (19) , for any absolutely continuous law of U = log 2 M , the objective in Eq. (23) has a global minimizer 
+
+q⋆ = 29 4 , Q⋆ 
+
+> max
+
+= q⋆ = 7 .25 . (39) 
+
+If the periodized density H is positive almost everywhere over one period, the minimizer is unique. 
+
+Figure 2 plots the UOS objective under a log-uniform density and several nonuniform wrapped densities. The curves have different shapes but share the same minimum at q = 7 .25, illustrating that distribution-specific harmonics affect the objective without shifting its grid-determined optimum. 
+
+UOS Quantization. Algorithm 1 summarizes the resulting MXFP4 quantization procedure. UOS modifies only the shared-exponent selection rule, while block formation and element-wise E2M1 quan-tization remain unchanged. For nonzero blocks, the normalized maximum after UOS scaling satisfies 
+
+q⋆
+
+2 < Mσ ≤ q⋆,
+
+which yields the range (3 .625 , 7.25] for q⋆ = 7 .25. 
+
+Comparison with Existing Scaling Rules. Table 1 compares OCP, TFS, and UOS at the stan-dard 32-element MXFP4 block granularity. The exact OCP baseline uses a floor-based conversion rule, whereas TFS and UOS belong to the ceiling-based family. The relation to OAS is given separately in Appendix G. Relative to TFS, UOS selects a smaller shared scale for a subset of blocks, improving the resolu-tion available to smaller values while admitting only the narrow overflow-rounding interval (7 , 7.25]. 8Algorithm 1 UOS-Based MXFP4 Block Quantization 
+
+Input: A block B = {vi}Bi=1 , B = 32; UOS boundary q⋆ = 7 .25 
+
+Output: E8M0 shared scale σ; E2M1 elements {pi}Bi=1 
+
+1: M ← max 1≤i≤B |vi|
+
+2: if B is an all-zero block then 
+
+3: σ ← 1
+
+4: pi ← 0, i = 1 , . . . , B 
+
+5: return σ, {pi}Bi=1 
+
+6: end if 
+
+7: e ← ⌈ log 2(M/q ⋆)⌉
+
+8: σ ← 2e
+
+9: for i = 1 to B do 
+
+10: pi ← ΠGE2M1 (vi/σ )
+
+11: end for 
+
+12: return σ, {pi}Bi=1 
+
+Table 1: Comparison of MXFP4 scaling rules at B = 32 . All normalized maxima above 6 map to the largest finite E2M1 value. The reported overflow-rounding interval is the stricter subset in which the nearest value on an unbounded E2M1 ladder would be 8 before finite-range saturation. The endpoint at 7 depends on the tie-breaking convention. 
+
+Method Shared-scale exponent Normalized maximum range Overflow-rounding interval 
+
+OCP ⌊log 2 M ⌋ − 2 [4 , 8) (7 , 8) TFS ⌈log 2(M/ 6) ⌉ (3 , 6] None UOS ⌈log 2(M/ 7.25) ⌉ (3 .625 , 7.25] (7 , 7.25] Vmax /S         
+
+> 00.5 11.5 23463.625 7.25 8
+> OCP: [4, 8)
+> TFS: (3, 6]
+> Ours (UOS): (3.625, 7.25]
+> Increase non-max representable space,
+> reduce underflow
+> Reduce truncation
+> error
+> Comparison of Maximum Value Mapping Ranges on MXFP4 E2M1
+
+Figure 3: Normalized block-maximum ranges under representative MXFP4 scaling rules. 
+
+The exact OCP floor rule maps block maxima to [4 , 8), with normalized maxima above 7 entering the overflow-rounding region. TFS uses (3 , 6] to avoid overflow of the block maximum, while UOS selects the intermediate range (3 .625 , 7.25]. Relative to OCP, UOS substantially narrows this interval. The optimum is not obtained by separately equating a clipping term and an underflow term. Instead, Eq. (33) balances the total normalized projection errors at the two endpoints associated with adjacent power-of-two scale choices. 9B FlashAttention / Online Softmax     
+
+> 𝐵 𝑟 ×𝑑
+> 𝐵 𝑐 ×𝑑
+
+𝑲 𝒋   
+
+> 𝐵 𝑐 ×𝑑 𝑣
+
+𝑸 𝒊 
+
+𝑽 𝒋   
+
+> 𝐵 𝑟 ×𝐵 𝑐
+
+𝑺 𝒊𝒋 = 𝑸 𝒊 𝑲 𝒋   
+
+> 𝑇
+> 𝒅
+> 𝐵 𝑟 ×𝐵 𝑐
+
+෩𝑷 𝒊𝒋              
+
+> =𝒆 𝑺 𝒊𝒋 −𝒓𝒐𝒘𝒎𝒂𝒙
+> 𝐵 𝑟 ×𝑑 𝑣
+> 𝐚𝐜 𝐜 𝒊
+> ←𝐚𝐜 𝐜 𝒊 +෩𝑷 𝒊𝒋 𝑽 𝒋
+> ℓ𝒊 ←ℓ𝒊 +෩𝑷 𝒊𝒋 𝟏 𝐵 𝑐
+> 𝐵 𝑟
+> 𝐵 𝑟 ×𝑑 𝑣
+
+𝑶 𝒊         
+
+> =𝐚𝐜 𝐜 𝒊
+> ℓ𝒊 [:,None ]
+> row -wise sum
+> update
+> output -accumulator
+> update
+> unnormalized
+> softmax
+> exponentials
+> Notice:
+> The same ෩𝑷 𝒊𝒋 feeds both ℓ𝒊 and 𝐚𝐜 𝐜 𝒊
+
+C Naive MXFP4 vs. PNQ 
+
+Full−Precision FA 
+
+෩𝑷 𝒊𝒋 
+
+ℓ𝒊 ← ℓ𝒊 + ෩𝑷 𝒊𝒋 𝟏 𝐵 𝑐  𝐚𝐜 𝐜 𝒊 ← 𝐚𝐜 𝐜 𝒊 + ෩𝑷 𝒊𝒋 𝑽 𝒋 
+
+𝑶 𝒊 = 𝐚𝐜 𝐜 𝒊 
+
+> ℓ𝒊
+
+[: , None ]
+
+Row sum and output update both use ෩𝑷 𝒊𝒋 ,
+
+Consistent, RowSum = 1
+
+Direct MXFP4 
+
+෩𝑷 𝒊𝒋     
+
+> 𝐚𝐜 𝐜 𝒊
+> 𝐝𝐢𝐫𝐞𝐜𝐭 ←𝐚𝐜 𝐜 𝒊
+> 𝐝𝐢𝐫𝐞𝐜𝐭 +෡𝑷 𝒊𝒋 𝑽 𝒋
+
+𝑶 𝒊  
+
+> 𝐝𝐢𝐫𝐞𝐜𝐭
+
+= 𝐚𝐜 𝐜 𝒊 
+
+> 𝐝𝐢𝐫𝐞𝐜𝐭
+
+ℓ𝒊 
+
+> 𝐝𝐢𝐫𝐞𝐜𝐭
+
+[: , None ]
+
+Row sum update uses ෡𝑷 𝒊𝒋 ,
+
+output update uses ෩𝑷 𝒊𝒋 ,
+
+Mismatch, RowSum ≠ 1
+
+෡𝑷 𝒊𝒋 = 𝓠 ∗ ෩𝑷 𝒊𝒋 
+
+ℓ𝒊  
+
+> 𝐝𝐢𝐫𝐞𝐜𝐭
+
+← ℓ𝒊  
+
+> 𝐝𝐢𝐫𝐞𝐜𝐭
+
++ ෩𝑷 𝒊𝒋 𝟏 𝐵 𝑐 
+
+PNQ 
+
+෩𝑷 𝒊𝒋     
+
+> 𝐚𝐜 𝐜 𝒊
+> 𝐏𝐍𝐐 ←𝐚𝐜 𝐜 𝒊
+> 𝐏𝐍𝐐 +෡𝑷 𝒊𝒋 𝑽 𝒋
+
+𝑶 𝒊  
+
+> 𝐏𝐍𝐐
+
+= 𝐚𝐜 𝐜 𝒊 
+
+> 𝐏𝐍𝐐
+
+ℓ𝒊 
+
+> 𝐏𝐍𝐐
+
+[: , None ]
+
+Row sum and output update both use ෡𝑷 𝒊𝒋 ,
+
+Consistent, RowSum = 1 
+
+෡𝑷 𝒊𝒋 = 𝓠 ∗ ෩𝑷 𝒊𝒋         
+
+> ℓ𝒊
+> 𝐏𝐍𝐐 =ℓ𝒊
+> 𝐏𝐍𝐐 +෡𝑷 𝒊𝒋 𝟏 𝐵 𝑐
+> 𝑀 ×𝑑
+> 𝑁 ×𝑑
+
+𝑲   
+
+> 𝑁 ×𝑑 𝑣
+
+𝑸 
+
+𝑽   
+
+> 𝑀 ×𝑁
+
+𝑺 = 𝑸 𝑲 𝑇    
+
+> 𝒅
+> Softmax
+> (row -wise) 𝑀 ×𝑁
+
+𝑷     
+
+> row -normalized
+> probability matrix
+> ෍𝑗
+> 𝑃 𝑖𝑗 =1
+> 𝑀 ×𝑑 𝑣
+
+𝑶 = 𝑷𝑽 
+
+A Standard Attention    
+
+> For clarity, 𝐚 𝐜 𝐜 _𝒊 denotes the current key/value tile's contribution to the unnormalized output accumulator; running -max rescaling and accumulation over preceding key/value tiles are omitted.
+
+Figure 4: Pre-Normalization Quantization (PNQ). (A) Standard attention forms the normalized probability matrix P before computing O = P V . (B) FlashAttention avoids materializing P and updates both the row-wise sum of exponentials ℓi and the unnormalized output accumulator eOi from the same exponential tile ePij . (C) A direct placement uses the unquantized tile ePij in the ℓi update but the quantized tile bPij in the eOi update. PNQ uses the same bPij in both updates. Running-max rescaling and previous key/value tiles are omitted for clarity. 
+
+4.2 Pre-Normalization Quantization 
+
+Softmax normalizes each attention row: X
+
+j
+
+Pij = 1 . (40) Because MXFP4 quantizes microscaling blocks independently, it does not by itself preserve this row-wise sum. Consequently, where quantization is inserted in the online-softmax loop determines whether the induced attention weights remain normalized. Throughout this section, Q⋆(·) denotes block-wise MXFP4 quantization using the UOS boundary q⋆ = 7 .25. To isolate the effect of quantization placement, both the direct formulation and PNQ use the same quantizer Q⋆.Using the notation introduced in Section 2, consider a single tile before accounting for previous accumulators and running-max rescaling. The tile adds 
+
+δℓ i = ePij 1Bc , δ eOi = ePij Vj (41) to the row-wise sum of exponentials and the unnormalized output accumulator. Both updates use the same exponential tile, as illustrated in Figure 4(B). For clarity, we omit the quantization mark on Vj ;its treatment is identical in the direct and PNQ formulations and does not affect the row-normalization analysis. 
+
+Normalization Mismatch under Direct Softmax-Path Quantization. A direct placement uses the unquantized exponential tile to update ℓi, but quantizes the same tile for the output-accumulator update: bPij = Q⋆( ePij ), δℓ direct 
+
+i = ePij 1Bc , δ eOdirect 
+
+i = bPij Vj . (42) 10 Here, bPij denotes a quantized unnormalized exponential tile, not a normalized probability tile. The mismatch is already visible at the tile level because 
+
+bPij 1Bc̸ = ePij 1Bc (43) in general. The final row-wise sum is therefore computed from different weights than those used in the output update. Appendix I gives the corresponding full-row expression after all online rescaling factors are included. 
+
+Pre-Normalization Quantization. PNQ quantizes the exponential tile before either update: 
+
+bPij = Q⋆( ePij ), (44) 
+
+δℓ PNQ  
+
+> i
+
+= bPij 1Bc , δ eOPNQ  
+
+> i
+
+= bPij Vj . (45) The row-wise sum and output accumulator are therefore updated from the same quantized exponential values, as shown in Figure 4(C). In the complete online-softmax recurrence, let 
+
+α(j) 
+
+> i
+
+= exp 
+
+
+
+m(j−1)  
+
+> i
+
+− m(j)
+
+> i
+
+
+
+(46) be the row-wise factor applied when the running maximum changes. PNQ updates 
+
+ℓ(j) 
+
+> i
+
+= α(j) 
+
+> i
+
+⊙ ℓ(j−1)  
+
+> i
+
++ bPij 1Bc , (47) 
+
+eO(j) 
+
+> i
+
+= Diag 
+
+
+
+α(j)
+
+> i
+
+ eO(j−1)  
+
+> i
+
++ bPij Vj . (48) Both FlashAttention states use the same running-max rescaling and the same quantized exponential tile. Appendix H shows that, after all key/value tiles have been processed, the two states can be written as 
+
+ℓi = bP eff  
+
+> i
+
+1, eOi = bP eff  
+
+> i
+
+V, Oi = Diag( ℓi)−1 eOi, (49) where bP eff  
+
+> i
+
+is a conceptual full-row matrix obtained by rescaling each quantized tile to the final row maximum and concatenating the resulting tiles. It is used only for analysis and is not materialized by the kernel. The normalized attention weights induced by PNQ are 
+
+P PNQ  
+
+> i
+
+= Diag 
+
+ bP eff  
+
+> i
+
+1
+
+−1 bP eff  
+
+> i
+
+. (50) 
+
+Proposition 1 (Row-Wise Normalization under PNQ) . For every attention row considered in this work, the weights induced by PNQ satisfy, in exact arithmetic, 
+
+P PNQ  
+
+> i
+
+1 = 1. (51) 
+
+Proof. Substituting Eq. (50) gives 
+
+P PNQ  
+
+> i
+
+1 = Diag 
+
+ bP eff  
+
+> i
+
+1
+
+−1 bP eff  
+
+> i
+
+1 = 1. (52) 
+
+■
+
+PNQ does not change the element-wise MXFP4 quantizer. Its role is to make the resulting quan-tization error enter the ℓi and eOi updates consistently, preventing it from becoming an additional row-dependent scale error. For the attention rows considered in this work, the key set is nonempty. Appendix J shows that the tile containing the final row maximum contributes an exponential value of 1, which is represented exactly under q⋆ = 7 .25; hence, ℓi > 0. Ordinary floating-point accumulation and division may still introduce their usual rounding error; Proposition 1 concerns the normalization identity of the induced weights. PNQ requires no additional pass over the attention matrix. The quantized exponential tile al-ready used by the low-precision P V GEMM is reused in the ℓi update. The mechanism-validation experiments evaluate the row-sum behavior of the direct placement and PNQ. 11 4.3 Overall MXAttention Pipeline 
+
+MXAttention integrates UOS and PNQ into tiled attention computation. At runtime, a fixed orthogo-nal Hadamard rotation RH is applied to Q and K for outlier suppression. Let Q⋆(·) denote block-wise MXFP4 quantization using the fixed UOS boundary q⋆ = 7 .25. The MXFP4 quantization of Q, K, V ,and the unnormalized softmax exponential tiles ePij all uses this boundary. PNQ reuses each quantized tile bPij in both the row-wise sum and output-accumulator updates. Algorithm 2: MXAttention Forward Pass 
+
+Input: Query, key, and value tensors Q, K, V ; fixed Hadamard rotation RH; UOS boundary 
+
+q⋆ = 7 .25 
+
+Output: Attention output O 
+
+> 1:
+
+Qrot ← QR H 
+
+> 2:
+
+Krot ← KR H 
+
+> 3:
+
+bQ ← Q ⋆(Qrot ) 
+
+> 4:
+
+bK ← Q ⋆(Krot ) 
+
+> 5:
+
+bV ← Q ⋆(V ) 
+
+> 6:
+
+for each query tile i do  
+
+> 7:
+
+mi ← −∞ , ℓi ← 0, eOi ← 0 
+
+> 8:
+
+for each key/value tile j do  
+
+> 9:
+
+Sij ← bQi bK⊤ 
+
+> j
+
+/√d 
+
+> 10:
+
+mnew  
+
+> i
+
+← max( mi, rowmax( Sij ))  
+
+> 11:
+
+αi ← exp( mi − mnew  
+
+> i
+
+) 
+
+> 12:
+
+ePij ← exp  Sij − mnew  
+
+> i
+
+1⊤
+
+> Bc
+
+ 
+
+> 13:
+
+bPij ← Q ⋆( ePij ) 
+
+> 14:
+
+ℓi ← αi ⊙ ℓi + bPij 1Bc 
+
+> 15:
+
+eOi ← Diag( αi) eOi + bPij bVj 
+
+> 16:
+
+mi ← mnew  
+
+> i
+> 17:
+
+end for  
+
+> 18:
+
+Oi ← Diag( ℓi)−1 eOi 
+
+> 19:
+
+end for  
+
+> 20:
+
+return O
+
+# 5 Experiments 
+
+We evaluate MXAttention on two large-scale video diffusion models through end-to-end generation quality, fully 4-bit ablations, and mechanism-level analyses of UOS and PNQ. 
+
+5.1 Experimental Setup 
+
+Models. We evaluate two large-scale open-source text-to-video models with distinct attention ar-chitectures: Wan2.2-14B and HunyuanVideo-13B . Wan2.2 employs separate self-attention and cross-attention modules, whereas HunyuanVideo adopts dual-stream and single-stream Transformer blocks with full attention. 
+
+Datasets & Generation. We use the same fixed prompt subset from the Open-Sora prompt suite for all compared methods [33]. For each model and prompt, all methods use the same generation seed, enabling paired comparisons with the FP16 output. 
+
+Evaluation Metrics. We evaluate generated-video quality with VBench [34], reporting Subject Con-sistency , Imaging Quality , and Aesthetic Quality , averaged over all generated videos. To measure frame-level similarity to the FP16 baseline, we report frame-level cosine similarity, Structural Similar-ity Index Measure (SSIM), and Peak Signal-to-Noise Ratio (PSNR), averaged over frames. 
+
+Implementation Details. We follow the recommended inference settings of both models. Wan2.2 generates 81-frame videos at 720p resolution using 40 denoising steps, while HunyuanVideo generates 129-frame videos at 720p resolution using 50 denoising steps. Only the Wan2.2 main comparison in 12 Table 2: End-to-end evaluation of 4-bit attention methods. All 4-bit Wan2.2 methods use the same hybrid-precision policy, retaining high precision for Block 0 and denoising steps 38–39. Hun-yuanVideo uses fully 4-bit attention. Bold values denote the best result among quantized methods.                                                                       
+
+> Model Method VBench Metrics (↑)Similarity to FP16 (↑)
+> Subject Imaging Aesthetic Cosine SSIM PSNR
+> Wan2.2 FP16 0.9562 0.7085 0.6042 –––MXFP4 (OCP) 0.9517 0.6414 0.6202 0.9290 0.5076 15.58 NVFP4 0.9583 0.6973 0.6158 0.9278 0.5275 15.52 NVFP4 + SageAttention 0.9558 0.6980 0.6127 0.9510 0.6177 17.72 MXAttention 0.9544 0.7054 0.6229 0.9536 0.6319 17.92
+> HunyuanVideo FP16 0.9665 0.6185 0.6242 –––MXFP4 (OCP) 0.9781 0.4459 0.5928 0.9489 0.5954 16.25 NVFP4 0.9666 0.6221 0.6162 0.9635 0.6359 17.80 NVFP4 + SageAttention 0.9649 0.6063 0.6288 0.9800 0.7424 20.57
+> MXAttention 0.9690 0.6380 0.6344 0.9745 0.7061 19.23
+
+Table 2 uses a fixed hybrid-precision policy: Block 0 and the final two denoising steps (38 and 39) remain in high precision, while all remaining attention computations use 4-bit attention. All other experiments use fully 4-bit attention, including the HunyuanVideo main comparison, the ablation studies on both models, and all mechanism-validation experiments. Here, fully 4-bit attention means that every attention block at every denoising step uses the 4-bit attention kernel; non-attention model components retain their original precision. 
+
+5.2 Baselines and Configurations 
+
+We compare MXAttention with FP16 and representative 4-bit attention configurations: 
+
+• FP16. The unmodified full-precision attention implementation. 
+
+• MXFP4 (OCP). A direct MXFP4 attention baseline using the exact floor-based OCP con-version rule [10, 28]. The unnormalized softmax tile eP is quantized into bP = Q⋆( eP ) for the output-accumulator update, while the row-wise sum ℓ is updated from the unquantized tile. 
+
+• NVFP4. A direct NVFP4 implementation in which Q, K, V , and eP are quantized for the two attention GEMMs. No additional smoothing or softmax-path scaling is applied [14, 15]. 
+
+• NVFP4 + SageAttention. The NVFP4 baseline augmented with channel-wise Q/K smooth-ing and two-level scaling for the softmax-path tile, following the SageAttention design [8]. 
+
+• MXAttention. Our method applies a fixed Hadamard rotation to Q/K for outlier suppres-sion [16, 17], uses the UOS boundary Qmax = 7 .25 for all MXFP4 quantization steps, and applies PNQ so that the same quantized softmax tile updates both ℓ and the output-accumulator state. 
+
+5.3 Main Results 
+
+Table 2 shows that direct OCP MXFP4 attention causes a substantial loss in generation quality. Imaging Quality decreases from 0.7085 to 0.6414 on Wan2.2 and from 0.6185 to 0.4459 on Hunyuan-Video. MXAttention raises the scores to 0.7054 and 0.6380, respectively: it recovers 95.4% of the FP16–MXFP4 gap on Wan2.2 and fully closes the gap on HunyuanVideo, where it exceeds the FP16 score. Among the quantized methods, MXAttention achieves the highest Imaging and Aesthetic scores on both models. On Wan2.2, it also obtains the highest cosine similarity, SSIM, and PSNR, leading five of the six reported metrics. Its Imaging Quality is only 0.0031 below FP16, while its Aesthetic Quality exceeds the FP16 baseline. The HunyuanVideo comparison uses fully 4-bit attention across all blocks and denoising steps. Relative to direct OCP MXFP4, MXAttention improves Imaging Quality by 0.1921 and Aesthetic 13 Figure 5: Qualitative comparison of 4-bit attention methods. Each row shows frames generated with the same prompt and random seed. The left three columns correspond to a Wan2.2 video and the right three columns correspond to a HunyuanVideo video, with multiple frames sampled from the same generated video. Direct OCP MXFP4 produces noticeable changes in object identity and appearance, while MXAttention better preserves the FP16 generation. Quality by 0.0416, while increasing SSIM from 0.5954 to 0.7061 and PSNR from 16.25 to 19.23 dB. It also exceeds FP16 in both Imaging and Aesthetic Quality. NVFP4 + SageAttention obtains the highest paired frame-level similarity on this model, while MXAttention leads Imaging and Aesthetic Quality. Overall, MXAttention recovers the generation-quality loss of direct MXFP4 and substantially im-proves similarity to FP16. Figure 5 provides qualitative comparisons under identical prompts and random seeds. Direct OCP MXFP4 produces noticeable changes in object identity and appearance compared with FP16. NVFP4-based methods reduce these artifacts but still exhibit minor appearance variations in some cases. MXAttention better preserves the semantic content and visual appearance of the FP16 generation, consistent with the improvements in Imaging Quality and frame-level similar-ity. These results demonstrate that MXFP4 attention with proper quantization techniques can retain FP16-level generation quality and remain competitive with strong NVFP4-based pipelines. 
+
+5.4 Ablation Studies 
+
+We evaluate the contribution of the fixed Hadamard rotation, PNQ, and UOS under fully 4-bit atten-tion. Unlike the main Wan2.2 comparison, no high-precision block or denoising-step fallback is used in this study. The rows form a sequential ablation: UOS is first removed from the full method, followed by PNQ and then the fixed Hadamard rotation. Table 3 shows that UOS, PNQ, and the fixed Hadamard rotation provide complementary gains under fully 4-bit attention. UOS consistently improves cosine similarity, SSIM, and PSNR on both models. Compared with the configuration without UOS, the full method improves these metrics from 0.9143/0.5084/14.90 to 0.9329/0.5519/15.96 on Wan2.2 and from 0.9676/0.6740/18.41 to 0.9745/0.7061/19.23 on Hunyuan-Video. The consistent gains in paired similarity support the analytical boundary Qmax = 7 .25 as a more accurate MXFP4 scale choice. PNQ produces the largest gain in Imaging Quality. Adding PNQ increases the score from 0.6352 to 0.6822 on Wan2.2 and from 0.5321 to 0.6423 on HunyuanVideo, while also improving all three paired similarity metrics. These gains agree with the analysis in Section 4.2: using the same quantized exponential tile for the row-wise sum and output-accumulator updates avoids the additional row-dependent scale error of direct softmax-path quantization. 14 Table 3: Sequential ablation under fully 4-bit attention. All attention blocks and denoising steps are quantized without high-precision fallback. Bold values denote the best result within each model.                                                                                      
+
+> Model Configuration Hadamard PNQ UOS VBench Metrics (↑)Similarity to FP16 (↑)
+> Subject Imaging Aesthetic Cosine SSIM PSNR
+> Wan2.2 Full ✓✓✓0.9424 0.6842 0.5994 0.9329 0.5519 15.96
+> w/o UOS ✓✓–0.9402 0.6822 0.6176 0.9143 0.5084 14.90 w/o PNQ and UOS ✓––0.9442 0.6352 0.6081 0.9063 0.4727 14.77 OCP MXFP4 –––0.9461 0.5452 0.5998 0.9127 0.4636 14.78 HunyuanVideo Full ✓✓✓0.9689 0.6380 0.6344 0.9745 0.7061 19.23
+> w/o UOS ✓✓–0.9713 0.6423 0.6229 0.9676 0.6740 18.41 w/o PNQ and UOS ✓––0.9759 0.5321 0.6046 0.9643 0.6520 17.87 OCP MXFP4 –––0.9781 0.4459 0.5928 0.9489 0.5954 16.25
+
+Figure 6: Qualitative ablation under fully 4-bit attention. From top to bottom: full MXAt-tention, without UOS, without UOS and PNQ, and direct OCP MXFP4. Removing UOS and PNQ progressively increases visible artifacts and reduces generation quality. The fixed Hadamard rotation further reduces the effect of Q/K outliers. Adding it to direct OCP MXFP4 raises Imaging Quality from 0.5452 to 0.6352 on Wan2.2 and from 0.4459 to 0.5321 on HunyuanVideo. On HunyuanVideo, it also improves cosine similarity, SSIM, and PSNR. The full configuration combines the highest cosine similarity, SSIM, and PSNR on both models with the highest Imaging Quality on Wan2.2 and the highest Aesthetic Quality on HunyuanVideo. These results show that UOS, PNQ, and the fixed Hadamard rotation address complementary sources of MXFP4 error and together provide the strongest overall balance. Figure 6 provides qualitative ablation results under fully 4-bit attention. Removing UOS gradu-ally introduces more visual artifacts, while further removing PNQ leads to additional degradation in generated details. Direct OCP MXFP4 exhibits the most severe quality degradation, with noticeable blurring and artifact patterns. The qualitative results are consistent with the quantitative ablation study, showing that UOS and PNQ provide complementary improvements. 
+
+5.5 Mechanism Validation 
+
+5.5.1 Validation of Universal Optimal Scaling 
+
+We compare UOS with the OCP boundary Qmax = 8, TFS with Qmax = 6, and a per-block empirical oracle obtained by sweeping Qmax from 6.00 to 8.00 in increments of 0.05. At the initial denoising step, the oracle independently minimizes MSE for Q, K, and V in each of the 40 evaluated attention blocks. For Wan2.2, Qmax = 7 .25 is the empirical optimum for 95.0%, 90.0%, and 90.0% of the evaluated 15 Table 4: Per-block empirical Qmax optima. Values are percentages over 40 attention blocks.                                
+
+> Model Tensor ≤7.15 7.20 7.25 ≥7.30
+> Wan2.2
+> Q0.0 5.0 95.0 0.0
+> K0.0 10.0 90.0 0.0
+> V0.0 10.0 90.0 0.0 HunyuanVideo
+> Q45.0 0.0 52.5 2.5
+> K0.0 62.5 32.5 5.0
+> V0.0 50.0 50.0 0.0
+
+Q, K, and V blocks, respectively. On HunyuanVideo, 7 .25 is the most frequent optimum for Q and is tied with 7 .20 for V , while the K optima concentrate at 7 .20 (62.5%) and 7 .25 (32.5%). Overall, 7 .25 is the mode or co-mode in five of the six tensor–model combinations and the second-most frequent choice in the remaining case. The sweep minimizes finite-sample tensor MSE, whereas UOS minimizes the data-free analytical objective in Eq. (23). Their agreement supports using Qmax = 7 .25 without layer-wise calibration. The softmax path is validated separately below. 
+
+5.5.2 Validation of Pre-Normalization Quantization 
+
+We use materialized attention probabilities as a diagnostic for the row-wise mass error introduced by block-wise MXFP4 quantization. FlashAttention does not materialize P during inference, and PNQ quantizes the unnormalized exponential tile eP . This diagnostic isolates how local MXFP4 rounding changes row-wise probability mass and complements the online-softmax analysis in Section 4.2. Across the 80 tensors in Figure 7(A), the average of the tensor-level mean row sums is 0.9266. This does not imply that every row has a sum below one; individual rows can be under- or over-normalized. It instead shows a consistent negative bias after aggregation across layers and prompts. Figure 7(B) separates the error by quantization outcome. Averaged across the tensors, zeroing contributes −0.0541, saturation contributes −0.0190, downward rounding contributes −0.0486, and upward rounding contributes +0 .0483. The row-sum error is therefore not equivalent to a single global scaling factor. Figure 7(C) evaluates a pre-quant global scaling baseline, which applies a single scaling factor to the entire softmax tile before MXFP4 quantization. Although global scaling can restore the average row sum of a representative tensor, it substantially increases the number of rows with over-normalized attention weights. Correcting the mean therefore does not restore row-wise normalization. Finally, Figure 7(D) shows that row-sum behavior depends on attention entropy. Rows with entropy above 5 account for approximately 75% of the representative tensor and are almost always under-normalized, while lower-entropy rows exhibit errors in both directions. PNQ avoids this row-dependent normalization error by using the same quantized exponential tile in the row-wise sum and output-accumulator updates. 16 0 5 10 15 20 25 30 35 40            
+
+> Layer index
+> 0.88
+> 0.90
+> 0.92
+> 0.94
+> 0.96
+> 0.98
+> 1.00
+> 1.02
+> Mean row-sum of quantized  P
+> 80/80 tensors below 1.0; average = 0.9266
+> (A) Row-sum error across layers
+> Prompt 0
+> Prompt 1
+> Underflow
+> /Zeroing
+> Clipping Round-down Round-up
+> −0.08
+> −0.06
+> −0.04
+> −0.02
+> 0.00
+> 0.02
+> 0.04
+> 0.06
+> Mean contribution to row-sum
+> -0.054
+> 31.8%
+> -0.019
+> 11.2%
+> -0.049
+> 28.6%
+> +0.048
+> 28.4%
+> 1 + ∑Δ = 0.9266
+> (B) Error-source decomposition
+> 0.8 0.9 1.0 1.1 1.2
+> Row-sum
+> 0
+> 5
+> 10
+> 15
+> 20
+> 25
+> Density
+> MXFP4: mean=0.918, std=0.020
+> Pre-scale: mean=1.001, std=0.022
+> pscale =0.917
+> (C) Effect of pre-quant global scaling
+> MXFP4
+> MXFP4 + pre-quant scale
+> 246810
+> Attention row entropy
+> 0.80
+> 0.85
+> 0.90
+> 0.95
+> 1.00
+> 1.05
+> Row-sum of quantized  P
+> (D) Dependence on attention entropy
+> Mean row-sum
+> 10–90 percentile
+> Ratio(row-sum > 1)
+> 0.0
+> 0.1
+> 0.2
+> 0.3
+> 0.4
+> 0.5
+> Ratio(row-sum > 1)
+
+Row-wise normalization error under MXFP4 probability quantization Figure 7: Row-sum diagnostics for MXFP4 probability quantization. (A) Across 80 Wan2.2 attention tensors at denoising step 9, covering two prompts and 40 layers, the mean row sum of each quantized tensor is below one. (B) The row-sum error is decomposed into zeroing, saturation, downward rounding, and upward rounding. (C) Pre-quant global scaling can restore the average row sum of a representative tensor but does not enforce normalization for individual rows. (D) High-entropy rows are predominantly under-normalized, whereas low-entropy rows may be under- or over-normalized. 
+
+5.6 Algorithmic Overhead and Kernel Integration 
+
+MXAttention preserves the tiled dataflow of low-precision attention. UOS changes only the boundary used in shared-scale selection; it retains the same block-maximum reduction, quantization granularity, and tensor traversal as direct MXFP4 quantization. PNQ reuses the quantized exponential tile bP ,already required by the low-precision output-accumulator update, to update the row-wise sum ℓ. It therefore requires neither an additional quantization operation nor another traversal of the attention tiles. Moreover, rotation and quantization can be executed in parallel by leveraging orthogonal compute units (GEMM vs. non-GEMM units), eliminating resource contention. The fixed Hadamard transform is applied online only to Q and K; the corresponding transformation outside this path is folded into the model weights. Because the rotation and block quantization operate locally on Q/K tiles, they can be fused into the Q/K preprocessing stage. These modifications add no attention-matrix materialization or extra pass over the key/value se-quence. They therefore introduce negligible algorithmic overhead and are compatible with a fused low-precision attention implementation. 17 6 Conclusion 
+
+This paper presents MXAttention , a data-free post-training quantization framework for MXFP4 attention in video diffusion models. We identify two numerical failure modes in direct MXFP4 at-tention: the clipping–underflow trade-off introduced by power-of-two block scaling and the mismatch between the row-wise sum and output-accumulator update caused by inconsistent quantization in the online-softmax loop. To address them, Universal Optimal Scaling (UOS) derives the closed-form boundary Qmax = 7 .25 as the distribution-independent minimizer of a global MXFP4 quantization-error objective, while Pre-Normalization Quantization (PNQ) uses the same quantized softmax exponential tiles for both the row-wise sum and output-accumulator updates, preserving row-wise normalization by construction. Experiments on Wan2.2 and HunyuanVideo show that MXAttention recovers at least 95% of the VBench Imaging Quality gap between direct OCP MXFP4 and FP16, substantially improves frame-level similarity, and maintains FP16-level generation quality with less than 0.01 absolute degradation on all reported VBench metrics. MXAttention also achieves results competitive with strong NVFP4-based baselines. UOS changes only the shared-scale selection, and PNQ reuses the quantized exponential tiles already required by the low-precision output path; neither requires an additional pass over the attention matrix. These results demonstrate that accurate MXFP4 attention can be achieved without calibration, quantization-aware training, or layer-wise parameter search. 
+
+# References 
+
+[1] W. Kong, Q. Tian, Z. Zhang, R. Min, Z. Dai, J. Zhou, J. Xiong, X. Li, B. Wu, J. Zhang 
+
+et al. , “Hunyuanvideo: A systematic framework for large video generative models,” arXiv preprint arXiv:2412.03603 , 2024. [2] Wan Team, A. Wang, B. Ai, B. Wen, C. Mao, C.-W. Xie et al. , “Wan: Open and advanced large-scale video generative models,” arXiv preprint arXiv:2503.20314 , 2025. [3] Z. Yang, J. Teng, W. Zheng, M. Ding, S. Huang, J. Xu, Y. Yang, W. Hong, X. Zhang, G. Feng 
+
+et al. , “Cogvideox: Text-to-video diffusion models with an expert transformer,” arXiv preprint arXiv:2408.06072 , 2024. [4] S. Luo, Y. Tan, L. Huang, J. Li, and H. Zhao, “Latent consistency models: Synthesizing high-resolution images with few-step inference,” in International Conference on Learning Representa-tions , 2024. [5] F.-Y. Wang, Z. Huang, A. W. Bergman, D. Shen, P. Gao, M. Lingelbach, K. Sun, W. Bian, G. Song, Y. Liu, X. Wang, and H. Li, “Phased consistency models,” in Advances in Neural Information Processing Systems , 2024. [6] F. Liu, S. Zhang, X. Wang, Y. Wei, H. Qiu, Y. Zhao, Y. Zhang, Q. Ye, and F. Wan, “Timestep embedding tells: It’s time to cache for video diffusion model,” in Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , 2025, pp. 7353–7363. [7] X. Zhao, X. Jin, K. Wang, and Y. You, “Real-time video generation with pyramid attention broadcast,” arXiv preprint arXiv:2408.12588 , 2024. [8] J. Zhang, J. Wei, P. Zhang, X. Xu, H. Huang, H. Wang, K. Jiang, J. Zhu, and J. Chen, “Sageat-tention3: Microscaling FP4 attention for inference and an exploration of 8-bit training,” arXiv preprint arXiv:2505.11594 , 2025. [9] P. Zhang, M. Noto, W. Tan, C. Jiang, W. Lin, W. Zhou, and H. Zhang, “Attn-qat: 4-bit attention with quantization-aware training,” arXiv preprint arXiv:2603.00040 , 2026. [10] Open Compute Project, “OCP Microscaling Formats (MX) Specification Version 1.0,” https: //www.opencompute.org/documents/ocp-microscaling-formats-mx-v1-0-spec-final-pdf, 2023. 18 [11] NVIDIA, “Openai triton on nvidia blackwell boosts ai per-formance and programmability,” https://developer.nvidia.com/blog/ openai-triton-on-nvidia-blackwell-boosts-ai-performance-and-programmability/, 2025, demon-strates hardware-accelerated MXFP4 GEMM support on NVIDIA Blackwell. [12] Advanced Micro Devices, Inc., “AMD Instinct MI350 Series GPUs,” https://www.amd.com/en/ products/accelerators/instinct/mi350.html, 2025, native MXFP4 and MXFP6 datatype support. [13] Huawei, “Leading a new paradigm for ai infrastructure,” https://www.huawei.com/en/news/ 2025/9/hc-xu-keynote-speech, 2025, announced MXFP4 support for the Ascend 950 series. [14] NVIDIA, “Introducing NVFP4 for efficient and accurate low-precision inference,” https:// developer.nvidia.com/blog/introducing-nvfp4-for-efficient-and-accurate-low-precision-inference/, 2025. [15] ——, “Using FP8 and FP4 with transformer engine,” https://docs.nvidia.com/deeplearning/ transformer-engine/user-guide/examples/fp8 primer.html, 2025. [16] S. Ashkboos, A. L. Mohtashami, M. L. Croci, B. Li, P. Cameron, M. Jaggi, D. Alistarh, T. Hoefler, and J. Hensman, “Quarot: Outlier-free 4-bit inference in rotated LLMs,” in Advances in Neural Information Processing Systems , 2024. [Online]. Available: https://proceedings.neurips. cc/paper files/paper/2024/hash/b5b939436789f76f08b9d0da5e81af7c-Abstract-Conference.html [17] Z. Liu, C. Zhao, I. Fedorov, B. Soran, D. Choudhary, R. Krishnamoorthi, V. Chandra, Y. Tian, and T. Blankevoort, “Spinquant: LLM quantization with learned rotations,” in International Conference on Learning Representations , 2025. [18] J. Zhang, J. Wei, P. Zhang, J. Zhu, and J. Chen, “Sageattention: Accurate 8-bit attention for plug-and-play inference acceleration,” in International Conference on Learning Representations ,2025. [19] J. Zhang, H. Huang, P. Zhang, J. Wei, J. Zhu, and J. Chen, “Sageattention2: Efficient attention with thorough outlier smoothing and per-thread INT4 quantization,” in International Conference on Machine Learning , 2025. [20] J. Zhang, X. Xu, J. Wei, H. Huang, P. Zhang, C. Xiang, J. Zhu, and J. Chen, “Sageattention2++: A more efficient implementation of sageattention2,” arXiv preprint arXiv:2505.21136 , 2025. [21] J. Chhugani, G. Jeong, B.-Y. Su, Y. Pan, H. Yang, A. Ankit, J. Yu, S. Deng, Y. Chen, N. Satish, and C. Kim, “Unveiling the potential of quantization with MXFP4: Strategies for quantization error reduction,” in International Conference on Machine Learning , 2026. [22] T. Gupta, H. Prairie, X. Wu, R. Abhyankar, Q. Wu, A. Silveria, P. Ponnusamy, J. Wang, B. Athi-waratkun, L. Song, T. Dao, D. Y. Fu, and C. De Sa, “Search your block floating point scales!” 
+
+arXiv preprint arXiv:2605.12464 , 2026. [23] W. Hu, C. Zhang, Z. Zhang, C. Guo et al. , “M 2xfp: A metadata-augmented microscaling data format for efficient low-bit quantization,” arXiv preprint arXiv:2601.19213 , 2026. [24] X. Li, S. Tesfai, Z. Zhang, H. Xi, S. Yang, L. Zhang, Y. Sun, K. Peng, M. Agrawala, I. Stoica, K. Keutzer, J.-Y. Zhu, S. Han, Y. Lin, and M. Li, “Deltaquant: 4-bit video diffusion models with spatiotemporal delta smoothing,” in Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , 2026, pp. 43 578–43 588. [25] T. Dao, D. Y. Fu, S. Ermon, A. Rudra, and C. R´ e, “Flashattention: Fast and memory-efficient ex-act attention with IO-awareness,” in Advances in Neural Information Processing Systems , vol. 35, 2022, pp. 10 448–10 459. [26] T. Dao, “Flashattention-2: Faster attention with better parallelism and work partitioning,” in 
+
+International Conference on Learning Representations , 2024. 19 [27] J. Shah, G. Bikshandi, Y. Zhang, V. Thakkar, P. Ramani, and T. Dao, “Flashattention-3: Fast and accurate attention with asynchrony and low-precision,” arXiv preprint arXiv:2407.08608 ,2024. [28] B. D. Rouhani, R. Zhao, A. More, M. Hall, A. Khodamoradi, S. Deng, D. Choudhary, M. Cornea, E. Dellinger, K. Denolf et al. , “Microscaling data formats for deep learning,” arXiv preprint arXiv:2310.10537 , 2023. [29] Y. Chen, H. Xi, J. Zhu, and J. Chen, “Oscillation-reduced MXFP4 training for vision transform-ers,” in Proceedings of the 42nd International Conference on Machine Learning , ser. Proceedings of Machine Learning Research, vol. 267, 2025. [30] K. V. Mardia and P. E. Jupp, Directional Statistics , ser. Wiley Series in Probability and Statistics. Chichester: John Wiley & Sons, 2000. [31] W. Bell and S. Nadarajah, “A review of wrapped distributions for circular data,” Mathematics ,vol. 12, no. 16, p. 2440, 2024. [32] E. M. Stein and R. Shakarchi, Fourier Analysis: An Introduction , ser. Princeton Lectures in Analysis. Princeton, NJ: Princeton University Press, 2003, vol. 1. [33] Z. Zheng, X. Peng, T. Yang, C. Shen, S. Li, H. Liu, Y. Zhou, T. Li, and Y. You, “Open-sora: Democratizing efficient video production for all,” arXiv preprint arXiv:2412.20404 , 2024. [34] Z. Huang, Y. He, J. Yu, F. Zhang, Y. Zhang, T. Li, W.-S. Zheng, Y. Qiao, and Z. Liu, “Vbench: Comprehensive benchmark suite for video generative models,” in Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , 2024. [35] L. Kuipers and H. Niederreiter, Uniform Distribution of Sequences . New York: John Wiley & Sons, 1974. 
+
+# A Exact Density under Power-of-Two Scaling 
+
+We analyze nonzero blocks for which the required shared-scale exponent lies within the E8M0 exponent range. The cases M = 0 and exponents outside this range are handled by the MXFP4 conversion routine and are omitted because they do not affect the derivation of q. Let M > 0 be the unscaled block maximum, let U = log 2 M have density fU , and define 
+
+eq (M ) = 
+
+
+
+log 2
+
+ Mq
+
+ 
+
+, Xq = M
+
+2eq (M ) . (53) For x ∈ (q/ 2, q ), every preimage of x has the form 
+
+M = 2 kx, U = log 2 x + k, k ∈ Z. (54) Indeed, 
+
+eq (2 kx) = 
+
+
+
+k + log 2
+
+ xq
+
+ 
+
+= k, (55) because log 2(x/q ) ∈ (−1, 0). The Jacobian of U = log 2 x + k is 
+
+dU dx = 1
+
+x ln 2 . (56) Summing over all preimages gives 
+
+gq (x) = 1
+
+x ln 2 
+
+X
+
+> k∈Z
+
+fU (log 2 x + k), x ∈ (q/ 2, q ). (57) Define the periodized log-domain density 
+
+H(t) = X
+
+> k∈Z
+
+fU (t + k). (58) 20 Table 5: Exact cumulative quantization error E(x) at E2M1 decision boundaries and selected grid points. 
+
+E(0) E(0 .25) E(0 .75) E(1 .25) E(1 .75) E(2 .5) E(3 .5) E(5) E(6) 0 1192 164 5192 7192 112 1613 24 78
+
+The function H has period one: H(t + 1) = H(t). Equation (57) can therefore be written as 
+
+gq (x) = g(x) = H(log 2 x)
+
+x ln 2 . (59) Thus, q selects a factor-of-two interval of a fixed periodized density rather than changing the density inside that interval. The density integrates to one over every such interval. Let a = log 2 q. Then 
+
+Z qq/ 2
+
+g(x) dx =
+
+Z aa−1
+
+H(t) dt (60) =
+
+Z 10
+
+H(t) dt (61) = X
+
+> k∈Z
+
+Z k+1 
+
+> k
+
+fU (u) du (62) = 1 . (63) For almost every q > 0, periodicity gives 
+
+g
+
+ q
+
+2
+
+
+
+= H(log 2 q − 1) (q/ 2) ln 2 (64) = 2 H(log 2 q)
+
+q ln 2 (65) = 2 g(q). (66) This proves Lemma 1. The result requires only the exact periodicity of H, not a log-uniform, Gaussian, or small-perturbation assumption. 
+
+# B Integrated Quantization Error of the E2M1 Grid 
+
+For nonnegative magnitudes, the finite E2M1 grid and its round-to-nearest decision boundaries are 
+
+GE2M1 = {0, 0.5, 1, 1.5, 2, 3, 4, 6}, (67) 
+
+TE2M1 = {0.25 , 0.75 , 1.25 , 1.75 , 2.5, 3.5, 5.0}. (68) The value 6 is the largest finite E2M1 value, and 5 is the decision boundary between 4 and 6. Hence, every normalized value above 5 projects to 6. The threshold 7 has a different role: it is the midpoint between 6 and the next value 8 on the unbounded E2M1 ladder. Values above 7 would round upward to 8 before finite-range saturation forces them to 6. We refer to this subset as the overflow-rounding region. For an interval [ a, b ] mapped to a quantization value r,
+
+Z ba
+
+(v − r)2 dv = (b − r)3 − (a − r)3
+
+3 . (69) Applying Eq. (69) successively gives the cumulative errors in Table 5. 21 For q ≥ 6, every value above 5 maps to 6, giving 
+
+E(q) = E(6) + 
+
+Z q
+
+> 6
+
+(v − 6) 2 dv = 78 + 13 (q − 6) 3. (70) For 6 ≤ q ≤ 7, q/ 2 ∈ [3 , 3.5], where values map to 3. Hence, 
+
+E
+
+ q
+
+2
+
+
+
+= 18 + 13
+
+ q
+
+2 − 3
+
+3
+
+. (71) For 7 ≤ q ≤ 8, q/ 2 ∈ [3 .5, 4], where values map to 4. Hence, 
+
+E
+
+ q
+
+2
+
+
+
+= 524 + 13
+
+ q
+
+2 − 4
+
+3
+
+. (72) Substitution into ∆( q) = E(q) − 8E(q/ 2) gives ∆( q) = 
+
+
+
+− 18 , 6 ≤ q ≤ 7,
+
+(4 q − 29)(4 q − 27) 8 , 7 ≤ q ≤ 8.
+
+(73) 
+
+# C Global Optimality of the UOS Boundary 
+
+Since D(x) = E(x)/x 3,
+
+D(q) − D
+
+ q
+
+2
+
+
+
+= E(q) − 8E(q/ 2) 
+
+q3 = ∆( q)
+
+q3 . (74) 
+
+C.1 Justification of Differentiation 
+
+Let F (x) = D(x)g(x). Since D is continuous on (0 , ∞) and g is locally integrable, F ∈ L1loc (0 , ∞). Define 
+
+G(t) = 
+
+Z t
+
+> 1
+
+F (x) dx. (75) Then G is absolutely continuous on every compact subinterval of (0 , ∞) and G′(t) = F (t) for almost every t. Since 
+
+J (q) = G(q) − G(q/ 2) , (76) 
+
+J is absolutely continuous and, for almost every q,
+
+J ′(q) = F (q) − 12 F (q/ 2) . (77) Using Eq. (66), 
+
+J ′(q) = D(q)g(q) − 12 D
+
+ q
+
+2
+
+
+
+g
+
+ q
+
+2
+
+
+
+(78) = g(q)
+
+h
+
+D(q) − D
+
+ q
+
+2
+
+i 
+
+(79) = g(q)
+
+q3 ∆( q). (80) Because g(q) ≥ 0, the derivative sign is determined by ∆( q). Table 6 gives the exact piecewise form of ∆( q) over q > 0. The quadratic in the final row has discriminant −18240 < 0 and a positive leading coefficient, so it is strictly positive. Therefore, ∆( q)
+
+
+
+= 0 , 0 < q ≤ 14 ,< 0, 14 < q < 29 4 ,
+
+= 0 , q = 29 4 ,> 0, q > 29 4 .
+
+(81) 22 Table 6: Exact piecewise form and sign of ∆( q) = E(q) − 8E(q/ 2). 
+
+Interval ∆( q) Sign 
+
+0 < q ≤ 14 0 0 
+
+> 14
+
+< q ≤ 12 − (4 q − 1) 2
+
+32 < 0 
+
+> 12
+
+< q ≤ 34
+
+16 q2 − 24 q + 7 32 < 0 
+
+> 34
+
+< q ≤ 54 − 116 < 0 
+
+> 54
+
+< q ≤ 32 − 16 q2 − 40 q + 27 32 < 0 
+
+> 32
+
+< q ≤ 74
+
+(4 q − 9)(4 q − 5) 32 < 0 
+
+> 74
+
+< q ≤ 7 − 18 < 07 < q ≤ 10 (4 q − 29)(4 q − 27) 8 < 0 before 29 /4, = 0 at 29 /4, > 0 afterward 
+
+q > 10 48 q2 − 864 q + 3983 8 > 0
+
+Combining Eqs. (80) and (81), J (q) is nonincreasing before q = 29 /4 and nondecreasing afterward. Hence q⋆ = 29 /4, equivalently Q⋆ 
+
+> max
+
+= 7 .25, is a global minimizer for every absolutely continuous law of log 2 M within the stated scale family. If H is positive almost everywhere over one period, J (q) is constant on 0 < q ≤ 1/4, strictly decreasing on (1 /4, 29 /4), and strictly increasing on (29 /4, ∞). Therefore, Q⋆ 
+
+> max
+
+= 29 /4 is the unique global minimizer. 
+
+# D Wrapped-Distribution and Harmonic Interpretation 
+
+Reducing a real-valued random variable modulo one yields a periodic density, commonly called a wrapped distribution [30, 31]. It can be represented either as a sum of translated densities or through Fourier coefficients. These classical results provide the mathematical tools used below; the contribution of UOS is the boundary-density consequence for power-of-two microscaling. Let 
+
+Yq = ( U − log 2 q) mod 1 ∈ [0 , 1) . (82) For noninteger U − log 2 q, which occurs almost surely under an absolutely continuous law, 
+
+Xq = q 2Yq −1. (83) At integer endpoints, the ceiling convention maps the value to q; this measure-zero distinction does not affect the density or the quantization-error integrals. If Yq is uniformly distributed, the Jacobian gives 
+
+fXq (x) = 1
+
+x ln 2 , x ∈ (q/ 2, q ]. (84) For the ceiling-based q = 8 interval (4 , 8], which differs from the exact OCP interval [4 , 8) only at measure-zero endpoints, this approximation gives Pr( X8 > 7) = 
+
+Z 87
+
+1
+
+x ln 2 dx = log 2
+
+87 ≈ 19 .27% . (85) This is a diagnostic estimate under the uniform wrapped-phase approximation, not an assumption required by Theorem 1. 23 Table 7: First-harmonic amplitude under a Gaussian log-domain prior. The values describe the leading Fourier component, not the complete pointwise deviation of the wrapped density. 
+
+σ σ2 a1(σ)
+
+0.10 0.01 1.6417 0.20 0.04 0.9081 0.30 0.09 0.3384 0.40 0.16 0.0850 0.50 0.25 0.0144 0.60 0.36 0.0016 1.00 1.00 5.35 × 10 −9
+
+D.1 Fourier Representation 
+
+The Fourier coefficients of the periodized density H are 
+
+cn =
+
+Z 10
+
+H(t)e−i2πnt dt (86) =
+
+Z ∞−∞ 
+
+fU (u)e−i2πnu du (87) = ϕU (−2πn ), (88) where ϕU (ω) = E[eiωU ]. The zeroth coefficient is c0 = 1. Under standard Fourier-convergence condi-tions [32], 
+
+H(t) = 1 + X
+
+> n̸=0
+
+ϕU (−2πn )ei2πnt . (89) For a general integrable density, the coefficient identity remains valid even when pointwise convergence of the Fourier series is not assumed. Equation (89) gives the harmonic interpretation of Lemma 1. For every integer n,
+
+ei2πn (log 2 q−1) = ei2πn log 2 q . (90) Thus, the uniform term and every nonzero Fourier mode take the same value at the two scale bound-aries. The harmonic components can change the objective value and the magnitude of its derivative, but they cannot reverse the derivative sign or shift the UOS minimizer. If U ∼ N (μ, σ 2), the Fourier series becomes 
+
+H(t) = 1 + 2 
+
+> ∞
+
+X
+
+> n=1
+
+e−2π2n2σ2
+
+cos (2 πn (t − μ)) . (91) The first-harmonic amplitude is 
+
+a1(σ) = 2 e−2π2σ2
+
+. (92) Higher harmonics may remain non-negligible when σ2 is small, so a1(σ) should not be interpreted as a bound on the total deviation from uniformity. 
+
+# E Wrapped-Phase Convergence for Location–Scale Families 
+
+Let Uσ = μ + σZ , where Z has an absolutely continuous density. For every nonzero integer n,
+
+|ϕUσ (−2πn )| = |ϕZ (−2πnσ )| . (93) Since Z has an integrable density, the Riemann–Lebesgue lemma gives lim |t|→∞ ϕZ (t) = 0 [32]. There-fore, ϕUσ (−2πn ) → 0 for every n̸ = 0. By the Fourier characterization of the uniform distribution modulo one [35], 
+
+Uσ mod 1 d
+
+−→ U (0 , 1) . (94) 24 0 1 2 3 4 5 6
+
+Block Maximum ( Vmax )
+
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> Density
+
+(a) Query (Q) 
+
+Vmax PDF    
+
+> 0246
+
+Block Maximum ( Vmax )
+
+> 0.0
+> 0.1
+> 0.2
+> 0.3
+> 0.4
+> 0.5
+
+(b) Key (K) 
+
+Vmax PDF     
+
+> 01234
+
+Block Maximum ( Vmax )
+
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+
+(c) Value (V) 
+
+Vmax PDF       
+
+> 0.000 0.005 0.010 0.015 0.020 0.025 0.030
+
+Block Maximum ( Vmax )
+
+> 0
+> 500
+> 1000
+> 1500
+> 2000
+
+(d) Attention Prob (P) 
+
+Vmax PDF    
+
+> 0123
+
+Log-Maximum (log 2 Vmax ) 
+
+> 0.00
+> 0.25
+> 0.50
+> 0.75
+> 1.00
+> 1.25
+> 1.50
+> Density
+> 20.16
+
+log 2 (Vmax ) PDF     
+
+> 10123
+
+Log-Maximum (log 2 Vmax ) 
+
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 20.33
+
+log 2 (Vmax ) PDF    
+
+> 1012
+
+Log-Maximum (log 2 Vmax )  
+
+> 0.00
+> 0.25
+> 0.50
+> 0.75
+> 1.00
+> 1.25
+> 1.50 20.16
+
+log 2 (Vmax ) PDF        
+
+> 28 24 20 16 12 840
+
+Log-Maximum (log 2 Vmax )  
+
+> 0.00
+> 0.05
+> 0.10
+> 0.15
+> 0.20 211.53
+
+log 2 (Vmax ) PDF     
+
+> 45678
+
+Scaled Maximum ( Vmax /S)
+
+> 0.0
+> 0.1
+> 0.2
+> 0.3
+> 0.4
+> 0.5
+> Density
+
+Scaled Vmax /S PDF      
+
+> Empirical PDF
+> Theory: 1
+> xln 2
+> 45678
+
+Scaled Maximum ( Vmax /S) 
+
+> 0.0
+> 0.1
+> 0.2
+> 0.3
+> 0.4
+> 0.5
+
+Scaled Vmax /S PDF     
+
+> 45678
+
+Scaled Maximum ( Vmax /S) 
+
+> 0.0
+> 0.1
+> 0.2
+> 0.3
+> 0.4
+> 0.5
+
+Scaled Vmax /S PDF     
+
+> 45678
+
+Scaled Maximum ( Vmax /S) 
+
+> 0.0
+> 0.1
+> 0.2
+> 0.3
+> 0.4
+> 0.5
+
+Scaled Vmax /S PDF      
+
+> 2.0 2.2 2.4 2.6 2.8 3.0
+
+Log-Scaled Maximum (log 2 (Vmax /S)) 
+
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> 1.2
+> 1.4
+> Density
+> ± 8.5%
+
+Log-Scaled log 2 (Vmax /S) PDF       
+
+> Empirical PDF
+> Ideal Base ( y= 1)
+> 2.0 2.2 2.4 2.6 2.8 3.0
+
+Log-Scaled Maximum (log 2 (Vmax /S)) 
+
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> 1.2
+> 1.4
+> ± 0.3%
+
+Log-Scaled log 2 (Vmax /S) PDF      
+
+> 2.0 2.2 2.4 2.6 2.8 3.0
+
+Log-Scaled Maximum (log 2 (Vmax /S)) 
+
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> 1.2
+> 1.4
+> ± 9.1%
+
+Log-Scaled log 2 (Vmax /S) PDF      
+
+> 2.0 2.2 2.4 2.6 2.8 3.0
+
+Log-Scaled Maximum (log 2 (Vmax /S)) 
+
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> 1.2
+> 1.4
+> ± 0.0%
+
+Log-Scaled log 2 (Vmax /S) PDF Figure 8: Empirical block-maximum distributions in Wan2.2. The rows show the original block maxima, their logarithms, the wrapped log-domain phases, and the corresponding normalized linear-domain values for Q, K, V , and the normalized attention probability matrix P . The visible nonuniformity corresponds to distribution-specific harmonic components but does not change the UOS boundary condition. The P column is included only as a distributional diagnostic; PNQ quantizes the unnormalized softmax exponential tile. Thus, broad absolutely continuous location–scale families approach a uniform wrapped phase. Without additional regularity assumptions, this weak convergence does not imply uniform convergence of the corresponding densities. 
+
+# F Empirical Wrapped-Phase Diagnostics 
+
+The following figures visualize block-maximum distributions before and after logarithmic wrapping. Figure 8 shows empirical distributions from Wan2.2 attention tensors, including the wrapped log-domain phases used in our analysis. Real attention tensors can exhibit clear nonuniform harmonic structure; UOS does not require these harmonics to be small. Figure 9 further examines how Hadamard rotation changes the empirical block-maximum distri-butions. Although the rotation modifies the log-domain harmonic structure, the periodic boundary relation used by UOS remains unchanged. 
+
+# G Relation to OAS and the OCP Endpoint Convention 
+
+At the common 32-element block granularity, the OAS scale-selection rule is equivalent to the ceiling-based boundary q = 7. Let 
+
+e6 =
+
+
+
+log 2
+
+ M
+
+6
+
+ 
+
+, x6 = M
+
+2e6 ∈ (3 , 6] . (95) 25 0 1 2 3 4 5 6 7
+
+> 0.0
+> 0.1
+> 0.2
+> 0.3
+> 0.4
+> 0.5
+> 0.6
+> Density
+
+Pre-Rotation: Vmax PDF        
+
+> 01234567
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+
+Post-Rotation: Vmax PDF     
+
+> 0123
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> 1.2
+> Density
+> 2
+
+0.18 
+
+Pre-Rotation: log 2 (Vmax ) PDF      
+
+> 0123
+> 0.00
+> 0.25
+> 0.50
+> 0.75
+> 1.00
+> 1.25
+> 1.50 2
+
+0.13 
+
+Post-Rotation: log 2 (Vmax ) PDF         
+
+> 4.0 4.5 5.0 5.5 6.0 6.5 7.0 7.5 8.0
+
+Scaled Maximum ( Vmax /S)
+
+> 0.0
+> 0.1
+> 0.2
+> 0.3
+> 0.4
+> 0.5
+> Density
+
+Pre-Rotation: Folded Linear Vmax /S PDF          
+
+> Empirical PDF
+> Theory: 1
+> xln 2
+> 4.0 4.5 5.0 5.5 6.0 6.5 7.0 7.5 8.0
+
+Scaled Maximum ( Vmax /S)
+
+> 0.0
+> 0.1
+> 0.2
+> 0.3
+> 0.4
+> 0.5
+
+Post-Rotation: Folded Linear Vmax /S PDF      
+
+> 2.0 2.2 2.4 2.6 2.8 3.0
+
+Log-Scaled Maximum (log 2 (Vmax /S)) 
+
+> 0.00
+> 0.25
+> 0.50
+> 0.75
+> 1.00
+> 1.25
+> 1.50
+> 1.75
+> Density
+
+± 5.6% 
+
+Pre-Rotation: Folded Log log 2 (Vmax /S) PDF       
+
+> Empirical PDF
+> Ideal Base ( y= 1)
+> 2.0 2.2 2.4 2.6 2.8 3.0
+
+Log-Scaled Maximum (log 2 (Vmax /S)) 
+
+> 0.00
+> 0.25
+> 0.50
+> 0.75
+> 1.00
+> 1.25
+> 1.50
+> 1.75
+
+± 16.5% 
+
+Post-Rotation: Folded Log log 2 (Vmax /S) PDF Figure 9: Effect of Hadamard rotation on block-maximum distributions. Rotation changes the log-domain distribution and its harmonic content; the boundary density ratio remains unchanged. Then 
+
+e7 = e6 +
+
+l
+
+log 2
+
+ x6
+
+7
+
+m 
+
+=
+
+(
+
+e6 − 1, 3 < x 6 ≤ 3.5,e6, 3.5 < x 6 ≤ 6. (96) Thus, q = 7 halves the TFS scale when x6 ∈ (3 , 3.5], mapping this interval to (6 , 7], and otherwise leaves the scale unchanged. This is the OAS scale-selection rule at the same block granularity [21]. The comparison does not include the smaller block size used in the full OAS configuration. The experimental OCP baseline uses the exact floor-based conversion rule 
+
+eOCP = ⌊log 2 M ⌋ − 2 = 
+
+
+
+log 2
+
+ M
+
+8
+
+ 
+
++ 1 . (97) 26 The ceiling-based q = 8 rule used in the continuous boundary analysis is 
+
+e8(M ) = 
+
+
+
+log 2
+
+ M
+
+8
+
+ 
+
+. (98) The two expressions agree whenever log 2(M/ 8) /∈ Z, since ⌈z⌉ = ⌊z⌋ + 1 for noninteger z. They differ when M/ 8 is an exact power of two. Under an absolutely continuous law, these endpoints have measure zero and do not affect the quantization-error integrals or Theorem 1. All reported OCP experiments use the exact floor-based rule. 
+
+# H Full Online-Softmax Form of PNQ 
+
+Let Tc be the number of key/value tiles processed for query block i. For each tile j, define the row-wise rescaling factor from its current running maximum to the final running maximum as 
+
+β(j) 
+
+> i
+
+= exp 
+
+
+
+m(j) 
+
+> i
+
+− m(Tc)
+
+> i
+
+
+
+. (99) Because 
+
+α(r) 
+
+> i
+
+= exp 
+
+
+
+m(r−1)  
+
+> i
+
+− m(r)
+
+> i
+
+
+
+, (100) the element-wise product of all subsequent rescaling factors telescopes: 
+
+> Tc
+
+Y
+
+> r=j+1
+
+α(r) 
+
+> i
+
+= exp 
+
+
+
+m(j) 
+
+> i
+
+− m(Tc)
+
+> i
+
+
+
+= β(j) 
+
+> i
+
+, (101) where the empty product for j = Tc is the all-ones vector. 
+
+Lemma 2 (Effective Full-Row Form) . After all key/value tiles have been processed, PNQ satisfies 
+
+ℓ(Tc) 
+
+> i
+
+=
+
+> Tc
+
+X
+
+> j=1
+
+β(j) 
+
+> i
+
+⊙
+
+ bPij 1Bc
+
+
+
+,
+
+eO(Tc) 
+
+> i
+
+=
+
+> Tc
+
+X
+
+> j=1
+
+Diag 
+
+
+
+β(j)
+
+> i
+
+ bPij bVj .
+
+(102) 
+
+Proof. Unrolling Eq. (48), the contribution of tile j is multiplied by every subsequent rescaling factor 
+
+α(r) 
+
+> i
+
+, for r = j+1 , . . . , T c. Equation (101) reduces their element-wise product to β(j) 
+
+> i
+
+, yielding Eq. (102). 
+
+■
+
+Define the effective quantized tile 
+
+bP eff  
+
+> ij
+
+= Diag 
+
+
+
+β(j)
+
+> i
+
+ bPij , (103) and the conceptual full-row matrix 
+
+bP eff  
+
+> i
+
+=
+
+h bP eff  
+
+> i1
+
+, . . . , bP eff 
+
+> iT c
+
+i
+
+. (104) Let bV denote the corresponding vertical concatenation of bV1, . . . , bVTc . Lemma 2 then gives 
+
+ℓ(Tc) 
+
+> i
+
+= bP eff  
+
+> i
+
+1, eO(Tc) 
+
+> i
+
+= bP eff  
+
+> i
+
+bV . (105) The matrix bP eff  
+
+> i
+
+is an analytical representation of the online recurrence and is never materialized by the kernel. 27 I Full-Row Mismatch under Direct Placement 
+
+For the direct placement, define 
+
+eP eff  
+
+> ij
+
+= Diag 
+
+
+
+β(j)
+
+> i
+
+ ePij , bP eff  
+
+> ij
+
+= Diag 
+
+
+
+β(j)
+
+> i
+
+ bPij , (106) and concatenate the tiles across the key sequence: 
+
+eP eff  
+
+> i
+
+=
+
+h eP eff  
+
+> i1
+
+, . . . , eP eff 
+
+> iT c
+
+i
+
+, bP eff  
+
+> i
+
+=
+
+h bP eff  
+
+> i1
+
+, . . . , bP eff 
+
+> iT c
+
+i
+
+. (107) The final direct-placement states are 
+
+ℓdirect  
+
+> i
+
+= eP eff  
+
+> i
+
+1, eOdirect  
+
+> i
+
+= bP eff  
+
+> i
+
+bV . (108) Hence, the final weights induced by the direct placement are 
+
+bP direct  
+
+> i
+
+= Diag 
+
+ eP eff  
+
+> i
+
+1
+
+−1 bP eff  
+
+> i
+
+, (109) with row sums bP direct  
+
+> i
+
+1 =
+
+ bP eff  
+
+> i
+
+1
+
+
+
+⊘
+
+ eP eff  
+
+> i
+
+1
+
+
+
+. (110) Here, ⊘ denotes element-wise division between the two row-wise sum vectors. The running-max rescaling is the same in both states, but the exponential tiles are not; the final row sum therefore need not equal one. 
+
+# J Positive PNQ Normalization Factor 
+
+Fix any row r of query block i. All attention rows considered in this work have a nonempty key set. Let tile j⋆ contain an entry c⋆ attaining the final maximum of row r:
+
+Sij ⋆ [r, c ⋆] = m(Tc) 
+
+> i
+
+[r]. (111) When tile j⋆ is processed, the running maximum for this row reaches its final value: 
+
+m(j⋆) 
+
+> i
+
+[r] = m(Tc) 
+
+> i
+
+[r]. (112) Therefore, 
+
+ePij ⋆ [r, c ⋆] = exp 
+
+
+
+Sij ⋆ [r, c ⋆] − m(j⋆) 
+
+> i
+
+[r]
+
+
+
+= 1 , (113) and 
+
+β(j⋆) 
+
+> i
+
+[r] = 1 . (114) Every entry of ePij ⋆ lies in (0 , 1], and the MXFP4 block containing ePij ⋆ [r, c ⋆] therefore has maximum magnitude one. Under the UOS boundary q⋆ = 7 .25, 
+
+eq⋆ (1) = 
+
+
+
+log 2
+
+ 17.25 
+
+ 
+
+= −2. (115) The shared scale is 2 −2 = 1 /4, so the normalized value is 12−2 = 4 , (116) which is exactly representable in E2M1. Hence, 
+
+Q⋆(1) = 1 . (117) Since this entry also has β(j⋆) 
+
+> i
+
+[r] = 1, it contributes exactly one to the final row-wise sum. Therefore, 
+
+ℓ(Tc) 
+
+> i
+
+[r] ≥ 1 > 0. (118) The normalization guarantee concerns the weights induced by the PNQ recurrence in exact arith-metic. It does not assert that the quantized weights equal the full-precision softmax weights. In an implementation, finite-precision accumulation and the final division may introduce ordinary floating-point rounding. PNQ removes the additional structural mismatch caused by updating ℓi with ePij 
+
+while updating eOi with bPij .28
