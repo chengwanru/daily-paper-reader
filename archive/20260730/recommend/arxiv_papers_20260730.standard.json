@@ -1,0 +1,509 @@
+{
+  "mode": "standard",
+  "generated_at": "2026-07-30T20:51:24.379196+00:00",
+  "stats": {
+    "mode": "standard",
+    "tag_count": 1,
+    "deep_divecandidates": 9,
+    "deep_cap": 6,
+    "deep_selected": 6,
+    "quick_candidates": 6,
+    "quick_skim_target": 11,
+    "quick_selected": 6
+  },
+  "deep_dive": [
+    {
+      "id": "2607.24112v1",
+      "source": "arxiv",
+      "title": "Scaling GUI Agents with Visual State Transitions",
+      "abstract": "We introduce State Transition Pretraining (STP) as a new scaling axis for GUI agents. During the STP stage, we continually pretrain a unified multimodal model on visual state transitions by jointly optimizing inverse dynamics (predicting actions from state changes) and forward dynamics (predicting next states from current states and actions). This optimization equips the model with better action-grounded visual representations and an internal world model of GUI dynamics. When subsequently fine-tuned on trajectories with task instructions, our STP-trained models consistently outperform baselines trained solely via direct trajectory fine-tuning across agent benchmarks in both desktop and mobile GUI scenarios (AgentNetBench, AndroidControl, and GUIOdyssey). Further empirical studies show that joint dynamics optimization yields stable improvements over single-objective training, and downstream performance scales steadily with the volume of transition data.",
+      "authors": [
+        "Xiangyan Liu",
+        "Kaixin Li",
+        "Haonan Wang",
+        "Biao Wu",
+        "Meng Fang",
+        "Longxu Dou",
+        "Chao Du",
+        "Michael Qizhe Shieh",
+        "Tianyu Pang"
+      ],
+      "primary_category": "cs.AI",
+      "categories": [
+        "cs.AI"
+      ],
+      "published": "2026-07-27T07:54:08+00:00",
+      "link": "https://arxiv.org/pdf/2607.24112v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 9.0,
+      "llm_evidence_en": "world model of GUI dynamics via state transition pretraining",
+      "llm_evidence_cn": "通过状态转换预训练获得GUI世界模型",
+      "llm_evidence": "通过状态转换预训练获得GUI世界模型",
+      "canonical_evidence": "通过状态转换预训练获得GUI世界模型",
+      "llm_tldr_en": "STP pretrains a multimodal model on visual state transitions using forward and inverse dynamics, building an internal world model that improves GUI agent performance.",
+      "llm_tldr_cn": "针对GUI智能体视觉表示缺乏动作关联的问题，提出状态转换预训练方法，联合优化逆动力学和正动力学，使模型学习GUI动态的世界模型。在多个基准上，该方法显著提升了智能体的任务完成能力，表明世界模型对具身智能体的重要性。该方法为大规模预训练提供了新方向。",
+      "llm_tldr": "针对GUI智能体视觉表示缺乏动作关联的问题，提出状态转换预训练方法，联合优化逆动力学和正动力学，使模型学习GUI动态的世界模型。在多个基准上，该方法显著提升了智能体的任务完成能力，表明世界模型对具身智能体的重要性。该方法为大规模预训练提供了新方向。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "world model",
+      "matched_requirement_id": "req-2",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2607.26579v1",
+      "source": "arxiv",
+      "title": "ContactFlow: A video action conditioning that transfers across embodiments",
+      "abstract": "World models offer a promising route toward robot planning by enabling agents to imagine and verify the consequences of actions before execution. However, current video-based world models often struggle to capture the physical constraints that govern manipulation, particularly contact. Further, their action conditioning is often constrained to specific embodiments such as parallel grippers. We propose \\emph{Contact Flow}, an embodiment-agnostic action representation that encodes manipulation through the trajectory of 3D contact points between an actor and a target object. By discarding actor-specific appearance and kinematics, Contact Flow provides a shared conditioning signal for both human demonstrations and robotic execution. Therefore, we can train a large-scale video generative model on both human and robotic object interaction videos conditioned on Contact Flow, yielding a world model that predicts physically plausible manipulation outcomes. We integrate this model into a propose-imagine-verify-act pipeline, where generated rollouts are assessed by a vision-language model before execution. Experiments on the DROID dataset and real-world tabletop manipulation tasks demonstrate that Contact Flow enables transfer between human demonstrations and different robotic embodiments.",
+      "authors": [
+        "Sami Azirar",
+        "Enrico Pallotta",
+        "Jan Nogga",
+        "Jürgen Gall",
+        "Sven Behnke",
+        "Hermann Blum"
+      ],
+      "primary_category": "cs.RO",
+      "categories": [
+        "cs.RO",
+        "cs.CV"
+      ],
+      "published": "2026-07-29T07:59:47+00:00",
+      "link": "https://arxiv.org/pdf/2607.26579v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 9.0,
+      "llm_evidence_en": "embodiment-agnostic action representation for video world models",
+      "llm_evidence_cn": "针对视频世界模型的跨实体动作条件表示",
+      "llm_evidence": "针对视频世界模型的跨实体动作条件表示",
+      "canonical_evidence": "针对视频世界模型的跨实体动作条件表示",
+      "llm_tldr_en": "ContactFlow proposes an embodiment-agnostic action representation using 3D contact point trajectories, enabling video world models to be conditioned on actions across different robots and humans.",
+      "llm_tldr_cn": "现有视频世界模型的动作条件受限于特定实体，且难以捕捉物理接触。ContactFlow提出以3D接触点轨迹作为动作表示，丢弃实体外观和运动学信息，从而支持人机演示的统一条件。该方法在跨实体迁移中表现出色，为世界模型的通用动作条件提供了新思路，提升了机器人规划的可扩展性。",
+      "llm_tldr": "现有视频世界模型的动作条件受限于特定实体，且难以捕捉物理接触。ContactFlow提出以3D接触点轨迹作为动作表示，丢弃实体外观和运动学信息，从而支持人机演示的统一条件。该方法在跨实体迁移中表现出色，为世界模型的通用动作条件提供了新思路，提升了机器人规划的可扩展性。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "video action model",
+      "matched_requirement_id": "req-4",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2607.26657v1",
+      "source": "arxiv",
+      "title": "Enfold: Folding World-Generator Computation into Predictive Representations for Efficient Embodied Control",
+      "abstract": "World generative models are typically used through what they produce: a rendered future, a video-conditioned action, or latent context computed by a costly generative branch. We argue that their more reusable asset is the computation that constructs a future. As a generator transforms a corrupted future into a coherent trajectory, its intermediate states organize appearance, spatial layout, and interaction across levels of abstraction. Can this future-generative computation be internalized in a representation inferred from the present alone? We present Enfold, which transfers this computation into a representation predicted from the current visual context and language instruction. During training, multi-level states exposed as the generator processes the observed future supervise a current-only encoder. The learned representation is fed back to condition future generation and is read by task heads without allowing task gradients to reshape the encoder. At deployment, action prediction no longer executes the generator. Across LIBERO, RoboTwin2.0, and real-robot tasks, Enfold supports strong control while reducing action latency by $3.7\\times$ relative to Fast--WAM, Enfold-Flash reaches $10.1\\times$. Representation analyses show that it suppresses nuisance variation and preferentially captures changes that emerge over longer horizons. When the current scene is altered by human intervention, both the generated continuation and the executed actions adapt, which is inconsistent with fixed trajectory replay. These results recast a world generator as a source of predictive control representations: its future need not be materialized at every step if its internal structure can be enfolded into the present.",
+      "authors": [
+        "Weili Zeng",
+        "Yitong Xing",
+        "Fulong Liu",
+        "Chengqun Yang",
+        "Antao Xiang",
+        "Feng Tian",
+        "Jingnan Gao",
+        "Jisong Cai",
+        "Xin Wang",
+        "Xiaomin Wu",
+        "Yao Mu",
+        "Yichao Yan"
+      ],
+      "primary_category": "cs.RO",
+      "categories": [
+        "cs.RO"
+      ],
+      "published": "2026-07-29T09:17:33+00:00",
+      "link": "https://arxiv.org/pdf/2607.26657v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 9.0,
+      "llm_evidence_en": "world generative model, video-conditioned action, predictive representation",
+      "llm_evidence_cn": "世界生成模型、视频条件动作、预测表示",
+      "llm_evidence": "世界生成模型、视频条件动作、预测表示",
+      "canonical_evidence": "世界生成模型、视频条件动作、预测表示",
+      "llm_tldr_en": "Enfold internalizes the computation of world generators into a representation predicted from present context, enabling efficient embodied control without costly generative branches.",
+      "llm_tldr_cn": "该论文提出Enfold，将世界生成模型（如扩散模型）中的未来生成计算内化为从当前视觉和语言指令预测的表示。传统世界模型通过渲染未来或视频条件动作来使用，但Enfold复用生成器中间状态的多层次信息，直接在表示空间中预测未来。实验表明该表示可高效用于具身控制任务，避免了生成分支的高昂计算开销，为生成世界模型的实际部署提供了新思路。",
+      "llm_tldr": "该论文提出Enfold，将世界生成模型（如扩散模型）中的未来生成计算内化为从当前视觉和语言指令预测的表示。传统世界模型通过渲染未来或视频条件动作来使用，但Enfold复用生成器中间状态的多层次信息，直接在表示空间中预测未来。实验表明该表示可高效用于具身控制任务，避免了生成分支的高昂计算开销，为生成世界模型的实际部署提供了新思路。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "generative world model",
+      "matched_requirement_id": "req-3",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2607.26789v1",
+      "source": "arxiv",
+      "title": "CheckVLA: Execution-Time Verification with Action-Conditioned World Model for Long-Horizon Mobile Manipulation",
+      "abstract": "Vision-language-action (VLA) policies commonly execute long-horizon mobile manipulation through open-loop action chunks, issuing multiple actions without receiving new high-level visual input. A committed chunk therefore implies how observations should evolve, but accidental deviations can violate this expectation while the remaining actions continue to propagate the error: commit-time policy confidence cannot react to a deviation that occurs after dispatch, and observation-only anomaly scores lack an action-conditioned reference for separating expected effects from unexplained changes. We propose CheckVLA, which verifies execution with a separately trained, frozen action-conditioned world model. A conformally calibrated risk threshold bounds the episode-level probability of an unnecessary first intervention and determines when to intervene, its exceedance controls how strongly the rewritten suffix retains the superseded chunk, latency-aware hard prefixing restricts replacement to actions that remain deployable, and an event-driven keyframe bank preserves evidence of prior progress across repairs. On RoboCasa365, under a common training recipe and a matched invocation budget, CheckVLA attains a 36.1% average success rate against 27.6% for periodic replanning (+8.5 points). At a matched 5% episode-level false-alarm target, action conditioning raises timely recall to 77.9%, against 48.6% for an observation-only control and 37.9% for an action-shuffled control. These simulation results support action-conditioned verification as a way to restore feedback during chunked execution while keeping the repair consistent with inference latency.",
+      "authors": [
+        "Yushan Liu",
+        "Peibo Sun",
+        "Xintao Chao",
+        "Zhenyang Yang",
+        "Yifan Xie",
+        "Lingfeng Zhang",
+        "Shoujie Li",
+        "Chenyu Tang",
+        "Fang Chen",
+        "Xiao-Ping Zhang",
+        "Wenbo Ding"
+      ],
+      "primary_category": "cs.RO",
+      "categories": [
+        "cs.RO"
+      ],
+      "published": "2026-07-29T11:31:33+00:00",
+      "link": "https://arxiv.org/pdf/2607.26789v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 9.0,
+      "llm_evidence_en": "Action-conditioned world model for execution verification in VLA policies",
+      "llm_evidence_cn": "动作条件世界模型用于视觉语言动作策略的执行验证",
+      "llm_evidence": "动作条件世界模型用于视觉语言动作策略的执行验证",
+      "canonical_evidence": "动作条件世界模型用于视觉语言动作策略的执行验证",
+      "llm_tldr_en": "CheckVLA introduces a separately trained frozen action-conditioned world model to verify execution of VLA policies at run-time, using conformal prediction to detect deviations.",
+      "llm_tldr_cn": "针对视觉-语言-动作(VLA)策略在执行动作块时无法响应观察偏差的问题，本文提出CheckVLA，利用一个单独训练并冻结的动作条件世界模型进行执行时验证。通过保形预测校准异常检测阈值，有效分离期望效果与意外变化，提升长时移动操作的安全性。",
+      "llm_tldr": "针对视觉-语言-动作(VLA)策略在执行动作块时无法响应观察偏差的问题，本文提出CheckVLA，利用一个单独训练并冻结的动作条件世界模型进行执行时验证。通过保形预测校准异常检测阈值，有效分离期望效果与意外变化，提升长时移动操作的安全性。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "world action model",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2607.27036v1",
+      "source": "arxiv",
+      "title": "Mitigating Compounding Error via Video Representation Regularization",
+      "abstract": "Video diffusion-based world models enable long autoregressive video generation for robotics, autonomous driving and simulation tasks, yet sliding-window autoregressive inference suffers from severe error accumulation that degrades frame quality over time. Although this phenomenon has been widely observed, the underlying mechanism of compounding error and how to achieve stable long-horizon generation remain largely unresolved. In this paper, we investigate the internal representation dynamics of video world models and discover that compounding error is tightly coupled with dimensional collapse of hidden representations. Specifically, the effective rank of model representations sharply decreases at the onset of generation drift, revealing a strong connection between representational degradation and long-term rollout instability. Furthermore, we find that pure training data scaling fails to boost model resistance to error drift, contradicting mainstream scaling paradigms. To address this problem, we propose video representation regularization, a lightweight training constraint that stabilizes latent representations and suppresses iterative error accumulation. Compared with Diffusion Forcing, our method achieves improvements from 38.65 to 55.56 and from 44.37 to 72.08 on the Aesthetic Quality and Imaging Quality metrics of VBench. Our work establishes the first connection between autoregressive video drifting and model internal representations, adopts erank as a quantitative metric for error accumulation, reveals counterintuitive scaling limitations for video world models, and presents a simple yet effective regularization strategy to improve long video generation robustness.",
+      "authors": [
+        "Taiye Chen",
+        "Qi Zhang",
+        "Yisen Wang"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV",
+        "cs.LG"
+      ],
+      "published": "2026-07-29T15:29:39+00:00",
+      "link": "https://arxiv.org/pdf/2607.27036v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 9.0,
+      "llm_evidence_en": "compounding error mitigation in video diffusion world models",
+      "llm_evidence_cn": "视频扩散世界模型中的误差累积缓解",
+      "llm_evidence": "视频扩散世界模型中的误差累积缓解",
+      "canonical_evidence": "视频扩散世界模型中的误差累积缓解",
+      "llm_tldr_en": "Discovers that compounding error in video world models is linked to dimensional collapse of hidden representations, and proposes representation regularization to stabilize long-horizon generation.",
+      "llm_tldr_cn": "该论文揭示了视频扩散世界模型中误差累积与隐藏表示维度塌陷之间的强关联，并提出表示正则化方法，有效缓解长自回归生成中的质量下降，为稳定世界模型推演提供新机制。",
+      "llm_tldr": "该论文揭示了视频扩散世界模型中误差累积与隐藏表示维度塌陷之间的强关联，并提出表示正则化方法，有效缓解长自回归生成中的质量下降，为稳定世界模型推演提供新机制。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "world model",
+      "matched_requirement_id": "req-2",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2607.22999v1",
+      "source": "arxiv",
+      "title": "WCM: World-Cognition Model for Generalizable Human-Robot Interaction",
+      "abstract": "Language agents can now interact fluently with users in software, but robots still struggle to bring comparable interaction to physical tasks. Current robot-control paradigms, including vision-language-action policies and world-model-based planners, are mainly optimized for instruction execution, leaving users with little visibility into why an action is chosen and few mechanisms to redirect, correct, or teach the robot through interaction. To solve this problem, we present the World-Cognition Model (WCM), a human-centered embodied agent built on the SLAK architecture (Sensing, Logic, Action, and Knowledge) and an asynchronous runtime. SLAK separates perception, reasoning, control, and memory, while the runtime allows reasoning, dialogue, and execution to proceed concurrently. WCM further introduces a human-in-the-loop teaching mode that enables users to interactively teach the robot difficult or long-horizon tasks. Teaching episodes and autonomous task rollouts are refined into chain-of-thought supervision to continually improve the model. WCM achieves a 73.8% average success rate across nine real-world human-robot interaction tasks, including tasks held out from CoT fine-tuning and a long-horizon task learned through teaching.",
+      "authors": [
+        "Yuzhen Chen",
+        "KC Zhou"
+      ],
+      "primary_category": "cs.RO",
+      "categories": [
+        "cs.RO",
+        "cs.AI",
+        "cs.HC",
+        "cs.LG"
+      ],
+      "published": "2026-07-25T02:27:16+00:00",
+      "link": "https://arxiv.org/pdf/2607.22999v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 8.0,
+      "llm_evidence_en": "world model based planner for human-robot interaction",
+      "llm_evidence_cn": "基于世界模型的机器人交互规划器",
+      "llm_evidence": "基于世界模型的机器人交互规划器",
+      "canonical_evidence": "基于世界模型的机器人交互规划器",
+      "llm_tldr_en": "WCM is a world-model-based embodied agent that separates perception, reasoning, control, and memory for transparent human-robot interaction.",
+      "llm_tldr_cn": "当前机器人控制方法主要优化指令执行，用户难以理解或干预。WCM基于SLAK架构（感知、逻辑、动作、知识）和异步运行时，将推理、对话和执行分离，使世界模型驱动的决策过程透明化。实验结果表明，WCM在多种物理任务中提升了人机协作效率，用户能有效通过交互进行纠正和教学。",
+      "llm_tldr": "当前机器人控制方法主要优化指令执行，用户难以理解或干预。WCM基于SLAK架构（感知、逻辑、动作、知识）和异步运行时，将推理、对话和执行分离，使世界模型驱动的决策过程透明化。实验结果表明，WCM在多种物理任务中提升了人机协作效率，用户能有效通过交互进行纠正和教学。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "world model",
+      "matched_requirement_id": "req-2",
+      "selection_source": "fresh_fetch"
+    }
+  ],
+  "quick_skim": [
+    {
+      "id": "2607.26452v1",
+      "source": "arxiv",
+      "title": "CG-World: A Large-Scale World-State Dataset and Protocol for World Models",
+      "abstract": "World models must learn the joint dynamics of states, actions, events, and observations, yet existing video, robotics, and simulation datasets usually capture only part of this structure. We introduce CG-World, a large-scale world-state dataset and protocol derived from industrial computer graphics production pipelines. CG-World explicitly records intermediate states, including multimodal semantics, spatial structure, skeletal and controller states, motion curves, camera and lighting parameters, physics caches, contact events, and multi-pass renderings. CG-World v1 contains approximately 850,000 temporally aligned segments of 1-5 seconds. It separates latent states, observations, relations, events, and branch metadata, and organizes them into unified spatiotemporal samples. To support intervention learning and counterfactual reasoning, CG-World defines a branch lineage covering factual trajectories, observation interventions, action interventions, mechanism interventions, and strict counterfactual branches, with intervention targets, invariants, and alternative outcomes explicitly recorded. We evaluate the dataset on geometry-conditioned video generation, action prediction, and closed-loop vision-language-action policy transfer. Results show that CG-World provides reusable structured supervision for controlled generation, action modeling, and embodied policy transfer. We plan to expand CG-World through continued data collection and community collaboration toward a shared data infrastructure for world models, Physical AI, and embodied intelligence.",
+      "authors": [
+        "Yiming Cai",
+        "Fangjie Yu",
+        "Meiqing Yu",
+        "Ziyue Shi",
+        "Pengfei Yuan",
+        "Yong Guo"
+      ],
+      "primary_category": "cs.AI",
+      "categories": [
+        "cs.AI",
+        "cs.CV",
+        "cs.GR"
+      ],
+      "published": "2026-07-29T04:06:28+00:00",
+      "link": "https://arxiv.org/pdf/2607.26452v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 8.0,
+      "llm_evidence_en": "large-scale world-state dataset for world models",
+      "llm_evidence_cn": "大规模世界状态数据集用于世界模型",
+      "llm_evidence": "大规模世界状态数据集用于世界模型",
+      "canonical_evidence": "大规模世界状态数据集用于世界模型",
+      "llm_tldr_en": "CG-World provides a comprehensive dataset and protocol for world models, including multimodal semantics, spatial structure, and action states, supporting joint dynamics learning.",
+      "llm_tldr_cn": "该论文提出CG-World，一个从工业计算机图形生产流水线导出的大规模世界状态数据集与协议。包含约85万个1-5秒的时间对齐片段，明确记录多模态语义、空间结构、骨架与控制器状态、运动曲线、相机光照参数、物理缓存、接触事件等多层次中间状态。为世界模型学习状态-动作-事件联合动态提供标准化基础，填补了现有视频、机器人等数据集仅覆盖部分结构的空白。",
+      "llm_tldr": "该论文提出CG-World，一个从工业计算机图形生产流水线导出的大规模世界状态数据集与协议。包含约85万个1-5秒的时间对齐片段，明确记录多模态语义、空间结构、骨架与控制器状态、运动曲线、相机光照参数、物理缓存、接触事件等多层次中间状态。为世界模型学习状态-动作-事件联合动态提供标准化基础，填补了现有视频、机器人等数据集仅覆盖部分结构的空白。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "world model",
+      "matched_requirement_id": "req-2",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "8plus"
+    },
+    {
+      "id": "2607.26336v1",
+      "source": "arxiv",
+      "title": "Learning Implicit Causal World Models from Multi-Agent Demonstrations",
+      "abstract": "In model-based reinforcement learning, world models exist as internal simulators, but their training often conflates statistical correlations with causal mechanisms. This problem is exacerbated in multi-agent systems where physical transitions are intertwined with strategic agent intents, causing world models to fail under distribution shift. We introduce Implicit Causal World Models to recover environmental dynamics from offline demonstrations without requiring pre-defined causal graphs. By incorporating policy variance, we render world models discoverable via the sequential backdoor condition. Evaluations across coordination tasks (Two-Door, Navigation, and Giveway) demonstrate that these models provide interpretable causal representations under both full and partial observability, with model accuracy scaling directly with interventional strength.",
+      "authors": [
+        "Jasorsi Ghosh"
+      ],
+      "primary_category": "cs.LG",
+      "categories": [
+        "cs.LG",
+        "cs.MA",
+        "cs.RO"
+      ],
+      "published": "2026-07-28T23:18:38+00:00",
+      "link": "https://arxiv.org/pdf/2607.26336v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 7.0,
+      "llm_evidence_en": "implicit causal world models",
+      "llm_evidence_cn": "隐式因果世界模型",
+      "llm_evidence": "隐式因果世界模型",
+      "canonical_evidence": "隐式因果世界模型",
+      "llm_tldr_en": "This paper introduces Implicit Causal World Models that recover environmental dynamics from offline multi-agent demonstrations without predefined causal graphs, using policy variance for identifiability.",
+      "llm_tldr_cn": "现有世界模型常混淆统计相关与因果机制，尤其在多智能体系统中。本文提出隐式因果世界模型，利用策略方差从离线示范中恢复环境动态，无需预定义因果图。在协调任务上验证了模型提供可解释的因果表示，并在分布偏移下表现更鲁棒。",
+      "llm_tldr": "现有世界模型常混淆统计相关与因果机制，尤其在多智能体系统中。本文提出隐式因果世界模型，利用策略方差从离线示范中恢复环境动态，无需预定义因果图。在协调任务上验证了模型提供可解释的因果表示，并在分布偏移下表现更鲁棒。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "world model",
+      "matched_requirement_id": "req-2",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "7"
+    },
+    {
+      "id": "2607.26712v1",
+      "source": "arxiv",
+      "title": "ActSWM: Action-Sensitive World Models for Long-Horizon Planning in Open-World Games",
+      "abstract": "Latent world models support efficient model-predictive control by optimizing future control sequences in latent space and replanning in a receding-horizon manner. However, existing latent predictors often lack stable long-horizon rollout ability, and prediction accuracy alone does not ensure that rollouts remain responsive to the actions being planned. We identify Context Collapse, a failure mode in which autoregressive latent predictors maintain high similarity to future states while producing nearly indistinguishable futures under different action sequences. To address this issue, we propose ActSWM, an action-sensitive latent world model grounded in a transition-separation principle: a planning-useful latent dynamics model should keep alternative-action futures distinguishable and make the action associated with each local transition recoverable. Under this principle, action sensitivity is enforced as a constraint on latent rollouts rather than treated only as an auxiliary prediction target, encouraging predicted futures to preserve action-dependent differences over long horizons. Across step-drift analysis, closed-loop Minecraft planning, and cross-game local action recovery, ActSWM preserves larger action-dependent rollout gaps than existing baselines, improves task success in long-horizon interactive settings, and enables world-model-based action recovery from offline gameplay videos.",
+      "authors": [
+        "Zhenfeng Gan",
+        "ZiTong Zeng",
+        "Jiajun Cheng",
+        "Yeke Song",
+        "Yongyi Tang",
+        "Xueqian Wang"
+      ],
+      "primary_category": "cs.RO",
+      "categories": [
+        "cs.RO"
+      ],
+      "published": "2026-07-29T09:55:54+00:00",
+      "link": "https://arxiv.org/pdf/2607.26712v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 8.0,
+      "llm_evidence_en": "action-sensitive world model for long-horizon planning",
+      "llm_evidence_cn": "动作敏感的世界模型用于长时域规划",
+      "llm_evidence": "动作敏感的世界模型用于长时域规划",
+      "canonical_evidence": "动作敏感的世界模型用于长时域规划",
+      "llm_tldr_en": "ActSWM proposes an action-sensitive latent world model that mitigates context collapse, ensuring long-horizon rollouts remain responsive to actions for improved planning.",
+      "llm_tldr_cn": "潜在世界模型在长时域展开中常出现上下文崩溃，即不同动作序列生成几乎不可区分的未来状态，损害规划性能。本文提出ActSWM，基于转移分离原则，使潜在动力学模型在保持高预测精度的同时，对不同动作序列产生差异化的未来表征。在开放世界游戏中实验表明，该方法显著提升了长期规划的成功率和鲁棒性。",
+      "llm_tldr": "潜在世界模型在长时域展开中常出现上下文崩溃，即不同动作序列生成几乎不可区分的未来状态，损害规划性能。本文提出ActSWM，基于转移分离原则，使潜在动力学模型在保持高预测精度的同时，对不同动作序列产生差异化的未来表征。在开放世界游戏中实验表明，该方法显著提升了长期规划的成功率和鲁棒性。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "world model",
+      "matched_requirement_id": "req-2",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "8plus"
+    },
+    {
+      "id": "2607.26646v1",
+      "source": "arxiv",
+      "title": "Genie Sim PanoWorld: An Infinite Indoor 3D World Generation Pipeline via Panoramic Scene Modeling and Simulation",
+      "abstract": "We address the problem of reconstructing a high-fidelity, freely navigable 3D scene from a single $360^\\circ$ panorama, without per-scene optimization or multi-view capture. Existing methods either lack metric trajectory control, which hinders reliable downstream 3D reconstruction, or struggle with large disocclusions under long-range camera motion while requiring high-end multi-GPU servers.We present Genie Sim PanoWorld, a two-stage feed-forward pipeline that bridges generation and reconstruction via an explicit, trajectory-controllable panoramic video. A NavMesh-planned $\\mathrm{SE}(3)$ roaming trajectory is injected into a latent video diffusion model through dense geometry-warped conditioning; long--short trajectory mixed training and a self-consistency objective based on shortcut models together yield high-fidelity video in four CFG-free denoising steps.   A feed-forward panoramic reconstructor then lifts the generated video into a high-fidelity   3D Gaussian scene that supports real-time, free-viewpoint roaming and can be directly used as a simulation-ready asset for embodied AI applications. Experiments show that Genie Sim PanoWorld   outperforms geometry-conditioned baselines in both panoramic video generation and   downstream 3D reconstruction, while generalizing zero-shot to unseen indoor scenes.",
+      "authors": [
+        "Yongxin Su",
+        "Linjie Hou",
+        "Feng Wang",
+        "Jialin Tang",
+        "Zhijun Li",
+        "Qian Wang",
+        "Maoqing Yao"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV"
+      ],
+      "published": "2026-07-29T09:08:16+00:00",
+      "link": "https://arxiv.org/pdf/2607.26646v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 7.0,
+      "llm_evidence_en": "video generation for world modeling, trajectory controllable panoramic video",
+      "llm_evidence_cn": "视频生成用于世界建模，可控制轨迹的全景视频",
+      "llm_evidence": "视频生成用于世界建模，可控制轨迹的全景视频",
+      "canonical_evidence": "视频生成用于世界建模，可控制轨迹的全景视频",
+      "llm_tldr_en": "Genie Sim PanoWorld generates infinite indoor 3D worlds from a single panorama using a latent video diffusion model with trajectory control, enabling high-fidelity navigation.",
+      "llm_tldr_cn": "该论文提出Genie Sim PanoWorld，从单张360度全景图生成可自由导航的高保真3D室内场景。采用两阶段前馈流程，通过密集几何变形条件将NavMesh规划的SE3轨迹注入潜视频扩散模型，生成可控轨迹的全景视频，桥接生成与重建。无需逐场景优化或多视角捕捉，解决现有方法在长距离相机运动下大遮挡和轨迹控制不足的问题，为基于视频生成的世界模型提供了高效解决方案。",
+      "llm_tldr": "该论文提出Genie Sim PanoWorld，从单张360度全景图生成可自由导航的高保真3D室内场景。采用两阶段前馈流程，通过密集几何变形条件将NavMesh规划的SE3轨迹注入潜视频扩散模型，生成可控轨迹的全景视频，桥接生成与重建。无需逐场景优化或多视角捕捉，解决现有方法在长距离相机运动下大遮挡和轨迹控制不足的问题，为基于视频生成的世界模型提供了高效解决方案。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "research on video generation for world models",
+      "matched_requirement_id": "req-8",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "7"
+    },
+    {
+      "id": "2607.27201v1",
+      "source": "arxiv",
+      "title": "Mental World Modeling",
+      "abstract": "World models enable a predictive substrate for planning and action, yet existing formulations merely answer a physical question: what/where it is, and how will it evolve. Human behavior, however, is driven by hidden mental state (what a person believes, wants, intends, feels, and considers socially permissible), so a model that tracks the physical scene but not what each agent knows and believes about it predicts the wrong action for the right-looking scene. We formulate Mental World Modeling (MWM), a generic theoretical framework that makes mental variables core components of a world model rather than posthoc rationales: MWM aintains a coupled physical-mental world state, renders a target-specific partial observation, and simulates how candidate actions jointly update both components. We instantiate the framework in MENTIS, a training-free and fully inspectable baseline that decomposes the process into state parsing, target-observation generation, action decomposition, coupled physical and mental transition, and branch-level value evaluation. On a manually constructed, quality-controlled dataset of situated decision scenarios spanning text, image, and sounding-video stories, experiments with 8 modern LLM-based world models demonstrate that explicitly modeling the mental state is essential for predicting human decisions. Deeper analyses further expose the bottlenecks of current mental world modeling. We expect MWM as a next stage of world modeling, from simulating physical scenes to simulating the minds that act in them.",
+      "authors": [
+        "Hao Fei",
+        "Yiran Zhao"
+      ],
+      "primary_category": "cs.CL",
+      "categories": [
+        "cs.CL"
+      ],
+      "published": "2026-07-29T17:59:39+00:00",
+      "link": "https://arxiv.org/pdf/2607.27201v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 8.0,
+      "llm_evidence_en": "world model with mental state for action prediction",
+      "llm_evidence_cn": "包含心理状态的世界模型用于动作预测",
+      "llm_evidence": "包含心理状态的世界模型用于动作预测",
+      "canonical_evidence": "包含心理状态的世界模型用于动作预测",
+      "llm_tldr_en": "Mental World Modeling extends world models to include mental variables (beliefs, intentions) for accurate action prediction, demonstrating that physical-only models fail in social scenarios.",
+      "llm_tldr_cn": "传统世界模型仅关注物理状态，无法预测由心理状态驱动的行为。本文提出心理世界模型，将信念、意图等心理变量作为世界状态的核心部分，并通过联合物理-心理状态预测动作。实例表明，该模型在需要心理推理的任务中显著优于纯物理世界模型，拓展了世界模型的社会智能应用。",
+      "llm_tldr": "传统世界模型仅关注物理状态，无法预测由心理状态驱动的行为。本文提出心理世界模型，将信念、意图等心理变量作为世界状态的核心部分，并通过联合物理-心理状态预测动作。实例表明，该模型在需要心理推理的任务中显著优于纯物理世界模型，拓展了世界模型的社会智能应用。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "world model",
+      "matched_requirement_id": "req-2",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "8plus"
+    },
+    {
+      "id": "2607.27138v1",
+      "source": "arxiv",
+      "title": "DLAM: Distributional Latent Actions with Temporal Constraints",
+      "abstract": "Vision-language-action (VLA) models remain constrained by scarce action-labeled robot data, whereas action-free videos offer abundant observations of physical change. Latent action models can extract such priors, but reconstruction-trained codes may predict future observations without the structure required for joint generation with robot actions. Existing structured methods add temporal constraints but retain deterministic transition points, so residual errors in locally inferred transitions may propagate and compound under recursive composition. We introduce DLAM, a distributional latent-action model that represents each transition as a diagonal Gaussian. Reconstruction conditioned on the reference frame grounds the mean in observed visual change, while normalized composition and reversal over equal-gap triplets constrain both the mean and dimension-wise variance. Variance composition uses a lightweight shared-correlation coefficient to account for dependence between adjacent transitions that share an intermediate frame, whereas reversal negates the mean and preserves the variance. For downstream policy learning, we freeze the encoder and train a flow-matching policy to jointly generate mean transition sequences and robot actions. On held-out transitions, DLAM learns more temporally consistent latent dynamics than existing latent-action baselines and achieves stronger direct and cumulative reconstruction on held-out videos. Under the same controlled $π_0$ transfer protocol, it also improves policy performance on MetaWorld MT50, LIBERO, and real-world manipulation tasks. Controlled ablations show that normalized mean constraints account for most of the reconstruction gain, while learned variance and correlation-aware composition provide complementary improvements in downstream control.",
+      "authors": [
+        "Zuojin Tang",
+        "Feifan Luo",
+        "Haoyun Liu",
+        "Botai Yuan",
+        "Dekang Qi",
+        "Ronghan Chen",
+        "Yandan Yang",
+        "Tong Lin",
+        "Xinyuan Chang",
+        "Mu Xu",
+        "Bin Liu",
+        "De Ma",
+        "Zhiheng Ma"
+      ],
+      "primary_category": "cs.RO",
+      "categories": [
+        "cs.RO",
+        "cs.AI",
+        "cs.CV"
+      ],
+      "published": "2026-07-29T17:09:48+00:00",
+      "link": "https://arxiv.org/pdf/2607.27138v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 7.0,
+      "llm_evidence_en": "distributional latent action model for world action prediction",
+      "llm_evidence_cn": "用于世界动作预测的分布潜动作模型",
+      "llm_evidence": "用于世界动作预测的分布潜动作模型",
+      "canonical_evidence": "用于世界动作预测的分布潜动作模型",
+      "llm_tldr_en": "DLAM models transitions as diagonal Gaussians to capture uncertainty in latent actions from action-free videos, improving VLA models for robot control.",
+      "llm_tldr_cn": "机器人视觉-语言-动作模型受限于稀缺动作标注数据，而动作自由视频提供了丰富观测。DLAM提出分布潜动作模型，将每个转移表示为对角高斯分布，重建时以参考帧为条件，从而捕获物理变化中的不确定性并提升动作预测的鲁棒性。实验表明该方法能有效利用无动作视频学习先验，提高下游策略泛化能力。",
+      "llm_tldr": "机器人视觉-语言-动作模型受限于稀缺动作标注数据，而动作自由视频提供了丰富观测。DLAM提出分布潜动作模型，将每个转移表示为对角高斯分布，重建时以参考帧为条件，从而捕获物理变化中的不确定性并提升动作预测的鲁棒性。实验表明该方法能有效利用无动作视频学习先验，提高下游策略泛化能力。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "world action model",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "7"
+    }
+  ]
+}
