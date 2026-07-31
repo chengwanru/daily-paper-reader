@@ -6,56 +6,55 @@
 </div>
 
 ## 每次日报
-- 最新运行日期：2026-07-30
-- 运行时间：2026-07-30 21:01:53 UTC
+- 最新运行日期：2026-07-31
+- 运行时间：2026-07-31 21:55:38 UTC
 - 运行状态：成功
-- 本次总论文数：12
+- 本次总论文数：11
 - 精读区：6
-- 速读区：6
+- 速读区：5
 
 ### 今日简报（AI）
-今日精选6篇精读论文，重点推荐《Scaling GUI Agents with Visual State Transitions》与《ContactFlow: Cross-embodiment video action conditioning》，分别聚焦GUI智能体扩展和跨实体动作迁移。建议优先精读这两篇，探索视觉状态转移在自动化操作中的应用潜力。
-- 详情：[/202607/30/README](/202607/30/README)
+今日精选11篇论文，6篇精读，聚焦世界模型与动作规划的前沿进展。  
+最值得关注的是两篇满分论文《LeapBot-WA》与《World Action Planner》，均围绕“世界模型+动作预测”展开，代表该方向核心突破。  
+建议先精读这两篇，再速读《PhiZero》了解物理语言如何融入世界模型，形成互补认知。
+- 详情：[/202607/31/README](/202607/31/README)
 
 ### 精读区论文标签
-1. [Scaling GUI Agents with Visual State Transitions](/202607/30/2607.24112v1-scaling-gui-agents-with-visual-state-transitions)  
+1. [LeapBot-WA: World-Anchor Action Models via Predictive Latent Alignments](/202607/31/2607.23969v2-leapbot-wa-world-anchor-action-models-via-predictive-latent-alignments)  
+   标签：评分：10.0/10、query:video-wam
+   evidence：直接提出基于预测性潜在对齐的世界动作模型，并讨论视频生成瓶颈。
+2. [World Action Planner: Generalizable Decision-Making with Action-Conditioned World Models](/202607/31/2607.27599v1-world-action-planner-generalizable-decision-making-with-action-conditioned-world-models)  
+   标签：评分：10.0/10、query:video-wam
+   evidence：世界动作规划器结合动作条件世界模型进行决策
+3. [EgoGenesis: Egocentric World-Action Modeling with Online Anchored Projective Memory and Action-3D RoPE](/202607/31/2607.28243v1-egogenesis-egocentric-world-action-modeling-with-online-anchored-projective-memory-and-action-3d-rope)  
+   标签：评分：10.0/10、query:video-wam
+   evidence：显式的世界-动作建模；基于预训练视频生成先验的自我中心世界-动作模拟器。
+4. [ShadowDancer: Teaching Video World Models Any Action by Learning Unified Dynamics Representations from a Video and Its Shadow](/202607/31/2607.28362v1-shadowdancer-teaching-video-world-models-any-action-by-learning-unified-dynamics-representations-from-a-video-and-its-shadow)  
+   标签：评分：10.0/10、query:video-wam
+   evidence：通过演示实现视频世界模型任意动作帧级控制
+5. [QuantWAMs: Calibrating at the Right Granularity for World Action Models](/202607/31/2607.28405v1-quantwams-calibrating-at-the-right-granularity-for-world-action-models)  
    标签：评分：9.0/10、query:video-wam
-   evidence：通过状态转换预训练获得GUI世界模型
-2. [ContactFlow: A video action conditioning that transfers across embodiments](/202607/30/2607.26579v1-contactflow-a-video-action-conditioning-that-transfers-across-embodiments)  
-   标签：评分：9.0/10、query:video-wam
-   evidence：针对视频世界模型的跨实体动作条件表示
-3. [Enfold: Folding World-Generator Computation into Predictive Representations for Efficient Embodied Control](/202607/30/2607.26657v1-enfold-folding-world-generator-computation-into-predictive-representations-for-efficient-embodied-control)  
-   标签：评分：9.0/10、query:video-wam
-   evidence：世界生成模型、视频条件动作、预测表示
-4. [CheckVLA: Execution-Time Verification with Action-Conditioned World Model for Long-Horizon Mobile Manipulation](/202607/30/2607.26789v1-checkvla-execution-time-verification-with-action-conditioned-world-model-for-long-horizon-mobile-manipulation)  
-   标签：评分：9.0/10、query:video-wam
-   evidence：动作条件世界模型用于视觉语言动作策略的执行验证
-5. [Mitigating Compounding Error via Video Representation Regularization](/202607/30/2607.27036v1-mitigating-compounding-error-via-video-representation-regularization)  
-   标签：评分：9.0/10、query:video-wam
-   evidence：视频扩散世界模型中的误差累积缓解
-6. [WCM: World-Cognition Model for Generalizable Human-Robot Interaction](/202607/30/2607.22999v1-wcm-world-cognition-model-for-generalizable-human-robot-interaction)  
+   evidence：针对联合预测未来观测与动作的世界动作模型提出量化校准框架
+6. [Security of World-Model-Based Embodied AI: A Lifecycle of Threats, Defenses, and Evaluation](/202607/31/2607.28226v1-security-of-world-model-based-embodied-ai-a-lifecycle-of-threats-defenses-and-evaluation)  
    标签：评分：8.0/10、query:video-wam
-   evidence：基于世界模型的机器人交互规划器
+   evidence：关于基于世界模型的具身AI安全的全面综述，覆盖威胁生命周期、防御与评估，直接涉及世界模型。
 
 ### 速读区论文标签
-1. [CG-World: A Large-Scale World-State Dataset and Protocol for World Models](/202607/30/2607.26452v1-cg-world-a-large-scale-world-state-dataset-and-protocol-for-world-models)  
+1. [PhiZero: A World Model Built Around Physical Language](/202607/31/2607.28624v1-phizero-a-world-model-built-around-physical-language)  
    标签：评分：8.0/10、query:video-wam
-   evidence：大规模世界状态数据集用于世界模型
-2. [ActSWM: Action-Sensitive World Models for Long-Horizon Planning in Open-World Games](/202607/30/2607.26712v1-actswm-action-sensitive-world-models-for-long-horizon-planning-in-open-world-games)  
-   标签：评分：8.0/10、query:video-wam
-   evidence：动作敏感的世界模型用于长时域规划
-3. [Mental World Modeling](/202607/30/2607.27201v1-mental-world-modeling)  
-   标签：评分：8.0/10、query:video-wam
-   evidence：包含心理状态的世界模型用于动作预测
-4. [Learning Implicit Causal World Models from Multi-Agent Demonstrations](/202607/30/2607.26336v1-learning-implicit-causal-world-models-from-multi-agent-demonstrations)  
-   标签：评分：7.0/10、query:video-wam
-   evidence：隐式因果世界模型
-5. [Genie Sim PanoWorld: An Infinite Indoor 3D World Generation Pipeline via Panoramic Scene Modeling and Simulation](/202607/30/2607.26646v1-genie-sim-panoworld-an-infinite-indoor-3d-world-generation-pipeline-via-panoramic-scene-modeling-and-simulation)  
-   标签：评分：7.0/10、query:video-wam
-   evidence：视频生成用于世界建模，可控制轨迹的全景视频
-6. [DLAM: Distributional Latent Actions with Temporal Constraints](/202607/30/2607.27138v1-dlam-distributional-latent-actions-with-temporal-constraints)  
-   标签：评分：7.0/10、query:video-wam
-   evidence：用于世界动作预测的分布潜动作模型
+   evidence：提出基于物理语言离散表示的世界模型，采用先推理后渲染的方式从视频中学习世界动力学
+2. [AgentHOI: Multi-Agent Reasoning for Human-Object-Interaction Video Generation via Implicit Representation Alignment](/202607/31/2607.22241v2-agenthoi-multi-agent-reasoning-for-human-object-interaction-video-generation-via-implicit-representation-alignment)  
+   标签：评分：6.0/10、query:video-wam
+   evidence：结合交互与运动规划的视频生成
+3. [Visko Orbis 1.0: A Live Model for Real-Time Interactive Long Video Generation](/202607/31/2607.26694v1-visko-orbis-10-a-live-model-for-real-time-interactive-long-video-generation)  
+   标签：评分：6.0/10、query:video-wam
+   evidence：支持实时交互和小时级滚动生成的长视频模型
+4. [FreqForcing: Autoregressive Long Video Generation via Spectral Self-Anchoring](/202607/31/2607.27110v1-freqforcing-autoregressive-long-video-generation-via-spectral-self-anchoring)  
+   标签：评分：6.0/10、query:video-wam
+   evidence：解决自回归长视频生成中的误差累积问题，提升视频世界模型长程展开的稳定性
+5. [VideoCoCo: Code-as-CoT for Physically-Consistent Video Generation via an Agentic Dual-Engine System](/202607/31/2607.27380v1-videococo-code-as-cot-for-physically-consistent-video-generation-via-an-agentic-dual-engine-system)  
+   标签：评分：6.0/10、query:video-wam
+   evidence：以代码作为思维链生成物理一致视频，支持世界模型式动态控制
 
 
 <div class="dpr-home-promo-card">

@@ -1,0 +1,386 @@
+Title: Visko Orbis 1.0: A Live Model for Real-Time Interactive Long Video Generation
+
+URL Source: https://arxiv.org/pdf/2607.26694v1
+
+Published Time: Thu, 30 Jul 2026 00:41:05 GMT
+
+Number of Pages: 15
+
+Markdown Content:
+# Visko Orbis 1.0: A Live Model for Real-Time Interactive Long Video Generation 
+
+Team Visko Abstract. We present Visko Orbis 1.0 , a Live Model for real-time, interactive long video generation. Users can change the prompt at any moment during generation, and the update becomes visible in real time. Visko Orbis 1.0 supports long-form text-to-video, image-to-video, and video continuation, with multilingual prompts and prompt switching while generation is in progress. A bounded multi-scale memory preserves subjects, scenes, and style across chunks, sustaining hour-scale rollouts without evident quality or color drift. Built on a distilled chunk-wise streaming generator and a streaming video upscaler, Visko Orbis 1.0 delivers 4K video generation at 24 FPS in real time, using an optimized GPU serving engine. In quantitative evaluations, Visko Orbis 1.0 achieves the best DOVER aesthetic and technical scores and the best VideoAlign visual and motion quality; in long-form Arena comparisons, it obtains the highest overall-preference and temporal-stability ratings among all the state-of-the-art real-time interactive video generation systems. …           
+
+> T=0s T=60s T=3600s T=600s
+> Live Streaming
+> E-commerce
+> Companion
+> Education Robotics
+> Filming
+> Entertainment Story-telling
+
+… …
+
+Real-time, Interactive Long Video Generation Support Various Applications 
+
+Figure 1 Overview of Visko Orbis 1.0 as a real-time, interactive long-video generation system. Left: Representative frames at 0, 60, 600, and 3600 seconds illustrate an hour-long rollout, while full-stream DOVER aesthetic, VideoAlign instruction-following, and HSV saturation trajectories track visual quality, prompt alignment, and color stability over time; red denotes Visko Orbis 1.0 and lighter curves denote comparison systems. The system delivers 4K output at 24 FPS with real-time interaction and long-horizon consistency. Right: Illustrative applications span entertainment, storytelling, live streaming, robotics, education, e-commerce, filming, and virtual companionship. 
+
+## 1 Introduction 
+
+Video generation has advanced rapidly in visual fidelity, motion realism, instruction following, and multimodal conditioning. Systems such as Sora [ 1 ], Veo [ 2], Seedance [ 3], Kling [ 4], Wan [ 5], HunyuanVideo [ 6], and LongCat-Video [ 7] now produce short videos of striking quality. Most of them, however, generate offline: a user submits a prompt, waits, and receives a finished clip that can no longer be changed. This paradigm serves bounded content creation well, but it excludes the experiences in which video is consumed while it is arXiv:2607.26694v1 [cs.CV] 29 Jul 2026 Visko Orbis 1.0 
+
+being made—live streams, games, virtual characters, interactive stories—where content must keep playing and keep responding to its audience. Such experiences demand a model that generates in real time, sustains long horizons, and stays under continuous user control. Existing work addresses parts of this demand, but no system covers it end to end. (1) Causal streaming. 
+
+CausVid [ 8] makes bidirectional video diffusion causal and streamable through few-step distillation and KV caching, and Self Forcing [ 9], Rolling Forcing [ 10 ], and Causal Forcing [ 11 ] further study exposure mismatch in causal distillation; these models stream, but live user control is not their focus. (2) Interaction. Oasis [ 12 ]couples autoregressive generation with a low-latency interactive stack, LongLive [ 13 ] studies sequential prompt updates over minute-scale rollouts, Matrix-Game 2.0 [ 14 ] streams action-conditioned worlds, Krea Realtime [ 15 ]and Helios [ 16 ] pursue real-time long-form generation, and Vidu S1 [ 17 ] supports speech-guided character interaction. (3) Long-horizon stability. FramePack [ 18 ] and FAR [ 19 ] compress long contexts under fixed token budgets, and MemFlow [ 20 ], VideoSSM [ 21 ], FadeMem [ 22 ], and Echo-Infinity [ 23 ] explore retrieval, hybrid state-space memory, distance-aware consolidation, and learned evolving memory; even so, small errors recirculate through generated history and can accumulate into drift. (4) Serving. Real-time delivery is as much an inference problem as a modeling problem: without state reuse, parallel execution, and streaming decode and upscaling, a capable model may still be too slow to watch. An interactive live model must hold all four together: accept updates while a rollout is active, preserve useful visual state across chunks, deliver frames progressively, and measure its response at the visible output rather than at an internal model boundary. These requirements reflect a broader shift that we have articulated as Live Models [24 ]: foundation models that execute as persistent processes rather than answering bounded queries. A Live Model generates in real time, under the clock of a world in motion; interacts continuously, folding new input into a process already underway; and maintains an ongoing existence, carrying state forward as long as it runs. For video generation, this contract fixes the system boundary at delivered video: a rollout is a stateful process in which generation history is carried between chunks, prompt updates are timestamped against the output clock, and new conditions apply without reinitializing the rollout. Evaluation adopts the same boundary, reporting quality, continuity across updates, and long-horizon drift over complete delivered streams. We introduce Visko Orbis 1.0 , our first realization of this paradigm: an interactive Live Model supporting long-form text-to-video (T2V), image-to-video (I2V), video-to-video (V2V) continuation, multilingual prompt-ing, and in-generation prompt switching. At its core, a latent-video model generates successive temporal chunks under a single conditional formulation. Each chunk reads the active event condition, optional visual references, and a bounded multi-scale memory of the preceding rollout; the resulting state is carried into the next chunk. This design separates the persistent visual state of a session from the user’s transient intent, so every entry mode shares the same future-generation process. The result is a system that a user can steer while it runs. A prompt update becomes visible in the output in under one second on average, and decoded chunks are delivered progressively rather than after the full video completes. Native 832 × 480 generation, reference-aware streaming super-resolution, and a multi-GPU serving pipeline together deliver 4K video at 24 frames per second. We summarize the key technical contributions of Visko Orbis 1.0 as follows: 
+
+• Unified live-video formulation. We formulate generation as a persistent, chunk-wise latent-flow process in which visual state is carried across chunks and time-indexed instructions can change without restarting the rollout. The same causal continuation interface supports T2V, I2V, and V2V generation. 
+
+• Event-aligned data and progressive streaming training. A multi-stage data engine combines safety and quality filtering, distribution balancing, and both single-event and temporally localized multi-event captions. We first learn a bidirectional short-video prior and then adapt it to history-conditioned streaming through single-event, event-aligned long-video, and human-curated training stages. 
+
+• Bounded memory for long-horizon generation. Recent history is retained at high latent resolution, older spans are progressively compressed, and information leaving the scheduled window is consolidated into a fixed-capacity learned state. Structured history perturbations and rollout-calibrated augmentation expose the model to recurrent generation errors while keeping memory and per-chunk computation bounded. 
+
+> 2Visko Orbis 1.0
+
+• Few-step flow post-training with physics-aware alignment. Guidance distillation removes the unconditional serving branch; history-conditioned trajectory consistency provides a stable few-step ini-tialization; and self-forcing distribution matching adapts the student to its own autoregressive histories. Group-relative reinforcement learning subsequently optimizes calibrated visual-quality, motion-quality, and text–video-alignment rewards. In addition, a latent world model scores candidate futures for predictive consistency, steering generation toward physically plausible motion and object dynamics. 
+
+• Live control and inference alignment. A rolling prompt summary, asynchronous prompt encoding, chunk-boundary condition updates, and versioned state invalidation let new instructions affect future video while preserving established session context. Conservative content-adaptive drift controls further stabilize long rollouts at inference time. 
+
+• Streaming high-resolution system co-design. Versioned state reuse, compiled and fused execution, batch-one sequence parallelism, and overlap across generation, decoding, restoration, encoding, and delivery form a single progressive pipeline. A reference-aware, single-refinement video super-resolution model uses temporally distilled decoding, conservative anchor refresh, and tiled distributed execution to transform native 832 × 480 chunks into progressively delivered 4K video. Evaluation treats complete events, rather than selected short clips or individual frames, as the unit of analysis. On the reported one- to three-minute outputs, Visko Orbis 1.0 obtains the highest DOVER aesthetic and technical scores and the highest VideoAlign visual- and motion-quality scores among the compared outputs; prompt-aware raw scores are interpreted descriptively because prompt suites are unmatched. In the long-form Arena study, Visko Orbis 1.0 achieves the highest overall-preference and temporal-stability Elo point estimates, while the one-hour diagnostic in Figure 1 tracks aesthetic quality, instruction following, and saturation throughout a substantially longer rollout. Full results and qualifications appear in Section 5. The method is organized into three sections. Data describes the governed training data and temporal captions; Model follows the progressive path from bidirectional pretraining through streaming adaptation, post-training, and super-resolution; and Inference describes online prompt control and the delivered-video runtime. 
+
+## 2 Data 
+
+Data quality is a primary scaling dimension for Visko Orbis 1.0 . We built the multi-stage data curation and captioning pipeline illustrated in Figure 2 to filter, annotate, rebalance, and preprocess a large-scale raw video collection. The system produces progressively narrower data tiers for broad-coverage pretraining, distribution-balanced mid-training, and high-quality fine-tuning rather than treating every surviving clip as interchangeable. Large-scale video datasets and generation systems similarly identify filtering, recaptioning, distribution control, and high-quality fine-tuning as central parts of the training recipe [25–29].  
+
+> Raw Video Collection.
+
+The raw video collection covers a wide range of real-world and generated visual domains. At a high level, these include the natural world and science; wildlife and animals; people, community, education, culture, sports, food, and health; urban, indoor, agricultural, industrial, and transportation environments; and creative, craft, digital, and gaming content. We consolidate exact and near-duplicate material before further processing and retain source and technical metadata for governance and analysis [ 30 , 31 ]. Detailed source proportions and raw-data totals are maintained in the internal data manifest.  
+
+> Shot-Aware Video Clipping.
+
+Raw videos vary from short recordings to long, heterogeneous programs and are not directly suitable as uniform training examples. We first detect shot boundaries from visual discontinuities and temporal change, following established shot-transition detection practice [ 32 ]. The resulting shots are then assembled or subdivided according to semantic continuity, content richness, action completeness, and camera behavior, producing clips between 3 and 240 seconds. Clipping is not a fixed-window operation. Adjacent shots may remain together when they form a coherent event or narrative unit, while a long shot can be divided around a meaningful action or scene change.  
+
+> Safety Filtering.
+
+Every candidate clip passes a layered safety and privacy filter before entering a training pool. Automated classifiers and rule-based checks screen for sexual or NSFW content, sexual exploitation or 
+
+> 3
+
+Visko Orbis 1.0 Mountains & Weather               
+
+> Wildlife
+> Agriculture
+> Health
+> Food &Dining
+> Sports
+> Community
+> Arts &Culture Home &Indoor life
+> Transportation
+> Gaming
+> Manufacturing
+> Science &Space
+> Nature
+> Robotics
+> Raw Data Collection
+> Clipping
+> Safety Filtering
+> Quality Filtering
+> Distribution Rebalancing
+> Human-Preference Curation
+> Multi-stage Captioning
+> Single-Event Captioning
+> Event-Aligned Temporal Captioning
+> Holistic description
+> Event bounded
+> Multi-stage Training Data
+
+Figure 2 Multi-stage data curation and captioning pipeline. The raw video collection spans diverse natural, human-centered, indoor, industrial, transportation, health, sports, and digital domains. Raw videos undergo shot-aware clipping, safety and quality filtering, distribution rebalancing, and human-preference curation. In parallel, every safety-passed clip receives a single-event caption and, where applicable, event-aligned temporal captions, producing governed data subsets for multi-stage training. 
+
+endangerment involving minors, graphic violence and gore, self-harm, hateful or extremist material, dangerous or illegal activity, sensitive personal information, and identity-sensitive content. Category-specific checks distinguish high-risk depictions from legitimate documentary, educational, scientific, or medical context where appropriate. High-confidence policy violations are excluded. Ambiguous or high-impact cases are quarantined for additional review rather than accepted through a single permissive threshold. 
+
+Quality Filtering. Long-horizon generation amplifies defects that may be tolerable in an isolated short clip: color-channel errors can become persistent casts, weak motion can produce static rollouts, and temporal jitter can propagate across later chunks. Safety-passed clips therefore undergo a cascaded assessment of structural integrity, spatial and technical quality, temporal quality, composition, and semantic usefulness, extending the multi-stage filtering practice used in large-scale video diffusion pipelines [ 27 –29 ]. Representative signals include decode and frame-rate integrity, corrupted or frozen frames, sharpness, exposure, color stability, compression, aesthetic quality, motion amplitude, flicker, jitter, camera stability, subject visibility, framing, event clarity, content richness, and captionability. Thresholds are calibrated by content and source type rather than applied universally, since animation, cinematic footage, scientific visualization, screen content, handheld video, sports, and low-light scenes have different expected distributions. 
+
+Distribution Rebalancing. Aggressive quality filtering alone can yield a clean but narrow training set: common source types, static scenes, or visually polished categories may dominate even when rarer events are important for model behavior. We maintain a coverage ledger over semantic domain, event and transition type, duration, motion regime, camera behavior, visual style, language context, and whether subjects or environments should persist across a boundary. Rebalancing operates on this ledger after quality scoring. Overrepresented strata are downweighted, underrepresented but valid strata receive higher sampling priority, and near-duplicate semantic clusters are prevented from consuming disproportionate training capacity. Balancing is stage specific: broad pretraining retains long-tail coverage, mid-training applies stronger distribution control, and fine-tuning prioritizes quality without collapsing event diversity. 
+
+4Visko Orbis 1.0  
+
+> Human-Preference Curation.
+
+The highest-quality tier is selected through human annotation and verification. Reviewers assess visual and technical quality, composition, semantic clarity, motion naturalness, temporal coherence, and the presence of subtle defects that automated metrics may miss. Human review also checks borderline automatic decisions and provides calibrated preference judgments among otherwise strong candidates. Only verified examples enter the human-preference pool used for high-quality fine-tuning. Reviewer feedback is aggregated into a versioned decision record and is also used to audit automatic quality signals, identify systematic false positives or false negatives, and propose future filter recalibration. This stage is intentionally narrower than the preceding quality-filtered pool: its purpose is to establish a concentrated quality ceiling, not to reproduce the full raw-data distribution.  
+
+> Multi-Stage Captioning.
+
+All clips that pass the safety filter are captioned so that the resulting governed data pool can support different stages of training. Caption generation is asynchronous and versioned independently from quality scores and sampling manifests. Two complementary annotation modes are produced: 1. Single-event captioning. Clips of up to 10 seconds receive a holistic caption describing the visible subjects, actions, environment, camera behavior, style, and temporal evolution as one coherent event, building on scalable multi-teacher and model-assisted video recaptioning practice [25, 26, 28]. 2. Event-Aligned Temporal Captioning. Every clip between 3 and 240 seconds undergoes event detection. Captions are generated from the visual evidence inside each detected event interval rather than from an undifferentiated full-video summary. The resulting record contains ordered event boundaries, local event captions, and persistent subject, scene, and style attributes that may span multiple intervals, following the temporally localized supervision used in dense event captioning and structured long-video datasets [ 33 –35 ]. Short clips can carry both views: a single-event caption for compact supervision and event-boundary metadata for a common temporal schema. For longer clips, interval-local captions prevent an action described late in a paragraph from being assigned to an earlier generation window. These annotations support progressively curated subsets of the same governed training data. Broad-Coverage Pretraining uses the safety-passed data to establish semantic and visual coverage; Distribution-Balanced Mid-training uses a quality-filtered and rebalanced mixture to strengthen underrepresented domains, motion regimes, and event transitions; and High-Quality Fine-tuning concentrates human-verified examples with verified single- and multi-event captions. 
+
+## 3 Model 
+
+Visko Orbis 1.0 is a conditional latent-video model trained progressively from bounded bidirectional generation to interactive, chunk-wise autoregressive streaming. The model section follows the order in which capabilities are acquired: short-video pretraining, streaming adaptation, quality-focused mid-training, event-aligned long-horizon training, human-curated fine-tuning, distillation and reward alignment, and a dedicated super-resolution model. The complete progression is summarized in Figure 3.  
+
+> Bidirectional pretraining
+> 1–5 s videos
+> Streaming adaptation
+> 3–10 s videos
+> Event mid-training
+> single + multi-event
+> Quality fine-tuning
+> human-curated quality tier
+> Post-training
+> distillation + GRPO
+> Figure 3
+
+Progressive model training. A short-video bidirectional model is first adapted to chunk-wise streaming generation, then specialized with single- and multi-event data, a human-curated quality tier, few-step distillation, and group-relative reward alignment.  
+
+> Model Formulation.
+
+Let zk denote the k-th latent-video chunk, Hk the bounded visual history available before that chunk, ck the text instruction active at the chunk boundary, and rk optional visual context carried from an input image or video prefix. Instructions are treated as external controls rather than observational random variables: after earlier output has been committed, the user or control policy supplies ck, and the model draws 
+
+> 5Visko Orbis 1.0
+
+the next chunk from pθ (zk | Hk, c k, r k). Composing these kernels in generation order defines the causal rollout law even when later instructions are selected adaptively; neither the current kernel nor the state update can access a future instruction or chunk. The rollout begins from (H1, r 1). T2V uses empty visual inputs, I2V initializes r1 from the supplied image while leaving H1 empty, and V2V initializes both from the encoded prefix. After zk is committed, a deterministic causal update constructs the state for zk+1 . Consequently, later prompt updates affect only uncommitted chunks and never revise delivered output.  
+
+> Pretraining and Streaming Adaptation.
+
+We first train on 1–5-second videos with full spatial-temporal attention, then initialize a chunk-wise streaming model from the shared bidirectional weights and adapt it on ordered chunks from 3–10-second videos [8, 9, 11, 13]. Both regimes use the linear rectified-flow objective [36, 37]: 
+
+ezσ = (1 − σ)z + σϵ, ϵ ∼ N (0 , I ),
+
+LRF = E
+
+h
+
+∥vθ (ezσ , σ ; q) − (ϵ − z)∥22
+
+i
+
+. (1) Here, σ = 0 denotes clean data, σ = 1 pure noise, and generation integrates the learned field from noise toward data. For bidirectional pretraining, z is the complete short-clip latent and q = c; for streaming adaptation, 
+
+z = zk and q = ( ck, r k, H k). Regression errors are averaged over latent elements, streaming losses are first averaged over the chunks in each example, and the outer expectation covers data, noise levels, Gaussian noise, and any sampled history augmentation. Only the current chunk is noised during streaming training; Hk
+
+contains committed past content. Shared parameters are initialized from the bidirectional checkpoint, while streaming-specific history and memory parameters are initialized separately.  
+
+> Bounded Multi-Scale Memory.
+
+The initial history H1 is supplied by the generation mode. After a chunk is committed, an incremental causal constructor updates the retained history and its fixed-shape persistent state Mk without recompressing the complete prefix. Recent chunks remain at native latent granularity while older spans are progressively compressed under a fixed token budget, following recency-structured and learned-memory designs [ 16 , 18 , 19 , 21 – 23 ]. Orbis reads persistent memory as an additional context tier and writes to it only when detailed history is evicted, preventing denoising evaluations from mutating memory implicitly. Multi-chunk training teaches the state to preserve long-range subject and scene cues while suppressing recurrent drift, with active memory and per-chunk cost independent of rollout length [38].  
+
+> Mid-Training.
+
+To strengthen the model’s ability to generate high-quality video, we apply stricter filtering and selection criteria to construct a higher-quality data subset for mid-training. The selected examples emphasize visual fidelity, clear and natural motion, accurate captions, and temporally complete events. The subset is balanced across natural and scientific scenes, people and cultural activity, urban and indoor environments, transport and industrial processes, and creative or digital material. Source groups include professionally captured footage, documentary and educational material, long-form everyday recordings, and diverse mobile or handheld capture conditions. These groups are rebalanced jointly with duration, motion, camera behavior, event density, and language so that the emphasis on quality does not narrow the model to a limited range of visual styles or content. In the first stage, we train on short videos that each contain a single complete event and are paired with a corresponding caption. This single-event training strengthens local image quality, motion naturalness, composition, and prompt following while preserving the history-conditioned objective in Equation (1). The second stage uses the event boundaries and interval-local captions described in Section 2. During event-aligned temporal training , each event condition is activated only over its annotated interval, and successive chunks may receive different instructions within the same continuous video. The model must follow the current event while preserving attributes that should remain stable across the transition. Because these examples extend to 240 seconds, this stage also exposes the model to substantially longer histories, repeated condition changes, and recovery after imperfect intermediate chunks.  
+
+> Long-Horizon Reliability.
+
+Long event-aligned examples establish the temporal curriculum, but duration alone does not expose the model to the imperfect histories encountered during autoregressive generation [ 9, 18 , 39 ]. 
+
+> 6Visko Orbis 1.0
+
+We therefore mix clean histories with two augmentation branches during streaming training. The first corrupts the committed training prefix before both retained history and persistent memory are constructed, using temporally varying degradation, temporal corruption, statistic shifts, and noise [ 16 , 18 ]. The second measures fixed-dimensional drift statistics between generated and reference histories matched by initialization, control schedule, and rollout horizon, then reapplies sampled shifts to clean bounded histories [ 9, 10 ]. Both branches are used only after the first chunk, leave H1, the current clean target, and external conditions unchanged, and are included in the expectation of Equation (1).  
+
+> Fine-Tuning.
+
+The final quality fine-tuning stage starts from clips that pass the strictest data-quality gates. Human reviewers score visual fidelity, motion naturalness, temporal coherence, composition, semantic clarity, subject and background stability, caption correctness, and the clarity of event transitions. Only sequences with an unambiguous, temporally localizable change—such as a person entering the scene, an animal or object appearing, or the camera turning toward a distinct region such as the sky—are retained for event-aligned fine-tuning. Repeated annotation and adjudication are used to construct a compact, high-confidence training subset rather than relying on a single aggregate quality score.  
+
+> Distillation and Reinforcement Learning.
+
+Post-training first reduces inference cost and then aligns the streaming policy with video-quality rewards. We distill a fixed classifier-free-guidance scale into a conditional-only student by matching a frozen teacher’s detached guided prediction at the same noised current-chunk state, causal history, and optional visual condition [ 40 ]. The scale is embedded in the student weights, so inference requires one conditional evaluation without applying classifier-free guidance again. Few-step distillation begins only after the chunk-wise causal architecture has been learned. We first apply endpoint-anchored consistency distillation to states on the same frozen reference probability-flow trajectory, using fixed causal context and an exponential-moving-average target branch [ 41 – 43 ]. We then refine the model with self-forcing DMD on student-generated histories [ 8, 9, 43 ]. At each noised student sample, DMD compares the frozen reference score with an online fake-score model fitted to the student distribution; their difference defines the generator update [ 44 ]. This ordering preserves causal structure before self-generated distribution matching and avoids directly distilling a bidirectional flow map into a causal student [11]. Finally, a frozen old-policy snapshot collects groups of stochastic rollouts for GRPO-style reinforcement learning. Current and old transition likelihoods are evaluated on the same recorded states and realized lower-noise actions under a fixed stochastic-sampler schedule, using the standard clipped objective [ 45 , 46 ]. Visual-quality, motion-quality, and text–video-alignment rewards are normalized separately within each prompt group and combined into a detached relative advantage. Training uses the marginal-preserving stochastic sampler of Flow-GRPO [ 47 ] and the KL-free multi-reward video variant of DanceGRPO [ 48 ]; deployment returns to deterministic flow sampling. Reward optimization remains separate from DMD.  
+
+> Video Super-Resolution.
+
+The native generator produces semantic and motion structure at 832 × 480 . Adedicated single-refinement video super-resolution model transforms each progressively decoded window into 4K output while preserving the motion established by the native generator.  
+
+> Temporal-Consistency Distillation for Super-Resolution.
+
+The high-capacity video autoencoder used by the restoration path is too expensive for the end-to-end real-time budget. We therefore develop a two-stage temporally aware distillation procedure to replace it with a compact student, related to recent work on compressed autoencoders and distilled video-VAE decoders [ 49 –51 ]. Stage A jointly trains the compact encoder and decoder through a native round trip, in which both compact components process the input video, and a cross-latent path, in which the compact decoder receives latents from the high-capacity encoder. Latent regression and cosine alignment bring the compact representation into the teacher latent space, while pixel and DISTS perceptual reconstruction losses preserve spatial detail [52]. Stage B adapts the compact path to the restored latent distribution encountered during super-resolution inference. It first adapts only the compact decoder on restored latents, then fixes that decoder while refining the restoration transformer. The frozen high-capacity teacher and compact student decode the same latent sequence, but the teacher output is used only as a detached target. During transformer refinement, the fixed student decoder remains differentiable with respect to its latent input, so supervision can still reach the 
+
+> 7Visko Orbis 1.0
+
+restoration transformer; all teacher-derived motion and reliability signals remain detached. Spatial supervision combines pixel and DISTS perceptual losses against the high-resolution target with reconstruction toward the detached teacher decode [ 52 ]. Temporal supervision matches adjacent student-frame changes to the teacher and adds occlusion-aware motion-compensated consistency [ 53 , 54 ]. For each adjacent pair, RAFT is evaluated on the reversed detached teacher-frame pair to obtain the target-to-source field used to backward-warp the earlier student frame onto the later frame’s grid [ 55 ]. The corresponding reliability mask is defined on that target grid and broadcast over channels; the residual is averaged over valid pixel-channel entries, with all-invalid transitions omitted. All spatial and temporal terms are averaged over their applicable frames and elements before weighted aggregation. The restoration transformer uses spatial-window attention while retaining all temporal frames inside each window, following the broader use of temporal propagation and transformer attention in video restoration [ 56 –58 ]. These losses are evaluated within a temporal training chunk and do not introduce an autoregressive dependence between super-resolution chunks. This within-chunk design preserves local restoration capacity and full temporal context while making the model compatible with tiled and distributed execution. Super-resolution improves reconstruction and presentation detail; it is not a mechanism for inventing semantic state absent from the native video. Evaluation reports native-generation and delivered-4K evidence separately. 
+
+## 4 Inference 
+
+Visko Orbis 1.0 is served as a continuously active Live Model session. Its inference stack is organized around state reuse, single-stream distributed execution, and progressive video delivery, so that long-form generation and live prompt updates share one steady-state path.  
+
+> Live State and Conditioning.
+
+Each session retains a bounded visual history together with its per-layer History KV Cache, history-context features, rotary-position tensors [ 59 ], and the active text condition. A rolling prompt summary carries established entities, relationships, environment, and style across interactions. New prompts are encoded asynchronously, admitted at the next uncommitted chunk, and guarded by session and prompt versions so that stale work cannot overwrite the current condition. Generic prefix-aware runtimes reuse immutable attention state, while causal video systems reuse history across autoregressive chunks [ 8, 13 , 60 –62 ]. Orbis applies these ideas at separate state lifetimes for text cross-attention K/V, prompt embeddings, and compatible visual history.  
+
+> Compiled Transformer Execution.
+
+The distilled generator requires one conditional transformer evaluation per denoising state. Orbis compiles the fixed-shape transformer as a whole and combines it with fused QKV projection, AdaLN, Q/K normalization, gated residual, and rotary-position kernels; spatial grids, timestep projections, and communication workspaces are precomputed and reused [ 63 –66 ]. The solver further replaces small generic linear-algebra calls with a closed-form UniPC corrector and keeps timestep state on device [ 67 ]. Shape-specific attention selection, calibrated W8A8 execution, BF16 decoding, reusable buffers, and guarded in-place updates reduce memory traffic while retaining higher precision at sensitive boundaries [68, 69].  
+
+> Full-Sequence Multi-GPU Execution.
+
+To reduce the latency of a single active stream, video tokens remain sequence-sharded throughout the transformer stack. Self-attention uses Ulysses-style sequence-to-head redistribution, while residual, feed-forward, cross-attention, and conditioning operations remain local to each shard [62, 70–72]. Q, K, and V are packed into a single all-to-all exchange; fused pack/unpack kernels write directly into reusable communication buffers, and timestep conditioning is materialized only for the local sequence. This full-sequence contract avoids repeatedly reconstructing the global token tensor between blocks and makes parallelism effective for batch-one streaming inference.  
+
+> Progressive Decode and Delivery.
+
+The pixel path uses a tensor-only compiled video decoder with temporal assembly buffers, a convolution-friendly three-dimensional memory layout, and tiled or spatially parallel execution when required. Latent generation, decoding, color conversion, media encoding, and delivery are connected through bounded FIFO queues and device events, allowing each completed temporal group to move downstream without retaining the full video on the GPU. Model weights, compiled graphs, and workspaces 
+
+> 8Visko Orbis 1.0
+
+remain resident across chunks and requests, while asynchronous copies and background media assembly keep host synchronization outside the generation path. Similar decoder and pipeline co-design has become central to recent real-time video systems and block-wise video autoencoders [3, 17, 62, 73].  
+
+> Content-Adaptive Drift Stabilization.
+
+Long rollouts can expose errors that are weak in any individual chunk but accumulate through recurrent history. Orbis therefore provides a conservative set of inference-time controls: training-aligned additive perturbation of selected pre-compression history latents, temporal RoPE scaling, history-attention reweighting, periodic VAE round-trip refresh, segment-local latent-statistics correction, and motion-aware negative-prompt routing. These controls target complementary forms of over-trusted history, motion escalation, and color drift, drawing on the broader literature on noisy causal context, bounded long-video memory, and temporal-frequency adaptation [ 10 , 13 , 18 , 20 , 22 , 39 , 74 ]. Because no fixed combination is safe across people, object, low-motion, and high-motion content, they are organized as content-specific profiles rather than a universal default; the unmodified path remains the correctness and quality reference.  
+
+> Physics-Aware Inference Alignment.
+
+We additionally use a latent-world-model reward to improve physical plausibility at inference time. Following the principle of WMReward [ 75 ], the world model predicts future representations from the visual context and compares them with candidate frames; the resulting predictive-consistency score steers or selects denoising trajectories toward plausible motion and object dynamics.  
+
+> Streaming Super-Resolution.
+
+Native 832 × 480 chunks are converted to 4K by a single-refinement video super-resolution model. A temporally distilled compact autoencoder limits decode cost, while spatial-window attention preserves the complete temporal extent within each restoration window [ 56 –58 ]. Window-shard sequence parallelism, halo-aware tiled decoding, and online merging of distributed softmax statistics provide the corresponding execution path [ 66 , 76 ]. Together with progressive assembly, the generator and super-resolution stages deliver 4K video at 24 FPS without waiting for the complete sequence. 
+
+## 5 Evaluation  
+
+> Evaluation protocol.
+
+We evaluate real-time interactive long-video generation on 74 cases [ 77 , 78 ]. Each case contains six events. Depending on the content richness of the case, each event spans 10, 20, or 30 seconds, yielding videos of approximately one, two, or three minutes, respectively. We score every event against the prompt active during that interval and average each metric across all events in the benchmark.  
+
+> Baselines and metrics.
+
+We compare with representative real-time, autoregressive, and long-video systems: Helios-Base and Helios-Distilled [ 16 ], Self-Forcing [ 9], Rolling-Forcing [ 10 ], Causal-Forcing [ 11 ], LongLive [ 13 ], MemFlow [ 20 ], InfinityStar [ 79 ], and SANA-Video [ 80 ]. Following multidimensional video-evaluation practice, the protocol separates perceptual quality, motion quality, prompt alignment, and distributional diagnostics rather than relying on a single aggregate score [81–83]. DOVER (Disentangled Objective Video Quality Evaluator) [ 84 ] provides no-reference aesthetic and technical quality scores. For VideoAlign/VideoReward [ 85 ], we sample events at two frames per second and obtain unbounded logits for visual quality, motion quality, and text alignment; their sum is the overall reward. For Human Preference Score v3 (HPSv3) [ 86 ], we score seven uniformly sampled frames and report mean and minimum frame rewards. HeliosBench reports semantic alignment from a video-language contrastive encoder, aesthetics from an image-language predictor trained on LAION aesthetic ratings, and net directional motion from signed mean Farnebäck optical flow [ 16 , 87 ]. Motion amplitude is descriptive, with no preferred direction.  
+
+> Quantitative results.
+
+On the prompt-independent dimensions in Table 1, Orbis leads DOVER aesthetic and technical quality (0.8101 and 0.5572) and VideoAlign visual and motion quality (1.5777 and 1.8646). Its HeliosBench aesthetic score, 0.5954, ranks third behind SANA-Video and LongLive. Its HeliosBench motion amplitude, 0.2477, indicates moderate net directional motion and is far below Causal-Forcing’s 1.2283. On the prompt-aware dimensions, Orbis has the largest raw VideoAlign text-alignment logit (0.1043), VideoAlign overall reward (3.5466), and HeliosBench semantic-alignment score (0.2361). Its Human Preference Score v3 frame mean and minimum increase to 8.1018 and 6.9719, respectively, placing both raw values behind SANA-Video and LongLive but ahead of MemFlow. 
+
+> 9
+
+Visko Orbis 1.0 Table 1 Quality, alignment, and motion measurements on the one- to three-minute event-based benchmark. Dark, medium, and pale green mark the first, second, and third raw values in each quality column. Panel B contains prompt-aware metrics; its coloring is descriptive rather than a formal cross-system rank because prompt suites differ. VideoAlign and HPSv3 outputs are unbounded reward logits. Motion is descriptive and has no preferred direction. 
+
+Panel A: Prompt-independent quality and motion 
+
+System DOVER Aesthetic ↑
+
+DOVER Technical ↑
+
+VideoAlign Visual Quality ↑
+
+VideoAlign Motion Quality ↑
+
+HeliosBench Aesthetic ↑
+
+HeliosBench Motion Amplitude Helios-Distilled 0.4989 0.2123 1.3881 1.5714 0.5329 0.1782 Self-Forcing 0.7057 0.3983 1.3739 1.8531 0.5819 0.0456 Helios-Base 0.6606 0.3696 1.3447 1.6186 0.5516 0.1248 SANA-Video 0.7913 0.4752 1.3220 1.7239 0.6153 0.1260 Rolling-Forcing 0.7702 0.4669 1.2826 1.5650 0.5596 0.0894 LongLive 0.8095 0.5166 1.2297 1.6667 0.6016 0.0973 MemFlow 0.7969 0.4986 1.2130 1.6231 0.5842 0.1451 InfinityStar 0.7589 0.4884 1.1905 1.6102 0.5190 0.4516 Causal-Forcing 0.7527 0.4663 1.0799 1.4060 0.5321 1.2283 
+
+Visko Orbis 1.0 0.8101 0.5572 1.5777 1.8646 0.5954 0.2477 
+
+Panel B: Prompt-aware alignment and frame preference 
+
+System VideoAlign Text Alignment ↑
+
+VideoAlign Overall Reward ↑
+
+HPSv3 Frame Mean ↑
+
+HPSv3 Frame Minimum ↑
+
+HeliosBench Semantic Alignment ↑
+
+Helios-Distilled -0.1431 2.8164 3.2673 1.6807 0.1620 Self-Forcing -0.1406 3.0864 5.6802 4.5280 0.1727 Helios-Base -0.1921 2.7711 5.9486 3.8945 0.1996 SANA-Video -0.2201 2.8258 8.4373 7.5114 0.1963 Rolling-Forcing -0.2345 2.6131 7.4059 6.3367 0.1882 LongLive -0.2366 2.6597 8.3717 7.2633 0.2036 MemFlow -0.2445 2.5915 8.0721 6.9502 0.2030 InfinityStar -0.2263 2.5744 4.4570 2.9372 0.1842 Causal-Forcing -0.3137 2.1722 6.3071 3.5434 0.2017 
+
+Visko Orbis 1.0 0.1043 3.5466 8.1018 6.9719 0.2361 
+
+Human preference evaluation. Automated rewards do not fully capture whether a long video remains con-vincing as events change and generation continues [ 83 ]. We therefore complement the metric suite with a randomized side-by-side Arena study, following the multidimensional human-evaluation structure used in recent comprehensive video evaluations and the pairwise Arena protocol [ 3, 81 , 88 ]. The study compares nine systems on both 60-second and 120-second outputs. Raters separately select the stronger video in overall preference, visual fidelity, instruction and event-switch compliance, and temporal stability. We aggregate the pairwise decisions into an Elo-scale rating independently for each dimension and report the point estimates. 
+
+Table 2 Multidimensional human preference on long-form video generation. Elo-scale point estimates are computed independently within each dimension; higher is better. Dark, medium, and pale green mark the first, second, and third scores in each column. 
+
+System Overall Elo ↑
+
+Visual fidelity Elo ↑
+
+Instruction / switch Elo ↑
+
+Temporal stability Elo ↑
+
+VISKO ORBIS 1.0 1838 1843 1711 1940 
+
+HappyOyster [89] 1734 1937 1722 1807 LongLive-2 [62] 1562 1566 1525 1556 Odyssey [90] 1552 1523 1507 1735 PixVerse-R1 [91] 1540 1637 1503 1531 Rolling-Forcing [10] 1382 1333 1376 1419 Helios [16] 1367 1240 1368 1226 Krea Realtime [15] 1323 1293 1420 1169 Causal-Forcing [11] 1262 1270 1377 1238 
+
+10 Visko Orbis 1.0 1200 1300 1400 1500 1600 1700 1800 1900  
+
+> Overall Arena score (Elo)
+> Causal-Forcing
+> Krea Realtime
+> Helios
+> Rolling-Forcing
+> PixVerse-R1
+> Odyssey
+> LongLive-2
+> HappyOyster
+> VISKO ORBIS 1.0
+> 1,262
+> 1,323
+> 1,367
+> 1,382
+> 1,540
+> 1,552
+> 1,562
+> 1,734
+> 1,838
+> Arena reference
+> Figure 4
+
+Overall long-form video Arena point estimates from the human preference study. VISKO ORBIS 1.0 
+
+obtains the highest overall score; Table 2 provides the dimension-level comparison and citations for all baselines. 
+
+Comparative analysis. The human study reveals a complementary pattern to the automated evaluation. Visko Orbis 1.0 obtains the highest point estimates for overall preference and temporal stability, while HappyOyster obtains the highest visual-fidelity score and a narrowly higher instruction score. The separation is largest in temporal stability, where Visko Orbis 1.0 scores 1940 compared with 1807 for the next-ranked system. Together, the dimension-level results suggest that Orbis’s perceived advantage is concentrated in maintaining a coherent long-form viewing experience, while the strongest competing system remains highly competitive on local appearance and instruction compliance. 
+
+## 6 Conclusion 
+
+We presented Visko Orbis 1.0 , a Live Model that reframes video generation from producing bounded clips to sustaining a controllable visual stream. By combining stateful chunk-autoregressive generation with event-aligned training, efficient distillation, progressive decoding, and streaming super-resolution, Visko Orbis 1.0 supports T2V, I2V, video continuation, and in-generation prompt updates, delivering 4K video at 24 FPS with an average visible response below one second in the reported serving configuration. Automated, human-preference, and long-horizon evaluations demonstrate strong visual quality, temporal stability, and interactive control. We hope this work helps advance video generation toward a responsive creative medium that users can direct continuously as it unfolds. 
+
+## Contributors 
+
+Project Leads : Zhengzhong Tu, Jie Yang, Qing Yin 
+
+Data : Siyuan Yang, Xiangbo Gao, Hongyuan Hua, Ryan Cui, Devin Ma 
+
+Pre-training : Xiangbo Gao, Siyuan Yang, Jiongze Yu, Zhengzhong Tu 
+
+Post-training : Ping He, Mingyang Wu, Yuheng Wu, Yushen Zuo 
+
+Evaluation : Ryan Cui, Yushen Zuo, Xiangbo Gao, Ping He, Zhengzhong Tu 
+
+Serving & Inference : Jie Yang, Xiao Jin, Yubo Yuan, Ryan Cui, Devin Ma 
+
+Contact : xiangbogaobarry@gmail.com, info@visko.ai 
+
+> 11
+
+Visko Orbis 1.0 
+
+## References 
+
+[1] T. Brooks, B. Peebles, C. Holmes et al. , “Video generation models as world simulators,” OpenAI Technical Report, https://openai.com/index/video-generation-models-as-world-simulators/, 2024. [2] Google DeepMind, “Veo: Our leading video generation model,” https://deepmind.google/models/veo/, 2024, accessed July 15, 2026. [3] Y. Gao et al. , “Seedance 1.0: Exploring the boundaries of video generation models,” arXiv preprint arXiv:2506.09113 , 2025. [4] Kling Team, “Kling-omni technical report,” arXiv preprint arXiv:2512.16776 , 2025. [5] Wan Team, “Wan: Open and advanced large-scale video generative models,” arXiv preprint arXiv:2503.20314 , 2025. [6] W. Kong et al. , “Hunyuanvideo: A systematic framework for large video generative models,” arXiv preprint arXiv:2412.03603 ,2024. [7] Meituan LongCat Team, X. Cai, Q. Huang, Z. Kang et al. , “Longcat-video technical report,” arXiv preprint arXiv:2510.22200 ,2025. [8] T. Yin, Q. Zhang, R. Zhang, W. T. Freeman, F. Durand, E. Shechtman, and X. Huang, “From slow bidirectional to fast autoregressive video diffusion models,” in Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , 2025, pp. 22 963–22 974. [9] X. Huang, Z. Li, G. He, M. Zhou, and E. Shechtman, “Self forcing: Bridging the train-test gap in autoregressive video diffusion,” arXiv preprint arXiv:2506.08009 , 2025. [10] K. Liu, W. Hu, J. Xu, Y. Shan, and S. Lu, “Rolling forcing: Autoregressive long video diffusion in real time,” arXiv preprint arXiv:2509.25161 , 2025. [11] H. Zhu, M. Zhao, G. He, H. Su, C. Li, and J. Zhu, “Causal forcing: Autoregressive diffusion distillation done right for high-quality real-time interactive video generation,” arXiv preprint arXiv:2602.02214 , 2026. [12] Decart, J. Quevedo, Q. McIntyre, S. Campbell, X. Chen, and R. Wachen, “Oasis: A universe in a transformer,” https: //oasis-model.github.io/, 2024. [13] S. Yang et al. , “Longlive: Real-time interactive long video generation,” arXiv preprint arXiv:2509.22622 , 2025. [14] X. He et al. , “Matrix-game 2.0: An open-source, real-time, and streaming interactive world model,” arXiv preprint arXiv:2508.13009 , 2025. [15] E. Millon, “Krea realtime 14b: Real-time, long-form ai video generation,” https://www.krea.ai/blog/krea-realtime-14b, 2025. [16] S. Yuan, Y. Yin, Z. Li, X. Huang, X. Yang, and L. Yuan, “Helios: Real real-time long video generation model,” arXiv preprint arXiv:2603.04379 , 2026. [17] J. Zhang et al. , “Vidu s1: A real-time interactive video generation model,” arXiv preprint arXiv:2607.03118 , 2026. [18] L. Zhang, S. Cai, M. Li, G. Wetzstein, and M. Agrawala, “Frame context packing and drift prevention in next-frame-prediction video diffusion models,” arXiv preprint arXiv:2504.12626 , 2025. [19] Y. Gu, W. Mao, and M. Z. Shou, “Long-context autoregressive video modeling with next-frame prediction,” arXiv preprint arXiv:2503.19325 , 2025. [20] S. Ji, X. Chen, S. Yang, X. Tao, P. Wan, and H. Zhao, “Memflow: Flowing adaptive memory for consistent and efficient long video narratives,” arXiv preprint arXiv:2512.14699 , 2025. [21] Y. Yu, X. Wu, X. Hu, T. Hu et al. , “Videossm: Autoregressive long video generation with hybrid state-space memory,” 
+
+arXiv preprint arXiv:2512.04519 , 2025. [22] Y. Lu, J. Yang, P. Koniusz, Y. Song, and Y. Yang, “Fademem: Distance-aware memory consolidation for autoregressive video diffusion,” arXiv preprint arXiv:2606.10671 , 2026. [23] Y. Bian, Z. Xue, S. Zhang, S. Zhang et al. , “Echo-infinity: Learning evolving memory for real-time infinite video generation,” 
+
+arXiv preprint arXiv:2606.04527 , 2026. [24] Z. Tu, J. Yang, and Q. Yin, “Introducing live models: A frontier for world models,” Visko Blog, https://www.visko.ai/blog/ introducing-live-models, 2026, july 2026. [25] Y. Wang, Y. He, Y. Li, K. Li et al. , “Internvid: A large-scale video-text dataset for multimodal understanding and generation,” 
+
+arXiv preprint arXiv:2307.06942 , 2023. [26] T.-S. Chen, A. Siarohin, W. Menapace, E. Deyneka et al. , “Panda-70m: Captioning 70m videos with multiple cross-modality teachers,” in Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , 2024. [27] A. Blattmann, T. Dockhorn, S. Kulal, D. Mendelevitch et al. , “Stable video diffusion: Scaling latent video diffusion models to large datasets,” arXiv preprint arXiv:2311.15127 , 2023. [28] Z. Yang, J. Teng, W. Zheng, M. Ding et al. , “Cogvideox: Text-to-video diffusion models with an expert transformer,” in 
+
+International Conference on Learning Representations , 2025. [29] A. Polyak, A. Zohar, A. Brown, A. Tjandra et al. , “Movie gen: A cast of media foundation models,” arXiv preprint arXiv:2410.13720 , 2024. [30] T. Gebru, J. Morgenstern, B. Vecchione, J. W. Vaughan, H. Wallach, H. Daumé III, and K. Crawford, “Datasheets for datasets,” arXiv preprint arXiv:1803.09010 , 2018. [31] M. Pushkarna, A. Zaldivar, and O. Kjartansson, “Data cards: Purposeful and transparent dataset documentation for responsible ai,” in Proceedings of the 2022 ACM Conference on Fairness, Accountability, and Transparency , 2022. [32] T. Souček and J. Lokoč, “Transnet v2: An effective deep network architecture for fast shot transition detection,” arXiv preprint arXiv:2008.04838 , 2020. [33] R. Krishna, K. Hata, F. Ren, L. Fei-Fei, and J. C. Niebles, “Dense-captioning events in videos,” in Proceedings of the IEEE 
+
+12 Visko Orbis 1.0 
+
+International Conference on Computer Vision , 2017. [34] A. Yang, A. Nagrani, P. H. Seo, A. Miech, J. Pont-Tuset, I. Laptev, J. Sivic, and C. Schmid, “Vid2seq: Large-scale pretraining of a visual language model for dense video captioning,” in Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , 2023. [35] X. Ju, Y. Gao, Z. Zhang, Z. Yuan et al. , “Miradata: A large-scale video dataset with long durations and structured captions,” 
+
+arXiv preprint arXiv:2407.06358 , 2024. [36] Y. Lipman, R. T. Q. Chen, H. Ben-Hamu, M. Nickel, and M. Le, “Flow matching for generative modeling,” in International Conference on Learning Representations , 2023. [37] X. Liu, C. Gong, and Q. Liu, “Flow straight and fast: Learning to generate and transfer data with rectified flow,” in 
+
+International Conference on Learning Representations , 2023. [38] W. King, Z. Xue, Y. Bian, J. Huang et al. , “Echo-memory: A controlled study of memory in action world models,” arXiv preprint arXiv:2606.09803 , 2026. [39] B. Chen, D. Marti Monso, Y. Du, M. Simchowitz, R. Tedrake, and V. Sitzmann, “Diffusion forcing: Next-token prediction meets full-sequence diffusion,” in Advances in Neural Information Processing Systems , 2024. [40] C. Meng, R. Rombach, R. Gao, D. Kingma, S. Ermon, J. Ho, and T. Salimans, “On distillation of guided diffusion models,” in Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , 2023, pp. 14 297–14 306. [41] Y. Song, P. Dhariwal, M. Chen, and I. Sutskever, “Consistency models,” in International Conference on Machine Learning ,2023. [42] K. Zheng, Y. Wang, Q. Ma, H. Chen, J. Zhang, Y. Balaji, J. Chen, M.-Y. Liu, J. Zhu, and Q. Zhang, “Large scale diffusion distillation via score-regularized continuous-time consistency,” in International Conference on Learning Representations ,2026. [Online]. Available: https://openreview.net/forum?id=2uNlM353RI [43] K. Zheng, G. He, M. Zhao, J. Zhang, H. Chen, J. Chen, C.-H. Lin, M.-Y. Liu, J. Zhu, and Q. Ma, “Causal-rcm: Aunified teacher-forcing and self-forcing open recipe for autoregressive diffusion distillation in streaming video generation and interactive world models,” arXiv preprint arXiv:2606.25473 , 2026. [44] T. Yin, M. Gharbi, R. Zhang, E. Shechtman, F. Durand, W. T. Freeman, and T. Park, “One-step diffusion with distribution matching distillation,” in Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , 2024, pp. 6613–6623. [45] Z. Shao, P. Wang, Q. Zhu, R. Xu et al. , “Deepseekmath: Pushing the limits of mathematical reasoning in open language models,” arXiv preprint arXiv:2402.03300 , 2024. [46] J. Schulman, F. Wolski, P. Dhariwal, A. Radford, and O. Klimov, “Proximal policy optimization algorithms,” arXiv preprint arXiv:1707.06347 , 2017. [47] J. Liu, G. Liu, J. Liang, Y. Li, J. Liu, X. Wang, P. Wan, D. Zhang, and W. Ouyang, “Flow-grpo: Training flow matching models via online rl,” arXiv preprint arXiv:2505.05470 , 2025. [48] Z. Xue, J. Wu, Y. Gao, F. Kong, L. Zhu, M. Chen, Z. Liu, W. Liu, Q. Guo, W. Huang, and P. Luo, “Dancegrpo: Unleashing grpo on visual generation,” arXiv preprint arXiv:2505.07818 , 2025. [49] J. Chen, H. Cai, J. Chen, E. Xie, S. Yang, H. Tang, M. Li, Y. Lu, and S. Han, “Deep compression autoencoder for efficient high-resolution diffusion models,” arXiv preprint arXiv:2410.10733 , 2024. [50] Y. Zou, J. Yao, S. Yu, S. Zhang, W. Liu, and X. Wang, “Turbo-vaed: Fast and stable transfer of video-vaes to mobile devices,” arXiv preprint arXiv:2508.09136 , 2025. [51] L. Zhu, Y. Huang, X. Ge, Y. Xue et al. , “Flash-vaed: Plug-and-play vae decoders for efficient video generation,” arXiv preprint arXiv:2602.19161 , 2026. [52] K. Ding, K. Ma, S. Wang, and E. P. Simoncelli, “Image quality assessment: Unifying structure and texture similarity,” IEEE Transactions on Pattern Analysis and Machine Intelligence , 2021. [53] M. S. M. Sajjadi, R. Vemulapalli, and M. Brown, “Frame-recurrent video super-resolution,” in Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition , 2018, pp. 6626–6634. [54] M. Chu, Y. Xie, J. Mayer, L. Leal-Taixé, and N. Thuerey, “Learning temporal coherence via self-supervision for gan-based video generation,” ACM Transactions on Graphics , 2020. [55] Z. Teed and J. Deng, “RAFT: Recurrent all-pairs field transforms for optical flow,” in European Conference on Computer Vision , 2020. [56] J. Liang, J. Cao, Y. Fan, K. Zhang, R. Ranjan, Y. Li, R. Timofte, and L. Van Gool, “VRT: A video restoration transformer,” 
+
+arXiv preprint arXiv:2201.12288 , 2022. [57] J. Liang, Y. Fan, X. Xiang, R. Ranjan, E. Ilg, S. Green, J. Cao, K. Zhang, R. Timofte, and L. Van Gool, “Recurrent video restoration transformer with guided deformable attention,” in Advances in Neural Information Processing Systems , 2022. [58] K. C. K. Chan, S. Zhou, X. Xu, and C. C. Loy, “BasicVSR++: Improving video super-resolution with enhanced propagation and alignment,” in Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , 2022, pp. 5972–5981. [59] J. Su, Y. Lu, S. Pan, A. Murtadha, B. Wen, and Y. Liu, “Roformer: Enhanced transformer with rotary position embedding,” 
+
+arXiv preprint arXiv:2104.09864 , 2021. [60] I. Gim, G. Chen, S.-s. Lee, N. Sarda, A. Khandelwal, and L. Zhong, “Prompt cache: Modular attention reuse for low-latency inference,” arXiv preprint arXiv:2311.04934 , 2023. [61] L. Zheng, L. Yin, Z. Xie, C. Sun, J. Huang, C. H. Yu, S. Cao, C. Kozyrakis, I. Stoica, J. E. Gonzalez, C. Barrett, and Y. Sheng, “SGLang: Efficient execution of structured language model programs,” arXiv preprint arXiv:2312.07104 , 2024. 
+
+> 13 Visko Orbis 1.0
+
+[62] Y. Chen, L. Wang, W. Huang, S. Yang, B. Zhang, Y. Xiao, R. Chu, W. Mao, Q. Hu, S. Liu, Y. Zhao, H. Mao, Y.-C. Chen, E. Xie, X. Qi, and S. Han, “Longlive-2.0: An nvfp4 parallel infrastructure for long video generation,” arXiv preprint arXiv:2605.18739 , 2026. [63] T. Chen, T. Moreau, Z. Jiang, L. Zheng, E. Yan, H. Shen, M. Cowan, L. Wang, Y. Hu, L. Ceze, C. Guestrin, and A. Krishnamurthy, “TVM: An automated end-to-end optimizing compiler for deep learning,” in 13th USENIX Symposium on Operating Systems Design and Implementation , 2018, pp. 578–594. [64] P. Tillet, H. T. Kung, and D. Cox, “Triton: An intermediate language and compiler for tiled neural network computations,” in Proceedings of the 3rd ACM SIGPLAN International Workshop on Machine Learning and Programming Languages ,2019, pp. 10–19. [65] J. Ansel, E. Yang, H. He, N. Gimelshein, A. Jain, M. Voznesensky, B. Bao, P. Bell, D. Berard, E. Burovski et al. , “PyTorch 2: Faster machine learning through dynamic python bytecode transformation and graph compilation,” in Proceedings of the 29th ACM International Conference on Architectural Support for Programming Languages and Operating Systems, Volume 2, 2024, pp. 929–947. [66] T. Dao, “Flashattention-2: Faster attention with better parallelism and work partitioning,” in International Conference on Learning Representations , 2024. [67] W. Zhao, L. Bai, Y. Rao, J. Zhou, and J. Lu, “UniPC: A unified predictor-corrector framework for fast sampling of diffusion models,” arXiv preprint arXiv:2302.04867 , 2023. [68] G. Xiao, J. Lin, M. Seznec, H. Wu, J. Demouth, and S. Han, “Smoothquant: Accurate and efficient post-training quantization for large language models,” in International Conference on Machine Learning , 2023. [69] T. Zhao, T. Fang, E. Liu, R. Wan, W. Soedarmadji, S. Li, Z. Lin, G. Dai, S. Yan, H. Yang, X. Ning, and Y. Wang, “ViDiT-Q: Efficient and accurate quantization of diffusion transformers for image and video generation,” in International Conference on Learning Representations , 2025. [70] S. A. Jacobs, M. Tanaka, C. Zhang, M. Zhang, S. L. Song, S. Rajbhandari, and Y. He, “Deepspeed ulysses: System optimizations for enabling training of extreme long sequence transformer models,” arXiv preprint arXiv:2309.14509 , 2023. [71] J. Fang and S. Zhao, “USP: A unified sequence parallelism approach for long context generative ai,” arXiv preprint arXiv:2405.07719 , 2024. [72] J. Fang, J. Pan, X. Sun, A. Li, and J. Wang, “xDiT: An inference engine for diffusion transformers with massive parallelism,” 
+
+arXiv preprint arXiv:2411.01738 , 2024. [73] Z. Li, B. Lin, Y. Ye, L. Chen, X. Cheng, S. Yuan, and L. Yuan, “Wf-vae: Enhancing video vae by wavelet-driven energy flow for latent video diffusion model,” arXiv preprint arXiv:2411.17459 , 2024. [74] M. Zhao, G. He, Y. Chen, H. Zhu, C. Li, and J. Zhu, “RIFLEx: A free lunch for length extrapolation in video diffusion transformers,” arXiv preprint arXiv:2502.15894 , 2025. [75] J. Yuan, X. Zhang, F. Friedrich, N. Beltran-Velez, M. Hall, R. Askari-Hemmat, X. Han, N. Ballas, M. Drozdzal, and A. Romero-Soriano, “Inference-time physics alignment of video generative models with latent world models,” arXiv preprint arXiv:2601.10553 , 2026. [76] M. Milakov and N. Gimelshein, “Online normalizer calculation for softmax,” arXiv preprint arXiv:1805.02867 , 2018. [77] X. Feng et al. , “Narrlv: Towards a comprehensive narrative-centric evaluation for long video generation models,” arXiv preprint arXiv:2507.11245 , 2025. [78] J. Chen, Q. Chen, J. Zhang, Y. Wu et al. , “Directorbench: Diagnosing long-form video generation with personalized multi-agent evaluation,” arXiv preprint arXiv:2605.30090 , 2026. [79] J. Liu, J. Han, B. Yan, H. Wu, F. Zhu, X. Wang, Y. Jiang, B. Peng, and Z. Yuan, “Infinitystar: Unified spacetime autoregressive modeling for visual generation,” arXiv preprint arXiv:2511.04675 , 2025. [80] J. Chen, Y. Zhao, J. Yu et al. , “Sana-video: Efficient video generation with block linear diffusion transformer,” arXiv preprint arXiv:2509.24695 , 2025. [81] Z. Huang, F. Zhang, X. Xu et al. , “Vbench++: Comprehensive and versatile benchmark suite for video generative models,” 
+
+arXiv preprint arXiv:2411.13503 , 2024. [82] Y. Liu, X. Cun, X. Liu, X. Wang, Y. Zhang, H. Chen, Y. Liu, T. Zeng, R. Chan, and Y. Shan, “Evalcrafter: Benchmarking and evaluating large video generation models,” in Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , 2024. [83] Y. Liu, L. Li, S. Ren, R. Gao, S. Li, S. Chen, X. Sun, and L. Hou, “Fetv: A benchmark for fine-grained evaluation of open-domain text-to-video generation,” in Advances in Neural Information Processing Systems Datasets and Benchmarks Track , 2023. [84] H. Wu, E. Zhang, L. Liao, C. Chen, J. Hou, A. Wang, W. Sun, Q. Yan, and W. Lin, “Exploring video quality assessment on user generated contents from aesthetic and technical perspectives,” in Proceedings of the IEEE/CVF International Conference on Computer Vision , 2023, pp. 20 144–20 154. [85] J. Liu, G. Liu, J. Liang, Z. Yuan, X. Liu, M. Zheng, X. Wu, Q. Wang, W. Qin, M. Xia, X. Wang, X. Liu, F. Yang, P. Wan, D. Zhang, K. Gai, Y. Yang, and W. Ouyang, “Improving video generation with human feedback,” arXiv preprint arXiv:2501.13918 , 2025. [86] Y. Ma, Y. Shui, X. Wu, K. Sun, and H. Li, “HPSv3: Towards wide-spectrum human preference score,” arXiv preprint arXiv:2508.03789 , 2025. [87] G. Farnebäck, “Two-frame motion estimation based on polynomial expansion,” in Scandinavian Conference on Image Analysis , 2003, pp. 363–370. [88] W.-L. Chiang, L. Zheng, Y. Sheng, A. N. Angelopoulos et al. , “Chatbot arena: An open platform for evaluating llms by 
+
+> 14 Visko Orbis 1.0
+
+human preference,” in International Conference on Machine Learning , 2024. [89] Alibaba ATH, “Happy oyster: Real-time world model for interactive creation,” https://www.happyoyster.com/home, 2026, accessed July 28, 2026. [90] Odyssey Team, “Introducing odyssey-2: A general-purpose world model,” https://odyssey.ml/introducing-odyssey-2, 2025, accessed July 28, 2026. [91] PixVerse, “Pixverse launches r1: A real-time world model that redefines ai video generation,” https://pixverse.ai/en/blog/ pixverse-launches-r1-real-time-world-model, 2026, accessed July 28, 2026.

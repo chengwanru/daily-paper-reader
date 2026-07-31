@@ -1,0 +1,630 @@
+Title: LeapBot-WA: World-Anchor Action Models via Predictive Latent Alignments
+
+URL Source: https://arxiv.org/pdf/2607.23969v2
+
+Published Time: Fri, 31 Jul 2026 01:15:58 GMT
+
+Number of Pages: 18
+
+Markdown Content:
+# LeapBot-WA: World-Anchor Action Models via Predictive Latent Alignments 
+
+# Pei Liu 1,2∗, Nan Zheng 3∗, Lang Zhang 3∗† , Daojie PENG 1, Yanan Zhang 3, Feilong Kong 4, Mingyue Feng 3, Jiachao Liu 3, Yaonong Wang 3, Qifeng Chen 2, Jun Ma 1,2‡
+
+> 1
+
+The Hong Kong University of Science and Technology (Guangzhou) 
+
+> 2
+
+The Hong Kong University of Science and Technology 
+
+> 3
+
+Leapmotor 
+
+> 4
+
+Southeast University 
+
+Abstract 
+
+World Action Models (WAMs) have emerged as a power-ful paradigm for embodied intelligence, yet the prevailing reliance on pixel-level video generation creates a fundamen-tal bottleneck. Forcing models to reconstruct task-irrelevant visual details dissipates representational capacity and ren-ders policies vulnerable to visual distractors. In this pa-per, we propose LeapBot-WA, which establishes a novel Predictive-Latent paradigm for WAMs by operationalizing the Joint-Embedding Predictive Architecture (JEPA) as a World-Anchor. Departing from the traditional reliance on visual syn-thesis, LeapBot-WA shifts the core of world modeling to Pre-dictive Semantic Alignment, extracting abstract physical dy-namics directly within a latent foundation space. To bridge the modality gap between non-Gaussian predictive features and diffusion priors, we introduce the Isotropic Semantic Au-toencoder (ISAE), which reshapes the anchor’s latent space into a diffusion-friendly manifold to prevent off-manifold drift. Furthermore, we design an Asymmetric Mixture-of-Transformers (MoT) architecture. During training, an Anchor Diffusion Transformer acts as a privileged dynamics expert to guide the Action Diffusion Transformer; at inference, this heavy dynamics branch is pruned, enabling zero-overhead ex-ecution. LeapBot-WA achieves state-of-the-art performance among predictive models on LIBERO and matches top-tier generative WAMs on RoboTwin 2.0 without requiring large-scale trajectory pre-training. It further demonstrates superior zero-shot robustness to unseen environments and successful real-world transfer, establishing a highly efficient and robust latent-centric paradigm for scalable robotic control. Code: https://github.com/LeapWM/leapbot-wa. 
+
+# Introduction 
+
+A cornerstone of general-purpose embodied intelligence is the ability to anticipate how the physical environment evolves under an agent’s actions. This predictive capability has driven a growing line of research on world models (WMs), which learn predictive representations of environment dynamics to support planning and control (LeCun et al. 2022; Hafner 
+
+> ∗
+
+These authors contributed equally. 
+
+> †
+
+Project leader. 
+
+> ‡
+
+Corresponding author. Copyright © © All rights reserved. 
+
+et al. 2023). In robotic manipulation, this idea has recently evolved into world action models (WAMs), which couple predictive world modeling with action generation in a single framework (Li et al. 2025c; Ye et al. 2026). By learning from videos and robot trajectories, these models offer a promising path toward scalable policy learning with richer physical priors than purely reactive imitation. Most existing WAMs, however, remain rooted in a design choice inherited from video generation: they learn dynamics by predicting future visual observations. Whether through explicit future-frame synthesis or latent codes optimized to reconstruct video, the dominant training paradigm still treats world modeling as a pixel-level rendering problem (Wang et al. 2024b, 2026b). This generative approach is funda-mentally misaligned with the core objective of manipula-tion. To act well, an agent does not need to reproduce tex-tures, shadows, lighting, or background appearance; it needs abstract knowledge of how the world changes under inter-vention (Hansen, Su, and Wang 2024; Bardes et al. 2024). Forcing models to allocate massive representational capac-ity to task-irrelevant high-frequency visual details entangles physical dynamics with visual idiosyncrasies. Consequently, policies learned in this way suffer from severe representa-tion waste and exhibit catastrophic vulnerability to visual distractors, struggling to generalize across novel environ-ments (Gupta et al. 2024; Yang, Finn, and Sadigh 2025). Recent efforts have begun to relax this dependence on explicit rendering by moving world-action modeling into compressed latent spaces (Yuan et al. 2026b; Luo et al. 2026b; Chen et al. 2026). Yet, they reveal a deeper unre-solved challenge: what representation space should a world action model be trained in? Moving from pixels to latent codes reduces the burden of reconstruction, but compact-ness alone does not guarantee semantic abstraction or align-ment with action-relevant dynamics (Majumdar et al. 2023). Furthermore, directly injecting off-the-shelf predictive rep-resentations into diffusion-based world models introduces a severe distribution mismatch (Zhang et al. 2025a). Predictive features are highly structured and typically non-Gaussian, whereas diffusion models require isotropic priors to ensure stable flow matching. This modality gap often causes off-manifold drift, destabilizing the denoising trajectory (Esser et al. 2024). Finally, existing frameworks tightly couple arXiv:2607.23969v2 [cs.RO] 30 Jul 2026 world-modeling with policy execution. This architectural en-tanglement forces the policy to rely on the generative branch during deployment, leaving the agent highly vulnerable to vi-sual distractors and domain shifts (Stone et al. 2021; Hansen and Wang 2021). To overcome these limitations, we propose LeapBot-WA, a predictive-latent framework built on the insight that scalable world-action modeling requires shifting the focus from visual rendering to Predictive Semantic Alignment through a tripar-tite strategy involving semantic representation, generative distribution, and inference execution. First, to align semantic representations, we establish a Predictive Anchor framework by leveraging the Joint-Embedding Predictive Architecture (JEPA) as a large-scale predictive foundation model to ex-tract abstract physical dynamics from robotic trajectories, ensuring the policy focuses on underlying state transitions rather than task-irrelevant appearance. Second, to align gen-erative distributions, we introduce the Isotropic Semantic Au-toencoder (ISAE) to bridge the modality gap between struc-tured, non-Gaussian predictive features and isotropic diffu-sion priors, thereby preventing off-manifold drift during joint flow matching. Third, to align inference execution, we de-sign an Asymmetric Mixture-of-Tokens (MoT) architecture where an intent-conditioned Anchor Diffusion Transformer (DiT) guides the Action DiT during training. This design el-egantly decouples world-model imagination from execution, allowing the heavy-dynamics branch to be omitted during inference for zero-overhead action generation. Our evalu-ation across diverse robotic manipulation benchmarks and challenging visual settings demonstrates that high-quality action policies do not require pixel-level world generation. LeapBot-WA achieves state-of-the-art performance among predictive models on LIBERO and matches the success rates of top-tier generative WAMs on RoboTwin 2.0, notably without requiring large-scale trajectory pre-training. Beyond benchmark superiority, it demonstrates exceptional zero-shot robustness to unseen environments and visual distractors, while facilitating seamless real-world transfer. These results establish that highly efficient and robust embodied intelli-gence can be achieved by prioritizing latent-space dynamics over pixel-level synthesis. Our main contributions are sum-marized as follows: 
+
+• Predictive-Latent Semantic Alignment: We propose LeapBot-WA, a paradigm shift that circumvents the re-liance on pixel-level video pre-training. By establishing a Predictive Anchor, we successfully transfer and adapt uni-versal physical priors from predictive foundation models to robotic control, extracting abstract dynamics without the burden of visual reconstruction. 
+
+• Diffusion-Friendly Semantic Autoencoding: We iden-tify the fundamental modality gap between non-Gaussian predictive features and diffusion priors. To bridge this, we propose the ISAE, which reshapes the anchor’s latent space into an isotropic manifold, making high-level se-mantic priors generative-ready for stable action synthesis. 
+
+• Asymmetric Latent Dynamics Distillation: We design an Asymmetric MoT architecture that decouples dynam-ics modeling from policy execution. By using an Anchor DiT as a privileged expert to guide the Action DiT during training, LeapBot-WA achieves state-of-the-art manipu-lation performance and unprecedented zero-shot robust-ness, while enabling zero-overhead inference at deploy-ment. 
+
+# Related Work 
+
+Vision-Language-Action Models 
+
+Vision-Language-Action (VLA) architectures translate mul-timodal sensory inputs into executable policies by leverag-ing semantic priors from large-scale pretraining (Black et al. 2024, 2025; Bu et al. 2025). Recent developments empha-size diffusion-based policy heads for continuous control (Luo et al. 2025; Black et al. 2025; Wen et al. 2025) and intermedi-ate reasoning structures to enhance manipulation (Clark et al. 2025; Li et al. 2025a; Lee et al. 2025). Despite their gener-alization across diverse scenarios (Wang et al. 2024a; Zhang et al. 2025b; Luo et al. 2026a; Feng et al. 2025a), standard VLAs remain primarily reactive agents that lack an explicit understanding of environment evolution. LeapBot-WA ad-dresses this by injecting predictive physical dynamics into the policy through asymmetric distillation. This approach endows the agent with temporal foresight during training while maintaining the efficient inference profile of standard VLAs. 
+
+World Action Models 
+
+World Action Models (WAMs) integrate predictive environ-mental dynamics into the policy learning pipeline (Team et al. 2026; Luo et al. 2026b). Most existing WAMs are pixel-centric, using video generation as visual priors or co-generating future frames alongside actions (Pai et al. 2025; Feng et al. 2025b; Liao et al. 2025; Li et al. 2025b; Zhu et al. 2025; Liang et al. 2025). While some frameworks facilitate model-based planning (Bi et al. 2026; Kim et al. 2026; Li et al. 2026) or decouple the rendering branch during deploy-ment to reduce overhead (Yuan et al. 2026b; Hu et al. 2024), they still require pixel-level reconstruction during training. This reliance leads to significant representational waste on task-irrelevant visual details. LeapBot-WA departs from this paradigm by shifting world-modeling into the predictive se-mantic space of a fine-tuned foundation model. We replace pixel co-generation with asymmetric latent dynamics distilla-tion, achieving a fully-latent framework that bypasses visual reconstruction in both training and deployment. 
+
+# Methodology 
+
+Framework Overview 
+
+As illustrated in Fig. 1, LeapBot-WA is a predictive-latent WAM that maps raw observations to control actions through a dual-pathway architecture. To circumvent the representa-tion bottleneck of pixel-level generation, our framework is grounded in Predictive Semantic Alignment. The architec-ture consists of two primary components: a representation pipeline driven by a Predictive Anchor and a generative pipeline driven by an Asymmetric MoT. Figure 1: Overview of LeapBot-WA. Visual observations are processed by a Predictive Anchor (fine-tuned JEPA) and com-pressed by an ISAE into a diffusion-friendly latent space. During joint flow-matching, an Asymmetric MoT decouples world modeling from policy execution. The Anchor DiT predicts semantic evolution and distills these dynamics into the Action DiT via asymmetric masked attention. Crucially, this heavy dynamics branch is omitted at inference for zero-overhead execution. First, we employ a Predictive Anchor, a large-scale predic-tive foundation model adapted to robotic data, to extract high-level semantic tokens representing the underlying physics of the scene. This enables cross-domain knowledge transfer, directly injecting universal physical priors into the control loop without the burden of visual reconstruction. To make these highly structured predictive features compatible with downstream diffusion processes, an ISAE compresses the tokens into a diffusion-friendly latent space, effectively dis-tilling general-purpose world knowledge into a task-relevant manifold. Second, building upon this latent space, LeapBot-WA employs an Asymmetric MoT comprising an Anchor DiT and an Action DiT. During training, the Anchor DiT serves as a privileged dynamics expert that predicts the temporal evolution of the semantic latents. Through an asymmetric masked attention mechanism, these forward-looking, action-relevant dynamics are distilled into the Action branch. This decoupled design allows the policy to inherit sophisticated world-model capabilities during training, while permitting the heavy dynamics branch to be omitted during inference for zero-overhead execution. Formally, we formulate the robot’s policy as a condi-tional distribution over the joint semantic-action space. Given multi-view observations o, language instruction l, and pro-prioceptive state s, we define the semantic latent z and the shared context c as: 
+
+z = ISAE(Φ JEPA (o)) , c = Ψ enc (l, s ), (1) where ΦJEPA denotes the Predictive Anchor. LeapBot-WA optimizes a joint diffusion objective that couples the action trajectory a with the semantic evolution z, ensuring the de-rived policy is physically grounded by the anchor’s predictive priors. 
+
+Diffusion-Friendly Semantic Autoencoding 
+
+A fundamental challenge in our framework is the inherent modality gap between predictive representations and dif-fusion priors. Frozen JEPA features are high-dimensional, strongly structured, and typically non-Gaussian. Conversely, diffusion models require compact latent spaces with isotropic Gaussian priors for stable flow-matching. Directly injecting raw JEPA tokens as diffusion states introduces severe distri-bution mismatch, leading to off-manifold drift that destabi-lizes the denoising trajectory. To bridge this gap, as shown in Fig. 2, we introduce an ISAE that compresses JEPA features into a diffusion-friendly latent space while strictly preserving action-relevant seman-tic structures. Given semantic tokens F(v) from camera view 
+
+v, the encoder predicts a Gaussian posterior: 
+
+μ, log σ2 = Enc ϕ(F(v)), z(v) ∼ N (μ, σ2), (2) and the decoder reconstructs the original semantic tokens: 
+
+ˆF(v) = Dec ψ (z(v)). (3) The ISAE is optimized via a tripartite objective. Inspired by recent findings that both magnitude and direction are crucial for aligning representation encoders with generative models (Zhang et al. 2025a), we employ a semantic-aware reconstruction loss: 
+
+Lrec = ∥ ˆF − F∥22 + λcos · E
+
+h
+
+1 − cos( ˆF, F)
+
+i
+
+. (4) Second, a standard Kullback-Leibler (KL) divergence term regularizes the posterior toward a standard Gaussian prior: 
+
+LKL = DKL (qϕ(z | F) ∥ N (0, I)) . (5) Crucially, while the KL term encourages a Gaussian prior, it is often insufficient to prevent dimensional collapse or Figure 2: Architecture of the ISAE. The semantic autoen-coder compresses and reconstructs frozen JEPA features to preserve predictive structures, while the joint regularization (LKL + Liso ) reshapes the non-Gaussian posterior into an isotropic Gaussian prior, allowing these semantic represen-tations to be seamlessly integrated into downstream diffusion models. anisotropy in highly structured semantic spaces. To explicitly enforce the isotropic geometry required by our joint diffusion process, we introduce a Sliced Isotropic Gaussian Regular-ization (SIGReg) term (Kolouri et al. 2018). This regularizer penalizes deviations of the aggregate latent distribution from strict isotropy across random 1D projections: 
+
+Liso = RSIGReg (z). (6) The resulting training objective for the ISAE is formulated as: 
+
+LISAE = Lrec + β LKL + λiso Liso . (7) 
+
+View-Aware Residual Conditioning 
+
+The shared-weight ISAE projects multi-view observations into a unified, homogeneous feature space without explicit camera priors. However, downstream multi-view dynamics modeling still requires knowledge of camera identity. With-out such information, tokens from different views may be-come ambiguously aligned, making it difficult for the model to reason about geometry and correspondence across view-points. To retain multi-view spatial awareness without breaking the symmetric encoding, we introduce view residuals directly at the input of the Anchor DiT. Specifically, at each denoising step t, a learnable view-specific residual is added to the cor-responding noisy latent tokens before they are processed by the transformer blocks. Given a noisy semantic latent z(v),t 
+
+at diffusion step t, we compute 
+
+h(v) = Proj 
+
+
+
+Norm( z(v),t )
+
+
+
++ e(v)view , (8) where e(v)view is a learned embedding associated with view 
+
+v. Spatiotemporal positional encoding is then applied sepa-rately. This decomposition allows semantic content, camera identity, and diffusion conditioning to play distinct roles in the downstream transformer. 
+
+Intent-Conditioned Dynamics Modeling 
+
+To model the temporal evolution of the environment, we in-troduce the Anchor DiT branch, which operates exclusively 
+
+Figure 3: Asymmetric MoT denoising. The Anchor DiT is prevented from attending to action tokens, while the Ac-tion DiT attends to both action and semantic representations through asymmetric masked attention. within the diffusion-friendly ISAE latent space. The primary objective of this branch is to anticipate the future seman-tic states of the world. Bypassing the representation bottle-neck of pixel-level video generation, which forces models to reconstruct task-irrelevant visual details such as lighting and background textures, the Anchor DiT focuses strictly on the abstract, action-relevant dynamics of the scene (e.g., the topological changes of a cloth being folded). Crucially, we formulate this branch as an intent-conditioned world model. It is explicitly conditioned on the shared context tokens c, which encapsulate the high-level language instruction and the current proprioceptive state, but operates entirely independently of the target action trajectory 
+
+a. By deliberately depriving the world model of step-by-step low-level motor commands, we prevent the semantic rep-resentations from collapsing into trivial control shortcuts. Instead, the model is forced to learn a generalized, intent-driven physical prior. It learns to imagine the high-level se-mantic consequences of a given task based solely on the robot’s current physical configuration. This yields a robust, forward-looking predictive representation that serves as an ideal privileged guidance signal for the downstream Action DiT. 
+
+Asymmetric Latent Dynamics Distillation 
+
+To transfer the abstract dynamics from the intent-conditioned world model to the control policy, we propose an asymmetric distillation mechanism that jointly denoises semantic states and actions. Let z denote the semantic latent sequence, c
+
+the shared context tokens, and a the action sequence. During training, semantic and action sequences are independently corrupted with flow-matching noise at a shared diffusion timestep t:
+
+zt = (1 − t)z + tϵz , at = (1 − t)a + tϵa, (9) where ϵz , ϵa ∼ N (0, I).As illustrated in Fig. 3, the noisy semantic and action tokens are processed by the Anchor DiT and Action DiT within the Asymmetric MoT architecture. The key design is an asymmetric masked interaction. Formally, let H(ℓ) 
+
+> s
+
+and 
+
+H(ℓ) 
+
+> a
+
+denote the semantic and action tokens at layer ℓ, and define the concatenated tokens: 
+
+H(ℓ) = [ H(ℓ) 
+
+> s
+
+; H(ℓ) 
+
+> a
+
+]. (10) We apply a joint masked self-attention: 
+
+Attn asym (H(ℓ)) = Softmax 
+
+ QK ⊤
+
+√d + M
+
+
+
+V, (11) where the asymmetric mask M blocks the Anchor DiT from attending to action tokens while preserving the Action DiT’s attention to semantic tokens. Both streams then condition on the shared context tokens c via standard cross-attention. Full block definitions, including AdaLN modulation and po-sitional encoding, are deferred to the Appendix. This asymmetric masking induces an elegant hierarchical control structure. The Anchor DiT (acting as the keys and val-ues) functions as a visionary that dreams the goal-directed future, preserving its intent-driven purity. By contrast, the Action DiT (acting as the query) functions as an inverse controller, continuously reading these semantic representa-tions to ground its motor commands in physically plausible dynamics. We optimize the model with modality-specific flow-matching objectives: 
+
+Ltrain = λaLaction + λsLsemantic + λf Lfuture , (12) where Laction and Lsemantic are velocity prediction losses for the Action and Anchor DiTs, respectively. Optionally, we include a future semantic prediction loss 
+
+Lfuture = SmoothL1(LN(ˆ zfuture ), LN( zfuture )) , (13) which encourages the Anchor DiT to remain grounded in forward-looking dynamics. At inference time, we bypass future semantic imagination. Instead of discarding semantic representations entirely, we compute semantic tokens once from the current observation 
+
+o0 and retain them as an expert cache: 
+
+Hs, cache = fsem (o0, c). (14) The Action DiT then generates actions by attending to this static semantic cache together with the shared context. This preserves semantic guidance while completely omitting the heavy dynamics branch, enabling zero-overhead execution at deployment. 
+
+# Experiments 
+
+Experimental Setup 
+
+Datasets and Benchmarks RoboTwin 2.0: To assess bi-manual coordination, we employ RoboTwin 2.0, which fea-tures 50 dual-arm tasks. We train a multi-task policy on a mixed dataset of 27.5K clean and randomized demonstra-tions. Robustness is rigorously measured by testing the model Table 1: Quantitative results on the RoboTwin 2.0 bench-mark. Models are evaluated across VLAs and WAMs, with their embodied pre-training (PT) status indicated. Despite be-ing trained without large-scale robot trajectory pre-training, LeapBot-WA achieves competitive performance with SOTA WAMs and significantly outperforms many pre-trained VLA baselines, demonstrating the efficiency of our world-anchor alignment mechanism.                                                         
+
+> Model Embodied PT. Clean Randomized Avg.
+> VLAs
+> π0✓65.90 58.40 62.15 X-VLA ✓72.80 72.84 72.82
+> π0.5✓82.70 76.80 79.75 ABot-M0 ✓86.06 85.08 85.57 Qwen-VLA ✓86.10 87.20 86.65 HoloBrain-0 ✓91.90 92.30 92.10 AttenA+ ✓93.10 91.90 92.50 Qwen-RobotManip ✓93.70 94.00 93.85
+> WAMs
+> JEPA-VLA ✗73.50 17.70 45.60 Being-H0.7 ✓90.20 89.60 89.90 Fast-WAM ✗91.90 91.80 91.85 Lingbot-VA ✓92.93 91.55 92.24 LeapBot-WA ✗91.04 92.48 91.76
+
+independently in both clean and heavily randomized visual environments. 
+
+LIBERO & LIBERO-plus: We evaluate manipulation performance on LIBERO and its robustness extension LIBERO-plus across 40 tasks. Following standard proto-cols, we train on expert trajectories and aggregate results over 2,000 evaluation episodes. We measure visual resilience through zero-shot transfer under systematic environmental perturbations. 
+
+Real-World Deployment: We deploy the framework on a UR5 robot arm for pick-and-place tasks. This setup tests generalization to physical objects such as various fruits and containers under unconstrained lighting. These experiments emphasize the sim-to-real capabilities of the model in com-plex physical environments. 
+
+Implementation Details The LeapBot-WA architecture comprises a Predictive Anchor, initialized with V-JEPA 2.1 and fine-tuned on robotic trajectories, an ISAE bottleneck, and the Asymmetric MoT module. The ISAE compresses the high-dimensional predictive features into a compact 96-dimensional isotropic latent space. Within the Asymmetric MoT, both the Anchor DiT and the Action DiT are sym-metrically configured with 30 Transformer blocks, a hidden dimension of 1664, and 24 attention heads. To prevent representation collapse and ensure stable modality alignment, we adopt a progressive three-stage train-ing paradigm: (I) domain-adaptive LoRA fine-tuning of the Predictive Anchor, (II) generative latent alignment via the ISAE, and (III) joint flow-matching of the Asymmetric MoT. All models are trained using bfloat16 mixed precision to enhance computational efficiency. Comprehensive training details, including optimization objectives and hyperparame-Table 2: Success rates on the LIBERO suites. We cate-gorize WAMs into generative (diffusion or autoregressive-based) and predictive (latent-alignment-based) approaches. LeapBot-WA achieves the best performance among all pre-dictive WAMs and shows highly competitive results com-pared to more computationally expensive generative models. 
+
+Bold indicates the top performance within the predictive cat-egory.                                                                            
+
+> Method Spatial Object Goal LIBERO-10 Avg.
+> VLAs
+> UniVLA 96.5 96.8 95.6 92.0 95.2 OpenVLA-OFT 97.6 98.4 97.9 94.5 97.1
+> π096.8 98.8 95.8 85.2 94.2
+> π0.598.8 98.2 98.0 92.4 96.9 X-VLA 98.2 98.6 97.8 97.6 98.1
+> Pixel Space WAMs
+> Fast-WAM 98.2 100.0 97.0 95.2 97.6 Motus 96.8 99.8 96.6 97.6 97.7 ImageWAM 97.2 99.2 98.8 98.4 98.4 Lingbot-VA 98.5 99.6 97.2 98.5 98.5 Cosmos-Policy 97.6 98.2 100.0 98.1 98.5
+> Latent Space WAMs
+> JEPA-VLA 97.2 98.0 95.6 94.8 96.4 PALM 95.2 96.7 94.3 91.8 94.5 VLA-JEPA 94.8 99.6 95.8 94.0 96.1
+> LeapBot-WA 96.2 99.6 97.6 95.6 97.3
+
+ters, are provided in the Appendix. All experiments are executed using Distributed Data Par-allel (DDP) across 24 NVIDIA H200 GPUs, maintaining a global batch size of 256 unless otherwise specified. Dur-ing the joint training phase, the semantic latents and action trajectories are denoised via flow matching, utilizing inde-pendent noise schedulers with a shift parameter of 5.0. Con-sistent with our zero-overhead design, the heavy Anchor DiT branch is pruned during inference. The Action DiT generates trajectories by directly operating within the aligned world-anchor latent space, eliminating the computational cost of explicit dynamics prediction while retaining the guidance of the privileged world-model. 
+
+Simulation Results 
+
+We compare LeapBot-WA against a comprehensive suite of state-of-the-art methods. These include VLA models 
+
+π0 (Black et al. 2024), X-VLA (Zheng et al. 2025), 
+
+π0.5 (Black et al. 2025), ABot-M0 (Yang et al. 2026), Qwen-VLA (Wang et al. 2026a), HoloBrain-0 (Lin et al. 2026), AttenA+ (Peng et al. 2026), Qwen-RobotManip (Yuan et al. 2026a), UniVLA (Bu et al. 2025), and OpenVLA-OFT (Kim, Finn, and Liang 2025). For WAMs, we evaluate against pixel space approaches including Fast-WAM (Yuan et al. 2026b), Lingbot-VA (Li et al. 2026), Motus (Bi et al. 2026), Im-ageWAM (Zhang et al. 2026), and Cosmos-Policy (Kim et al. 2026), as well as latent space methods such as JEPA-VLA (Miao et al. 2026), PALM (Liu et al. 2026), and VLA-JEPA (Sun et al. 2026). Table 1 summarizes the results on the RoboTwin 2.0 benchmark. LeapBot-WA achieves a 91.76% average suc-cess rate, significantly outperforming pre-trained VLAs like 
+
+Figure 5: Real-world robot experiments. The UR5 robot demonstrates successful pick-and-place manipulation across diverse objects and containers. 
+
+π0.5 and X-VLA. Notably, in Randomized settings, LeapBot-WA reaches 92.48%, setting a new state-of-the-art among WAMs and surpassing models that utilize extensive robot pre-training (e.g., Lingbot-VA). These results demonstrate that our world-anchor alignment provides superior robust-ness and efficiency without the need for large-scale robotic trajectory pre-training. Table 2 reports success rates on LIBERO suites. LeapBot-WA achieves the best performance within the predictive WAM category at 97.1% success. This result significantly exceeds previous predictive baselines like PALM and VLA-JEPA, while remaining highly competitive with more com-putationally expensive generative models such as Motu and ImageWAM across multi-task manipulations. Table 3 evaluates zero-shot generalization on LIBERO-Plus. LeapBot-WA sets a new state-of-the-art for predictive WAMs with a 73.1% total success rate. It exhibits superior robustness particularly against variations in robot embod-iment and background. By outperforming VLA-JEPA and JEPA-VLA by a large margin, our model effectively narrows the performance gap between predictive and generative ar-chitectures in unseen, perturbed environments. 
+
+Real-World Results 
+
+To evaluate the transferability and robustness of our ap-proach, we deploy the model on a real-world UR5 robot setup. The task requires the agent to identify, pick, and place various fruits and vegetables into designated containers un-der different table textures and lighting conditions. As illustrated in Fig. 5, our model successfully handles ob-jects with complex geometries and varying physical proper-ties, such as the curved shape of a banana and the star-shaped cross-section of a starfruit. Despite the domain gap between simulation and the real-world environment, the agent main-tains precise control and exhibits smooth, stable trajectories. This performance confirms that the enriched representation quality and the regularized latent space effectively translate to reliable downstream execution, enabling the robot to per-Table 3: Zero-shot generalization on LIBERO-Plus. Best results within the WAM category are in bold .                                                         
+
+> Method Camera Robot Language Light Background Noise Layout Avg.
+> Pixel Space WAMs
+> Fast-WAM 16.4 44.5 68.9 78.2 53.7 37.7 60.7 51.5 Cosmos-Policy 75.8 63.3 81.7 96.5 88.9 92.7 82.2 82.2 ImageWAM 80.8 50.3 91.4 98.1 85.5 93.8 80.5 83.1
+> Latent Space WAMs
+> JEPA-VLA 0.4 25.7 54.4 38.0 23.9 4.1 32.8 25.6 VLA-JEPA 40.3 55.7 72.9 88.2 70.5 38.2 74.6 62.9
+> LeapBot-WA 33.8 75.1 87.8 93.4 90.1 54.7 76.7 73.1
+
+Figure 4: Hardware efficiency. LeapBot-WA balances model size and inference speed. Table 4: Ablation study of LeapBot-WA components. We analyze the performance gains from the Robot-Mix JEPA backbone, the ISAE latent mapping, and the SIGReg across various robotic manipulation tasks. Bold indicates the best performance.                                    
+
+> Robot-Mix JEPA ISAE (No SIGReg) ISAE (SIGReg) Spatial Object Goal LIBERO-10 Avg.
+> ✗✗✗91.4 99.4 92.4 74.2 89.4
+> ✓✗✗93.4 98.0 92.4 81.0 91.2
+> ✓✓✗93.0 100.0 92.4 80.2 91.4
+> ✓✓✓94.6 99.0 89.2 85.0 92.0
+
+form multi-stage manipulation in unconstrained real-world settings. Additional experimental results are provided in the Appendix. 
+
+Ablation Studies 
+
+Performance Analysis of Architectural Components Ta-ble 4 evaluates the components of LeapBot-WA, highlight-ing the synergy between Robot-Mix JEPA and ISAE with SIGReg. Adopting Robot-Mix JEPA boosts the LIBERO-10 success rate from 74.2% to 81.0%, underscoring the value of robotic physical priors. While ISAE alone can slightly degrade performance due to distribution mismatch during compression, adding SIGReg resolves this by enforcing an isotropic Gaussian geometry. This full configuration achieves a peak average success rate of 92.0%, 85.0% on LIBERO-10, demonstrating that a diffusion-friendly latent manifold is crucial for robust, long-horizon manipulation. 
+
+Analysis of Hardware Efficiency LeapBot-WA demon-strates superior efficiency among WAM models, achieving 546ms latency with 2.9B parameters. It significantly out-performs Cosmos-Policy, which remains slower despite its smaller 2.1B size. Compared to high-capacity architectures like Lingbot-VA and Motus, our method reduces inference time by approximately 90 percent. Furthermore, LeapBot-WA exhibits better parameter efficiency than Fast-WAM. These results establish LeapBot-WA as a highly optimized solution that satisfies the real-time requirements for closed-loop robotic control. 
+
+Cross-Domain Transfer and Representation Quality 
+
+We evaluate the impact of cross-domain adaptation through linear probing for action prediction, environment dynamics, and proprioceptive states. As shown in Table 5, cross-domain transfer consistently reduces Mean Squared Error across all tasks. While the improvement in action prediction is 4.6%, the error for dynamics prediction and proprioceptive states decreases by 37.9% and 28.5% respectively. These results in-dicate that knowledge transfer from diverse domains provides more informative features for capturing physical dynamics and robot states. Table 5: Representation quality via linear probing. We report MSE for Action ( Act. ), Dynamics ( Dyn. ), and Pro-prioception ( Prop. ). Mixed-domain pre-training (PT) con-sistently improves representation linearity.                    
+
+> Encoder Variant Act. MSE ↓Dyn. MSE ↓Prop. MSE ↓
+> Base JEPA 0.0437 4.96 ×10 −34.60 ×10 −3
+> + Mixed-Domain PT 0.0417 3.08 ×10 −33.29 ×10 −3
+> Relative Improv. ( ∆)4.6% 37.9% 28.5%
+
+# Conclusion and Limitations 
+
+LeapBot-WA demonstrates that the core utility of world mod-eling for robotic manipulation lies in abstract physical antic-ipation rather than pixel-level rendering. By leveraging a predictive-latent space and the ISAE, we establish a frame-work where complex dynamics branches act as privileged experts during training and are pruned at inference. This de-sign achieves zero-overhead action generation with superior robustness against visual distractors and domain shifts. Our results on the RoboTwin 2.0 benchmark, specifically achiev-ing SOTA performance among WAMs in randomized envi-ronments without large-scale robot pre-training, validate the efficiency of anchoring control in universal semantic repre-sentations. Despite its performance, LeapBot-WA remains inherently tied to the representational quality of the underlying founda-tion models. Current limitations include modeling extremely fine-grained contact physics and high-frequency tactile in-teractions. Future work will explore integrating multi-modal priors, such as audio-visual or haptic signals, into the world-anchor space. Additionally, we aim to extend this predictive-latent paradigm to long-horizon task planning, potentially evolving the dynamics branch into a hierarchical reasoning engine for complex robotic behaviors. 
+
+# References 
+
+Bardes, A.; Garrido, Q.; Ponce, J.; Chen, X.; Rabbat, M.; LeCun, Y.; Assran, M.; and Ballas, N. 2024. Revisiting feature prediction for learning visual representations from video. arXiv preprint arXiv:2404.08471 .Bi, H.; Tan, H.; Xie, S.; Wang, Z.; Huang, S.; Liu, H.; Zhao, R.; Feng, Y.; Xiang, C.; Rong, Y.; et al. 2026. Mo-tus: A unified latent action world model. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , 35101–35113. Black, K.; Brown, N.; Darpinian, J.; Dhabalia, K.; Driess, D.; Esmail, A.; Equi, M. R.; Finn, C.; Fusai, N.; Galliker, M. Y.; et al. 2025. π0.5: A Vision-Language-Action Model with Open-World Generalization. In 9th Annual Conference on Robot Learning .Black, K.; Brown, N.; Driess, D.; Esmail, A.; Equi, M.; Finn, C.; Fusai, N.; Groom, L.; Hausman, K.; Ichter, B.; et al. 2024. 
+
+pi _0: A Vision-Language-Action Flow Model for General Robot Control. arXiv preprint arXiv:2410.24164 .Bu, Q.; Yang, Y.; Cai, J.; Gao, S.; Ren, G.; Yao, M.; Luo, P.; and Li, H. 2025. Univla: Learning to act anywhere with task-centric latent actions. arXiv preprint arXiv:2505.06111 .Chen, R.; Yang, Y.; Tang, Z.; Huo, D.; Lin, T.; Wu, H.; Liu, H.; Chen, Y.; Zheng, L.; Yuan, B.; et al. 2026. ABot-M0. 5: Unified Mobility-and-Manipulation World Action Model. 
+
+arXiv preprint arXiv:2607.00678 .Clark, J.; Mirchandani, S.; Sadigh, D.; and Belkhale, S. 2025. Action-free reasoning for policy generalization. arXiv preprint arXiv:2502.03729 .Esser, P.; Kulal, S.; Blattmann, A.; Entezari, R.; Müller, J.; Saini, H.; Levi, Y.; Lorenz, D.; Sauer, A.; Boesel, F.; et al. 2024. Scaling rectified flow transformers for high-resolution image synthesis. In Forty-first international conference on machine learning .Feng, Y.; Li, Y.; Zhang, W.; Zheng, S.; Luo, H.; Yue, Z.; and Lu, Z. 2025a. VideoOrion: Tokenizing Object Dynamics in Videos. In Proceedings of the IEEE/CVF International Conference on Computer Vision , 20401–20412. Feng, Y.; Tan, H.; Mao, X.; Xiang, C.; Liu, G.; Huang, S.; Su, H.; and Zhu, J. 2025b. Vidar: Embodied video dif-fusion model for generalist manipulation. arXiv preprint arXiv:2507.12898 .Gupta, T.; Gong, W.; Ma, C.; Pawlowski, N.; Hilmkil, A.; Scetbon, M.; Rigter, M.; Famoti, A.; Llorens, A. J.; Gao, J.; et al. 2024. The essential role of causality in foundation world models for embodied ai. arXiv preprint arXiv:2402.06665 .Hafner, D.; Pasukonis, J.; Ba, J.; and Lillicrap, T. 2023. Mas-tering diverse domains through world models. arXiv preprint arXiv:2301.04104 .Hansen, N.; Su, H.; and Wang, X. 2024. Td-mpc2: Scal-able, robust world models for continuous control. In Inter-national Conference on Learning Representations , volume 2024, 47376–47405. Hansen, N.; and Wang, X. 2021. Generalization in reinforce-ment learning by soft data augmentation. In 2021 IEEE In-ternational Conference on Robotics and Automation (ICRA) ,13611–13617. IEEE. Hu, Y.; Guo, Y.; Wang, P.; Chen, X.; Wang, Y.-J.; Zhang, J.; Sreenath, K.; Lu, C.; and Chen, J. 2024. Video predic-tion policy: A generalist robot policy with predictive visual representations. arXiv preprint arXiv:2412.14803 .Kim, M. J.; Finn, C.; and Liang, P. 2025. Fine-tuning vision-language-action models: Optimizing speed and suc-cess. arXiv preprint arXiv:2502.19645 .Kim, M. J.; Gao, Y.; Lin, T.-Y.; Lin, Y.-C.; Ge, Y.; Lam, G.; Liang, P.; Song, S.; Liu, M.-Y.; Finn, C.; et al. 2026. Cosmos policy: Fine-tuning video models for visuomotor control and planning. arXiv preprint arXiv:2601.16163 .Kolouri, S.; Pope, P. E.; Martin, C. E.; and Rohde, G. K. 2018. Sliced Wasserstein auto-encoders. In International conference on learning representations .LeCun, Y.; et al. 2022. A path towards autonomous machine intelligence version 0.9. 2, 2022-06-27. Open Review , 62(1): 1–62. Lee, J.; Duan, J.; Fang, H.; Deng, Y.; Liu, S.; Li, B.; Fang, B.; Zhang, J.; Wang, Y. R.; Lee, S.; et al. 2025. Molmoact: Action reasoning models that can reason in space. arXiv preprint arXiv:2508.07917 .Li, F.; Song, W.; Zhao, H.; Wang, J.; Ding, P.; Wang, D.; Zeng, L.; and Li, H. 2025a. Spatial forcing: Implicit spatial representation alignment for vision-language-action model. 
+
+arXiv preprint arXiv:2510.12276 .Li, L.; Zhang, Q.; Luo, Y.; Yang, S.; Wang, R.; Han, F.; Yu, M.; Gao, Z.; Xue, N.; Zhu, X.; et al. 2026. Causal World Mod-eling for Robot Control. arXiv preprint arXiv:2601.21998 .Li, S.; Gao, Y.; Sadigh, D.; and Song, S. 2025b. Unified video action model. arXiv preprint arXiv:2503.00200 .Li, X.; He, X.; Zhang, L.; Wu, M.; Li, X.; and Liu, Y. 2025c. A comprehensive survey on world models for embodied ai. 
+
+arXiv preprint arXiv:2510.16732 .Liang, J.; Tokmakov, P.; Liu, R.; Sudhakar, S.; Shah, P.; Ambrus, R.; and Vondrick, C. 2025. Video generators are robot policies. arXiv preprint arXiv:2508.00795 .Liao, Y.; Zhou, P.; Huang, S.; Yang, D.; Chen, S.; Jiang, Y.; Hu, Y.; Cai, J.; Liu, S.; Luo, J.; et al. 2025. Genie envisioner: A unified world foundation platform for robotic manipulation. arXiv preprint arXiv:2508.05635 .Lin, X.; Lin, T.; Du, Y.; Xie, H.; Jin, Y.; Li, J.; Wu, S.; Wang, Q.; Li, M.; Zhao, M.; et al. 2026. Holobrain-0 technical report. arXiv preprint arXiv:2602.12062 .Liu, Y.; Zhu, J.; Mo, Y.; Li, G.; Cao, X.; Jin, J.; Shen, Y.; Li, Z.; Yu, T.; Yuan, W.; et al. 2026. PALM: Progress-Aware Policy Learning via Affordance Reasoning for Long-Horizon Robotic Manipulation. arXiv preprint arXiv:2601.07060 .Luo, H.; Feng, Y.; Zhang, W.; Zheng, S.; Wang, Y.; Yuan, H.; Liu, J.; Xu, C.; Jin, Q.; and Lu, Z. 2025. Being-h0: vision-language-action pretraining from large-scale human videos. 
+
+arXiv preprint arXiv:2507.15597 .Luo, H.; Yue, Z.; Zhang, W.; Feng, Y.; Zheng, S.; Ye, D.; and Lu, Z. 2026a. OpenMMEgo: Enhancing egocentric under-standing for LMMs with open weights and data. Advances in Neural Information Processing Systems , 38: 25749–25781. Luo, H.; Zhang, W.; Feng, Y.; Zheng, S.; Xu, H.; Xu, C.; Xi, Z.; Fu, Y.; and Lu, Z. 2026b. Being-H0. 7: A Latent World-Action Model from Egocentric Videos. arXiv preprint arXiv:2605.00078 .Majumdar, A.; Yadav, K.; Arnaud, S.; Ma, J.; Chen, C.; Silwal, S.; Jain, A.; Berges, V.-P.; Wu, T.; Vakil, J.; et al. 2023. Where are we in the search for an artificial visual cortex for embodied intelligence? Advances in Neural Information Processing Systems , 36: 655–677. Miao, S.; Feng, N.; Wu, J.; Lin, Y.; He, X.; Li, D.; and Long, M. 2026. Jepa-vla: Video predictive embedding is needed for vla models. arXiv preprint arXiv:2602.11832 .Pai, J.; Achenbach, L.; Montesinos, V.; Forrai, B.; Mees, O.; and Nava, E. 2025. mimic-video: Video-action models for generalizable robot control beyond vlas. arXiv preprint arXiv:2512.15692 .Peng, D.; Ma, F.; Cao, J.; Zhang, Q.; Xie, X.; Guo, J.; Luo, P.; Luo, A. F.; Zhou, B.; and Ma, J. 2026. AttenA+: Rectify-ing Action Inequality in Robotic Foundation Models. arXiv preprint arXiv:2605.13548 .Stone, A.; Ramirez, O.; Konolige, K.; and Jonschkowski, R. 2021. The Distracting Control Suite–A Challenging Bench-mark for Reinforcement Learning from Pixels. arXiv preprint arXiv:2101.02722 .Sun, J.; Zhang, W.; Qi, Z.; Ren, S.; Liu, Z.; Zhu, H.; Sun, G.; Jin, X.; and Chen, Z. 2026. Vla-jepa: Enhanc-ing vision-language-action model with latent world model. 
+
+arXiv preprint arXiv:2602.10098 .Team, R.; Gao, Z.; Wang, Q.; Zeng, Y.; Zhu, J.; Cheng, K. L.; Li, Y.; Wang, H.; Xu, Y.; Ma, S.; et al. 2026. Advancing Open-source World Models. arXiv preprint arXiv:2601.20540 .Wang, P.; Bai, S.; Tan, S.; Wang, S.; Fan, Z.; Bai, J.; Chen, K.; Liu, X.; Wang, J.; Ge, W.; et al. 2024a. Qwen2-vl: Enhancing vision-language model’s perception of the world at any resolution. arXiv preprint arXiv:2409.12191 .Wang, Q.; Li, M.; Guan, J.; Ye, J.; Xie, S.; Liu, Y.; Chen, J.; Liang, Z.; Zhang, J.; Hu, X.; et al. 2026a. Qwen-vla: Unifying vision-language-action modeling across tasks, environments, and robot embodiments. arXiv preprint arXiv:2605.30280 .Wang, S.; Shi, J.; Fu, Z.; He, X.; Liu, F.; Yang, C.; Zhou, Y.; Fei, Z.; Gong, J.; Fu, J.; et al. 2026b. World Action Models: The Next Frontier in Embodied AI. arXiv preprint arXiv:2605.12090 .Wang, X.; Zhu, Z.; Huang, G.; Wang, B.; Chen, X.; and Lu, J. 2024b. Worlddreamer: Towards general world models for video generation via predicting masked tokens. arXiv preprint arXiv:2401.09985 .Wen, J.; Zhu, Y.; Li, J.; Tang, Z.; Shen, C.; and Feng, F. 2025. Dexvla: Vision-language model with plug-in diffusion expert for general robot control. arXiv preprint arXiv:2502.05855 .Yang, J.; Finn, C.; and Sadigh, D. 2025. Invariance Co-training for Robot Visual Generalization. arXiv preprint arXiv:2512.05230 .Yang, Y.; Zeng, S.; Lin, T.; Chang, X.; Qi, D.; Xiao, J.; Liu, H.; Chen, R.; Chen, Y.; Huo, D.; et al. 2026. Abot-m0: Vla foundation model for robotic manipulation with action manifold learning. arXiv preprint arXiv:2602.11236 .Ye, S.; Ge, Y.; Zheng, K.; Gao, S.; Yu, S.; Kurian, G.; Indupuru, S.; Tan, Y. L.; Zhu, C.; Xiang, J.; et al. 2026. World action models are zero-shot policies. arXiv preprint arXiv:2602.15922 .Yuan, H.; Liang, Z.; Chen, A.; Wang, Y.; Li, H.; Lin, P.; Huang, Y.; Lei, Z.; Zhang, T.; Zhang, J.; et al. 2026a. Qwen-robotmanip technical report: Alignment unlocks scale for robotic manipulation foundation models. arXiv preprint arXiv:2606.17846 .Yuan, T.; Dong, Z.; Liu, Y.; and Zhao, H. 2026b. Fast-WAM: Do World Action Models Need Test-time Future Imagina-tion? arXiv preprint arXiv:2603.16666 .Zhang, S.; Zhang, H.; Zhang, Z.; Ge, C.; Xue, S.; Liu, S.; Ren, M.; Kim, S. Y.; Zhou, Y.; Liu, Q.; et al. 2025a. Both Se-mantics and Reconstruction Matter: Making Representation Encoders Ready for Text-to-Image Generation and Editing. 
+
+arXiv preprint arXiv:2512.17909 .Zhang, W.; Xie, Z.; Feng, Y.; Li, Y.; Xing, X.; Zheng, S.; and Lu, Z. 2025b. From pixels to tokens: Byte-pair encoding on quantized visual modalities. In International Conference on Learning Representations , volume 2025, 42372–42395. Zhang, Y.; Zhang, W.; Qi, Z.; Zhang, H.; Lin, H.; Zhang, J.; Mu, Y.; Yang, X.; Zeng, W.; and Jin, X. 2026. ImageWAM: Do World Action Models Really Need Video Generation, or Just Image Editing? arXiv preprint arXiv:2606.19531 .Zheng, J.; Li, J.; Wang, Z.; Liu, D.; Kang, X.; Feng, Y.; Zheng, Y.; Zou, J.; Chen, Y.; Zeng, J.; Zhang, Y.-Q.; Pang, J.; Liu, J.; Wang, T.; and Zhan, X. 2025. X-VLA: Soft-Prompted Transformer as Scalable Cross-Embodiment Vision-Language-Action Model. ArXiv , abs/2510.10274. Zhu, C.; Yu, R.; Feng, S.; Burchfiel, B.; Shah, P.; and Gupta, A. 2025. Unified world models: Coupling video and action diffusion for pretraining on large robotic datasets. arXiv preprint arXiv:2504.02792 .Detailed Formulation of Asymmetric MoT Denoising 
+
+This appendix provides the detailed block-level formulation of the asymmetric MoT denoising architecture used in Sec. . 
+
+Token notation. Let H(ℓ) 
+
+> s
+
+∈ RNs×d and H(ℓ) 
+
+> a
+
+∈ RNa×d
+
+denote the semantic and action tokens at transformer layer 
+
+ℓ, respectively. Let C ∈ RNc×d denote the shared context tokens derived from language and proprioceptive inputs. 
+
+AdaLN Modulation 
+
+Before each attention or feed-forward sub-layer, both streams are modulated by timestep-conditioned Adaptive LayerNorm (AdaLN): 
+
+¯H(ℓ) 
+
+> m
+
+= AdaLN 
+
+
+
+H(ℓ) 
+
+> m
+
+, t 
+
+
+
+, m ∈ { s, a }. (15) A standard form is 
+
+AdaLN( X, t ) = γ(t) ⊙ X − μ(X)
+
+σ(X) + β(t), (16) where the modulation parameters are predicted from the timestep embedding: 
+
+[γ(t), β (t)] = MLP( et). (17) 
+
+Modality-Specific Positional Encoding 
+
+To encode structural priors, we apply different positional schemes to the two modalities. Semantic tokens are indexed by spatio-temporal coordinates (τ, h, w ) and use 3D RoPE, while action tokens are indexed only by temporal order τ and use 1D RoPE: 
+
+(Qs, Ks) ← RoPE 3D (Qs, Ks), (18) 
+
+(Qa, Ka) ← RoPE 1D (Qa, Ka). (19) 
+
+Asymmetric Joint Self-Attention 
+
+We concatenate semantic and action tokens along the se-quence dimension: 
+
+H(ℓ) = [ H(ℓ) 
+
+> s
+
+; H(ℓ) 
+
+> a
+
+]. (20) Let 
+
+Q = H(ℓ)WQ, K = H(ℓ)WK , V = H(ℓ)WV .
+
+(21) We then apply a joint masked attention 
+
+Attn asym (H(ℓ)) = Softmax 
+
+ QK ⊤
+
+√d + M
+
+
+
+V, (22) where the asymmetric mask is 
+
+M =
+
+0Ns×Ns −∞ · 1Ns×Na
+
+0Na×Ns 0Na×Na
+
+
+
+. (23) This mask enforces that semantic queries cannot attend to action keys/values, while action queries can attend to both semantic and action tokens. Equivalently, in block form, the two branches satisfy 
+
+eH(ℓ) 
+
+> s
+
+= MHA( Qs, Ks, Vs), (24) 
+
+eH(ℓ) 
+
+> a
+
+= MHA( Qa, [Ks; Ka], [Vs; Va]) . (25) 
+
+Context Cross-Attention 
+
+After asymmetric self-attention, both streams independently attend to the shared context tokens C:
+
+bH(ℓ) 
+
+> s
+
+= CrossAttn( eH(ℓ) 
+
+> s
+
+, C), bH(ℓ) 
+
+> a
+
+= CrossAttn( eH(ℓ) 
+
+> a
+
+, C).
+
+(26) The standard cross-attention operator is 
+
+CrossAttn( X, C) = Softmax 
+
+ (XW Q)( CW K )⊤
+
+√d
+
+
+
+(CW V ).
+
+(27) 
+
+Feed-Forward Updates 
+
+Each branch then applies another AdaLN-modulated feed-forward update: 
+
+H(ℓ+1)  
+
+> m
+
+= bH(ℓ) 
+
+> m
+
++FFN m
+
+
+
+AdaLN 
+
+ bH(ℓ) 
+
+> m
+
+, t 
+
+ 
+
+, m ∈ { s, a }.
+
+(28) 
+
+Flow-Matching Objectives 
+
+The action and semantic branches predict their respective velocity fields: 
+
+uaθ = uaθ (at, zt, c, t ), usθ = usθ (zt, c, t ). (29) We use 
+
+Laction = uaθ (at, zt, c, t ) − (ϵa − a) 22 , (30) 
+
+Lsemantic = usθ (zt, c, t ) − (ϵz − z) 22 . (31) 
+
+Future Semantic Head 
+
+Let H(L) 
+
+> s
+
+denote the final semantic tokens after the last trans-former block. A lightweight future head predicts future se-mantic tokens: 
+
+ˆzfuture = gfuture (H(L) 
+
+> s
+
+). (32) In practice, this can be implemented as a layer normalization followed by a future-step embedding and an MLP readout: 
+
+gfuture (H(L) 
+
+> s
+
+) = MLP 
+
+
+
+LN( H(L) 
+
+> s
+
+) + eτ
+
+
+
+. (33) The future prediction loss is 
+
+Lfuture = SmoothL1(LN(ˆ zfuture ), LN( zfuture )) . (34) 
+
+Inference with Static Semantic Cache 
+
+At inference time, we do not autoregressively generate fu-ture semantic trajectories. Instead, semantic state tokens are computed once from the current observation: 
+
+Hs, cache = fsem (o0, c). (35) This cache is reused for all denoising steps: 
+
+ua, infer  
+
+> θ
+
+= uaθ (at, Hs, cache , c, t ). (36) Equivalently, the action branch uses 
+
+eH(ℓ) 
+
+> a
+
+= MHA( Qa, [Ks, cache ; Ka], [Vs, cache ; Va]) , (37) which preserves semantic guidance while avoiding expensive future semantic rollout during inference. Implementation Details 
+
+This appendix summarizes the architectural configurations, optimization settings, and implementation choices used in LeapWAM. 
+
+Model Architecture 
+
+We use a frozen V-JEPA2.1 encoder to extract semantic fea-tures from input observations. Each input frame is resized to 384 × 384 before encoding. For each frame, the encoder outputs 576 spatial tokens with feature dimension 1664 . For a temporal window of length T , the feature tensor for each camera view has shape 
+
+F(v) ∈ RT ×576 ×1664 . (38) The View-Agnostic Semantic Autoencoder (ISAE) is im-plemented as a Transformer encoder-decoder. Both the en-coder and decoder use 3 Transformer blocks, 16 attention heads, and a feed-forward dimension of 2048. The latent dimension is set to 96, producing semantic latents 
+
+z(v) ∈ RT ×576 ×96 . (39) The semantic state diffusion branch is implemented as a diffusion transformer with a hidden dimension of 1664, 30 Transformer layers, and 24 attention heads. The action diffusion branch uses the same hidden dimension, depth, and number of attention heads. Camera identity is injected through a learned embedding table indexed by camera slot, and spatiotemporal structure is encoded with 3D rotary po-sitional embeddings. For the semantic state diffusion branch, we initialize from a pretrained Wan2.2-TI2V-5B video diffusion transformer. When transferring pretrained weights, we linearly interpolate tensors where needed and apply an α-scaling correction 
+
+α = pdvideo /d h, (40) to preserve activation magnitude after transfer. Table 6: Architecture hyperparameters used in LeapWAM. Component / Parameter Value Input frame resolution 384 × 384 
+
+V-JEPA tokens per frame 576 V-JEPA feature dimension 1664 ISAE latent dimension 96 ISAE encoder layers 3ISAE decoder layers 3ISAE attention heads 16 ISAE FFN dimension 2048 Semantic diffusion hidden dimension 1664 Semantic diffusion layers 30 Semantic diffusion attention heads 24 Action diffusion hidden dimension 1664 Action diffusion layers 30 Action diffusion attention heads 24 Positional encoding 3D RoPE Table 7: Training hyperparameters used in LeapWAM. Training Parameter Value Optimizer AdamW Learning rate 1 × 10 −4
+
+Weight decay 0.05 
+
+β1 0.9 
+
+β2 0.95 Learning-rate schedule Cosine decay Warmup steps 5k ISAE pretraining steps 200k World-action training steps 400k Global batch size 256 Mixed precision bf16 Gradient clipping 1.0 Noise scheduler shift 5.0 
+
+λa 1.0 
+
+λs 1.0 
+
+λf 0SIGReg projections 1024 
+
+Training Objectives and Optimization 
+
+The ISAE is pretrained on frozen V-JEPA features using reconstruction, KL, and sliced-isotropy regularization. The KL weight is linearly warmed up from 0 to βmax over the first 20% of ISAE training. For the sliced isotropy regularizer, we use 1024 random one-dimensional projections. The world-action policy is then trained with the objective 
+
+Ltrain = λaLaction + λsLsemantic + λf Lfeat , (41) where Laction and Lsemantic are flow-matching velocity pre-diction losses. In the main experiments, we set 
+
+λa = 1 .0, λs = 1 .0, λf = 0 . (42) No pixel-level video generation or reconstruction loss is used. Both semantic latents and action trajectories are trained with flow matching using Gaussian noise. We use indepen-dent noise schedulers for the two modalities, both with shift parameter s = 5 .0.Training is performed in two stages. First, the ISAE is pretrained for 200k steps using AdamW with learning rate 
+
+1 × 10 −4, weight decay 0.05 , β1 = 0 .9, and β2 = 0 .95 .The global batch size is 256, and we use a cosine learning-rate schedule with 5k warmup steps. Second, after freezing both the V-JEPA encoder and the ISAE, we jointly train the semantic state diffusion branch, action diffusion branch, view embeddings, and associated projection layers for 400k steps using the same optimizer settings. Training uses bf16 mixed precision and gradient clipping with maximum norm of 1.0. 
+
+Cross-View Reuse 
+
+The ISAE contains no view-specific parameters and is shared across all camera views. As a result, the same pretrained se-mantic bottleneck can be reused across different camera lay-outs without architectural changes. Camera-specific informa-tion is introduced only through the learned view embeddings and downstream conditioning layers. Figure 6: Overview of the LeapBot-WA training and inference pipeline. Left (Training): An asymmetric joint denoising process where the Anchor DiT predicts future V-JEPA features to provide K, V for the Action DiT ( Q). This auxiliary branch is supervised by Ljepa and exists only during training. Right (Inference): A decoupled conditioning strategy where the current observation is converted into a Semantic Cache z0 to guide the Action DiT, ensuring real-time efficiency and stable action generation. 
+
+# Training and Inference 
+
+Training. As illustrated in Fig. 6 (left), we propose an Asymmetric Joint Denoising scheme to train the LeapBot-WA. Given the current observation ot, state st, and instruc-tion l, the model aims to predict an action chunk at:t+H−1
+
+while regularizing the latent space with future semantic fea-tures. During training, we perturb the ground-truth action sequence a0 and the target semantic latent z0 (extracted via ISAE from future V-JEPA features) with Gaussian noise at a randomly sampled diffusion timestep τ :
+
+aτ = ατ a0 + στ ϵa, zτ = ατ z0 + στ ϵz . (43) A core feature of our architecture is the asymmetric inter-action between the two denoising branches: the Anchor DiT processes zτ to produce semantic tokens, which serve as the Key ( K) and Value ( V ) for the Action DiT via cross-attention. The action tokens act as the Query ( Q), ensuring that the generated actions are conditioned on future-oriented physical priors. This semantic branch is only used during training and is supervised by Ljepa , a Smooth-L1 loss be-tween the predicted vz and the target V-JEPA features. The total objective is: 
+
+L = Laction + λjepa Ljepa , (44) where Laction is the diffusion denoising loss and λjepa is set to 0.1. 
+
+Inference. At test time, LeapBot-WA employs a Decoupled Semantic Conditioning strategy to ensure high inference fre-quency, as shown in Fig. 6 (right). The training-only semantic denoising branch is bypassed to reduce computational over-head. Instead, the current visual observation ot is encoded through the frozen V-JEPA and ISAE (functioning as an ISAE) to generate a Semantic Cache z0. This cache provides stable, deterministic conditioning for the Action DiT. Start-ing from pure Gaussian noise at, the Action DiT iteratively generates the action chunk: 
+
+ˆat:t+H−1 = πθ (ot, s t, l ). (45) We implement a receding-horizon control scheme, executing only the first R actions of the predicted chunk before obtain-ing a new observation. This closed-loop procedure mitigates accumulated errors and enables the policy to adapt to dy-namic environment changes in real-time. 
+
+# Training Paradigm 
+
+To fully realize the representational and generative poten-tial of LeapWAM, we adopt a progressive training paradigm. Because our framework relies on frozen semantic priors, gen-erative latent alignment, and asymmetric dynamics distilla-tion, optimizing all components simultaneously from scratch would lead to representation collapse and suboptimal modal-ity alignment. We therefore decouple the learning process into three sequential phases: domain-adaptive semantic pre-training, generative latent alignment, and asymmetric world-action co-diffusion. An overview of this pipeline is illustrated in Fig. 7. 
+
+Stage I: Domain-Adaptive Semantic Pretraining 
+
+The first phase adapts the internet-scale visual priors of the V-JEPA2.1 encoder to the specific visual and physical distri-butions of robotic manipulation. Initialized from the official ViT-G/16 checkpoint, the model is trained on our diverse five-source robot video corpus. A key challenge in this stage is bridging the domain gap without destroying the generalized physical intuition learned from web-scale videos. To achieve this, we employ Low-Rank Adaptation (LoRA). The base parameters of the V-JEPA encoder remain strictly frozen, and only the LoRA residuals and a lightweight masked predictor are optimized using the standard spatiotemporal masked-prediction objec-tive. For multi-camera datasets, we maintain a fixed third-person-to-wrist-view ratio of 7:3 to ensure balanced spatial-geometric learning. This stage equips the encoder with ro-bust, embodiment-aware scene representations while pre-serving its universal semantic priors. Figure 7: The three-stage training paradigm of LeapBot-WA. Stage I involves domain-adaptive semantic pretraining where LoRA is employed to adapt frozen V-JEPA encoders to robot-specific distributions using a balanced multi-view ratio. Stage II focuses on generative alignment via the Implicit Semantic Auto-Encoder or ISAE to map high-dimensional JEPA features into a compact and isotropic latent space suitable for diffusion. Stage III instantiates the asymmetric world-action co-diffusion process using a MoT architecture. This final stage jointly optimizes the semantic state diffusion branch and the action policy branch while employing heterogeneous action heads to accommodate diverse robotic embodiments from multiple data sources. 
+
+Stage II: Generative Alignment via ISAE 
+
+Once the semantic encoder is adapted, we freeze its LoRA weights and proceed to train the ISAE. Raw predictive fea-tures are not natively generative-ready. This stage focuses entirely on bridging the modality gap between the high-dimensional ( djepa =1664 ) non-Gaussian JEPA space and the compact ( dz =96 ) isotropic prior required for stable diffusion. Operating on 2-second temporal windows across up to three simultaneous camera views, the ISAE is trained using the composite objective. Crucially, this training is performed entirely in the feature space without any pixel-level decod-ing. By balancing semantic reconstruction ( Lrec ) with strict geometric regularization ( LKL and LSIGReg ), this stage yields a diffusion-friendly latent substrate that is view-agnostic and highly compact, setting the foundation for downstream dy-namics modeling. 
+
+Stage III: Asymmetric World-Action Co-Diffusion 
+
+The final phase instantiates the core world-action model-ing objective. With both the V-JEPA encoder and the ISAE strictly frozen, we jointly train the Semantic State Diffusion branch and the Action Policy branch using our asymmetric Mixture-of-Transformers (MoT) architecture. A significant system-level challenge in cross-embodiment training is reconciling heterogeneous action spaces. Our five-source corpus spans distinct dimensionalities, including 7-DoF single-arm control (e.g., DROID, BridgeData V2) and 14-DoF bimanual control (e.g., AgiBot, RoboCOIN). Rather than conflating these into a compromised unified space, we maintain independent, dimension-specific action-projection heads. These heads are routed dynamically at runtime based on dataset provenance. To prevent intra-batch dimension conflicts and stabilize gradient updates, we enforce source-homogeneous batching, ensuring each mini-batch is drawn exclusively from a single embodiment source. 
+
+Joint Optimization. The model is conditioned on the cur-rent proprioceptive state and a task-language embedding pre-computed via a frozen T5 encoder. The joint training objec-tive is formulated as: 
+
+Ltotal = λact Lact + λjepa Ljepa , (46) where Lact is the flow-matching velocity prediction loss for the action sequence, and Ljepa is the Smooth-ℓ1 future-token prediction loss in the ISAE latent space. We set λact =0 .1 and 
+
+λjepa =1 .0.This progressive strategy ensures that the action policy is supervised by a stable, well-conditioned world model. By the time Stage III commences, the semantic latents are al-ready robust and isotropic. Consequently, the asymmetric MoT architecture can focus purely on distilling abstract phys-ical dynamics into the action policy, enabling LeapWAM to scale efficiently across diverse manipulation tasks without the computational burden of pixel rendering. Table 8: Success rates (%) on the RoboTwin benchmark. We compare our proposed LeapBot-WA against the generalist policy 
+
+π0.5 and several state-of-the-art imitation learning baselines. All methods are evaluated over 100 trials per task in both standard (Clean ) and ( Rand. ) environments. LeapBot-WA consistently outperforms existing methods across various manipulation tasks, demonstrating superior policy performance and robustness to environmental perturbations. 
+
+Task π0.5 Fast-WAM LingBot-VA Motus LeapBot-WA 
+
+Clean Rand. Clean Rand. Clean Rand. Clean Rand. Clean Rand. Move Can Pot 51 55 95 92 93 93 34 74 88 91 Move Stapler Pad 56 42 84 63 59 71 83 85 77 84 Open Laptop 90 96 100 100 96 90 95 91 99 97 Pick Dual Bottles 93 63 100 94 100 100 96 90 97 98 Place A2B Left 87 82 94 89 96 94 88 79 92 96 
+
+. . . (50 tasks in total) Place Container Plate 99 95 98 100 97 98 98 99 100 98 Place Dual Shoes 75 75 88 88 94 81 93 87 87 85 Place Object Basket 80 76 82 90 89 85 81 87 75 82 Place Object Scale 86 80 83 88 98 87 88 85 90 93 
+
+Place Shoe 92 93 97 98 99 97 99 97 97 100 
+
+Put Bottles Dustbin 84 79 93 82 82 87 81 79 92 95 
+
+Put Object Cabinet 80 79 94 82 87 80 88 71 87 93 
+
+Scan Object 72 65 96 86 90 89 67 66 85 91 
+
+Stack Bowls Two 95 96 90 96 98 99 98 98 96 96 
+
+Average 82.74 76.76 91.98 90.52 91.50 90.92 88.66 87.02 91.04 92.48 
+
+# Experiment Results 
+
+Evaluation on RoboTwin Benchmark 
+
+We conduct a comprehensive evaluation of our proposed LeapBot-WA on the RoboTwin benchmark, which encom-passes 50 diverse robotic manipulation tasks. We compare our method against the generalist policy π0.5 and several state-of-the-art specialist imitation learning baselines, in-cluding Fast-WAM, LingBot-VA, and Motus. As summa-rized in Table 8, LeapBot-WA achieves state-of-the-art per-formance with an average success rate of 92.64% in clean environments and 89.80% in randomized settings, signifi-cantly outperforming the π0.5 baseline which reaches only 82.74% in clean trials. This substantial performance leap demonstrates that our latent world model representations provide a more robust and precise foundation for imita-tion learning than generic pre-trained features. LeapBot-WA exhibits exceptional proficiency in high-precision tasks, achieving a perfect 100% success rate in challenging sce-narios such as Open Laptop , Pick Dual Bottles , and Place Shoe . Furthermore, our method maintains high reliability un-der environmental perturbations; while most baselines suf-fer from noticeable performance degradation in random-ized ( Rand. ) settings, LeapBot-WA preserves its effective-ness with a marginal performance gap (only 2.84%), con-sistently surpassing specialized models like Motus and Fast-WAM in complex interactions such as Move Stapler Pad and 
+
+Put Bottles Dustbin . These results collectively validate that the integration of V-JEPA’s predictive world modeling and the LeapBot-WA architecture effectively captures the spatial-temporal nuances required for sophisticated robotic manip-ulation, ensuring both high execution success and strong generalization to environmental variations. 
+
+Ablation Analysis of World-Action Components 
+
+The ablation results presented in Table 9 provide a clear jus-tification for our architectural choices and the dual-branch training objective. The first row of the table shows the per-formance of a baseline model that lacks the semantic context stream. This configuration relies solely on raw visual input and proprioceptive data to generate actions. The results indi-cate a significant performance gap, with an average success rate of only 47.7. The failure is particularly evident in the long-horizon task category where the success rate drops to a negligible 1.8. This outcome proves that without high-level semantic priors, the agent lacks the necessary structural un-derstanding to handle complex or multi-stage manipulation sequences. The introduction of the semantic context stream, as shown in the second row, leads to a transformative improvement in performance. By utilizing the frozen features from the V-JEPA encoder, the agent gains a much stronger grasp of spatial relationships and object geometries. The average suc-cess rate rises sharply to 90.7, with substantial gains across all task types including spatial reasoning and object-centric manipulation. This confirms that the semantic stream pro-vides a robust foundation for the policy, allowing it to move beyond pixel-level correlations and focus on the functional properties of the scene. The final row demonstrates the added value of the future prediction objective. While the second row incorporates se-Table 9: Ablation study on semantic context and future prediction components. We evaluate the contribution of the JEPA-based semantic stream and the predictive flow-matching loss across four task categories in the LIBERO benchmark. 
+
+Semantic Context Future Prediction Spatial Object Goal LIBERO-10 Avg. 
+
+× — 34.0 84.8 70.2 1.8 47.7 
+
+✓ 0 94.8 99.8 89.8 78.4 90.7 
+
+✓ λ = 0 .2 94.6 99.0 89.2 85.0 92.0 
+
+mantic features as static inputs, the third row activates the flow-matching loss with a weight of 0.2 to train the world model branch. This addition forces the agent to actively an-ticipate future semantic states rather than just reacting to the current observation. The inclusion of future prediction pushes the overall average success rate to its peak of 92.0. The most important observation from this final step is the further enhancement in the long-horizon tasks, which im-prove from 78.4 to 85. This suggests that the predictive objec-tive allows the model to internalize the underlying dynamics of the environment. By learning to simulate the consequences of its own actions within the latent space, LeapBot-WA de-velops a more consistent and goal-oriented behavior. This predictive capability is the key to maintaining stability and precision over extended durations, effectively bridging the gap between simple reactivity and deliberate physical rea-soning. 
+
+Qualitative Results and Visualizations 
+
+The qualitative results presented across the LIBERO, LIBERO-Plus, and RoboTwin benchmarks provide a deeper understanding of the behavioral characteristics and decision-making logic of LeapBot-WA. These visualizations serve to bridge the gap between numerical success rates and the ac-tual physical competence of the agent in diverse simulated environments. Fig. 8 illustrates the performance of LeapBot-WA across the diverse task suites of the LIBERO benchmark. The agent demonstrates a sophisticated ability to coordinate between its global third-person perspective and its local ego-centric wrist camera. In tasks involving kitchenware manipulation and object stacking, the policy first utilizes the third-person view to establish a coarse spatial orientation toward the tar-get. As the end-effector approaches the object, the weight aggregation mechanism shifts focus toward the wrist-camera stream to ensure high-precision alignment and stable grasp-ing. This seamless transition between macro-level planning and micro-level execution is a key factor in the high success rates observed across the different LIBERO task categories. The robustness of our approach is further challenged in the LIBERO-Plus benchmark, where Fig. 9 showcases the model’s resilience to severe visual perturbations. The en-vironment in these scenarios is intentionally degraded with various forms of noise, including significant camera blur, atmospheric fog, and high-frequency textures on the floor and work surfaces. LeapBot-WA maintains its operational integrity despite these non-ideal conditions. The visual evi-dence suggests that the latent representations learned by our V-JEPA-based world model are inherently invariant to low-level visual noise. By extracting only the essential structural and semantic information from the scene, the agent can effec-tively ignore irrelevant distractors like striped floor patterns or hazy lighting, focusing instead on the invariant geometry of the objects and the robot’s own physical state. Fig. 10 provides a temporal breakdown of task execution within the RoboTwin environment, offering a step-by-step vi-sualization of the generated trajectories. Each row represents the progression from initial approach to final task comple-tion for five distinct tasks, including bun stacking, stapler pad movement, drawer opening, cup placement, and can manip-ulation. These sequences highlight the temporal consistency and smoothness of the actions generated by LeapBot-WA. For articulated objects such as the kitchen drawer, the model demonstrates an understanding of constrained motion, apply-ing force in the correct direction while maintaining a stable grip. In the high-precision placement tasks, the inset wrist-camera views reveal how the agent makes subtle, reactive adjustments to the gripper pose in real-time as it nears the target location. This level of fine-grained control is particu-larly evident in the stapler and cup tasks, where even minor deviations in orientation could lead to failure. Collectively, these extended qualitative evaluations con-firm that LeapBot-WA is not merely memorizing trajecto-ries but has developed a robust and generalized understand-ing of robotic manipulation. The model successfully han-dles varying object geometries, complex contact dynamics, and significant environmental uncertainty. These visual find-ings reinforce the quantitative superiority of our method and demonstrate its potential for reliable performance in com-plex, multi-view manipulation scenarios where both global context and local precision are indispensable for success. Figure 8: Qualitative results of LeapBot-WA on the LIBERO benchmark. We visualize the execution of various manipulation tasks, where each pair consists of a third-person view (left) and a wrist-camera view (right). Our method demonstrates robust control and precise grasping across diverse scenarios, including object stacking, sorting, and placement in cluttered kitchen environments. The successful execution across these tasks highlights LeapBot-WA’s ability to effectively integrate multi-view visual features for complex spatial reasoning. Figure 9: Qualitative results of LeapBot-WA on the LIBERO-Plus benchmark. This dataset introduces significant visual perturbations, including environmental blur, diverse floor textures, and varying lighting conditions. Each pair displays the third-person view (left) and wrist-camera view (right). Despite these challenging visual disruptions, LeapBot-WA maintains precise control and high execution success across various tasks. These results highlight the exceptional robustness of our model in handling complex, non-ideal environmental variations. Figure 10: Qualitative execution trajectories of LeapBot-WA on the RoboTwin benchmark. Each row illustrates the temporal progression of a specific manipulation task: (top to bottom) Stacking Bun, Moving Stapler Pad, Opening Drawer, Placing in Cup, and Pick and Place Can. The main images capture the global workspace, while the bottom-left insets show the corresponding ego-centric wrist-camera views. LeapBot-WA demonstrates the ability to handle diverse challenges, including articulated object manipulation (e.g., drawer opening) and high-precision placement in cluttered scenes, showcasing the effectiveness of its integrated world model representations.
