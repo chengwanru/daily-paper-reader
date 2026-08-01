@@ -1,6 +1,9 @@
 * <a class="dpr-sidebar-root-link" href="#/">首页</a>
 * <a class="dpr-sidebar-root-link dpr-sidebar-noactive-link" href="javascript:void(0)" data-dpr-hash="#/tutorial/README">使用教程</a>
 * Daily Papers
+  * 2026-08-01 <!--dpr-date:20260801-->
+    * 精读区
+      * <a class="dpr-sidebar-item-link dpr-sidebar-item-structured" href="#/202608/01/2607.28415v1-qqworld-quantile-quantile-matching-for-world-model-regularization" data-sidebar-item="{&quot;title&quot;: &quot;QQWorld: Quantile-Quantile Matching for World Model Regularization&quot;, &quot;link&quot;: &quot;https://arxiv.org/abs/2607.28415v1-qqworld-quantile-quantile-matching-for-world-model-regularization&quot;, &quot;score&quot;: &quot;9.0&quot;, &quot;tags&quot;: [{&quot;kind&quot;: &quot;query&quot;, &quot;label&quot;: &quot;video-wam&quot;}], &quot;evidence&quot;: &quot;正则化潜在世界模型，直接改进世界模型训练&quot;}">QQWorld: Quantile-Quantile Matching for World Model Regularization</a>
   * 2026-07-31 <!--dpr-date:20260731-->
     * 精读区
       * <a class="dpr-sidebar-item-link dpr-sidebar-item-structured" href="#/202607/31/2607.23969v2-leapbot-wa-world-anchor-action-models-via-predictive-latent-alignments" data-sidebar-item="{&quot;title&quot;: &quot;LeapBot-WA: World-Anchor Action Models via Predictive Latent Alignments&quot;, &quot;link&quot;: &quot;https://arxiv.org/abs/2607.23969v2-leapbot-wa-world-anchor-action-models-via-predictive-latent-alignments&quot;, &quot;score&quot;: &quot;10.0&quot;, &quot;tags&quot;: [{&quot;kind&quot;: &quot;query&quot;, &quot;label&quot;: &quot;video-wam&quot;}], &quot;evidence&quot;: &quot;直接提出基于预测性潜在对齐的世界动作模型，并讨论视频生成瓶颈。&quot;}">LeapBot-WA: World-Anchor Action Models via Predictive Latent Alignments</a>
