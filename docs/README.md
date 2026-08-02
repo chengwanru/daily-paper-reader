@@ -6,24 +6,28 @@
 </div>
 
 ## 每次日报
-- 最新运行日期：2026-08-01
-- 运行时间：2026-08-01 21:13:24 UTC
+- 最新运行日期：2026-08-02
+- 运行时间：2026-08-02 20:32:25 UTC
 - 运行状态：成功
-- 本次总论文数：1
+- 本次总论文数：2
 - 精读区：1
-- 速读区：0
+- 速读区：1
 
 ### 今日简报（AI）
-今日精读1篇论文，聚焦世界模型正则化新方法。最值得关注的是《QQWorld》提出的分位数-分位数匹配技术，获9.0高分。建议后续关注该方向在强化学习与模型泛化上的实验验证。
-- 详情：[/202608/01/README](/202608/01/README)
+今日精读《Schrödinger's Cat》聚焦场景运动学的概率建模，速读一篇具身智能经验合成论文，共2篇。  
+最值得关注的是精读文章（8.0分），它用“薛定谔的猫”思想实验，将未来场景变化表示为概率分布而非单一结果。  
+建议普通读者优先理解该“概率化预测”思路，这对自动驾驶、机器人决策很有参考价值。
+- 详情：[/202608/02/README](/202608/02/README)
 
 ### 精读区论文标签
-1. [QQWorld: Quantile-Quantile Matching for World Model Regularization](/202608/01/2607.28415v1-qqworld-quantile-quantile-matching-for-world-model-regularization)  
-   标签：评分：9.0/10、query:video-wam
-   evidence：正则化潜在世界模型，直接改进世界模型训练
+1. [Schrödinger's Cat: Probabilistic Representation and Prediction of Potential Scene Kinematics](/202608/02/2607.25984v1-schrdingers-cat-probabilistic-representation-and-prediction-of-potential-scene-kinematics)  
+   标签：评分：8.0/10、query:video-wam
+   evidence：从图像预测未来场景动力学分布的概率潜生成模型，类似视频世界模型
 
 ### 速读区论文标签
-- 本次无速读推荐。
+1. [From Passive Video to Editable Experience: Physically Grounded Experience Synthesis for Embodied Intelligence](/202608/02/2607.26903v1-from-passive-video-to-editable-experience-physically-grounded-experience-synthesis-for-embodied-intelligence)  
+   标签：评分：6.0/10、query:video-wam
+   evidence：从人类视频生成机器人条件视频，用于具身学习
 
 
 <div class="dpr-home-promo-card">

@@ -1,0 +1,39 @@
+{
+  "label": "2026-08-02",
+  "date": "2026-08-02",
+  "generated_at": "2026-08-02T20:32:31",
+  "count": 2,
+  "papers": [
+    {
+      "paper_id": "202608/02/2607.25984v1-schrdingers-cat-probabilistic-representation-and-prediction-of-potential-scene-kinematics",
+      "section": "deep",
+      "title_en": "Schrödinger's Cat: Probabilistic Representation and Prediction of Potential Scene Kinematics",
+      "authors": "Timy Phan, Jannik Wiese, Björn Ommer",
+      "date": "2026-07-28",
+      "pdf": "https://arxiv.org/pdf/2607.25984v1",
+      "score": "8.0",
+      "evidence": "从图像预测未来场景动力学分布的概率潜生成模型，类似视频世界模型",
+      "tldr": "预测场景未来需要建模多种可能运动，现有方法或生成外观主导视频，或仅采样少量轨迹，未显式建模运动分布。本文提出GARFIELD，学习未来运动学潜在分布的结构化时空表示，可同时联合采样所有轨迹并高效获取密度。实验显示其运动规划性能媲美大型视频生成模型，采样速度提升97倍，密度估计快两个数量级，支持交互式探索与不确定性规划。",
+      "tags": "query:video-wam",
+      "abstract_en": "Predicting how a scene may evolve from partial observations requires reasoning about multiple possible futures rather than committing to a single trajectory. Existing approaches either generate appearance-dominated video predictions or sample a small number of trajectories without explicitly modeling the distribution of possible motion. We introduce Goal-Aware Representations of Future kInEmatic Latent Distributions (GARFIELD), a probabilistic model of scene kinematics that learns a structured spatio-temporal latent representation of the distribution over possible futures given an image and optional spatio-temporally sparse constraints. The same latent representation enables both joint sampling of all trajectories and direct access to the underlying motion distribution through an efficient deterministic density decoder. As a result, uncertainty about future motion can be localized to specific scene elements and timesteps and progressively refined through additional constraints. Experiments demonstrate strong motion planning performance competitive with large video generation models while sampling trajectories $97\\times$ faster. Our method further estimates motion densities two orders of magnitude faster than Monte-Carlo sampling from motion generation models, enabling interactive exploration and uncertainty-aware planning.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "paper_id": "202608/02/2607.26903v1-from-passive-video-to-editable-experience-physically-grounded-experience-synthesis-for-embodied-intelligence",
+      "section": "quick",
+      "title_en": "From Passive Video to Editable Experience: Physically Grounded Experience Synthesis for Embodied Intelligence",
+      "authors": "Jia Luo",
+      "date": "2026-07-29",
+      "pdf": "https://arxiv.org/pdf/2607.26903v1",
+      "score": "6.0",
+      "evidence": "从人类视频生成机器人条件视频，用于具身学习",
+      "tldr": "具身智能的瓶颈在于数据，尽管网上有海量人类操作视频，但因人体与机器人形态差异，这些视频无法直接用于训练。Pegasus框架通过构建任务图、可供性与约束图直至机器人规划图的层级式图结构，结合分层可供性潜空间和物理验证器，将人类演示转化为机器人可学习的数据。在GTEA Gaze+和EPIC-KITCHENS-100等基准上验证了跨实体翻译的可靠性，将数据生成从硬件采集问题重构为可扩展的低资源知识迁移问题。",
+      "tags": "query:video-wam",
+      "abstract_en": "The key bottleneck in embodied AI is not model architecture but data. Although billions of human manipulation videos exist online, robots cannot directly learn from them due to the embodiment gap between human morphology and robot hardware. We introduce Pegasus, a low-resource framework that bridges this gap by translating human demonstrations into robot-learnable data through structured knowledge transfer. Instead of relying on raw video prompts, Pegasus constructs a graph-based intermediate representation: a Task Graph extracted from human videos is transformed through Affordance and Constraint Graphs into a Robot Planning Graph for robot-conditioned video generation. A hierarchical affordance latent space models the relationship between object states, affordances, and tasks, enabling generalization beyond object identities. A closed-loop physics verifier further filters invalid generations using kinematic feasibility, collision constraints, and joint limits. We evaluate Pegasus across a range of egocentric manipulation benchmarks, including GTEA Gaze+ and EPIC-KITCHENS-100, and diverse robot embodiments, assessing Task Correctness, Executability, State Consistency, and Learnability. Results demonstrate reliable cross-embodiment translation and show that robot data generation can be reframed from a hardware collection problem into a scalable, low-resource knowledge transfer problem.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    }
+  ],
+  "errors": []
+}
