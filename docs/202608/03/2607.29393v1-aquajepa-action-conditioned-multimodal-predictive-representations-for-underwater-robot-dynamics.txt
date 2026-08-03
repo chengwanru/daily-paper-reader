@@ -1,0 +1,229 @@
+Title: AquaJEPA: Action-Conditioned Multimodal Predictive Representations for Underwater Robot Dynamics
+
+URL Source: https://arxiv.org/pdf/2607.29393v1
+
+Published Time: Mon, 03 Aug 2026 00:53:26 GMT
+
+Number of Pages: 8
+
+Markdown Content:
+# AquaJEPA: Action-Conditioned Multimodal Predictive Representations for Underwater Robot Dynamics 
+
+Alan-Barsag Gazzaev, Alexey Gavrilov, and Sergey Muravyov 
+
+Abstract — Underwater robots combine complementary sen-sors whose reliability changes abruptly with water visibility, viewpoint, and vehicle motion. We introduce AquaJEPA, an action-conditioned joint-embedding predictive model that fuses an RGB camera, forward-looking sonar, and proprioception with explicit sensor validity. It predicts a future latent target conditioned on eight-thruster commands and supplies velocity and sonar-profile predictions to a shared receding-horizon planner. We study the method in Stonefish against reactive, state-only, ordinary multimodal, supervised dynamics, and recurrent world-model baselines. We further isolate the EMA target, action margin, masks, and modality dropout. A preregistered 120-environment replication comprises five independent replicates of a grid crossing three unseen obstacle maps, four water-visibility coefficients, and nominal versus shifted dynamics, while intermittently removing DVL observations. In 120 fresh paired environments with scheduled DVL loss, AquaJEPA reaches 74 goals, versus 68 for both state-only and the recurrent world model, and attains the lowest mean final error (0.906 m). Paired final-error reductions relative to ordinary multimodal prediction, supervised dynamics, and the recurrent world model are 0.273 m (95% CI: 0.190–0.356), 0.364 m (0.260–0.468), and 0.106 m (0.025–0.187), respectively. AquaJEPA therefore achieves the best aggregate closed-loop performance and significantly outperforms three action-conditioned predictive baselines in paired final error; its advantage over state-only remains statistically unresolved. 
+
+I. I NTRODUCTION 
+
+Underwater perception is intrinsically heterogeneous. An RGB camera provides texture and semantics but degrades with attenuation, backscatter, and illumination. Forward-looking sonar (FLS) retains geometric returns in conditions where optical sensing is weak, yet offers lower angular and semantic resolution. IMU, pressure, and Doppler velocity log (DVL) measurements add motion information, but DVL bottom lock can disappear. A dynamics model that assumes a complete observation vector can therefore be least reliable in the conditions where model-based control is most valuable. World models compress observations and predict how actions change future states [ 1 ], [ 2], [ 3]. Pixel-level prediction, however, allocates capacity to appearance details that may be unpredictable and irrelevant to control. Joint-embedding predictive architectures (JEPAs) instead predict future features [ 4], [ 5 ], [ 6]. For underwater control, the representation must additionally distinguish futures caused by different thruster sequences and remain interpretable when one sensing stream vanishes. 
+
+> All authors are with ITMO University. This work has been submitted to the IEEE for possible publication. Copyright may be transferred without notice, after which this version may no longer be accessible.
+
+We propose AquaJEPA, illustrated in Fig. 1. Sensor-specific encoders feed a mask-aware fusion module. An action encoder summarizes a short sequence of eight normalized thruster commands. The predictor learns against a stop-gradient exponential-moving-average (EMA) target while physical heads estimate future velocity change and near-range sonar intensity. Modality dropout and a counterfactual action margin encourage graceful sensor loss and action sensitivity. At test time, an ensemble of three predictors scores a fixed library of receding-horizon actions. This paper makes three contributions:  
+
+> •
+
+an action-conditioned camera–sonar–proprioceptive JEPA with mask-aware multimodal fusion, physical auxiliary heads, and a control-sensitive latent objective;  
+
+> •
+
+controlled comparisons with state-only, supervised action-conditioned dynamics, and recurrent world-model baselines, plus one-factor ablations of the target, action margin, masks, and modality dropout; and  
+
+> •
+
+a paired closed-loop evaluation across unseen maps, four visibility settings, dynamics shifts, and scheduled DVL loss, with paired bootstrap evidence of improvements over ordinary multimodal prediction, supervised dynam-ics, and a recurrent world model. The novelty is not a new sensor encoder, recurrent cell, or planner in isolation. It is the integration and controlled evaluation of action-conditioned joint-embedding prediction for multimodal underwater robot dynamics under structured partial observability. The evaluation is organized around three questions. First, does the learned future embedding distinguish consequences of different thruster sequences, rather than merely extrapolate vehicle inertia? Second, which components of the training objective preserve prediction when camera, sonar, or DVL measurements disappear? Third, when the action library and task cost are held fixed, does the representation improve goal reaching across unseen geometry, optical attenuation, and dynamics shifts? We answer the first two with held-out prediction and one-factor interventions, and the third with paired closed-loop episodes. II. R ELATED WORK 
+
+A. Latent dynamics and model-based control 
+
+Learned world models support planning by rolling compact states forward under candidate actions. World Models sepa-rates visual compression, recurrent dynamics, and control [ 1 ]; PlaNet and Dreamer learn recurrent latent state-space models for planning or imagined policy learning [ 2 ], [ 3 ]. Probabilistic arXiv:2607.29393v1 [cs.RO] 31 Jul 2026 camera encoder              
+
+> EI
+> sonar encoder
+> ES
+> proprio encoder
+> Ep
+> RGB
+> It
+> FLS
+> St
+> IMU, DVL, depth
+> pt
+> multimodal observation encoder
+> mask-aware fusion
+> F(hIt, h St, h pt, m t)
+> validity mask
+> mt
+> joint predictor
+> P(zt, q t,∆t)
+> thruster sequence
+> ut:t+K−1
+> future latent ˆzt+K
+> c∆v, sonar profile
+> EMA target encoder
+> z+
+> t+K= sg( ¯E(ot+K))
+> shared receding-horizon planner candidate cost →selected thruster command
+> zt
+> GRU Eu
+> latent target
+> Fig. 1. AquaJEPA architecture and closed-loop use. Sensor-specific encoders produce a mask-aware fused state. A GRU encodes future thruster commands, and the predictor is trained against an EMA future target with physical auxiliary heads. During closed-loop evaluation, the same predictor scores a shared action library.
+
+ensembles explicitly represent dynamics uncertainty [ 7], while MuZero and TD-MPC2 show that task-relevant latent prediction can avoid reconstructing the full observation [ 8], [ 9]. These methods establish strong action-conditioned alternatives to AquaJEPA. Our recurrent and supervised baselines test whether an underwater JEPA objective adds value when the observation encoders, data, action horizon, and downstream planner are held fixed. 
+
+B. Joint-embedding predictive learning 
+
+JEPA frames representation learning as prediction in an abstract feature space [ 4]. I-JEPA predicts masked image-region embeddings without negative pairs [ 5 ], and V-JEPA extends the idea to spatiotemporal video targets [ 6]. These models motivate our EMA target and feature-space loss, but visual temporal predictability alone does not demonstrate controllability. AquaJEPA conditions every rollout on the proposed thruster sequence and adds a margin requiring the executed action to match the future target better than inverse and zero-action alternatives. 
+
+C. Multimodal learning under missing sensors 
+
+Multimodal fusion must accommodate different geometries, sampling rates, and failure modes [ 10 ]. Modality dropout is a well-established way to prevent over-reliance on a single stream [ 11 ]. Camera and FLS are especially complementary underwater: the former carries appearance and the latter supplies acoustic range structure when visibility deteriorates. Existing synchronized sonar–visual collections, such as SOVIS [ 12 ], are valuable for cross-modal perception, but SOVIS releases camera, FLS, temperature, and pressure rather than action-labelled trajectories with IMU/DVL and causal thruster commands. We therefore use simulator trajectories for action-conditioned learning and treat real sonar–visual transfer as a separate open problem. 
+
+D. Underwater simulation and planning 
+
+Marine vehicles exhibit added mass, damping, buoyancy, currents, and actuator allocation effects [ 13 ]. Gazebo-based UUV Simulator and Stonefish provide physics and sensor in-terfaces for repeatable underwater robot studies [ 14 ], [ 15 ]. We use Stonefish through the ROS/u0env environment released with USIM and U0 [ 16 ], pinned at commit 3f4b840 . The base stack provides camera, inertial and velocity measure-ments, pressure, thruster interfaces, and privileged simulator state; our fail-closed collection extension additionally records synchronized setpoints and Stonefish’s native raw FLS stream. Our planner resembles sampling-based model predictive control [ 17 ], but candidate actions and costs are identical across learned models to isolate predictive representations. The closest conceptual alternatives therefore occupy dif-ferent points on two axes: what is predicted and how partial observations are handled. Recurrent world models predict state-like features through sequential transitions; supervised dynamics directly regress physical outcomes; and visual JEPAs predict abstract targets without a control interface. Our comparison holds the multimodal encoders, training trajectories, action horizon, and planner interface as constant as possible. This makes the objective—joint-embedding, su-pervised, or recurrent—the principal experimental difference rather than the amount of privileged state or planner tuning. III. P ROBLEM FORMULATION 
+
+Let xt denote the unobserved vehicle–environment state, including pose, velocity, local geometry, current, and actuator effectiveness. The robot sees only a multimodal observation 
+
+ot and applies an eight-dimensional thruster command ut.Optical attenuation, acoustic artifacts, and intermittent DVL lock make this a partially observed controlled process. We seek a compact representation zt = E(ot) whose predicted future ˆzt+K changes with the proposed control sequence 
+
+ut:t+K−1 while retaining information needed for short-horizon navigation. This goal differs from reconstructing the next sensor frame. The future camera contains illumination and texture changes that need not affect the best thruster command, while the future sonar contains speckle and view-dependent returns. We therefore train in representation space and attach only two physical readouts used by the planner: velocity change and a coarse near-range sonar profile. The target encoder is used during learning but is not required for online action selection. For a fixed candidate set Ut, the downstream decision is 
+
+u∗ 
+
+> t
+
+= first arg min 
+
+> u∈U t
+
+J(P (E(ot), u), o t, g t) , (1) where gt is the navigation goal and only the first command is executed before replanning. All learned baselines expose the same velocity and sonar readouts to the same J. Consequently, closed-loop differences measure the utility of their predictive representations within this shared control interface, not superiority of a separately tuned controller. IV. A QUA JEPA 
+
+A. Observation and action model 
+
+At time t, the robot receives 
+
+ot = ( It, S t, p t, m t), (2) where It is RGB, St is raw FLS intensity, pt ∈ R15 contains DVL velocity, IMU angular velocity and linear acceleration, IMU orientation, pressure, and DVL altitude, and mt ∈{0, 1}3 marks camera, sonar, and proprioceptive availability. Normalized thruster control ut ∈ [−1, 1] 8 is sampled at 10 Hz. The model predicts K steps ahead from ot and ut:t+K−1.
+
+B. Mask-aware multimodal encoder 
+
+Separate convolutional camera and sonar encoders and a two-layer proprioceptive MLP produce 64-dimensional features 
+
+hIt = EI (It), hSt = ES (St), hpt = Ep(pt). (3) Fusion explicitly receives validity: 
+
+zt = F ([ mIt hIt ; mSt hSt ; mpt hpt ; mt]) . (4) During training, camera or sonar is removed with probability 0.35. The planner checkpoint also uses 0.35 DVL dropout; dropped DVL velocity and altitude are zeroed before propri-oceptive encoding. Both image encoders use four stride-two 5×5 convolutional blocks with 32, 64, 96, and 128 channels, GroupNorm, and GELU, followed by global average pooling and a linear projection. RGB and FLS inputs are independently resized to 96 × 128 and scaled to [0 , 1] . The proprioceptive encoder and fusion network are two-layer MLPs with GELU and LayerNorm. The 15 proprioceptive values comprise three DVL velocities, three IMU angular velocities, three IMU linear accelerations, a four-dimensional orientation quaternion, pressure, and DVL altitude. Multiplying each modality embedding by its mask before concatenation prevents a missing sensor from being confused with an arbitrary learned feature, while appending mt tells the fusion layer which evidence was actually available. 
+
+C. Action-conditioned joint prediction 
+
+A GRU summarizes the K = 5 thruster commands as 
+
+qt. The predictor consumes the current embedding, action summary, and physical horizon: 
+
+ˆzt+K = P ([ zt; qt; ∆ t]) . (5) An EMA copy of the multimodal encoder builds a stop-gradient target z+ 
+
+> t+K
+
+= sg( ¯E(ot+K )) with momentum 0.99. Auxiliary heads decode future velocity change c∆vt+K and a 32-bin sonar range-intensity profile ˆst+K .The loss is 
+
+L = Llat + Lvel + 0 .5Lsonar + 0 .1Lcm + 2 .0Lact , (6) where latent and cross-modal terms use cosine distance and the physical heads use L1 losses. For latent prediction error 
+
+e(u) = 1 − cos( P (zt, u, ∆t), z + 
+
+> t+K
+
+), the action loss is 
+
+Lact = 12
+
+X
+
+> ˜u∈{− u, 0}
+
+[0 .02 + e(u) − e(˜ u)] +. (7) This explicitly penalizes locally action-invariant predictions. The cross-modal term aligns the camera and sonar embed-dings at the current time, whereas the latent term constrains the fused future. These terms play different roles: cross-modal alignment supplies a common geometric signal when one exteroceptive stream is weak, while the future target preserves information not captured by the low-dimensional physical heads. The action margin is evaluated only for samples with non-negligible commands and compares the executed sequence with both its inverse and a zero sequence. Thus a model cannot satisfy the objective solely by copying zt or predicting average inertial drift. 
+
+D. Shared receding-horizon planner 
+
+At 2 Hz, every learned method scores the same goal-directed, constant, pulse, ramp, and braking action candidates over a 0.5 s horizon. A three-seed ensemble minimizes 
+
+J(u) = λv ∥ˆvt+K (u) − v∗ 
+
+> t
+
+∥1 + λcCnear (u) + λe∥u∥1
+
++ λs∥ut − ut−1∥1 + λq Std[ˆ vt+K (u)] . (8) The desired body velocity v∗ 
+
+> t
+
+is computed from the navigation goal. Action limits, task cost, online residual correction, and success radius are frozen across methods. The candidate library contains neutral and previous-action holds, a braking pulse, axis-aligned surge/sway/yaw/heave primitives, and goal-aligned mixtures with hold, pulse, and ramp temporal profiles. Primitive amplitudes use scales 
+
+{0.60 , 0.85 , 1.00 , 1.15 } around 0.30 and are clipped at 0.45. The weights are λv = 1 , λc = 0 .05 , λe = 0 .001 , λs = 0 .005 ,and λq = 0 .05 . The sonar cost averages the nearest third of the predicted 32-bin profile; uncertainty is the ensemble standard deviation of predicted final velocity. When DVL is available, an exponential residual estimate ( α = 0 .25 , clipped to 0.20 m/s) corrects systematic velocity bias for every learned method. At each planner update, the goal displacement is rotated into the DVL body frame and capped at 0.40 m/s. Every ensemble member rolls out every candidate, the costs are averaged, and the first thruster vector of the minimum-cost sequence is held until the next 2 Hz update. During a declared DVL-loss window, velocity and altitude inputs are zeroed, the planner’s velocity-valid flag is updated, and residual adaptation is paused. This causal loop uses no privileged odometry inside the predictive model; simulator odometry is used only to form the navigation target and compute evaluation metrics. V. E XPERIMENTAL PROTOCOL 
+
+A. Training data and controls 
+
+We collect 12 synchronized 30 s Stonefish BlueROV2 episodes at 10 Hz: eight training, two validation, and two held-out test episodes. Complete environment episodes, rather than frames, define splits. The collector requires camera, raw FLS, IMU, DVL, pressure, and the applied eight-thruster command, and rejects non-monotonic or out-of-schedule samples. Randomization covers initial pose, lighting, water visibility, current, and action amplitude. Training examples are constructed as causal five-command windows: the current observation precedes the recorded command sequence and the target observation is taken after the fifth command. The physical elapsed time is included in the predictor rather than assumed from an array index. Sonar supervision is formed by averaging intensity over bearing and adaptively pooling range to 32 bins; velocity supervision is the change from the current to the future DVL reading. No frame from a validation or test episode appears in training. All models use the same image sizes ( 96 × 128 ), 64-dimensional latent, 18 AdamW epochs, batch size 64, learning rate 3×10 −4, weight decay 10 −4, mixed precision, and seeds 11, 22, and 33. Checkpoints are selected using validation data only. Existing state-only, ordinary multimodal, and AquaJEPA checkpoints are frozen before the new study. Validation checkpoint selection is also objective-aware. JEPA variants use a composite of future-velocity MAE, executed-versus-zero-action ranking, and the signed no-action gap; rankings below 0.55 and negative gaps incur penalties. Supervised and recurrent baselines are selected by future-velocity MAE. Test metrics never participate in selection. This discourages choosing a low-error but action-insensitive checkpoint for AquaJEPA while retaining the natural super-vised criterion for the physical dynamics baselines. 
+
+B. Baselines and ablations 
+
+The closed-loop baselines are: (i) a reactive controller without a learned model; (ii) a state-only action predictor; (iii) ordinary multimodal latent prediction without AquaJEPA’s sensor-dropout preparation; (iv) supervised action-conditioned dynamics, which shares the encoders and predictor but optimizes only velocity and sonar-profile targets; and (v) a recurrent supervised world model that applies a GRUCell transition for each action. Supervised baselines receive the same modality and DVL corruptions as AquaJEPA. The state-only model retains proprioception but masks camera and sonar. The ordinary multimodal model uses the same three sensor encoders and feed-forward action transition, but lacks AquaJEPA’s sensor-dropout preparation. Supervised dynamics removes latent, cross-modal, and action-margin losses while retaining the physical heads. The recurrent world model replaces the single GRU action summary with a GRUCell transition applied once per command and is trained only on the physical targets. Hence the strongest alternatives are not deprived of actions, multimodal input, corruption exposure, or the downstream planner. Four one-factor ablations replace the EMA target by an online stop-gradient target, remove the action margin, hide the explicit mask while retaining zeroed inputs, or remove camera/sonar modality dropout while retaining DVL dropout.                         
+
+> TABLE I FROZEN CLOSED -LOOP PROTOCOL . E VERY METHOD RECEIVES THE SAME FACTOR CELLS ,ACTION CANDIDATES ,TASK COST ,AND DVL-LOSS SCHEDULE .
+> Item Setting Simulator / vehicle Stonefish / BlueROV2, 10 Hz Planner 2 Hz; 5 steps / 0.5 s Episode / success 55 s / terminal error ≤1mLayouts open arc, east corridor, north slalom Visibility coefficient 0.10, 0.15, 0.20, 0.25 Current 0.08 m/s nominal; 0.18 m/s shifted Shifted actuation horizontal efficiencies 0.82–0.88 DVL missing 10–15, 25–30, 40–45 s Inference units 5×(3 ×4×2) = 120 paired episodes
+
+Ablations use the same three model seeds and held-out prediction episodes; they are not used to tune the planner. A separately sealed corruption evaluation compares Aqua-JEPA, no explicit mask, and no modality dropout on the two untouched test episodes under nominal, camera-absent, sonar-absent, DVL-absent, and combined camera–DVL con-ditions. Its primary outcome is five-step future-velocity MAE, summarized across the three frozen model seeds. 
+
+C. Factorial closed-loop evaluation 
+
+Before outcomes were opened, we sealed 120 scenarios: five independent environment-seed replicates of the 24-cell Cartesian product of three unseen obstacle layouts (open arc, east corridor, and north slalom), four Stonefish Jerlov coefficients (0.10, 0.15, 0.20, and 0.25), and nominal or shifted dynamics. The shifted regime raises current magnitude from 0.08 to 0.18 m/s and sets the four horizontal-thruster efficiencies to 0.82–0.88. Initial pose, current direction, lighting, map, and dynamics are identical across methods within an episode. Each 55 s run removes DVL velocity and altitude during 10–15, 25–30, and 40–45 s. A 1 m terminal goal radius defines success. The resulting matrix has 720 runs and 120 paired inferential units. Scenario seeds, factor cells, analysis code, and SHA-256 hashes were frozen before any closed-loop outcome was observed. 
+
+D. Metrics and uncertainty 
+
+Prediction outcomes are future-velocity MAE, sonar-profile MAE, latent cosine error, and executed-versus-zero-action ranking. Closed-loop outcomes are success, final and mean goal error, collision, minimum clearance, and command total variation. We report every paired final-error difference and summarize AquaJEPA minus each baseline by its mean, win/tie/loss count, and percentile 95% interval from 10,000 cell-stratified paired bootstrap resamples (seed 20260729). Results are also stratified by layout, visibility coefficient, and dynamics regime. Each bootstrap draw resamples five entire paired episodes within each of the 24 factor cells and then averages the cell means with equal weight; it never resamples frames or control steps. For final error, a negative difference means that TABLE II FIVE -STEP HELD -OUT PREDICTION (MEAN ± STANDARD DEVIATION ACROSS THREE SEEDS ). R ANK MEANS THE EXECUTED ACTION HAS LOWER TARGET ERROR THAN ZERO ACTION .                                 
+
+> Method Velocity MAE ↓Sonar MAE ↓Action rank ↑
+> State-only 0.0047 ±0.0004 0.0242 ±0.0002 0.453 ±0.013 Multimodal heads 0.0048 ±0.0007 0.0246 ±0.0002 0.394 ±0.016 Supervised dyn. 0.0045 ±0.0001 0.0188 ±0.0056 0.407 ±0.000 Recurrent WM 0.0043 ±0.0003 0.0194 ±0.0074 0.198 ±0.066 AquaJEPA 0.0052 ±0.0004 0.0243 ±0.0003 0.436 ±0.012 w/o EMA 0.0054 ±0.0008 0.0243 ±0.0001 0.431 ±0.024 w/o margin 0.0047 ±0.0006 0.0274 ±0.0051 0.182 ±0.045 w/o masks 0.0050 ±0.0009 0.0246 ±0.0002 0.394 ±0.035 w/o mod. dropout 0.0053 ±0.0001 0.0242 ±0.0003 0.424 ±0.014
+
+AquaJEPA finishes closer to the goal. A win is an episode with lower final error than the comparator; for success, the reported difference is AquaJEPA’s paired success indicator minus the baseline indicator. These episode-level estimands match the factor sweep and avoid treating highly correlated 10 Hz observations as independent. The preregistered primary comparator is state-only. A positive primary decision requires all three gates: the upper endpoint of the paired final-error interval is below zero, the lower endpoint of the paired success interval is at least −0.10 ,and AquaJEPA’s collision rate does not exceed state-only. Other pairwise comparisons are secondary and are reported in full. VI. R ESULTS 
+
+A. Action conditioning and missing observations 
+
+On the original held-out transitions, AquaJEPA reduces future-velocity MAE by 22.1% relative to the no-action ablation (0.004971 versus 0.006382) and ranks the executed action above a matched counterfactual in 75.2% of samples. Under fixed sensor corruption, its worst velocity MAE is 0.00590, compared with 0.01274 for ordinary fusion. This establishes action sensitivity and missing-input robustness before examining the new closed loop. 
+
+B. Supervised baselines and component ablations 
+
+Table II compares the new dynamics baselines and single-component ablations at the five-step horizon. Action rank exposes a distinction hidden by velocity MAE: the recurrent model records the lowest velocity MAE (0.0043) but only 0.198 action rank, while AquaJEPA reaches 0.436. Removing the action margin likewise lowers MAE but reduces action rank to 0.182. The margin therefore improves the counterfac-tual sensitivity needed by the planner. For supervised models, latent action rank is a diagnostic against the frozen encoder target rather than a training objective. Under camera blackout, AquaJEPA retains 0.0056 velocity MAE, whereas removing modality dropout raises it to 0.0108; the combined camera–DVL condition gives 0.0055 versus 0.0108. This repeated twofold gap identifies sensor-loss exposure as the clearest driver of missing-sensor robustness. The no-explicit-mask ablation records 0.0051 on the same                                                  
+
+> TABLE III FUTURE -VELOCITY MAE UNDER FROZEN SENSOR INTERVENTIONS
+> (MEAN ±STANDARD DEVIATION OVER THREE MODEL SEEDS ). DVL
+> DROPOUT REMAINS ENABLED DURING TRAINING FOR ALL ROWS .
+> Method Nominal Camera absent Camera+DVL absent AquaJEPA 0.0052 ±0.0004 0.0056 ±0.0006 0.0055 ±0.0005 w/o explicit masks 0.0050 ±0.0009 0.0051 ±0.0007 0.0051 ±0.0008 w/o modality dropout 0.0053 ±0.0001 0.0108 ±0.0039 0.0108 ±0.0038
+> TABLE IV CLOSED -LOOP RESULTS ACROSS 120 PAIRED ENVIRONMENTS . F INAL ERROR AND CLEARANCE ARE MEANS IN METERS ;COLLISION IS THE PERCENTAGE OF EPISODES .
+> Method Success Collision Final error ↓Clearance ↑
+> Reactive 33/120 0.0% 1.469 1.274 State-only 68/120 0.0% 0.916 0.583 Multimodal predictor 58/120 0.0% 1.179 0.622 Supervised dynamics 47/120 0.0% 1.269 0.673 Recurrent world model 68/120 0.0% 1.012 0.607 AquaJEPA 74/120 0.0% 0.906 0.543
+
+fixed-corruption metric, so this test does not isolate an additional mask benefit. 
+
+C. Closed-loop evaluation under visibility and dynamics shifts 
+
+Table IV reports all six planners on the frozen 120-episode matrix. On the frozen replication, AquaJEPA has the highest success count and lowest mean final error: 74/120 successes and 0.906 m, compared with 68/120 and 0.916 m for state-only and 68/120 and 1.012 m for the recurrent world model. Paired final-error intervals exclude zero against ordinary mul-timodal prediction ( −0.273 m, 95% CI [−0.356 , −0.190] ), supervised dynamics ( −0.364 m, [−0.468 , −0.260] ), and the recurrent model ( −0.106 m, [−0.187 , −0.025] ). AquaJEPA therefore achieves the best aggregate closed-loop performance and significantly outperforms these three action-conditioned predictive baselines in paired final error; its advantage over state-only remains statistically unresolved because the paired interval is [−0.100 , 0.079] m. The paired distribution in Fig. 2 shows whether an aggregate difference is driven by a few environments or is repeated across the factor sweep. Table V reports the episode-level estimands behind the aggregate means. Against ordinary multimodal prediction, AquaJEPA wins 78 of 120 paired episodes and improves success by 0.133; against supervised dynamics it wins 81 and improves success by 0.225. Both final-error and success intervals exclude zero for these two matched predictive baselines. Against the recurrent world model, the final-error interval also excludes zero, while the success interval includes zero. Together, these estimates show that the aggregate lead is supported by repeated episode-level improvements against all three action-conditioned predictive baselines. 
+
+D. Where the closed-loop difference appears 
+
+All 120 environments combine poor optical visibility with three scheduled DVL-loss windows. AquaJEPA leads on north slalom (28/40 successes, 0.779 m) and open arc (22/40, 0.959 m). It succeeds in 57/60 nominal-dynamics episodes TABLE V PAIRED CLOSED -LOOP EFFECTS FOR AQUA JEPA MINUS EACH COMPARATOR ACROSS 120 EPISODES . F INAL -ERROR DIFFERENCES ARE IN METERS ;    
+
+> NEGATIVE IS BETTER . W/T/L COUNTS LOWER /EQUAL /HIGHER FINAL ERROR FOR AQUA JEPA. S UCCESS DIFFERENCES ARE PAIRED PROPORTIONS .INTERVALS USE 10,000 CELL -STRATIFIED BOOTSTRAP RESAMPLES .
+
+## Comparator ∆ final error [95% CI] W/T/L ∆ success [95% CI] Reactive −0.563 [−0.631 , −0.494 ] 98/0/22 +0 .342 [+0 .275 , +0 .408 ]State-only −0.011 [−0.100 , +0 .079 ] 64/0/56 +0 .050 [−0.025 , +0 .125 ]Multimodal −0.273 [−0.356 , −0.190 ] 78/0/42 +0 .133 [+0 .067 , +0 .200 ]Supervised dyn. −0.364 [−0.468 , −0.260 ] 81/0/39 +0 .225 [+0 .150 , +0 .308 ]Recurrent WM −0.106 [−0.187 , −0.025 ] 72/0/48 +0 .050 [−0.025 , +0 .125 ]
+
+and 17/60 shifted episodes; state-only obtains 54/60 and 14/60, respectively. Across the four Jerlov settings, AquaJEPA reaches 17–21 of 30 goals per level and has the lowest mean error at coefficients 0.10 and 0.20. Thus the aggregate gain spans visibility and dynamics cells while remaining layout dependent: in east corridor it reaches 24/40 goals versus 30/40 for state-only and 33/40 for the recurrent model. The visibility sweep is deliberately not a clean-camera versus turbid-camera comparison: every cell is already a degraded underwater setting and every episode contains 15 s of scheduled DVL loss. The right panel of Fig. 2 therefore tests whether the aggregate result persists as optical attenuation changes while sonar remains available. AquaJEPA succeeds in 21/30, 17/30, 19/30, and 17/30 episodes from coefficient 0.10 through 0.25. Its mean final error is lowest among all methods at coefficients 0.10 and 0.20. Across the full poor-visibility suite it retains the highest success count and lowest aggregate final error. Dynamics shift is the stronger disturbance: AquaJEPA’s mean final error rises from 0.394 m in nominal cells to 1.417 m with increased current and reduced horizontal-thruster effectiveness. Nevertheless it succeeds in 57/60 nominal cells and retains 17/60 successes after the shift, compared with 54/60 and 14/60 for state-only, 53/60 and 15/60 for the recurrent model, and 41/60 and 6/60 for supervised dynamics. No planner collides in the frozen matrix, so collision rate does not explain the success difference and is not claimed as a comparative advantage. AquaJEPA’s mean clearance is 0.543 m, compared with 0.583 m for state-only and 0.607 m for the recurrent model; the aggregate claim therefore concerns goal reaching and final error rather than clearance. VII. D ISCUSSION 
+
+The study separates three explanations that a comparison with ordinary fusion alone cannot resolve. The state-only baseline tests whether direct motion sensing is sufficient; supervised dynamics tests whether physical auxiliary targets alone explain planning quality; and the recurrent model tests whether an autoregressive transition is enough. The one-factor ablations then locate which parts of the JEPA training recipe contribute to prediction under sensor loss. The experiments also show why a supervised prediction table alone is insufficient for model selection. AquaJEPA’s ac-tion margin strengthens ranking of the executed action against matched counterfactuals, which directly serves the shared planner’s comparison of unexecuted candidates. Coupling this control-sensitive latent with physical velocity and sonar heads makes the objectives complementary: one separates  
+
+> Fig. 2. Closed-loop behavior under partial observability. Left: per-episode paired final-error differences between AquaJEPA and each learned baseline; values below zero favor AquaJEPA, boxes show interquartile ranges, and dots show all 120 episodes. Right: mean final error at each Stonefish visibility coefficient, pooling three layouts and two dynamics regimes.
+
+candidate futures, while the other preserves calibrated short-horizon predictions. The missing-sensor intervention gives a similarly specific mechanism result. Modality dropout approximately halves velocity error when camera is absent, including the combined camera–DVL condition. Across the frozen corruptions, train-ing exposure to missing modalities is therefore the clearest isolated driver of test-time sensor-loss robustness. The paired factorial design is also important. Every method sees the same map, water coefficient, current direction, actuator efficiencies, initial pose, and DVL-loss schedule. Differences therefore cannot be attributed to easier random draws, while the per-episode plot exposes heterogeneity hidden by an overall mean. The 120-episode replication establishes AquaJEPA’s highest aggregate success and lowest mean final error, with statistically supported paired final-error gains over ordinary multimodal prediction, supervised dynamics, and the recurrent world model. Across the full closed loop, this is a coherent performance result rather than a single favorable metric. AquaJEPA is the only learned planner that combines the highest goal count with the lowest aggregate final error. Its paired final-error improvements over all three action-conditioned predictive baselines exclude zero, and the aggregate lead persists across visibility levels and both nominal and shifted dynamics. Because the action library, planner cost, online correction, sensor-loss schedule, and episode realization are held fixed, these differences localize to the predictive representation used to rank candidate actions. Partial observability is central to this interpretation. Every evaluation episode combines degraded optical sensing with scheduled DVL loss, requiring the planner to use sonar geometry together with intermittent motion cues. The ordinary multimodal comparison shows that access to all sensor streams alone does not produce the result; the supervised and recurrent comparisons show that physical regression or additional transi-tion capacity alone is likewise insufficient. AquaJEPA instead couples a latent future target, counterfactual action sensitivity, and sensor-loss exposure within the same controlled planning interface. From a robotics perspective, the strongest result occurs where the sensing assumptions are jointly stressed: attenuated vision, intermittent velocity feedback, unseen geometry, and an action-to-motion shift. Camera and sonar features alone do not guarantee this behavior, because the ordinary multimodal predictor is exposed to the same online observations and planner. The paired improvement over that baseline demon-strates that action-sensitive predictive structure, rather than multimodality by itself, improves closed-loop control in poor visibility. VIII. L IMITATIONS 
+
+Three limitations bound the claim. First, all evidence comes from one Stonefish BlueROV2 model with a discrete action library, privileged scoring odometry, and approximate collision geometry. Second, performance varies across layouts and secondary metrics, and the single-factor study does not independently validate every architectural component. Third, Jerlov coefficients and injected DVL/actuator failures are controlled proxies rather than a complete model of real water, acoustic artifacts, timing drift, or hardware degradation. The result therefore establishes robustness in the tested simulation regime; real action-conditioned validation requires synchronized camera, sonar, state, and causal thruster telemetry. IX. C ONCLUSION 
+
+AquaJEPA predicts future multimodal representations con-ditioned on thruster sequences and uses the resulting physical heads for receding-horizon action selection. The expanded simulation study compares strong state-only, supervised, and recurrent alternatives, isolates four design components, and tests fresh paired episodes across maps, visibility, dynamics, and DVL loss. The 120 fresh paired environments confirm that AquaJEPA achieves the highest aggregate success and lowest mean final error, with statistically supported paired final-error improvements over ordinary multimodal prediction, supervised dynamics, and the recurrent world model under poor visibility and intermittent velocity sensing. The next step is a strictly held-out transfer study on real trajectories with verified command timing. ACKNOWLEDGMENT 
+
+OpenAI Codex was used under author supervision for language editing throughout all sections of the manuscript. The authors verified all claims, citations, analyses, code, and numerical results. REFERENCES [1] D. Ha and J. Schmidhuber, “Recurrent world models facilitate policy evolution,” in Advances in Neural Information Processing Systems , vol. 31. Curran Associates, Inc., 2018, pp. 2450–2462. [Online]. Available: https://proceedings.neurips.cc/paper/2018/hash/ 2de5d16682c3c35007e4e92982f1a2ba-Abstract.html [2] D. Hafner, T. Lillicrap, I. Fischer, R. Villegas, D. Ha, H. Lee, and J. Davidson, “Learning latent dynamics for planning from pixels,” in Proceedings of the 36th International Conference on Machine Learning , ser. Proceedings of Machine Learning Research, vol. 97. PMLR, 2019, pp. 2555–2565. [Online]. Available: https://proceedings.mlr.press/v97/hafner19a.html [3] D. Hafner, T. Lillicrap, J. Ba, and M. Norouzi, “Dream to control: Learning behaviors by latent imagination,” in International Conference on Learning Representations , 2020. [Online]. Available: https://openreview.net/forum?id=S1lOTC4tDS [4] Y. LeCun, “A path towards autonomous machine intelligence,” 2022, openReview position paper, version 0.9.2. [Online]. Available: https://openreview.net/forum?id=BZ5a1r-kVsf [5] M. Assran, Q. Duval, I. Misra, P. Bojanowski, P. Vincent, M. Rabbat, Y. LeCun, and N. Ballas, “Self-supervised learning from images with a joint-embedding predictive architecture,” in Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition ,June 2023, pp. 15 619–15 629. [6] A. Bardes, Q. Garrido, J. Ponce, X. Chen, M. Rabbat, Y. LeCun, M. Assran, and N. Ballas, “Revisiting feature prediction for learning visual representations from video,” Transactions on Machine Learning Research , 2024. [Online]. Available: https: //openreview.net/forum?id=QaCCuDfBk2 [7] K. Chua, R. Calandra, R. McAllister, and S. Levine, “Deep reinforcement learning in a handful of trials using probabilistic dynamics models,” in Advances in Neural Information Processing Systems , vol. 31. Curran Associates, Inc., 2018, pp. 4754–4765. [Online]. Available: https://proceedings.neurips.cc/paper/2018/hash/ 3de568f8597b94bda53149c7d7f5958c-Abstract.html [8] J. Schrittwieser, I. Antonoglou, T. Hubert, K. Simonyan, L. Sifre, S. Schmitt, A. Guez, E. Lockhart, D. Hassabis, T. Graepel, T. Lillicrap, and D. Silver, “Mastering Atari, Go, chess and shogi by planning with a learned model,” Nature , vol. 588, no. 7839, pp. 604–609, 2020. [9] N. Hansen, H. Su, and X. Wang, “TD-MPC2: Scalable, robust world models for continuous control,” in International Conference on Learning Representations , 2024. [Online]. Available: https: //openreview.net/forum?id=FzpfPa6unv [10] T. Baltru ˇsaitis, C. Ahuja, and L.-P. Morency, “Multimodal machine learning: A survey and taxonomy,” IEEE Transactions on Pattern Analysis and Machine Intelligence , vol. 41, no. 2, pp. 423–443, 2019. [11] N. Neverova, C. Wolf, G. W. Taylor, and F. Nebout, “ModDrop: Adaptive multi-modal gesture recognition,” IEEE Transactions on Pattern Analysis and Machine Intelligence , vol. 38, no. 8, pp. 1692– 1706, 2016. [12] W. Chen, P. Tinn, P. G. Auran, M. Ludvigsen, and P. H. Haro, “A sonar-visual dataset for cross-modal underwater robot perception,” arXiv preprint arXiv:2606.01398 , 2026. [Online]. Available: https://arxiv.org/abs/2606.01398 [13] T. I. Fossen, Handbook of Marine Craft Hydrodynamics and Motion Control , 2nd ed. Wiley, 2021. [14] M. M. M. Manh ˜aes, S. A. Scherer, M. Voss, L. R. Douat, and T. Rauschenbach, “UUV simulator: A gazebo-based package for underwater intervention and multi-robot simulation,” in OCEANS 2016 MTS/IEEE Monterey . IEEE, September 2016, pp. 1–8. [15] P. Cie ´slak, “Stonefish: An advanced open-source simulation tool designed for marine robotics, with a ROS interface,” in OCEANS 2019 - Marseille . IEEE, June 2019, pp. 1–6. [16] J. Gu, Z. Wu, P. Si, S. Qiu, Y. Feng, L. Sun, L. Luo, L. Yu, J. Wang, and Z. Wu, “USIM and U0: A vision-language-action dataset and model for general underwater robots,” arXiv preprint arXiv:2510.07869 ,2025. [Online]. Available: https://arxiv.org/abs/2510.07869 [17] G. Williams, P. Drews, B. Goldfain, J. M. Rehg, and E. A. Theodorou, “Information-theoretic model predictive control: Theory and applications to autonomous driving,” IEEE Transactions on Robotics , vol. 34, no. 6, pp. 1603–1622, 2018.
