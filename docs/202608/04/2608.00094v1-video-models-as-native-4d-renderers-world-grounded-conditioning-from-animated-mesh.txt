@@ -1,0 +1,559 @@
+Title: Video Models as Native 4D Renderers: World-Grounded Conditioning from Animated Mesh
+
+URL Source: https://arxiv.org/pdf/2608.00094v1
+
+Published Time: Tue, 04 Aug 2026 00:03:57 GMT
+
+Number of Pages: 14
+
+Markdown Content:
+# Video Models as Native 4D Renderers: World-Grounded Conditioning from Animated Mesh 
+
+# JUNHAO CHEN, Tsinghua University, China 
+
+# MINGJIN CHEN, The Hong Kong Polytechnic University, China 
+
+# HENGHAOFAN ZHANG, University of Electronic Science and Technology of China, China 
+
+# MINGLIN CHEN, Sun Yat-sen University, China 
+
+# LIAOYUAN FAN, The University of Hong Kong, China 
+
+# BORAN ZHANG, University of Science and Technology of China, China 
+
+# SAINING ZHANG, Nanyang Technological University, Singapore 
+
+# MINGZE SUN, Tsinghua University, China 
+
+# HAO ZHAO, Tsinghua University, China 
+
+# RUQI HUANG ∗, Tsinghua University, China 
+
+# ZHIHAO LI, SparcAI Inc., USA 
+
+# YUFEI WANG †, SparcAI Inc., USA 
+
+Fig. 1. DAR is a reference-guided 4D renderer: with the animated mesh and camera fixed, changing only the first-frame reference image re-renders the scene’s appearance. The same animated car mesh, camera trajectory, and 4D geometry are held fixed; each column uses a different reference style and each row is a normalized animation time. DAR alters paint style, color, and vehicle appearance while keeping the camera, pose, and silhouette aligned, indicating partial decoupling between geometry and appearance. 
+
+> ∗
+
+Corresponding authors: Ruqi Huang and Yufei Wang. 
+
+> †
+
+Corresponding Author. Authors’ Contact Information: Junhao Chen, yisuanwang@gmail.com, Tsinghua Uni-versity, Shenzhen, China; Mingjin Chen, chenmingjin1238@gmail.com, The Hong Kong Polytechnic University, Hong Kong, China; Henghaofan Zhang, hhfzhang@outlook. com, University of Electronic Science and Technology of China, Chengdu, China; Min-glin Chen, chenmlin8@mail2.sysu.edu.cn, Sun Yat-sen University, Guangzhou, China; Liaoyuan Fan, u3619617@connect.hku.hk, The University of Hong Kong, Hong Kong, China; Boran Zhang, chenqingsui1@gmail.com, University of Science and Technology of China, Hefei, China; Saining Zhang, saining002@e.ntu.edu.sg, Nanyang Techno-logical University, Singapore, Singapore; Mingze Sun, smz22@mails.tsinghua.edu.cn, Tsinghua University, Beijing, China; Hao Zhao, zhaohao@air.tsinghua.edu.cn, Tsinghua University, Beijing, China; Ruqi Huang, ruqihuang@sz.tsinghua.edu.cn, Tsinghua Uni-versity, Shenzhen, China; Zhihao Li, zhihao.li@sparclab.ai, SparcAI Inc., Wilmington, DE, USA; Yufei Wang, yufei.wang@sparclab.ai, SparcAI Inc., Wilmington, DE, USA. 
+
+Pretrained video diffusion models can act as renderers when the desired scene state is already specified by an animated mesh, a camera trajectory, and a reference image. This 4D generative rendering setting raises a representation question: what image-format condition lets a video backbone obey both camera motion and scene-internal animation? We propose DAR, a reference-guided renderer that extends Wan2.2 camera control from Plücker rays alone to a joint camera-plus-geometry interface. DAR projects a neural 4D G-buffer (tracking, world position, and normal) from the animated mesh and injects it through a widened control adapter while preserving the pretrained image-to-video prior. The central design choice is the pair of tracking and world position. Tracking identifies the persistent surface element that should carry appearance; world position gives its current scene-coordinate state; normal supplies local shape. Depth plus calibrated rays can recover 3D in principle, but depth is a camera-dependent chart in which camera and object motion 
+
+1arXiv:2608.00094v1 [cs.CV] 30 Jul 2026 are mixed. On the 68-case DAR-4D benchmark, LoRA DAR reaches PSNR 23.22, SSIM 0.895, and LPIPS 0.134, improving over off-the-shelf Wan2.2-Depth by 1.54 dB PSNR; a full fine-tune reaches PSNR 25.36 and SSIM 0.917. Matched ablations show that replacing world position by depth reduces PSNR by 1.26–1.55 dB at every checkpoint, supporting tracking+world-position correspondence as a practical 4D rendering condition. CCS Concepts: • Computing methodologies → Computer graphics ;  
+
+> Rendering ;Computer vision ;Image and video synthesis .Additional Key Words and Phrases: generative rendering, video diffusion, 4D scenes, animated mesh, world-position conditioning, geometry-aware control, reference-guided synthesis, controllable world models
+
+1 Introduction 
+
+Generative video models are increasingly useful as rendering en-gines. In many graphics workflows, a user or simulator already specifies the 4D state of a scene: an animated mesh, a camera path, and a reference appearance. The target is therefore not an uncon-strained video, but a rendered video that preserves the specified camera trajectory and scene motion while adding material, light-ing, texture, and high-frequency detail. This problem appears in previz, look development, game cinematics, synthetic-data genera-tion, embodied simulation, and world-model visualization. We call it 4D generative rendering . The difficulty is that ordinary videos entangle observer motion and object motion, while a renderer must keep them separately controllable. Existing controllable video models expose only part of this in-terface. Camera-control models such as Wan2.2-Camera follow a target trajectory through Plücker rays, but they receive no per-frame object geometry, so foreground identity and animation are left to the image-to-video prior or a text prompt [Wan et al . 2025]. Depth-conditioned models receive a strong projected layout signal, but depth is measured in the current camera frame and does not identify which moving surface point is being observed [Alhaija et al .2025; ByteDance Seed Team 2025; Wan et al . 2025]. Tracking-guided and 3D-assisted methods move closer to generative rendering, but sparse or object-centric tracks weaken under novel views and oc-clusion, while static-scene anchor methods assume the surface state does not change over time [Cai et al . 2024; Gu et al . 2025; Kim et al .2025]. The common limitation is representation: a single camera map, depth map, prompt, or sparse tracking image cannot tell the model both which ray is being rendered and which animated surface state lies on that ray. We propose DAR (Diffusion as Renderer) , a reference-guided video renderer built around a neural 4D G-buffer that uses a pre-trained video diffusion model as the renderer. As shown in Fig. 2, the animated mesh is rasterized into tracking, world-position, and nor-mal maps; the target camera is represented by per-pixel Plücker rays; and a first-frame reference image supplies appearance. Architec-turally, we keep the Wan2.2-Fun-5B-Control-Camera backbone and make one targeted change: the original camera-control adapter is widened from 24 Plücker channels to (24 +𝑁 ) camera-plus-geometry channels, then fine-tuned with LoRA. The transformer therefore receives, at the same early control point, the ray being rendered, the animated surface state on that ray, and the reference appearance to propagate. The key condition is tracking plus world position . Tracking tells the model which persistent surface element should carry ap-pearance; world position tells where that element is in the current 3D scene. Unlike depth, this pair separates surface identity from camera measurement and keeps observer motion in the Plücker channels. This follows a long graphics and vision principle: view-consistent synthesis is easier when a model is given dense coordinate or cor-respondence maps, as in functional maps, DensePose, NOCS, UV position maps, and UV-space texture diffusion [Chen et al . 2026b; Feng et al . 2018; Guler et al . 2018; Ovsjanikov et al . 2012; Wang et al .2019; Yu et al . 2023; Zeng et al . 2024]. DAR brings this principle to dynamic mesh-to-video rendering by using tracking+world position as a visible 4D state code. We evaluate DAR on DAR-4D , a multi-source rendering cor-pus and synthesis pipeline built from rigged animations, physics scenes, public/third-party 3D assets, BlenderKit scenes, and Unreal Engine environments. On the 68-case 4d_vis benchmark, LoRA DAR reaches PSNR 23.22 , SSIM 0.895 , and LPIPS 0.134 , improving over off-the-shelf Wan2.2-Depth by +1.54 dB PSNR. A full fine-tune of the same condition reaches PSNR 25.36 and SSIM 0.917 . In the matched depth-swap ablation, where only world position is replaced by depth, world position improves PSNR by +1.42 dB at checkpoint 10k and by 1.26–1.55 dB across all saved checkpoints. Qualitative comparisons with Wan2.2-Camera, Wan2.2-Depth, DAS, and Vide-oFrom3D show that camera-only, depth-only, and sparse/static 3D controls each fail on one axis of the renderer interface. Our contributions are: 
+
+• a formulation of 4D generative rendering as reference-guided video rendering from an animated mesh and target camera path; 
+
+• a neural 4D G-buffer condition that pairs Plücker rays with tracking, world position, and normal maps; 
+
+• a geometric and empirical argument that tracking+world position is a better visible 4D state code than camera-dependent depth for dual camera/object control; 
+
+• DAR-4D , a renderer-ready corpus and benchmark. It contains RGB videos, calibrated cameras, Plücker rays, and per-frame buffers for depth, normal, world position, and tracking. 
+
+2 Related Work 2.1 Animation Production Pipelines 
+
+Bringing an animated shot to the screen has traditionally meant committing to a full production pipeline, whose form depends on the medium. 2D animation composes hand-drawn or vector keyframes that are inbetweened and composited, and recent methods learn to synthesize such vector animations directly [Chen et al . 2026e]. 
+
+3D and CG animation for film and games instead builds an explicit world: assets are modeled, generated from multimodal or composi-tional inputs [Chen et al . 2025a; Weng et al . 2026a], and edited [Weng et al . 2026b], then rigged and driven by learned skeleton and motion generation [Sun et al . 2025, 2026], and finally textured, lit, and ren-dered with extensive support from texture and material synthesis and physically based (neural) rendering [Chen et al . 2023; Gao et al .2024; Liang et al . 2025; Xue et al . 2025; Zeng et al . 2024]. Scene-level 
+
+> 2
+
+animation scales this to whole environments that must stay con-sistent across views and over time [Chen et al . 2024a; Höllein et al .2024; Huang et al . 2025], while video generation animates directly in pixel space through pose- and skeleton-conditioned character synthesis [Chen et al . 2026c; Xu et al . 2024] and general control-lable generators [Jiang et al . 2025; Wan et al . 2025]. These pipelines reach high visual quality, but they sit at two extremes: classical CG needs a fully specified renderable scene, whereas pure video generation leaves the underlying 3D/4D state implicit and hard to control precisely. 
+
+2.2 Generative Rendering with Video Diffusion 
+
+This gap motivates generative rendering : rather than authoring ma-terials and lighting and invoking a classical renderer, one specifies only the scene geometry and lets a pretrained video diffusion model act as the renderer [Cai et al . 2024; Gu et al . 2025; Huang et al . 2026; Kim et al . 2025; Zhang et al . 2025]. The open question is which geometric condition to expose. Camera-control models steer view-point through ray or pose signals [Bai et al . 2025; Wan et al . 2025], depth-, edge-, and normal-conditioned systems use projected ge-ometry for layout [Alhaija et al . 2025; ByteDance Seed Team 2025], and 3D-conditional or tracking-guided methods render from coarse geometry, tracked points, or explicit 3D inputs [Chen et al . 2026a]. Their control is typically single-axis, however: camera controls ig-nore the animated surface state, depth is view-dependent, and static anchors do not handle articulated motion. A parallel lineage shows that dense coordinate maps ease cross-view reasoning, from func-tional maps, DensePose, and NOCS to UV-space diffusion and neural G-buffers [Chen et al . 2024b; Feng et al . 2018; Guler et al . 2018; Miao et al . 2026; Ovsjanikov et al . 2012; Wang et al . 2019; Yu et al . 2023]. DAR unifies these views: it keeps Wan2.2’s camera prior but condi-tions camera rays and a per-frame 4D G-buffer together, giving one control signal for both observer and object motion. 
+
+2.3 Dynamic 4D Data and Synthetic Scene Generation 
+
+Training and evaluating a video renderer requires paired dynamic data, and a growing set of resources supplies parts of it. Large static-object and scene collections provide geometry and appear-ance diversity [Deitke et al . 2023; Ling et al . 2024], synthetic engines and generative domain randomization render controllable data with ground-truth buffers [Geng et al . 2025; Greff et al . 2022], and non-rigid, dynamic-stereo, and 4D or physics-oriented corpora add de-formable and time-varying supervision [Karaev et al . 2023; Li et al .2021; Wen et al . 2025; Wu et al . 2025; Zhou et al . 2026]. A recent line turns monocular or multi-view video into 4D or world-scale scenes [Chen et al . 2026d,g, 2025b; Yang et al . 2026], which is ex-actly the kind of pipeline that yields paired video and 4D-scene data. DAR-4D is complementary to these resources: rather than propos-ing new capture or reconstruction, it converts heterogeneous assets into a single renderer-ready format with paired RGB, calibrated cameras, Plücker rays, and per-frame depth, normal, world-position, and tracking maps, so that alternative conditioning representations can be compared under matched renderer inputs. Appendix A.2 details the dataset landscape. 
+
+3 Method 
+
+DAR is a representation-level extension of Wan2.2 camera con-trol (Fig. 2). We keep the pretrained video diffusion substrate and Plücker-ray camera interface, but replace the camera-only control tensor by a joint camera-plus-4D-geometry tensor. This section de-fines the rendering problem, the adapter change, and the role of tracking+world position as the visible 4D state code. 
+
+3.1 Problem Formulation 
+
+Let S denote the canonical surface domain of an animated mesh. At video time 𝑡 , the animation maps a surface point 𝑠 ∈ S to world position and normal 
+
+𝑋 𝑡 (𝑠 ) ∈ R3, 𝑛 𝑡 (𝑠 ) ∈ S2. (1) A camera 𝐶 𝑡 = (𝐾 𝑡 , 𝑅 𝑡 , 𝑜 𝑡 ) projects visible surface points to pixels. For pixel 𝑢 = (𝑥, 𝑦 ), let 𝑠 𝑡 (𝑢 ) be the visible surface point selected by rasterization, if any. The target renderer should produce 
+
+ˆV = 𝐺 𝜃 
+
+
+
+𝐼 ref , {𝐶 𝑡 }𝑇 𝑡 =1, {𝑋 𝑡 , 𝑛 𝑡 , 𝑠 𝑡 }𝑇 𝑡 =1, 𝜏 
+
+
+
+, (2) where 𝐼 ref is the first-frame appearance reference and 𝜏 is an optional text prompt. The geometry and camera are not latent variables to be invented by the model; they are user-specified state. 
+
+3.2 From Wan2.2 Camera Control to DAR Control 
+
+For each pixel 𝑢 and time 𝑡 , Wan2.2-Control-Camera forms a Plücker ray 
+
+𝜌 𝑡 (𝑢 ) =  𝑑 𝑡 (𝑢 ), 𝑜 𝑡 × 𝑑 𝑡 (𝑢 ) ∈ R6, (3) where 𝑑 𝑡 (𝑢 ) is the world-space ray direction and 𝑜 𝑡 is the camera center. Wan2.2 temporally packs four neighboring frames to match the video VAE latent grid: 
+
+𝑌 cam = P4
+
+
+
+{𝜌 𝑡 }𝑇 𝑡 =1
+
+
+
+∈ R24 ×𝐹 ×𝐻 ×𝑊 . (4) The original control adapter maps 𝑌 cam to transformer-width fea-tures and adds them to the DiT patch tokens. This interface controls camera motion, but it says nothing about which animated surface lies on each ray. DAR keeps the representation in Eq. (3) , the temporal packing in Eq. (4) , and the same residual injection point. The change is the control tensor: 
+
+𝑌 DAR = 𝑌 cam ⊕ P vae (𝐵 ) ∈ R(24 +𝑁 ) × 𝐹 ×𝐻 ×𝑊 , (5) where 𝐵 is a mesh-projected geometry buffer and Pvae resamples it to the latent temporal grid. We replace the camera adapter by 
+
+𝑥 (0) = Patch (𝑧 𝜎 ) + 𝐴 𝜙 (𝑌 DAR ). (6) The main configuration uses 𝑁 =9. The adapter is the same light-weight SimpleAdapter family used by Wan2.2 camera control: pixel-unshuffle, stride-2 convolution, and two residual blocks, out-putting transformer-width features. Camera and animated geometry are therefore fused before the DiT reasons over the video, rather than appended as late guidance. 
+
+> 3
+
+Mesh 
+
+Projection 
+
+Renderer 
+
+2. Target Camera Trajectory     
+
+> intrinsics +extrinsics →per -pixel rays
+
+Temporal 
+
+VAE Pack 
+
+Denoised 
+
+Video latent 
+
+48ch 
+
+Per -pixel 
+
+Plucker 
+
+Ray s  
+
+> 𝜌 !(𝑢 )∈ℝ"
+
+𝑃 !   
+
+> 𝑌 #$% ∈ℝ&' ×)×*×+
+> 24 ch
+> W
+> H
+> 𝐹
+> Interpolate to
+> Latent temporal
+> gri d
+
+Select 
+
+Condition 
+
+channels 
+
+4. Text Prompt 𝝉   
+
+> T5 context / classifier -free guidance
+> Repeat as first -
+> frame -only
+> masked video
+> Wan VAE
+> Encode rMasked reference
+> latent
+> 48ch + mask 4ch = 52ch
+> Noisy Video Latent
+
+𝒛 𝝈        
+
+> 48ch
+> Concat =100ch
+> Input to pretrained
+> patch embeddin g
+> World -position
+> anchor
+> World position is scene -
+> coordinate
+> correspondence; depth
+> is camera -dependent
+> 𝑮 𝒇𝒖𝒍𝒍𝟗𝒄𝒉 :tracking 3+world position 3 + normal 3=9ch
+> Cross -attention
+> context
+> Video
+> latent+reference
+> condition token s
+> T5 text contex t
+> +3072 -d
+> camera/ geomery
+> control
+> Wan2.2
+> modification:
+> Replace 24ch camera
+> adapter with 24+ 𝑁 '()
+> adapter
+
+3072 -d control Feature   
+
+> added to DiT patch tokens
+
+Widened SimpleAdapter 
+
+(𝟑𝟑 → 𝟑𝟎𝟕𝟐 )    
+
+> PixelUnshuffle ×16 + Conv + 2 ResBlocks
+> Concat : 24 +9 = 33ch
+> 𝑌 #$% 𝑌 ,-.
+> 9𝑐ℎ 24𝑐ℎ
+
+DAR Widened Camera 
+
+Adapter   
+
+> Dual -control inferace
+> Plucker rays specify observer;
+> 4D G -buffer specifies animated
+> surface
+
+Generated 4D 
+
+Rendering Video 
+
+Wan VAE 
+
+Decode r
+
+> 𝑌 /01
+
++
+
+Pretrained Wan2.2 Video DiT    
+
+> Flow -matching denoising loop
+> 50 steps at inference, CFG guidance = 3.0
+> Patch
+> embeddin g
+> 3D Dit Blocks
+> (Transformer) Head
+
+𝐶 "
+
+𝐶 #
+
+𝐶 $  
+
+> 𝑌 ,-. ∈ℝ2!"# ×)×*×+
+> 𝑁 ,-. ch
+> W
+> H
+> 𝐹
+
+3. Reference Image 𝐼 𝑟𝑒𝑓 
+
+> appearance anchor
+
+Neural 4D G-buffer 𝐵 𝑡 𝑢           
+
+> Tracking q(𝑠 *𝑢 )
+> 3c h
+> World Position 𝑋 *(𝑠 *𝑢 )
+> 3c h
+> Normal 𝑛 *(𝑠 *𝑢 )
+> 3c h
+
+1. 4D scene mesh           
+
+> surface state 𝑋 *𝑠 , normal 𝑛 *𝑠 , identity q𝑠
+> t=1 t=1 t=T
+> time
+> …
+
+T5 Encoder Fig. 2. DAR pipeline. An animated 4D mesh, target camera trajectory, reference image, and text prompt are converted into aligned video-diffusion conditions. Plücker rays encode the observer; a mesh projection renderer produces tracking, world-position, and normal maps; a widened SimpleAdapter injects the combined camera-plus-geometry control into the pretrained Wan2.2 video DiT. 
+
+3.3 Neural 4D G-buffer 
+
+For each visible pixel 𝑢 at time 𝑡 , DAR projects three mesh-derived signals: 
+
+𝐵 𝑡 (𝑢 ) = 𝑞 (𝑠 𝑡 (𝑢 )) , ¯𝑋 𝑡 (𝑠 𝑡 (𝑢 )) , ¯𝑛 𝑡 (𝑠 𝑡 (𝑢 ))  ∈ R9. (7) Here 𝑞 (𝑠 ) ∈ [ 0, 1]3 is a persistent tracking color or instance/part identity, ¯𝑋 𝑡 is the scene-normalized world position, and ¯𝑛 𝑡 is the normal mapped to image range. Pixels without a visible mesh hit are filled by the background convention used in the projection renderer and are masked consistently across all channels. The three components serve different roles. Tracking gives a persistent identity cue for appearance transport. World position gives the current metric 3D state of the visible surface. Normal gives first-order local shape for shading and silhouette detail. We call this tensor a neural 4D G-buffer because it plays the role of a classical G-buffer (an image-format intermediate representation for rendering) but contains only the geometry needed by a reference-guided video diffusion renderer. 
+
+3.4 Why Tracking+World Position Is the 4D Code 
+
+Depth is easy to render and widely supported by video models. With calibrated rays, an ideal geometric decoder can back-project depth into 3D; the issue is the inductive bias of the conditioning interface. A 4D renderer needs the condition image to expose both which persistent surface element is visible and where that element is in the target 3D state . These are different variables: appearance is attached to surface identity, while silhouette, occlusion, and camera-relative layout depend on current world state. 
+
+Definition 1 (visible 4D state code). For a visible mesh hit, 𝜒 𝑡 (𝑢 ) is a visible 4D state code if it determines the pair 
+
+ 𝑞 (𝑠 𝑡 (𝑢 )) , 𝑋 𝑡 (𝑠 𝑡 (𝑢 ))  (8) up to the tracking granularity, and if this code is independent of the observing camera. DAR uses 𝜒 𝑡 (𝑢 ) = (𝑞 (𝑠 𝑡 (𝑢 )) , ¯𝑋 𝑡 (𝑠 𝑡 (𝑢 ))) : tracking indexes the persistent surface/part identity, while normalized world position gives the current scene-coordinate state. 
+
+Proposition 1 (depth is a camera chart; DAR is a scene-state chart). 
+
+For view-z depth 𝑑 𝐶 (𝑋 ) = 𝑒 ⊤
+
+3 𝑅 (𝑋 − 𝑜 ), a single depth value is non-injective over 3D points and changes when the same point is observed by a translated camera. Tracking alone identifies what to propagate but not where it should be rendered; world position alone gives a state coordinate but not the persistent identity needed for appearance transport when parts repeat, cross, or occlude. Their pair 
+
+(𝑞, ¯𝑋 ) determines both variables in Eq. (8) within the scene bounds, while Plücker rays separately encode the observer. Appendix A.1 gives the derivation and motion-factorization view. 
+
+Consequence for reference-guided rendering. Let 𝑎 (𝑞 ) denote ap-pearance attached to a persistent surface identity. With (𝑞, ¯𝑋 ), the 
+
+4model can learn appearance transport conditioned on explicit iden-tity and current 3D state. With depth, it must recover 𝑋 by com-bining depth, pixel location, and camera pose, while still inferring identity from appearance history. Our controlled depth-swap abla-tion tests the geometric slot: DAR and the matched depth variant keep tracking, normal, backbone, data, and optimization fixed, and replace only world position by depth. 
+
+3.5 Appearance Branch and Training Objective 
+
+The reference image follows the Wan2.2 image-to-video inpainting interface. We place 𝐼 ref in the first frame of a video tensor, zero-fill the remaining frames, and provide a binary mask indicating which latent positions are known. This appearance condition is concatenated with the noisy latent in the original Wan2.2 path; DAR changes only the control adapter in Eq. (6). Let 𝑐 = (𝐼 ref , 𝑌 DAR , 𝜏 ) collect all conditions. With flow-matching noise level 𝜎 , the model predicts the scheduler target 𝑣 𝜎 :
+
+ˆ𝑣 𝜃 = 𝑓 𝜃 (𝑧 𝜎 , 𝜎, 𝑐 ), L( 𝜃 ) = E ∥𝑓 𝜃 (𝑧 𝜎 , 𝜎, 𝑐 ) − 𝑣 𝜎 ∥22
+
+ . (9) For LoRA experiments, the pretrained Wan2.2 transformer is frozen except for rank-256 LoRA modules on attention/FFN projections and the new SimpleAdapter . The full-fine-tune variant trains all trans-former parameters plus the same adapter. The 24-channel camera-only ablation is the same widened-interface code path with 𝑁 =0.
+
+4 DAR-4D Dataset 
+
+To train and evaluate a 4D renderer, each sample must expose the animated scene state, target camera trajectory, and dense per-frame projections in a video-model format. We therefore build DAR-4D , a rendering corpus that builds on the OVOW pipeline for constructing paired video and 4D-scene data [Chen et al . 2026g], separating large source pools from the smaller verified splits used for quantitative claims. 
+
+4.1 Sources and Evaluated Splits 
+
+Table 1 lists both raw assets and evaluated clips. This avoids conflat-ing available rendering material with benchmark cases that have complete RGB, camera, geometry-buffer, inference, and metric veri-fication. Compared with existing 3D/4D resources, DAR-4D is organized around the paired tuple needed here: first-frame reference, target camera, animated mesh state, and dense geometry buffers. Appen-dix A.2 contrasts this interface with prior datasets. 
+
+4.2 Procedural 4D Scene Synthesis 
+
+The synthetic pipeline turns assets into plausible animated scenes through randomized but constrained assembly, complementing code-driven parametric generation of CAD and Blender scenes [Chen et al . 2026f]. For the mixed-asset path, each scene samples multiple textured meshes, one or more rigged Z-OO animals, an HDRI environment, and a trajectory seed. Static meshes are scaled into a compact physical range, placed by AABB rejection sampling with a collision margin, and optionally given simple keyframed motion such as spin, tilt, bob, slide, sway, or self-orbit. Rigged ani-mals are imported with their FBX animation, scaled to a target size,                        
+
+> Table 1. DAR-4D sources and evaluated splits. Source counts come from local manifests; evaluated splits list clips with complete rendering, inference, and metric verification.
+> Component Scale Use in DAR-4D BlenderKit scene blends 4,192 Complex Blender scenes rendered under randomized camera paths. Unreal Engine archives 2,588 Indoor/outdoor environments for cinematic trajectories and clutter. Textured mesh records 10.48M total; 82,725 strict textured Object pool for synthetic scene as-sembly and appearance diversity. Z-OO rigged assets 2,448 assets; 74 categories Articulated animal FBX/BVH mo-tion for 4D dynamics.
+> 4d_vis main benchmark 17 scenes ×4paths = 68 clips Main quantitative table, ablations, and external baseline suite. OOD-34 probe 17 unseen scenes
+> ×2 paths = 34 clips Generalization check for unseen as-sets and trajectories. Reference variants 10 clips Appearance-control test with fixed geometry and camera.
+
+looped through NLA strips, and attached to drive empties so root motion can be composed with the skeletal walk cycle. Motion planning is collision-aware. Initial placement avoids over-laps with existing static and animated objects. Walking paths are sampled as smooth piecewise trajectories in the ground plane, den-sified with Catmull-Rom interpolation, and rejected if the moving AABB intersects static objects or another moving path at the same frame. If no valid path is found, the asset is kept stationary rather than allowing interpenetration. This conservative rule keeps train-ing conditions physically plausible. Camera trajectories are generated from archetypes rather than fixed templates. The Blender path uses 16 trajectory families, in-cluding short/half/full orbits, orbit+dolly, top-down orbits, low arcs, pure dolly, lateral pan, rolling orbit, orbit+pan, and vertical arcs. The UE path uses a related 14-family generator with orbit, corridor, dolly, top-spin, and oblique motions. Each trajectory randomizes span, start yaw, pitch, roll, dolly, pan, and radius within conservative bounds. A fit-camera step computes animated scene bounds over sampled frames and clamps camera distance so the subject remains in view. 
+
+4.3 Unified DAR Format and Quality Control 
+
+After rendering, every sample is converted into a unified DAR bundle. A sample directory contains video.mp4 , the first-frame 
+
+reference.png , camera intrinsics/extrinsics, renderer metadata, and per-frame projection files. Each projection stores five aligned signal families: tracking for dense object/part identity, world_pos 
+
+for normalized world coordinates, normal for surface orientation, 
+
+depth for a view-dependent baseline signal, and sparse_tracking 
+
+for point-track style controls. Quality control combines automatic filters with renderer-side constraints. The scripts reject or quarantine samples with near-uniform RGB, depth, normal, world-position, or tracking statistics, filter unsafe camera paths, verify scene-level world-position normal-ization, and inspect tracking/color buffers for consistency. These checks keep the reported benchmark conservative: the full corpus is 
+
+> 5
+
+designed to scale, but the paper reports only subsets with complete rendering, inference, and metric verification. 
+
+5 Experimental Setup 
+
+The central comparison is a controlled condition-form ablation: all trainable variants share the same backbone, training data, com-pute budget, and optimization recipe; the variable is the geometry channel set provided to the widened SimpleAdapter .
+
+5.1 Protocol and Compared Methods 
+
+The main evaluation set is the 68-case 4d_vis benchmark: 17 base scenes and 4 camera trajectories per scene. All methods receive the same first-frame reference image, target camera trajectory, and mesh projection. Resolution is fixed to 480 ×832 ; sequence length follows the ground-truth clip and may be 49, 77, 81, 89, 93, 117, or 249 frames. We additionally report OOD-34, with 17 unseen scenes and 2 novel trajectories per scene, and a 10-case reference-variant subset that fixes geometry/camera while changing the reference image. We compare four groups. Off-the-shelf Wan2.2 includes Wan2.2-Camera, conditioned on Plücker rays only, and Wan2.2-Depth, conditioned on ground-truth depth videos and the first-frame reference [Wan et al . 2025]. DAR LoRA variants include the full condition with tracking, world position, and normal channels, together with 11 ablations. Single-channel rows isolate tracking, normal, world position, and depth; leave-one-out rows remove one channel family from the full design; depth-swap rows replace world position by depth in comparable channel sets. The complete configuration list is in Appendix A.3. Full fine-tune reports DAR at checkpoint 4000 without the LoRA bottleneck. External baselines 
+
+include DAS and VideoFrom3D, executed on the same 68 cases [Gu et al. 2025; Kim et al. 2025]. DAS and VideoFrom3D have useful but mismatched interfaces: DAS is image/tracking-guided object-centric synthesis, while Vide-oFrom3D assumes sparse anchors and mostly static scene geometry. Their output length, resolution, and camera-control targets there-fore do not exactly match our animated-mesh renderer protocol. We resize outputs and sample frames by normalized animation time be-fore computing the same metrics, and mark these rows as diagnostic rather than part of the controlled ablation ranking. 
+
+5.2 Metrics 
+
+We report PSNR, SSIM [Wang et al . 2004], and LPIPS [Zhang et al .2018] as primary frame-aligned rendering metrics against the corre-sponding Blender ground-truth frame. We also report TempL1, the mean L1 distance between adjacent-frame differences, and RefL1, the mean per-frame L1 distance to the first-frame reference. RefL1 is auxiliary: a low value can indicate appearance retention, but it can also indicate that a method stays too close to the first view rather than respecting novel camera motion. We leave tracking IoU, ATE/RTE, FVD, and VBench-style scores to future work be-cause they require reverse-estimated masks, cameras, or perceptual judgments that would introduce additional estimator error into the current frame-aligned protocol. 
+
+5.3 Training and Inference 
+
+All LoRA settings start from Wan2.2-Fun-5B-Control-Camera. The backbone is frozen except for rank-256 LoRA modules on atten-tion QKV/O and FFN projections, while the new SimpleAdapter 
+
+is trained. We use AdamW, learning rate 1×10 −4, constant-with-warmup scheduling with 200 warmup steps, batch size 1, gradient accumulation 1, 10,000 training steps, checkpoints every 2,000 steps, bf16 mixed precision, and gradient checkpointing. Inference uses guidance scale 3.0, 50 flow-matching denoising steps, and seed 42. Each LoRA run uses either 3× A800-80GB or 2× H100-80GB and takes roughly 36 hours. For the full fine-tune, we train selected condition sets without LoRA on GPUs 1–7 ( 7× A800-80GB) using FSDP Full-Shard. The backbone and SimpleAdapter are trained together, for roughly 5.4B trainable parameters. Hyperparameters match the LoRA recipe ex-cept for a lower learning rate, 2×10 −5. Sec. 6.3 reports DAR check-point 4000 on all 68 4d_vis cases; Appendix A.4 reports the matched checkpoint-2000 full-fine-tune ablations. 
+
+6 Results 
+
+We evaluate DAR on the 4d_vis split of DAR-4D: 17 OVOW/UE assets [Chen et al . 2026g] and 4 trajectory variants per asset, for 68 videos. The comparison includes two off-the-shelf Wan2.2 base-lines, two executed external baselines, 11 LoRA geometry abla-tions, and a full-fine-tune preview. All LoRA settings share the same Wan2.2-Fun-5B-Control-Camera backbone, 10,000-step train-ing budget, rank-256 LoRA setting, and hyperparameters; only the geometry channels input to SimpleAdapter change. 
+
+6.1 Main Quantitative Comparison 
+
+Table 2 gives the 68-case comparison. All LoRA rows are reported at checkpoint 10,000. Rows marked with † use normalized-time alignment because the external system emits a non-matching video length or resolution; we include them as diagnostic reference points, but exclude them from the controlled rank ordering. 
+
+DAR improves frame-aligned rendering quality. DAR reaches PSNR 23.22 , SSIM 0.895 , and LPIPS 0.134 , improving over off-the-shelf Wan2.2-Depth by +1.54 dB PSNR, +0.060 SSIM, and −0.041 
+
+LPIPS. This is a strong comparison because Wan2.2-Depth receives an oracle ground-truth depth video at evaluation time. The result indicates that the condition form matters: a joint Plücker plus 9-channel geometry interface is a better fit to our 4D rendering protocol than a single view-dependent depth signal. 
+
+World position beats depth when identity and shape are fixed. DAR and the matched depth-swap variant form the key controlled pair: same backbone, training recipe, and tracking/normal inputs, with only world position replaced by depth. The world-position condition improves PSNR by +1.42 dB , SSIM by +0.034 , and LPIPS by −0.023 
+
+at checkpoint 10k, and remains ahead by +1.26–+1.55 dB PSNR across all saved checkpoints. This supports Sec. 3.4: when identity 𝑞 
+
+and local shape are exposed, the geometric state slot benefits from camera-independent world position rather than camera-dependent depth.             
+
+> 6Table 2. Main quantitative comparison on the DAR-4D 68-scene benchmark. ↑means higher is better and ↓means lower is better. Bold marks the best value among frame-aligned Wan/DAR rows and underline marks the second best. All trainable ablation rows share backbone, data, compute, and training recipe; the variable is the geometry channel set input to SimpleAdapter .†rows are executed external baselines sampled by normalized animation time, so they are diagnostic rather than part of the controlled ablation ranking.
+
+Method PSNR ↑ SSIM ↑ LPIPS ↓ TempL1 ↓ RefL1 ↓
+
+Off-the-shelf Wan2.2-Camera (no FT) [Wan et al. 2025] 13.51 0.521 0.419 7.96 33.84 Wan2.2-Depth (no FT) [Wan et al. 2025] 21.68 0.835 0.175 6.99 29.55 
+
+External † DAS [Gu et al. 2025] 13.44 0.528 0.464 2.59 45.55 VideoFrom3D (67/68) [Kim et al. 2025] 8.04 0.371 0.652 3.61 89.30 Single-channel Camera rays only (Plücker) 12.66 0.488 0.436 15.96 47.16 Depth only (1ch) 20.93 0.842 0.161 6.03 43.15 Normal only (3ch) 22.16 0.869 0.150 9.90 42.34 World position only (3ch) 21.71 0.836 0.169 9.97 42.84 Tracking only (3ch) 19.36 0.808 0.219 12.90 47.52 Multi-channel Tracking + normal (6ch, no world position) 18.74 0.777 0.220 12.97 35.83 Tracking + world position (6ch, no normal) 18.94 0.789 0.211 12.57 35.21 Normal + world position (6ch, no tracking) 19.73 0.802 0.210 12.68 34.32 Tracking + depth (4ch) 20.94 0.836 0.169 10.15 43.36 Normal + depth (4ch) 21.26 0.840 0.170 9.28 41.76 Tracking + normal + depth (7ch) [world position → depth] 21.80 0.861 0.157 10.12 43.13 
+
+DAR (tracking + world position + normal) 23.22 0.895 0.134 9.10 38.77 
+
+The geometry channels are complementary. Compared with the strongest single-channel LoRA variant, normal-only conditioning at 22.16 PSNR, DAR gains +1.06 dB . Removing tracking, world po-sition, or normal from the full design drops PSNR by 3.49, 4.48, and 4.28 dB respectively. The 9-channel buffer is therefore not just chan-nel expansion; tracking, world position, and normal carry different parts of the renderer state. Together, these ablations match the prediction of Sec. 3.4: tracking, world position, and normal are complementary. The theory does not require world position alone to dominate every low-capacity LoRA row; it predicts that the full visible-state code should be strongest when identity and local shape are controlled, which is exactly what the matched depth-swap pair tests. 
+
+6.2 Qualitative Results and Failure Modes 
+
+The post-reference figure pages show representative outputs. Fig. 4 shows the final-frame comparison against Wan2.2-Camera, Wan2.2-Depth, and Blender GT under a ±60 ◦ orbit, where the target view is farthest from the reference: Wan2.2-Camera hallucinates the foreground and Wan2.2-Depth couples camera and object motion, whereas DAR matches both the target camera and the animated mesh state. Fig. 5 compares Wan2.2-Camera, Wan2.2-Depth, DAS, VideoFrom3D, and DAR at matched normalized animation times. Camera-only control follows viewpoint but hallucinates the fore-ground; depth preserves coarse layout but entangles camera and object motion; DAS preserves some local identity but is object-centric; VideoFrom3D can synthesize plausible novel views but is tied to a mostly static-scene assumption. DAR better follows both the target camera and the animated mesh state. Fig. 3 shows that the same interface handles humans, animals, vehicles, mechanical objects, and indoor scenes under large horizontal orbits. 
+
+6.3 Generalization, Appearance Variants, and Full Fine-Tune 
+
+Appendix A.4 adds four stress tests beyond Table 2. First, trajectory-stratified results show that DAR is best on all four camera-motion groups, including the largest ±60 ◦ orbit. Second, the matched depth-swap comparison favors world position at every LoRA checkpoint from 2k to 10k. Third, replacing persistent tracking by a binary fore-ground mask at checkpoint 2000 drops PSNR by 1.60 dB under LoRA and 1.27 dB under full fine-tuning. Fourth, OOD-34 remains a stress test: Wan2.2-Depth reaches 22.25 PSNR, tracking+world-position conditioning reaches 20.99, and DAR reaches 19.04, indicating that the full 9-channel LoRA model still needs more capacity or data for open-category generalization. The reference-variant subset tests appearance control by fixing one animated car mesh and camera while changing only the ref-erence image, as shown in Fig. 1. DAR changes paint style, color blocks, and vehicle appearance while keeping the camera, pose, and silhouette aligned, indicating partial decoupling between geome-try and appearance. To estimate the ceiling of DAR without the LoRA bottleneck, we also fully fine-tune the model. Checkpoint 4000 reaches PSNR 25.36 , SSIM 0.917 , LPIPS 0.130 , and TempL1 
+
+4.72 on all 68 cases: +2.14 dB above LoRA DAR ck10000 and +3.68 dB above off-the-shelf Wan2.2-Depth.         
+
+> 7Fig. 3. 4D rotation gallery. DAR outputs under a horizontal orbit ( ±60 ◦) around six Blender meshes. Each row shows one scene; columns show the first-frame reference and DAR outputs at 𝑡 =0,𝑇
+> 3,2𝑇
+> 3, 𝑇 −1. DAR follows the target camera trajectory while preserving the animated mesh state and reference appearance across humans, animals, vehicles, mechanical objects, and indoor scenes.
+
+7 Conclusion 
+
+We introduced 4D generative rendering: given an animated mesh scene, a target camera path, and a reference image, a video diffusion model should render the specified 4D state rather than invent a new one. DAR builds on Wan2.2’s Plücker-ray camera interface and adds a mesh-projected neural 4D G-buffer (tracking, world position, and normals) through the early control path, where tracking+world po-sition serves as a camera-invariant state code that helps disentangle camera motion from animated surface motion and improves adher-ence to both trajectory and mesh state in our evaluations. More broadly, our results suggest that the representation of visible 4D state is a central ingredient for controllable 4D generative rendering: exposing persistent surface identity (tracking) together with scene-coordinate state (world position) provides a more faithful control signal than camera-dependent depth when both camera and object motion vary. DAR is intentionally scoped as a renderer (not geometry recon-struction, mesh generation, or editable PBR material authoring) and assumes accurate 4D inputs plus a first-frame reference image; ap-plying it to real reconstructions will likely require confidence masks and/or robustness to noisy geometry. Generalization is still limited by finite synthetic supervision (68 clips; OOD-34 suggests remaining gaps in LoRA capacity and data diversity), motivating broader cate-gories, richer motion/clutter/material coverage, and per-category reporting. Finally, DAR is not real-time (480 ×832, 81 frames, 50 steps: ~ 1.5–2.5 minutes per clip on a single H100/A100), and videos beyond 200 frames can flicker under large camera changes and long occlusions, suggesting temporal condition smoothing and clip-level memory as next steps. 
+
+> 8
+
+References 
+
+Hassan Abu Alhaija, Jose Alvarez, Maciej Bala, Tiffany Cai, Tianshi Cao, Liz Cha, Joshua Chen, Mike Chen, Francesco Ferroni, Sanja Fidler, et al . 2025. Cosmos-transfer1: Conditional world generation with adaptive multimodal control. arXiv preprint arXiv:2503.14492 (2025). Jianhong Bai, Menghan Xia, Xiao Fu, Xintao Wang, Lianrui Mu, Jinwen Cao, Zuozhu Liu, Haoji Hu, Xiang Bai, Pengfei Wan, et al . 2025. Recammaster: Camera-controlled generative rendering from a single video. In Proceedings of the IEEE/CVF International Conference on Computer Vision (ICCV) . 14834–14844. ByteDance Seed Team. 2025. Seedance 1.0: Exploring the Boundaries of Video Genera-tion Models. https://seed.bytedance.com/seedance. Shengqu Cai, Duygu Ceylan, Matheus Gadelha, Chun-Hao Paul Huang, Tuanfeng Yang Wang, and Gordon Wetzstein. 2024. Generative Rendering: Controllable 4D-Guided Video Generation with 2D Diffusion Models. In Proceedings of the IEEE/CVF Confer-ence on Computer Vision and Pattern Recognition (CVPR) . 7611–7620. Dave Zhenyu Chen, Haoxuan Li, Hsin-Ying Lee, Sergey Tulyakov, and Matthias Nießner. 2024a. SceneTex: High-Quality Texture Synthesis for Indoor Scenes via Diffusion Priors. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) . 21081–21091. Dave Zhenyu Chen, Yawar Siddiqui, Hsin-Ying Lee, Sergey Tulyakov, and Matthias Nießner. 2023. Text2Tex: Text-driven Texture Synthesis via Diffusion Models. In 
+
+Proceedings of the IEEE/CVF International Conference on Computer Vision (ICCV) .18558–18568. Junhao Chen, Mingjin Chen, Jianjin Xu, Xiang Li, Junting Dong, Mingze Sun, Puhua Jiang, Hongxiang Li, Yuhang Yang, Hao Zhao, Xiao-Xiao Long, and Ruqi Huang. 2026c. DanceTogether: Generating Interactive Multi-Person Video without Identity Drifting. In The Fourteenth International Conference on Learning Representations (ICLR) .Junhao Chen, Xinghao Chen, Henghaofan Zhang, Zihao Qiao, Saining Zhang, Yongzhi Li, Ruqi Huang, Sisi Li, Yimin Sheng, Jianyi Zhu, and Hao Zhao. 2026d. Engine-Native Editable 3D World Reconstruction with Objects and Lighting. arXiv preprint arXiv:2607.20889 (2026). Junhao Chen, Kejun Gao, Yuehan Cui, Mingze Sun, Mingjin Chen, Shaohui Wang, Xiaoxiao Long, Fei Ma, Qi Tian, Hao Zhao, and Ruqi Huang. 2026e. LottieGPT: Tokenizing Vector Animation for Autoregressive Generation. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) . 31639– 31651. Junhao Chen, Xiang Li, Mingjin Chen, Boran Zhang, Henghaofan Zhang, Yibin Xu, Yuehan Cui, Fangsheng Weng, Fei Ma, Qi Tian, Ruqi Huang, and Hao Zhao. 2026f. PairCoder++: Pair Programming as a Universal Paradigm for Verified Code-Driven Multimodal and Structured-Artifact Generation. arXiv preprint arXiv:2607.01883 
+
+(2026). Junhao Chen, Xiang Li, Xiaojun Ye, Chao Li, Zhaoxin Fan, and Hao Zhao. 2025a. Idea23d: Collaborative lmm agents enable 3d model generation from interleaved multimodal inputs. In Proceedings of the 31st International Conference on Computational Linguis-tics (COLING) . 4149–4166. Junhao Chen, Boran Zhang, Mingjin Chen, Henghaofan Zhang, Saining Zhang, Cong-cong Zhu, Hao Zhao, Ruqi Huang, Zhihao Li, and Yufei Wang. 2026g. One Video, One World: Turning Monocular Video into Physical 4D Scenes. arXiv preprint arXiv:2606.31388 (2026). Junyi Chen, Haoyi Zhu, Xianglong He, Yifan Wang, Jianjun Zhou, Wenzheng Chang, Yang Zhou, Zizun Li, Zhoujie Fu, Jiangmiao Pang, and Tong He. 2025b. DeepVerse: 4D Autoregressive Video Generation as a World Model. arXiv preprint arXiv:2506.01103 
+
+(2025). Mingjin Chen, Junhao Chen, Zhaoxin Fan, Yujian Lee, Zichen Dang, Lili Wang, Yawen Cui, Lap-Pui Chau, and Yi Wang. 2026a. HVG-3D: Bridging Real and Simulation Domains for 3D-Conditional Hand-Object Interaction Video Synthesis. In Proceed-ings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) .15986–15997. Mingjin Chen, Junhao Chen, Huan-ang Gao, Xiaoxue Chen, Zhaoxin Fan, and Hao Zhao. 2026b. Ultraman: ultra-fast and high-resolution texture generation for 3D human reconstruction from a single image. Machine Vision and Applications 37, 2 (2026), 24. Zhifei Chen, Tianshuo Xu, Wenhang Ge, Leyi Wu, Dongyu Yan, Jing He, Luozhou Wang, Lu Zeng, Shunsi Zhang, and Yingcong Chen. 2024b. Uni-Renderer: Unify-ing Rendering and Inverse Rendering Via Dual Stream Diffusion. arXiv preprint arXiv:2412.15050 (2024). Matt Deitke, Ruoshi Liu, Matthew Wallingford, Huong Ngo, Oscar Michel, Aditya Kusupati, Alan Fan, Christian Laforte, Vikram Voleti, Samir Yitzhak Gadre, et al . 2023. Objaverse-XL: A Universe of 10M+ 3D Objects. In Advances in Neural Information Processing Systems (NeurIPS) , Vol. 36. 47183–47198. Yao Feng, Fan Wu, Xiaohu Shao, Yanfeng Wang, and Xi Zhou. 2018. Joint 3D Face Reconstruction and Dense Alignment with Position Map Regression Network. In 
+
+Proceedings of the European Conference on Computer Vision (ECCV) . 557–574. Chenjian Gao, Boyan Jiang, Xinghui Li, Yingpeng Zhang, and Qian Yu. 2024. GenesisTex: Adapting Image Denoising Diffusion to Texture Space. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) . 4620–4629. Zheng Geng, Nan Wang, Shaocong Xu, Chongjie Ye, Bohan Li, Zhaoxi Chen, Sida Peng, and Hao Zhao. 2025. One View, Many Worlds: Single-Image to 3D Object Meets Generative Domain Randomization for One-Shot 6D Pose Estimation. arXiv preprint arXiv:2509.07978 (2025). Klaus Greff, Francois Belletti, Lucas Beyer, Carl Doersch, Yilun Du, Daniel Duckworth, David J Fleet, Dan Gnanapragasam, Florian Golemo, Charles Herrmann, Thomas Kipf, Abhijit Kundu, et al . 2022. Kubric: A Scalable Dataset Generator. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) .3749–3761. Zekai Gu, Rui Yan, Jiahao Lu, Peng Li, Zhiyang Dou, Chenyang Si, Zhen Dong, Qifeng Liu, Cheng Lin, Ziwei Liu, Wenping Wang, and Yuan Liu. 2025. Diffusion as Shader: 3D-aware Video Diffusion for Versatile Video Generation Control. arXiv preprint arXiv:2501.03847 (2025). Riza Alp Guler, Natalia Neverova, and Iasonas Kokkinos. 2018. DensePose: Dense Hu-man Pose Estimation in the Wild. In Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition (CVPR) . 7297–7306. Lukas Höllein, Aljaž Božič, Norman Müller, David Novotny, Hung-Yu Tseng, Christian Richardt, Michael Zollhöfer, and Matthias Nießner. 2024. ViewDiff: 3D-Consistent Image Generation with Text-to-Image Models. In Proceedings of the IEEE/CVF Con-ference on Computer Vision and Pattern Recognition (CVPR) . 5043–5052. Zhipeng Huang, Wangbo Yu, Xinhua Cheng, Chengshu Zhao, Yunyang Ge, Mingyi Guo, Li Yuan, and Yonghong Tian. 2025. RoomPainter: View-Integrated Diffusion for Consistent Indoor Scene Texturing. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) . 574–584. Zheng-Hui Huang, Zhixiang Wang, Jiaming Tan, Ruihan Yu, Yidan Zhang, Bo Zheng, Yu-Lun Liu, Yung-Yu Chuang, and Kaipeng Zhang. 2026. Generative World Renderer. 
+
+arXiv preprint arXiv:2604.02329 (2026). Zeyinzi Jiang, Zhen Han, Chaojie Mao, Jingfeng Zhang, Yulin Pan, and Yu Liu. 2025. Vace: All-in-one video creation and editing. In Proceedings of the IEEE/CVF Interna-tional Conference on Computer Vision (ICCV) . 17191–17202. Nikita Karaev, Ignacio Rocco, Benjamin Graham, Natalia Neverova, Andrea Vedaldi, and Christian Rupprecht. 2023. DynamicStereo: Consistent Dynamic Depth from Stereo Videos. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) . 17409–17419. Geonung Kim, Janghyeok Han, and Sunghyun Cho. 2025. VideoFrom3D: 3D Scene Video Generation via Complementary Image and Video Diffusion Models. In SIGGRAPH Asia 2025 Conference Papers .Yang Li, Hikari Takehara, Takafumi Taketomi, Bo Zheng, and Matthias Nießner. 2021. 4DComplete: Non-Rigid Motion Estimation Beyond the Observable Surface. In 
+
+Proceedings of the IEEE/CVF International Conference on Computer Vision (ICCV) .5530–5540. Ruofan Liang, Zan Gojcic, Huan Ling, Jacob Munkberg, Jon Hasselgren, Zhi-Hao Lin, Jun Gao, Alexander Keller, Nandita Vijaykumar, Sanja Fidler, and Zian Wang. 2025. DiffusionRenderer: Neural Inverse and Forward Rendering with Video Diffusion Models. arXiv preprint arXiv:2501.18590 (2025). Lu Ling, Yichen Sheng, Zhi Tu, Wentian Zhao, Cheng Xin, Kun Wan, Lantao Yu, Qianyu Guo, Zixun Yu, Yawen Lu, et al . 2024. DL3DV-10K: A Large-Scale Scene Dataset for Deep Learning-Based 3D Vision. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) . 22172–22182. Xingyu Miao, Junting Dong, Qin Zhao, Yuhang Yang, Junhao Chen, and Yang Long. 2026. From Frames to Sequences: Temporally Consistent Human-Centric Dense Prediction. arXiv preprint arXiv:2602.01661 (2026). Maks Ovsjanikov, Mirela Ben-Chen, Justin Solomon, Adrian Butscher, and Leonidas Guibas. 2012. Functional maps: a flexible representation of maps between shapes. 
+
+ACM Transactions on Graphics (TOG) 31, 4 (2012), 1–11. Mingze Sun, Junhao Chen, Junting Dong, Yurun Chen, Xinyu Jiang, Shiwei Mao, Puhua Jiang, Jingbo Wang, Bo Dai, and Ruqi Huang. 2025. DRiVE: Diffusion-based Rigging Empowers Generation of Versatile and Expressive Characters. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) . 21170– 21180. Mingze Sun, Cheng Zeng, Jiansong Pei, Junhao Chen, Chaoyue Song, Shaohui Wang, Tianyuan Chang, Bin Huang, Zijiao Zeng, and Ruqi Huang. 2026. Animator-Centric Skeleton Generation on Objects with Fine-Grained Details. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) . 17336– 17345. Team Wan, Ang Wang, Baole Ai, Bin Wen, Chaojie Mao, Chen-Wei Xie, Di Chen, Feiwu Yu, Haiming Zhao, Jianxiao Yang, et al . 2025. Wan: Open and advanced large-scale video generative models. arXiv preprint arXiv:2503.20314 (2025). He Wang, Srinath Sridhar, Jingwei Huang, Julien Valentin, Shuran Song, and Leonidas J Guibas. 2019. Normalized Object Coordinate Space for Category-Level 6D Object Pose and Size Estimation. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) . 2637–2646. Zhou Wang, Alan C Bovik, Hamid R Sheikh, and Eero P Simoncelli. 2004. Image quality assessment: from error visibility to structural similarity. IEEE transactions on image processing 13, 4 (2004), 600–612. 
+
+> 9
+
+Kairun Wen, Yuzhi Huang, Runyu Chen, Hui Zheng, Yunlong Lin, Panwang Pan, Chenxin Li, Wenyan Cong, Jian Zhang, Junbin Lu, et al . 2025. DynamicVerse: A Physically-Aware Multimodal Framework for 4D World Modeling. arXiv preprint arXiv:2512.03000 (2025). Fangsheng Weng, Junhao Chen, Xiang Li, Jie Qin, Hanzhong Guo, Chunhao Shao, and Xiaoguang Han. 2026a. GarmentGPT: Compositional Garment Pattern Generation via Discrete Latent Tokenization. In The Fourteenth International Conference on Learning Representations (ICLR) .Jiawei Weng, Saining Zhang, Zhenxin Diao, Peishuo Li, Henghaofan Zhang, Junhao Chen, and Hao Zhao. 2026b. Feedforward 3D Editing Learns from Semantic-Part Transformation. arXiv preprint arXiv:2605.27351 (2026). Rundi Wu, Ruiqi Gao, Ben Poole, Alex Trevithick, Changxi Zheng, Jonathan T Barron, and Aleksander Holynski. 2025. CAT4D: Create Anything in 4D with Multi-View Video Diffusion Models. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) . 26057–26068. Zhongcong Xu, Jianfeng Zhang, Jun Hao Liew, Hanshu Yan, Jia-Wei Liu, Chenxu Zhang, Jiashi Feng, and Mike Zheng Shou. 2024. MagicAnimate: Temporally Consistent Human Image Animation using Diffusion Model. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) . 2025–2035. Bowen Xue, Giuseppe Claudio Guarnera, Shuang Zhao, and Zahra Montazeri. 2025. PBR-Inspired Controllable Diffusion for Image Generation. arXiv preprint arXiv:2503.15147 (2025). Yuxue Yang, Lue Fan, Ziqi Shi, Junran Peng, Feng Wang, and Zhaoxiang Zhang. 2026. NeoVerse: Enhancing 4D World Model with in-the-wild Monocular Videos. arXiv preprint arXiv:2601.00393 (2026). Xin Yu, Peng Dai, Wenbo Li, Lan Ma, Zhengzhe Liu, and Xiaojuan Qi. 2023. Texture Generation on 3D Meshes with Point-UV Diffusion. In Proceedings of the IEEE/CVF International Conference on Computer Vision (ICCV) . 4206–4216. Xianfang Zeng, Xin Chen, Zhongqi Qi, Wen Liu, Zibo Zhao, Zhibin Wang, Bin Fu, Yong Liu, and Gang Yu. 2024. Paint3D: Paint Anything 3D with Lighting-Less Texture Diffusion Models. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) . 4252–4262. Richard Zhang, Phillip Isola, Alexei A Efros, Eli Shechtman, and Oliver Wang. 2018. The Unreasonable Effectiveness of Deep Features as a Perceptual Metric. In Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition (CVPR) . 586–595. Zhiyuan Zhang, Dongdong Chen, and Jing Liao. 2025. I2V3D: Controllable image-to-video generation with 3D guidance. arXiv preprint arXiv:2503.09733 (2025). Siyuan Zhou, Hejun Wang, Hu Cheng, Jinxi Li, Dongsheng Wang, Junwei Jiang, Yixiao Jin, Jiayue Huang, Shiwei Mao, Shangjia Liu, et al . 2026. Physinone: Visual physics learning and reasoning in one suite. arXiv preprint arXiv:2604.09415 (2026). 
+
+> 10
+
+Fig. 4. DAR controls both camera trajectory and in-scene 4D mesh animation for generative rendering. Each row shows one OVOW Blender asset under a ±60 ◦ horizontal orbit. Except for the reference column, all panels show the final frame 𝑡 =𝑇 , where the target view is farthest from the first-frame reference. Columns show reference, mesh-derived 9-channel geometry, Wan2.2-Camera, Wan2.2-Depth, Blender GT, and DAR. Wan2.2-Camera lacks per-frame object geometry and hallucinates the foreground; Wan2.2-Depth couples camera and object motion; DAR jointly injects Plücker camera rays and 9-channel geometry to better match both the target camera and mesh animation. 
+
+> 11
+
+Fig. 5. Executed baseline suite across animation time. Three OVOW assets are shown at five normalized time points ( 𝑡 =0/25% /50% /75% /𝑇 ) across Reference, Blender GT, Wan2.2-Camera, Wan2.2-Depth, DAS, VideoFrom3D, and DAR. All videos are sampled by normalized animation time. DAR more consistently preserves both target camera trajectory and animated mesh state. 
+
+> 12
+
+A Supplemental Details A.1 Proof Details 
+
+We restate the tracking/world-position argument from Sec. 3.4. As-sume the tracking code 𝑞 is unique at the selected surface/part granularity and the scene normalization for ¯𝑋 is injective inside the scene bounds. Then (𝑞 (𝑠 𝑡 (𝑢 )) , ¯𝑋 𝑡 (𝑠 𝑡 (𝑢 ))) determines both the persistent visible identity and the current world-space state of the rasterized hit. Dropping 𝑞 loses the identity variable needed for reference appearance transport; dropping ¯𝑋 loses the metric target state needed for viewpoint, occlusion, and silhouette control. Nor-mal is not required for this identifiability statement, but supplies local differential shape. For depth, fix a camera 𝐶 = (𝐾, 𝑅, 𝑜 ) and choose any nonzero vector 𝑣 satisfying 𝑒 ⊤ 
+
+> 3
+
+𝑅𝑣 = 0. Then 𝑋 and 𝑋 +𝑣 have the same view-z depth because 
+
+𝑑 𝐶 (𝑋 + 𝑣 ) = 𝑒 ⊤ 
+
+> 3
+
+𝑅 (𝑋 − 𝑜 ) + 𝑒 ⊤ 
+
+> 3
+
+𝑅𝑣 = 𝑑 𝐶 (𝑋 ), (10) but they are different 3D points. Thus a scalar depth value cannot identify a surface point. For camera dependence, translate the cam-era center by Δ = 𝛼𝑅 ⊤𝑒 3 while keeping orientation fixed. The new depth is 
+
+𝑑 𝐶 ′ (𝑋 ) = 𝑒 ⊤ 
+
+> 3
+
+𝑅 (𝑋 − 𝑜 − Δ) = 𝑑 𝐶 (𝑋 ) − 𝛼, (11) so the same world point receives a different condition value when-ever 𝛼 ≠ 0. By definition, normalized world position 𝑤 (𝑋 ) = ¯𝑋 
+
+does not use 𝐶 ; after a fixed scene normalization, ¯𝑋 = ¯𝑋 ′ implies 
+
+𝑋 = 𝑋 ′ inside the scene bounding box. The calibrated back-projection caveat is real. If a pixel ray is 
+
+𝑟 𝐶 (𝑢 ) = 𝑅 ⊤𝐾 −1 ˜𝑢 , then 
+
+𝑋 = 𝑜 + 𝑑 𝐶 (𝑋 )
+
+𝑒 ⊤ 
+
+> 3
+
+𝑅𝑟 𝐶 (𝑢 ) 𝑟 𝐶 (𝑢 ) (12) recovers world position from depth plus camera. The representa-tion issue is therefore not information loss under ideal geometry, but inductive bias: depth asks the video model to learn camera-dependent inverse projection while also learning appearance trans-port, whereas world position exposes the scene-coordinate corre-spondence directly. 
+
+Motion factorization. For a moving surface point, 
+
+𝑑 𝑑𝑡 𝑑 𝐶 𝑡 (𝑋 𝑡 ) = 𝑒 ⊤ 
+
+> 3
+
+¤𝑅 𝑡 (𝑋 𝑡 − 𝑜 𝑡 ) + 𝑒 ⊤ 
+
+> 3
+
+𝑅 𝑡 ( ¤ 𝑋 𝑡 − ¤ 𝑜 𝑡 ), (13) so depth mixes object motion, camera translation, and camera rota-tion. World position exposes ¤𝑋 𝑡 in the scene frame, while Plücker rays expose the camera. DAR therefore factors the two user controls before they enter the DiT. 
+
+Identifiability corollary. Suppose two visible states (𝑞 1, 𝑋 1) ≠
+
+(𝑞 2, 𝑋 2) receive the same condition value under a non-injective code 𝜅 . Any renderer that conditions only on 𝜅 and the reference appearance cannot distinguish the two states without additional context; appearance transport and target-state rendering are not identifiable from the code alone. The pair (𝑞, ¯𝑋 ) avoids this ambi-guity at the chosen tracking granularity inside the scene bounds, while scalar depth avoids it only after being composed with pixel coordinates and camera pose and still does not explicitly expose persistent identity. 
+
+A.2 Existing 4D / Dynamic-Scene Data 
+
+Table 3 summarizes the closest data resources. The key difference is the supervision tuple needed by DAR: first-frame reference, explicit target camera path, animated mesh state, and per-frame geometry buffers aligned to the generated RGB frames. 
+
+Table 3. Position of DAR-4D among existing 3D/4D data resources. 
+
+Existing resources are valuable, but most are organized for static 3D assets, dynamic scene understanding, stereo/depth estimation, or physics reasoning rather than reference-guided 4D generative rendering.     
+
+> Resource Primary content Gap for DAR-style rendering Objaverse-XL [Deitke et al. 2023] 10M+ static 3D assets Scale, but no native animation, target cameras, or condition videos. Kubric / MOVi [Greff et al. 2022] Procedural dynamic videos with rich annotations Excellent synthetic control, but not packaged as reference+mesh+camera renderer tuples. 4DComplete [Li et al. 2021] Non-rigid 4D object motion Focuses on deforming shapes, not reference-guided scene video rendering. Dynamic Replica [Karaev et al. 2023] Real dynamic stereo/depth sequences Captures real motion, but mesh state and camera/ appearance controls are not independently editable. DynamicVerse [Wen et al. 2025] Multimodal 4D world modeling data Broad 4D understanding resource; not a matched ablation benchmark for mesh-derived renderer conditions. PhysInOne [Zhou et al. 2026] Visual physics learning and reasoning suite Rich physical dynamics, but not organized around neural G-buffer conditioning for video diffusion renderers. DAR-4D Animated meshes, cameras, RGB, depth, normal, world position, tracking Built to test condition representations for 4D generative rendering.
+
+A.3 Ablation Configurations 
+
+Table 4. DAR and 11 LoRA ablations on DAR-4D. All variants share the Wan2.2-Fun-5B backbone, SimpleAdapter + LoRA rank-256 training, the same 10k-step budget, and the same hyperparameters. The only variable is the geometry channel set input to SimpleAdapter .
+
+Condition set Geometry channels Ch. Camera rays only none beyond Plücker rays 24+0=24 Depth only depth (1) 24+1=25 Tracking only tracking (3) 24+3=27 Normal only normal (3) 24+3=27 World position only world position (3) 24+3=27 Tracking + normal tracking + normal (6, no world position) 24+6=30 Tracking + world position tracking + world position (6, no normal) 24+6=30 Normal + world position normal + world position (6, no tracking) 24+6=30 Tracking + depth tracking + depth (4) 24+4=28 Normal + depth normal + depth (4) 24+4=28 Tracking + normal + depth tracking + normal + depth (7) 24+7=31 DAR [ours] tracking + world position + normal (9) 24+9=33 
+
+A.4 Additional Quantitative Results 
+
+Table 2 is intentionally the controlled 10k-step LoRA ranking. This appendix adds four diagnostic views of the same evidence: trajectory difficulty, checkpoint stability, explicit identity-code replacement, and OOD generalization. The OOD result does not contradict the main claim. On the matched 68-case benchmark, the depth-swap comparison keeps all non-position channels fixed and favors world position at every 
+
+> 13
+
+Table 5. Trajectory-stratified results on the 68-case 4d_vis bench-mark. Each cell reports PSNR/SSIM/LPIPS. DAR is best in all trajectory groups, including the largest ±60 ◦ orbit.                           
+
+> Trajectory 𝑛 Wan2.2-Depth Depth swap DAR dolly ±15 ◦17 22.49/0.864/0.151 22.63/0.892/0.133 22.96 /0.910 /0.120
+> orbit ±30 ◦17 21.94/0.837/0.179 21.64/0.853/0.165 25.61 /0.921 /0.124
+> orbit ±60 ◦17 20.60/0.789/0.209 20.89/0.824/0.185 21.56 /0.851 /0.163
+> orbit 0→45 ◦17 21.69/0.852/0.162 22.03/0.876/0.146 22.74 /0.897 /0.131
+
+Table 6. LoRA checkpoint sweep for the matched world-position/depth swap. DAR keeps tracking and normal fixed and uses world position; the depth-swap variant replaces world position with depth. The PSNR advantage is positive at every saved checkpoint.                                             
+
+> Step DAR Depth swap ΔPSNR PSNR SSIM LPIPS PSNR SSIM LPIPS DAR −swap 2000 21.41 0.828 0.182 19.86 0.770 0.225 +1.55 4000 22.57 0.863 0.158 21.31 0.818 0.187 +1.26 6000 22.25 0.863 0.156 20.96 0.827 0.179 +1.29 8000 22.88 0.888 0.140 21.58 0.853 0.159 +1.30 10000 23.22 0.895 0.134 21.80 0.861 0.157 +1.42
+
+Table 7. Tracking identity and world-position stress test at checkpoint 2000. Replacing persistent tracking by a binary mask weakens rendering even when world position and normal remain available. The pattern holds both with LoRA and with full fine-tuning.                                    
+
+> Training Condition PSNR SSIM LPIPS TempL1 LoRA tracking + world position + normal 21.41 0.828 0.182 10.10 LoRA binary mask + world position + normal 19.81 0.767 0.223 6.83 LoRA binary mask + depth + normal 19.97 0.793 0.207 5.90
+> Full-FT tracking + world position + normal 23.27 0.877 0.153 4.58
+> Full-FT binary mask + world position + normal 22.00 0.849 0.164 4.71 Full-FT binary mask + depth + normal 19.66 0.797 0.208 4.64
+
+Table 8. Selected OOD-34 stress-test results. OOD-34 uses unseen scenes and novel trajectories. We report it as a generalization diagnosis, not as the primary controlled representation ranking.                                         
+
+> Method PSNR SSIM LPIPS TempL1 RefL1 Wan2.2-Camera 10.44 0.538 0.466 9.44 74.53 Wan2.2-Depth 22.25 0.913 0.118 2.46 27.01 Depth only 20.98 0.837 0.161 4.19 25.74 Tracking only 17.15 0.734 0.297 4.78 39.50 Tracking + world position 20.99 0.845 0.149 3.86 23.50
+> Tracking + normal + depth 20.16 0.819 0.174 4.29 23.92 DAR 19.04 0.812 0.190 3.77 26.60
+
+LoRA checkpoint. On OOD-34, the lighter tracking+world-position variant can outperform DAR, suggesting that rank-256 LoRA ca-pacity and current training diversity are limiting open-category generalization for the full 9-channel condition. 
+
+A.5 User Study and Additional Stress Tests 
+
+The current quantitative evidence is frame-aligned and controlled, which is appropriate for a renderer. A user study can complement it by asking whether viewers perceive the intended controls. We recommend a two-alternative forced-choice study with three ques-tions per pair: (1) which video better follows the target camera path, (2) which better follows the animated object motion, and (3) which better preserves the first-frame appearance. Each trial should show the first-frame reference, a compact visualization of the target condi-tion, and two anonymized videos sampled from the same case. The main pairings are DAR vs. Wan2.2-Depth, DAR vs. Wan2.2-Camera, and DAR vs. the matched depth-swap variant. The last pairing is the most important because it isolates world position from depth while keeping tracking and normal fixed. For a submission version with completed human results, report the preference rate, 95% bootstrap confidence interval, and binomial test against 50% for each question and pairing. Stratify by cam-era trajectory severity and by foreground category if the number of trials permits. We do not insert synthetic preference numbers here; the protocol is included to make the next evidence collection reproducible. Two additional automatic stress tests would further support the method claim. First, a correspondence stress test should evaluate large-orbit cases where first and last views have minimal overlap, reporting endpoint PSNR/LPIPS and a mask-restricted foreground metric. Second, a motion-separation stress test should pair the same object animation with multiple camera paths and the same camera path with multiple object animations. The expected failure mode is that depth-only control degrades when camera and object motion are recombined, while world-position conditioning remains stable because the camera and surface-state factors stay separated.

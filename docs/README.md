@@ -6,47 +6,79 @@
 </div>
 
 ## 每次日报
-- 最新运行日期：2026-08-03
-- 运行时间：2026-08-03 21:37:56 UTC
+- 最新运行日期：2026-08-04
+- 运行时间：2026-08-04 22:01:15 UTC
 - 运行状态：成功
-- 本次总论文数：9
-- 精读区：6
-- 速读区：3
+- 本次总论文数：19
+- 精读区：12
+- 速读区：7
 
 ### 今日简报（AI）
-今日精读6篇、速读3篇，聚焦世界模型与机器人操作；最值得关注的是满分论文《WorldDiT》统一世界与动作建模，以及《ST-WAM》在视觉分布偏移下的鲁棒操作。建议优先精读这两篇，把握世界模型驱动VLA的前沿方向。
-- 详情：[/202608/03/README](/202608/03/README)
+今日19篇论文聚焦世界动作模型，2篇满分精读引发关注。  
+最值得看SelfWAM与DynamicWAM，分别攻克快速机器人控制与动态操作中的运动条件建模。  
+建议下一步从移动操作的轨迹引导入手，延伸阅读DreamTrajectory。
+- 详情：[/202608/04/README](/202608/04/README)
 
 ### 精读区论文标签
-1. [WorldDiT: A Unified Diffusion Architecture for World and Action Modeling](/202608/03/2607.23909v2-worlddit-a-unified-diffusion-architecture-for-world-and-action-modeling)  
+1. [SelfWAM: A Self-Grounded Unified World Action Model for Fast Robot Control](/202608/04/2608.00725v1-selfwam-a-self-grounded-unified-world-action-model-for-fast-robot-control)  
    标签：评分：10.0/10、query:video-wam
-   evidence：通过未来帧预测将动作生成与视觉世界建模耦合的扩散架构
-2. [ST-WAM: Semantic-Temporal World Action Model for Robust Manipulation under Visual Distribution Shifts](/202608/03/2607.28993v1-st-wam-semantic-temporal-world-action-model-for-robust-manipulation-under-visual-distribution-shifts)  
+   evidence：自接地的统一世界动作模型，联合预测动作和未来RGB帧
+2. [DynamicWAM: Dual-Path Motion Conditioning for World-Action Models in Dynamic Manipulation](/202608/04/2608.00793v1-dynamicwam-dual-path-motion-conditioning-for-world-action-models-in-dynamic-manipulation)  
+   标签：评分：10.0/10、query:video-wam
+   evidence：提出DynamicWAM，面向动态操作的世界-动作模型，采用双路径运动条件
+3. [MiniWorld: Democratizing the Training of Video World Models from Scratch](/202608/04/2608.01127v1-miniworld-democratizing-the-training-of-video-world-models-from-scratch)  
+   标签：评分：10.0/10、query:video-wam
+   evidence：从零训练视频世界模型学习智能体动作下的环境动态，是视频世界模型的核心工作
+4. [EndoWAM: A Grounded World-Action Model for Generalizable Endoscopic Navigation](/202608/04/2608.01221v1-endowam-a-grounded-world-action-model-for-generalizable-endoscopic-navigation)  
+   标签：评分：10.0/10、query:video-wam
+   evidence：首个用于内窥镜导航的世界-动作模型，将预测性视觉动态与动作生成耦合
+5. [Faster-WAM: Do World Action Models Need Deep Action Modules?](/202608/04/2608.02365v1-faster-wam-do-world-action-models-need-deep-action-modules)  
+   标签：评分：10.0/10、query:video-wam
+   evidence：明确针对世界动作模型与视频世界模型耦合
+6. [DreamTraj: Generating 6-DoF Object Trajectories by Reading Unrendered Video Diffusion Latents](/202608/04/2608.00486v1-dreamtraj-generating-6-dof-object-trajectories-by-reading-unrendered-video-diffusion-latents)  
    标签：评分：9.0/10、query:video-wam
-   evidence：面向视觉分布偏移下鲁棒操作的时间语义世界动作模型
-3. [Auto-JEPA: A Latent World Model of Continuous Intent for End-to-End Autonomous Driving](/202608/03/2607.29031v1-auto-jepa-a-latent-world-model-of-continuous-intent-for-end-to-end-autonomous-driving)  
+   evidence：从RGB图像和任务指令读取视频扩散潜变量预测6-DoF物体轨迹，直接对应基于视频的世界动作预测
+7. [Disentangling Visuo-Tactile Foresight: Oracle-Guided Interface Discovery for World Action Models](/202608/04/2608.00547v1-disentangling-visuo-tactile-foresight-oracle-guided-interface-discovery-for-world-action-models)  
    标签：评分：9.0/10、query:video-wam
-   evidence：面向动作的潜在世界模型，预测连续驾驶意图
-4. [FBFM: A Training-Free Asynchronous Feedback Mechanism for Flow-Matching in World-Action Models Execution](/202608/03/2607.29235v1-fbfm-a-training-free-asynchronous-feedback-mechanism-for-flow-matching-in-world-action-models-execution)  
+   evidence：直接研究触觉世界动作模型中未来视觉-触觉预测的结构以指导动作生成，完全契合世界动作模型需求。
+8. [FlowPilot: Real-Time World-Action Modeling for Agile UAV Navigation](/202608/04/2608.00635v1-flowpilot-real-time-world-action-modeling-for-agile-uav-navigation)  
    标签：评分：9.0/10、query:video-wam
-   evidence：用于世界动作模型执行的无训练异步反馈机制，基于流匹配
-5. [BWM: A Low-Cost High-Fidelity World Simulator for Robot Learning](/202608/03/2607.29302v1-bwm-a-low-cost-high-fidelity-world-simulator-for-robot-learning)  
+   evidence：联合去噪未来深度观测与可执行轨迹的紧凑世界动作模型，耦合视频与动作专家，直接匹配需求。
+9. [FactorJEPA: Factorizing Monolithic Futures into Layout-Agent-Interaction Channels for Crowded and Chaotic Global South Urban Worlds](/202608/04/2608.01049v1-factorjepa-factorizing-monolithic-futures-into-layout-agent-interaction-channels-for-crowded-and-chaotic-global-south-urban-worlds)  
    标签：评分：9.0/10、query:video-wam
-   evidence：动作条件世界模型，低成本高保真预测动作后果的世界模拟器
-6. [FibVLA: An Efficient Temporal Vision-Language-Action Model with Fibonacci Sampling](/202608/03/2607.29596v1-fibvla-an-efficient-temporal-vision-language-action-model-with-fibonacci-sampling)  
-   标签：评分：8.0/10、query:video-wam
-   evidence：面向物理世界动作预测的VLA模型，结合视觉时序历史，属于视频/视觉动作模型
+   evidence：面向世界模型，用JEPA对拥挤混乱的城市场景进行未来预测
+10. [SG-WAM: Self-Guided World Modeling in Geometry-Aware Policy Space](/202608/04/2608.01397v1-sg-wam-self-guided-world-modeling-in-geometry-aware-policy-space)  
+   标签：评分：9.0/10、query:video-wam
+   evidence：提出自引导世界动作模型SG-WAM，在几何感知策略空间中建模未来动态，直接对应世界动作模型需求
+11. [World Action Models in Real Time: An Empirical Study of Smooth Execution via Asynchronous Deployment](/202608/04/2608.01880v1-world-action-models-in-real-time-an-empirical-study-of-smooth-execution-via-asynchronous-deployment)  
+   标签：评分：9.0/10、query:video-wam
+   evidence：世界动作模型的实时执行，研究异步部署策略
+12. [DF$^3$: World Modeling via Decoder-Free Feature Forecasting in Autonomous Navigation](/202608/04/2608.02428v1-df3-world-modeling-via-decoder-free-feature-forecasting-in-autonomous-navigation)  
+   标签：评分：9.0/10、query:video-wam
+   evidence：在潜在空间无解码器预测视频未来状态，实现自主导航中的世界建模
 
 ### 速读区论文标签
-1. [WCM: A World Critic Model for Vision-Language-Action Reinforcement Learning](/202608/03/2607.29613v1-wcm-a-world-critic-model-for-vision-language-action-reinforcement-learning)  
+1. [DreamTrajectory: Trajectory-Guided Action Generation with World Model Alignment for Mobile Manipulation](/202608/04/2608.01381v1-dreamtrajectory-trajectory-guided-action-generation-with-world-model-alignment-for-mobile-manipulation)  
    标签：评分：8.0/10、query:video-wam
-   evidence：通过世界评论家模型为视觉-语言-动作强化学习引入显式世界建模目标
-2. [A Causality-aware Infer-diagnose-refine Framework for Test-time Modality Adaptation in VLA Models](/202608/03/2607.25516v1-a-causality-aware-infer-diagnose-refine-framework-for-test-time-modality-adaptation-in-vla-models)  
+   evidence：在移动操作中使用世界模型对齐进行动作生成，类似世界动作模型
+2. [WorldExam: Benchmarking World Models from Apparent Appearance to Inherent Reactivity](/202608/04/2608.02603v1-worldexam-benchmarking-world-models-from-apparent-appearance-to-inherent-reactivity)  
+   标签：评分：8.0/10、query:video-wam
+   evidence：将视频生成模型作为世界模型进行分层评测，直接支持视频生成用于世界模型的研究。
+3. [Video Models as Native 4D Renderers: World-Grounded Conditioning from Animated Mesh](/202608/04/2608.00094v1-video-models-as-native-4d-renderers-world-grounded-conditioning-from-animated-mesh)  
    标签：评分：7.0/10、query:video-wam
-   evidence：面向VLA动作预测的测试时推断-诊断-细化框架，利用事实与反事实视觉观测
-3. [AquaJEPA: Action-Conditioned Multimodal Predictive Representations for Underwater Robot Dynamics](/202608/03/2607.29393v1-aquajepa-action-conditioned-multimodal-predictive-representations-for-underwater-robot-dynamics)  
+   evidence：利用预训练视频扩散模型作为世界接地4D渲染器，以动画网格和相机条件生成视频，推动世界状态渲染的视频生成研究
+4. [WM-Cov: Test Adequacy for Interactive World-Model-Style Autonomous Driving Simulation](/202608/04/2608.00298v1-wm-cov-test-adequacy-for-interactive-world-model-style-autonomous-driving-simulation)  
+   标签：评分：7.0/10、query:video-wam
+   evidence：针对交互式世界模型风格仿真提出测试充分性标准，涉及世界模型/生成模拟器的评估。
+5. [FreqForcing: Autoregressive Long Video Generation via Spectral Self-Anchoring](/202608/04/2607.27110v2-freqforcing-autoregressive-long-video-generation-via-spectral-self-anchoring)  
    标签：评分：6.0/10、query:video-wam
-   evidence：基于动作条件的多模态预测世界模型
+   evidence：长视频生成中通过频谱自锚定缓解误差累积
+6. [MoRoute: Dynamic Routing for In-Context Multimodal Video Generation](/202608/04/2607.29545v1-moroute-dynamic-routing-for-in-context-multimodal-video-generation)  
+   标签：评分：6.0/10、query:video-wam
+   evidence：多模态视频生成，在VLM与视频DiT之间动态路由
+7. [UniMoCa: Unifying Motion and Camera Controls as Visual Proxies for Faithful Human Video Generation](/202608/04/2608.01944v1-unimoca-unifying-motion-and-camera-controls-as-visual-proxies-for-faithful-human-video-generation)  
+   标签：评分：6.0/10、query:video-wam
+   evidence：将运动与相机控制统一为视觉代理的可控视频生成方法，可为动作条件世界模型提供支持。
 
 
 <div class="dpr-home-promo-card">

@@ -1,0 +1,363 @@
+Title: UniMoCa: Unifying Motion and Camera Controls as Visual Proxies for Faithful Human Video Generation
+
+URL Source: https://arxiv.org/pdf/2608.01944v1
+
+Published Time: Tue, 04 Aug 2026 02:06:58 GMT
+
+Number of Pages: 10
+
+Markdown Content:
+# UniMoCa: Unifying Motion and Camera Controls as Visual Proxies for Faithful Human Video Generation 
+
+## Liming Tan ∗1, Ye Chen ∗1, Hao Zhang †3, Lirong Qian 1, Feifei Li 2, Bingbing Ni ‡1,2  
+
+> 1
+
+Shanghai Jiao Tong University 2 USC-SJTU Institute of Cultural and Creative Industry 3 Monash University 
+
+Abstract 
+
+Controlling human motion and camera movement is essen-tial for faithful human-oriented video generation, yet remains challenging in multi-person scenes with large body motions, occlusions, and dynamic cameras. Existing pipelines typically rely on visual motion sequences, such as skeleton maps, pose maps, or rendered body representations, for motion control, while using camera embeddings for camera control. Such het-erogeneous control interfaces force video generation models to reconcile pixel-aligned visual cues with non-visual geomet-ric embeddings, making motion-camera attribution difficult and sensitive to camera estimation errors. We propose Uni-MoCa , a representation-driven framework that unifies motion and camera controls in visual space. At the core of UniMoCa is Motion-Camera Visual Proxy (MCVP ), a mutually-sharable novel representation that converts 3D human motion and camera trajectories extracted from driving videos into an identity-neutral visual proxy. MCVP renders temporally aligned human geometry under the recovered camera trajec-tory and augments it with explicit camera trajectory markers, replacing heterogeneous visual-parametric controls with dis-tinguishable visual cues. As both control factors are repre-sented in the same visual space, they become mutually com-patible rather than heterogeneous, enabling consistent joint reasoning and editing during video generation. We further cu-rate a MCVP-Video dataset covering complex actions, multi-person interactions, and diverse camera trajectories. Experi-ments based on the Wan2.2 I2V show that UniMoCa achieves substantial gains in human motion control, camera control, temporal consistency, and camera-aware robustness with min-imal additional complexity. More details are shown in our Project page: https://tanliming-daniel.github.io/UniMoCa/. 
+
+## Introduction 
+
+High-quality video generation is moving beyond visual real-ism toward precise controllability (Blattmann et al. 2023b,a; Ho et al. 2022; Wan et al. 2025; Yang et al. 2025; Lin et al. 2024; Chen et al. 2025; Hu et al. 2026a; Chen et al. 2026). In human video synthesis, a model should not only preserve natural appearance and temporal coherence, but also follow desired human motions and camera movements (Zhou et al. 2025; He et al. 2024; Cao et al. 2025; Zhang et al. 2024; 
+
+> ∗
+
+These authors contributed equally. 
+
+> †
+
+Work done during internship at SJTU. 
+
+> ‡
+
+Corresponding author. Video       
+
+> Generation
+> Model
+> Visual
+> Signals
+> Geometric
+> Signals
+> Video
+> Generation
+> Model
+> Heterogeneous Controls
+> UniMoCa MCVP
+> Unified Visual Proxy
+> Error & Ambiguity
+> Faithful Control
+> Driving Video
+> Driving Video
+> Motion Cue
+> Camera Code
+> Motion Factor
+> Camera Factor
+> Motion
+> Misalignment
+> Camera
+> Misalignment
+> Heterogeneous
+> Space
+> Unified
+> Visual Space
+> 𝐾 1,𝑇 1𝐾 2,𝑇 2𝐾 3,𝑇 3
+
+Figure 1: Illustration of our Motivation. Prior methods combine visual motion cues with geometric camera codes, creating ambiguous motion-camera attribution across het-erogeneous control spaces (top). UniMoCa instead expresses both controls as MCVP in a shared visual space for faithful motion and camera control (bottom). Wang et al. 2025a). This requirement becomes particularly challenging in scenes involving multiple people, large body motions, occlusions, and dynamic cameras, where subject motion and viewpoint changes jointly determine the observed video. Recent controllable human-oriented video generation and character animation methods have made notable progress in motion control (Zhou et al. 2025; Hu et al. 2026b; Yan et al. 2026b,a; Zhou et al. 2024; Wang et al. 2025c; Wan et al. 2025). Many approaches introduce visual motion sequences, such as skeleton maps or rendered body representations, to guide human motion, while camera-controllable video gen-eration methods often use Plücker coordinate embeddings or other camera encodings to control viewpoint changes (He et al. 2024; Bai et al. 2025; Cao et al. 2025; Luo et al. 2025; He et al. 2025). These advances improve motion control and camera control separately , but joint camera-and-human mo-tion control remains comparatively underexplored (Cao et al. 2025). As illustrated in Figure 1, common pipelines still ex-pose motion and camera through differently structured con-trol signals, making it difficult for the model to learn their respective roles in the generated video. Specifically, existing motion-camera control pipelines face two related challenges. First, motion control and camera con-arXiv:2608.01944v1 [cs.CV] 3 Aug 2026 trol are often encoded in incompatible forms . Human mo-tion is typically provided as pixel-aligned visual motion se-quences (Zhou et al. 2025; Hu et al. 2026b; Yan et al. 2026b; Zhou et al. 2024), whereas camera movement is injected through sparse geometric conditions such as Plücker coordi-nate embeddings (He et al. 2024; Cao et al. 2025; Li et al. 2024; Zhang, Rao, and Agrawala 2023). Since visual mo-tion sequences are image-space observations already formed under a camera view, they contain camera-projected body changes.The model must therefore align visual motion cues with non-visual camera embeddings and infer whether an ob-served image change should be attributed to the subject or to the camera, which leads to ambiguity. Second, such hetero-geneous controls are sensitive to intermediate estimation errors. Camera trajectory estimation errors propagate into Plücker coordinate embeddings, while visual motion condi-tions may contain tracking jitter, body reconstruction errors, or rendering misalignment. When these noisy signals are given in different spaces, the model cannot easily determine whether a mismatch comes from camera estimation error or visual motion extraction error. This makes high-quality, temporally stable, and geometrically aligned motion-camera training data a key prerequisite for reliable control. To address these issues, we propose UniMoCa , arepresentation-driven framework for faithful human-oriented video generation. Our key idea is not to introduce a more complex control injection module, but to replace the het-erogeneous visual-parametric interface with a unified visual representation, accomodating both motion and camera con-trol signal in a consistent visual space. To this end, we intro-duce Motion-Camera Visual Proxy (MCVP) , a mutually-sharable novel representation. MCVP extracts 3D human motion and camera trajectories from driving videos, renders temporally smoothed and coordinate-aligned human geom-etry under the recovered camera trajectory, and augments the rendered proxy with explicit camera trajectory markers. In this way, human motion, multi-person spatial relation-ships, occlusions, and camera dynamics are all exposed to the video generation model as visual cues, while body mo-tion and camera movement remain distinguishable through different visual primitives. MCVP also mitigates the impact of imperfect intermedi-ate estimation. Unlike prior Plücker-based conditioning (He et al. 2024; Bahmani et al. 2025; He et al. 2025), which injects camera errors as raw perturbations in a parametric space, MCVP converts the recovered camera trajectory into visual proxy frames. As a result, moderate camera errors mainly ap-pear as mild visual deviations in scale, position, viewpoint, or marker location, which video diffusion models can more nat-urally absorb. Temporal smoothing, coordinate alignment, and sample filtering further suppress high-frequency jitter and failed reconstructions in the recovered human motion and camera trajectories. Since MCVP is identity-neutral, small geometric errors do not directly contaminate the target ap-pearance, but instead act as control noise that the model can learn to handle robustly. To support this representation, we curate a MCVP-Video 
+
+dataset covering complex human actions, multi-person in-teractions, and diverse camera trajectories. During training, MCVP is encoded into proxy tokens temporally aligned with the target video and jointly processed with video genera-tion tokens by the denoising transformer. We further use shifted positional encoding to distinguish proxy tokens from generated video tokens, allowing the model to treat MCVP as control context rather than generated content. Built on the Wan2.2 I2V (Wan et al. 2025), UniMoCa introduces motion-camera control with minimal additional complexity. Experiments show that our method substantially improves human motion control accuracy and camera control accu-racy, while also achieving better motion adherence, tempo-ral consistency, and camera-aware robustness in challenging multi-person and moving-camera scenarios. 
+
+## Related Works 
+
+Human-oriented video generation Recent reference-based animation methods condition video diffusion models on human-centric signals to reproduce target performances while preserving subject identity (Hu 2024; Hu et al. 2026b; Zhang et al. 2024; Tan et al. 2024; Wang et al. 2025c; Cheng et al. 2025; Zhou et al. 2024, 2025; Hu et al. 2025). RealisDance-DiT integrates multiple motion repre-sentations (Zhou et al. 2025) including HaMeR (Pavlakos et al. 2024), DWPose (Yang et al. 2023), and SMPL-X hu-man priors (Pavlakos et al. 2019; Loper et al. 2023; Bogo et al. 2016), to enhance motion fidelity and geometric consistency. However, it primarily focuses on single-person animation and remains limited in handling multi-character interactions. SCAIL further introduces an identity-agnostic 3D skeleton representation rendered with different hues, enabling scal-able multi-character animation without requiring explicit identity annotations (Yan et al. 2026b). Nevertheless, these methods may suffer from camera-induced jitter, unnatural foot sliding, temporal misalignment, and degraded motion coherence. To address these limitations, SCAIL-2 proposes an end-to-end driving paradigm that directly utilizes driving videos as conditions, avoiding unreliable intermediate rep-resentations while preserving rich appearance and motion context. However, its reliance on pre-existing driving videos limits controllability and editability, and the generation qual-ity remains highly dependent on the quality and diversity of the input motion sequences (Yan et al. 2026a). 
+
+Camera-Controlled Video Generation. Camera-controlled video generation aims to manipulate viewpoints while pre-serving visual consistency and temporal coherence. Exist-ing methods incorporate camera geometry through camera-control branches (Hu et al. 2024; He et al. 2024, 2025; Bah-mani et al. 2025; Cao et al. 2025) or camera-aware positional encodings (Li et al. 2026), enabling controllable viewpoint synthesis but offering limited control over complex human dynamics. ReCamMaster extends camera control to video re-rendering with novel camera trajectories from a single input video, yet remains dependent on existing videos and pro-vides limited motion controllability (Bai et al. 2025). Uni3C further introduces joint camera and human motion control us-ing scene point clouds and SMPL-X (Pavlakos et al. 2019), but relies on expensive 3D reconstruction and mainly targets single-person scenarios (Cao et al. 2025). Achieving efficient camera control with scalable multi-person motion generation Driving Video  
+
+> MCVP Construction
+> MCVP -guided Video Generation
+> Camera -View
+> Motion Seq.
+> Camera Traj .
+> Inverse
+> Camera
+> Transform.
+> +
+> Smoothing
+> Global -View Motion Seq.
+> Human Visual Factor
+> Camera Visual Factor
+> MCVP
+> Wan -VAE
+> Enc.
+> Proxy
+> Enc.
+> Add Noise
+> Shifted
+> RoPE
+> Two young adults
+> jogging across …
+> Text tokens
+> Token
+> Concatenation
+
+Diffusion 
+
+Transformer 
+
+Block 
+
+× 𝑵 
+
+> Wan -VAE
+> Dec.
+> Trainable Parameters
+> Frozen Parameters
+> Output Video
+> ,
+> Image tokens
+> Video tokens
+> Proxy tokens
+> Motion
+> Alignment
+> Camera
+> Alignment
+
+Figure 2: Overview of UniMoCa. Top: we recover camera-view human motion and camera trajectories from a driving video, transform and smooth the motion in global coordinates, and render the human and camera visual factors into MCVP. Bottom: a proxy encoder maps MCVP to visual tokens with Shifted RoPE; these tokens are concatenated with noisy video and appearance/text condition tokens and processed by the diffusion transformer. therefore remains an open challenge (Zheng et al. 2026a,b; Yu et al. 2025). 
+
+## Method 
+
+Our method is built on a simple observation: precise motion-camera control does not necessarily require a complex con-trol injection architecture; it requires the model to receive motion and camera cues in a form that is both unified and distinguishable. UniMoCa therefore keeps the Wan2.2 I2V (Wan et al. 2025) largely unchanged and introduces 
+
+Motion-Camera Visual Proxy (MCVP) , a new visual con-ditioning representation that converts 3D human motion and camera trajectories into distinguishable visual factors in a dense visual space. Figure 2 gives an overview of the frame-work. 
+
+Preliminaries 
+
+Heterogeneous motion-camera controls. Given a driving video V d = {Idt }Tt=1 , let Ht denote the underlying 3D hu-man state at frame t, including body pose, geometry, and multi-person spatial layout, and let Ct denote the camera state. Existing methods commonly use visual motion control sequences, such as skeleton maps, pose maps, or rendered body representations, to guide human motion. We denote such a visual motion condition by Vt:
+
+Vt = Emot (Idt ) ≈ ψ(Π( Ct, H t)) , (1) 
+
+where Emot extracts a visual motion condition from the driv-ing frame, Π( ·) denotes camera projection, and ψ denotes the rendering or rasterization process used to form the vi-sual condition. The important point is that Vt is an image- or video-space control signal: it is visually aligned with pixels and already contains camera-projected body observations. In contrast, camera control is commonly represented by Plücker coordinate embeddings: 
+
+Qt = ϕpl (Ct), (2) 
+
+where ϕpl maps camera parameters to a sparse geometric embedding. During flow-matching training, the denoising network therefore receives the heterogeneous controls as: 
+
+u (zτ , τ, I 0, V1: T , Q 1: T , y ; θ) , (3) 
+
+where zτ is the noisy video latent, I0 is the image-to-video appearance condition, and y is an optional text con-dition. Although both V1: T and Q1: T serve as controls, they are produced by heterogeneous mappings: ψ con-verts camera-projected human states into pixel-aligned vi-sual maps, whereas ϕpl converts camera parameters into sparse geometric ray embeddings. Thus, V1: T already re-flects camera projection in image space, while Q1: T remains a non-visual parametric signal. Since supervision is applied only to the target video trajectory, the model must recon-cile these heterogeneous cues implicitly, which can weaken motion-camera attribution and make control recombination difficult. 
+
+Sensitivity to estimation errors. The heterogeneous formu-lation is also brittle to imperfect intermediate estimates. Let 
+
+ξVt denote the extraction or rendering error in the visual motion condition, and let ηCt denote the camera estimation error. The resulting first-order perturbation to the denoising prediction can be written as: 
+
+δu θ ≈
+
+> T
+
+X
+
+> t=1
+
+Ju 
+
+> Vt
+
+ξVt +
+
+> T
+
+X
+
+> t=1
+
+JuQt JQCt ηCt . (4) 
+
+where Ju 
+
+> Vt
+
+and JuQt are the Jacobians of the model prediction with respect to the visual motion condition and the Plücker condition, and JQCt is the Jacobian of the Plücker embed-ding with respect to the camera state. The two terms arise from different mechanisms: ξVt is governed by the upstream visual motion pipeline, such as SMPL estimation, SAM3D-based reconstruction, tracking, and rasterization, whereas ηCt
+
+is transformed by the analytic ray embedding and Plücker co-ordinate formulation (Yang et al. 2026; Wang et al. 2025d). Since these errors propagate through different control spaces, the model must implicitly determine whether a mismatch comes from visual motion noise or camera estimation noise. This increases the learning burden of flow-matching training. UniMoCa addresses this issue by replacing heterogeneous visual-parametric inputs with a unified visual representation that makes motion and camera cues distinguishable and con-verts moderate camera errors into visual-space perturbations. 
+
+Motion-Camera Visual Proxy 
+
+We propose Motion-Camera Visual Proxy (MCVP) , a vi-sual conditioning representation for motion-camera control. MCVP is constructed from a driving video and organizes motion and camera information into two visual factors: a hu-man visual factor that carries articulated body geometry, and a camera visual factor that carries explicit camera dynamics. We first extract camera-view human motion from the driv-ing video using SAM 3D Body (Yang et al. 2026; Wang et al. 2025d):     
+
+> ˆScam 1: T=Ebody (Vd),(5)
+
+where ˆScam 1: T denotes a camera-view motion sequence in the 2D+T space. We then estimate camera intrinsics and extrin-sics using Depth Anything 3 (Lin et al. 2025):       
+
+> ( ˆK1: T,ˆE1: T) = Ecam (Vd),(6)
+
+where ˆKt and ˆEt denote the estimated camera intrinsics and extrinsics, respectively. Given the recovered camera param-eters, we inverse-project the camera-view motion sequence into a global 3D+T motion sequence and smooth it in the global space:           
+
+> ˆHglob 1: T=U( ˆScam 1: T; ˆK1: T,ˆE1: T),
+> ˜H1: T=Sczv ( ˆHglob 1: T),(7)
+
+where U denotes the inverse camera transformation, and Sczv 
+
+denotes a standard contact-aware zero-velocity trajectory re-finement operator (Zou et al. 2020). This step smooths global human trajectories by encouraging contacted foot joints to remain stationary, thereby suppressing temporal jitter and foot-skating artifacts without changing the identity-neutral nature of the proxy. For notation simplicity, we write ˆCt = ( ˆKt, ˆEt). Instead of injecting ˆC1: T as raw camera parameters, we replay the recovered camera trajectory during rendering. Specifically, we render an identity-neutral, camera-aware human factor 
+
+F Ht = Rbody ( ˜Ht; ˆCt), and a non-human camera marker 
+
+F Ct = Rcam ( ˆCt). The final MCVP frame and sequence are:          
+
+> Pt=G(FHt, F Ct),P={Pt}Tt=1 ,(8)
+
+where G denotes a visual composition operator that over-lays the camera marker onto the human visual factor with a fixed spatial layout to form the final proxy frame. Since ˆCt
+
+is replayed during rendering, camera-induced scale changes, viewpoint changes, occlusions, and multi-person spatial re-lationships are directly visible in the proxy sequence. MCVP introduces a homogeneous visual interface for motion-camera control. Both F Ht and F Ct are visual sig-nals: the human factor preserves articulated body geometry, while the camera factor visualizes camera dynamics with ex-plicit markers. Since they are composed into the same proxy frame Pt and later encoded synchronously with the target video, the denoising transformer observes body motion and camera movement within a shared spatio-temporal visual to-ken space. The visual markers provide an explicit cue for changes in camera parameters, allowing the model to infer camera motion from marker dynamics and implicitly sep-arate camera-induced changes from the body motion cues embedded in F Ht . In this way, MCVP replaces the heteroge-neous interface of visual motion sequences and non-visual camera embeddings with distinguishable visual factors in the same dense visual space. MCVP also reduces the brittleness caused by imperfect intermediate estimation. Let δP t denote the visual residual induced by motion and camera estimation. Compared with the heterogeneous perturbation in Eq. (4), errors in MCVP affect the denoising prediction through a single visual proxy path:          
+
+> δu mcvp
+> θ≈
+> TX
+> t=1
+> JuPtδP t,δP t=JP
+> ˜HtξHt+JP
+> ˆCtηCt.
+> (9)
+
+where JuPt is the Jacobian of the model prediction with respect to the visual proxy, while JP
+
+> ˜Ht
+
+and JP
+
+> ˆCt
+
+describe how errors in the smoothed global motion and recovered camera affect the rendered proxy. The key difference is that both motion and camera errors are absorbed into the same visual residual δP t, so the denoiser only observes a homogeneous image-space perturbation rather than a separate parametric camera shift. In practice, this makes the effect of estimation noise more local and easier to smooth out: errors appear as mild changes in body alignment, scale, viewpoint, or marker location, instead of a global perturbation in a non-visual control branch. Temporal smoothing, coordinate alignment, and sample filtering further suppress high-frequency jitter and failed reconstructions. Since the proxy is identity-neutral, moderate geometry errors do not directly contaminate target appearance, but act as visual conditioning noise that the video model can learn to handle. 
+
+MCVP-Guided Video Generation 
+
+UniMoCa uses MCVP as an additional visual input for the Wan2.2 I2V backbone. We do not introduce a complex new control branch or an auxiliary disentanglement loss. Instead, MCVP is encoded as visual proxy tokens and concatenated with noisy video tokens, first-frame tokens, and text tokens in the denoising transformer. Let X = {It}Tt=1 be the training video, I0 the first-frame appearance input, and y the text input. The target video is encoded by the Wan VAE and perturbed at flow timestep τ to obtain noisy video tokens 
+
+zvid  
+
+> τ
+
+, while MCVP is encoded by a trainable proxy encoder as zmcvp = Eproxy (P ). The model is optimized with the standard flow-matching objective: SCAIL SCAIL2 MultiAnimate Seedance 2.0 (with MCVP) Ours 
+
+> sliding sliding
+
+Figure 3: Qualitative comparison of motion control. Note that we also feed MCVP to Seedance 2.0, as it supports this input and performs better than visualized motion alone (see supplementary).       
+
+> L= E x0,x 1,P,I 0,y,τ
+> 
+> u
+> 
+> [zvid
+> τ;zmcvp ;z0;zy], τ ;θ
+> 
+> −vτ
+> 22
+> 
+> .
+> (10)
+
+where x0 and x1 denote the sampled endpoints of the flow path, vτ is the target velocity at flow timestep τ , [·; ·] denotes token concatenation, and z0 and zy are the first-frame and text tokens (Lipman et al. 2022). The proxy encoder Eproxy 
+
+maps MCVP into the token space of the Wan denoising transformer. In our implementation, we initialize Eproxy with the weights of the patchify module in Wan-VAE. 
+
+Shifted RoPE for MCVP. Because MCVP tokens and video tokens share similar spatio-temporal layouts but play differ-ent roles, we apply Shifted RoPE to MCVP tokens. (Su et al. 2021; Heo et al. 2024) Let t, h, and w denote the temporal index, spatial row, and spatial column of a token on the video grid:     
+
+> Pos vid
+> t,h,w = ( t, h, w ),
+> Pos mcvp
+> t,h,w = ( t, h, w + ∆) ,(11)
+
+where ∆ is a fixed spatial offset. Shifted RoPE preserves the temporal correspondence between MCVP and the target video, while marking MCVP tokens as control context rather than generated content. Compared with heterogeneous train-ing, MCVP-guided generation no longer requires the trans-former to reconcile a noisy visual motion sequence with a separate non-visual camera embedding. Motion-related and camera-related cues are presented as synchronized visual proxy tokens, allowing the transformer to learn body-motion and camera-motion effects within a unified token space. The separation is induced by the structure of MCVP and the shifted token roles, rather than by an explicit disentangle-ment objective (Heo et al. 2024; Chong et al. 2025; Kong et al. 2026). 
+
+MCVP Dropout for Robust Motion Learning. While MCVP provides accurate motion and camera guidance, re-lying on MCVP in every training sample may lead the de-noising transformer to overfit the proxy representation and weaken its ability to model intrinsic motion dynamics. To improve robustness, we randomly drop the MCVP input dur-ing training with a fixed probability (Srivastava et al. 2014). This stochastic conditioning strategy encourages the model to learn complementary motion priors from the visual con-text while preserving the controllability provided by MCVP when it is available. This regularization is also intended to reduce sensitivity to incomplete or imperfect proxy signals; its empirical effect is evaluated in Table 3. Method Automatic Eval. (Video-Bench) Human Eval. Img. Quality ↑                                         
+
+> Motion Smooth. ↑
+> Temporal Cons. ↑
+> Appear. Cons. ↑
+> Img. Quality ↑
+> Motion Cons. ↑
+> Appear. Cons. ↑
+> MultiAnimate 3.41 3.48 3.62 3.35 3.20 3.05 2.98 SCAIL1 4.01 3.86 4.08 3.95 3.74 3.62 3.57 SCAIL2 4.18 4.03 4.25 4.12 3.91 4.05 3.75 Seedance2.0 4.75 4.49 4.56 4.51 4.31 4.17 4.28 Ours 4.26 4.55 4.60 4.15 4.24 4.21 3.91
+
+Table 1: Quantitative comparisons with automatic evaluations and human evaluations. Recammaster Ours Seedance 2.0 (with MCVP)   
+
+> Recammaster Seedance 2.0 (with MCVP) Ours
+
+Figure 4: Qualitative comparison of camera control. UniMoCa follows the prescribed reframing more accurately while main-taining subject layout, motion, and scene consistency. 
+
+MCVP–Video Data Curation. We collect human-centric videos with continuous shots, prioritizing clips that contain substantial human motion, multi-person interactions, or dy-namic camera movement (Wang et al. 2025b, 2024; Zhang et al. 2025; Bai et al. 2025). Each source video is divided into fixed-length clips, from which we construct temporally aligned MCVP sequences using the procedure described above. We discard clips with incomplete human recon-struction, discontinuous subject tracks, implausible camera-pose jumps or visible misalignment between the proxy and the source video. Starting from 200k candidate clips, this pipeline yields 80k valid video–MCVP pairs, corresponding to approximately 120 hours of training data. 
+
+Inference. At inference, UniMoCa allows users to customize appearance, human motion, and camera movement through a common interface. Appearance is specified by a first-frame image and an optional text prompt, while MCVP can be constructed from either a driving video or user-authored 3D content. For the latter, users can author character animations and camera trajectories in Blender or Unreal Engine, from which we render the human proxy and camera markers to form MCVP. Because human motion is maintained in a global 3D + T
+
+space, a motion sequence can be freely combined with dif-ferent camera trajectories and target appearances. Users can therefore generate multiple directed shots of the same per-formance by changing the camera path, or transfer the same motion-camera specification across different appearances by changing the first frame, without model retraining or archi-tectural modifications. 
+
+## Experiments 
+
+Experiment Settings 
+
+Implementation Details. We train UniMoCa on our curated MCVP-Video dataset consisting of 80k valid videos for 5000 steps with a batch size of 24 and a learning rate of 1e-5 at the resolution of 832x480, using 8 NVIDIA H100 GPUs for approximately a week. The model is optimized using AdamW. We apply a dropout rate of 0.15 to MCVP tokens and set the Shifted RoPE spatial offset ∆ = 120 .
+
+Evaluation Metrics. For evaluation, we construct a bench-mark by holding out a subset of videos from our MCVP-Method Camera Accuracy Video-Bench RotErr ↓ TransErr ↓
+
+Img. Quality ↑
+
+Motion Cons. ↑
+
+Subject Cons. ↑
+
+ReCamMaster 2.10 5.35 3.88 3.42 3.86 Seedance2.0 1.25 4.74 4.73 4.04 4.62 Ours 1.13 4.53 4.28 4.57 4.58 
+
+Table 2: Quantitative comparison on camera accuracy and Video-Bench metrics. Video dataset, ensuring that all evaluation samples are ex-cluded from training. Conventional metrics such as FID and FVD assume the availability of ground-truth videos for com-parison (Yu, Zhang, and Deng 2021; Ge et al. 2024; Un-terthiner et al. 2019). However, in cross-identity animation, the target appearance is deliberately different from the driv-ing subject, rendering these reference-based metrics unsuit-able. To provide more meaningful evaluation, we employ Video-Bench’s human-aligned protocol, assessing genera-tions along multiple perceptual axes with scores ranging from 1 to 5 (Ning et al. 2025). Beyond these perceptual mea-sures, we quantify camera control precision using RotErr 
+
+and TransErr , which measure angular and translational de-viations from the target camera path (Bai et al. 2025). 
+
+Comparisons with Prior Works 
+
+Motion Control. We compare our method with state-of-the-art human video generation methods (MultiAnimate (Hu et al. 2026b), SCAIL (Yan et al. 2026b), SCAIL-2 (Yan et al. 2026a), and the commercial model Seedance 2.0)in terms of motion-control accuracy. The results are shown in Table 1. UniMoCa outperforms all open-source baselines, especially on motion-centric metrics due to the proposed MCVP, which represents human motion and camera dynam-ics as temporally aligned signals in a unified visual space. Al-though Seedance 2.0 remains stronger on appearance-centric measurements such as image quality, UniMoCa surpasses it on motion-control metrics, which is nontrivial for a research system competing with a leading commercial model. We also show some qualitative results in Figure 3. We can see that UniMoCa better follows articulated motion, contact, and multi-person layouts while remaining visually competitive with Seedance 2.0. These results show that our unified vi-sual Conditioning helps the model distinguish subject motion from viewpoint change while synthesizing both coherently. 
+
+Camera Control. We compare our method with SOTA camera-control baseline ReCamMaster (Bai et al. 2025) and Seedance 2.0 in terms of camera-control accuracy. The re-sults are shown in Table 2. UniMoCa clearly outperforms the open-source baseline, especially on camera-tracking metrics and motion consistency, thanks to the proposed MCVP. It is noted that UniMoCa surpasses Seedance 2.0 on camera accuracy metrics. We also show some qualitative results in Figure 4. We can see that UniMoCa better follows the pre-scribed reframing while preserving subject layout and motion coherence. These results show that unified visual condition-ing separates subject motion from camera motion, enabling 
+
+Variant RotErr ↓ TransErr ↓
+
+Motion Cons. ↑
+
+Image Quality ↑
+
+Baseline - - 4.18 4.27 + Plücker Enc. 2.86 5.33 3.95 4.08 + ProPE 1.94 5.14 4.08 4.16 + MCVP 1.13 4.53 4.21 4.28 
+
+w/o shifted RoPE 2.15 5.27 3.93 4.01 w/o Dropout 1.25 4.83 4.10 4.18 
+
+Table 3: Ablation study of key components. Reference Image Driving Pose PRoPE MCVP (Ours)  
+
+> Camera Trajectory PRoPE
+> Reference Image
+> degraded motion control performa nce
+> Plücker Enc. Plücker Enc. MCVP (Ours)
+> less robust to joint human-camera motions
+
+Figure 5: Heterogeneous motion-camera controls degrade video generation quality. more accurate camera following while preserving human dy-namics. 
+
+Ablation Study 
+
+Unified Visual Conditioning. Table 3 compares different motion-camera conditioning designs. We use Wan2.2 condi-tioned with pure motion sequence as baseline. Plücker en-coding (He et al. 2024) and PRoPE (Li et al. 2026) make camera control possible, but they combine visual human-motion cues with heterogeneous parametric camera signals, which weakens the model’s ability to separate body motion from viewpoint change. MCVP performs best across the ab-lation metrics and also improves motion and image-quality measurements over the no-camera baseline. Figure 5 fur-ther shows that parametric encodings degrade contact and struggle under joint subject-camera motion, whereas MCVP preserves coherent articulation and viewpoint evolution. 
+
+Training Components. Table 3 also validates Shifted RoPE and MCVP dropout. Shifted RoPE keeps proxy tokens dis-tinguishable from video tokens, while dropout improves ro-bustness to imperfect conditioning. Their combination yields the best overall behavior. 
+
+## Conclusion 
+
+We propose UniMoCa , a simple and effective framework that uses MCVP to represent human motion and camera tra-jectories in a unified visual space for joint motion and cam-era control in human video generation. Experiments show strong motion and camera control results, outperforming open-source baselines and remaining competitive with lead-ing commercial systems. References 
+
+Bahmani, S.; Skorokhodov, I.; Siarohin, A.; Menapace, W.; Qian, G.; Vasilkovsky, M.; Lee, H.-Y.; Wang, C.; Zou, J.; Tagliasacchi, A.; et al. 2025. Vd3d: Taming large video diffusion transformers for 3d camera control. In Inter-national Conference on Learning Representations , volume 2025, 66712–66737. Bai, J.; Xia, M.; Fu, X.; Wang, X.; Mu, L.; Cao, J.; Liu, Z.; Hu, H.; Bai, X.; Wan, P.; et al. 2025. Recammaster: Camera-controlled generative rendering from a single video. In Proceedings of the IEEE/CVF International Conference on Computer Vision , 14834–14844. Blattmann, A.; Dockhorn, T.; Kulal, S.; Mendelevitch, D.; Kilian, M.; Lorenz, D.; Levi, Y.; English, Z.; Voleti, V.; Letts, A.; et al. 2023a. Stable video diffusion: Scaling la-tent video diffusion models to large datasets. arXiv preprint arXiv:2311.15127 .Blattmann, A.; Rombach, R.; Ling, H.; Dockhorn, T.; Kim, S. W.; Fidler, S.; and Kreis, K. 2023b. Align your latents: High-resolution video synthesis with latent diffusion models. In Proceedings of the IEEE/CVF conference on computer vision and pattern recognition , 22563–22575. Bogo, F.; Kanazawa, A.; Lassner, C.; Gehler, P.; Romero, J.; and Black, M. J. 2016. Keep it SMPL: Automatic estimation of 3D human pose and shape from a single image. In Euro-pean conference on computer vision , 561–578. Springer. Cao, C.; Zhou, J.; Li, S.; Liang, J.; Yu, C.; Wang, F.; Xue, X.; and Fu, Y. 2025. Uni3c: Unifying precisely 3d-enhanced camera and human motion controls for video generation. In Proceedings of the SIGGRAPH Asia 2025 Conference Papers , 1–12. Chen, Y.; Chen, X.; Zhu, Y.; Tan, L.; Wan, Z.; Xiong, Y.; Wang, T.; Liu, J.; Zhang, W.; Zhang, X.; et al. 2026. World Narrative Model for Highly Controllable Video Generation: A Paradigm Shift from Pixel Sampling to Physical World Orchestration. arXiv preprint arXiv:2606.31946 .Chen, Y.; Tan, L.; Zhu, Y.; Wang, Y.; and Ni, B. 2025. Vec-torized video representation with easy editing via hierarchi-cal spatio-temporally consistent proxy embedding. arXiv preprint arXiv:2510.12256 .Cheng, G.; Gao, X.; Hu, L.; Hu, S.; Huang, M.; Ji, C.; Li, J.; Meng, D.; Qi, J.; Qiao, P.; et al. 2025. Wan-animate: Unified character animation and replacement with holistic replication. arXiv preprint arXiv:2509.14055 .Chong, Z.; Zhang, W.; Zhang, S.; Zheng, J.; Dong, X.; Li, H.; Wu, Y.; Jiang, D.; and Liang, X. 2025. Catv2ton: Taming diffusion transformers for vision-based virtual try-on with temporal concatenation. arXiv preprint arXiv:2501.11325 .Ge, S.; Mahapatra, A.; Parmar, G.; Zhu, J.-Y.; and Huang, J.-B. 2024. On the content bias in fréchet video distance. In Proceedings of the IEEE/CVF conference on computer vision and pattern recognition , 7277–7288. He, H.; Xu, Y.; Guo, Y.; Wetzstein, G.; Dai, B.; Li, H.; and Yang, C. 2024. Cameractrl: Enabling camera control for text-to-video generation. arXiv preprint arXiv:2404.02101 .He, H.; Yang, C.; Lin, S.; Xu, Y.; Wei, M.; Gui, L.; Zhao, Q.; Wetzstein, G.; Jiang, L.; and Li, H. 2025. Cameractrl ii: Dynamic scene exploration via camera-controlled video diffusion models. In Proceedings of the IEEE/CVF Interna-tional Conference on Computer Vision , 13416–13426. Heo, B.; Park, S.; Han, D.; and Yun, S. 2024. Rotary position embedding for vision transformer. In European Conference on Computer Vision , 289–305. Springer. Ho, J.; Salimans, T.; Gritsenko, A. A.; Chan, W.; Norouzi, M.; and Fleet, D. J. 2022. Video diffusion models. In ICLR workshop on deep generative models for highly structured data .Hu, L. 2024. Animate anyone: Consistent and controllable image-to-video synthesis for character animation. In Pro-ceedings of the IEEE/CVF conference on computer vision and pattern recognition , 8153–8163. Hu, T.; Lu, M.; Wang, Y.; Zhang, J.; Hao, J.; Pan, Y.; Yi, R.; Ma, L.; and Tao, D. 2026a. MetaWorld: Scaling Multi-Agent Video World Model from Single-view Video Data. 
+
+arXiv preprint arXiv:2606.02753 .Hu, T.; Yu, Z.; Zhou, Z.; Liang, S.; Zhou, Y.; Lin, Q.; and Lu, Q. 2025. Hunyuancustom: A multimodal-driven ar-chitecture for customized video generation. arXiv preprint arXiv:2505.04512 .Hu, T.; Zhang, J.; Yi, R.; Wang, Y.; Huang, H.; Weng, J.; Wang, Y.; and Ma, L. 2024. Motionmaster: Training-free camera motion transfer for video generation. arXiv preprint arXiv:2404.15789 .Hu, Y.; Gong, H.; Yang, C.; An, Z.; Xu, Y.; and Liu, S. 2026b. MultiAnimate: Pose-Guided Image Animation Made Extensible. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , 9306–9316. Kong, Z.; Gao, F.; Zhang, Y.; Kang, Z.; Wei, X.; Cai, X.; Chen, G.; and Luo, W. 2026. Let them talk: Audio-driven multi-person conversational video generation. Advances in Neural Information Processing Systems , 38: 70990–71013. Li, M.; Yang, T.; Kuang, H.; Wu, J.; Wang, Z.; Xiao, X.; and Chen, C. 2024. Controlnet++: Improving conditional controls with efficient consistency feedback: Project page: liming-ai. github. io/controlnet_plus_plus. In European Conference on Computer Vision , 129–147. Springer. Li, R.; Yi, B.; Liu, J.; Gao, H.; Ma, Y.; and Kanazawa, A. 2026. Cameras as relative positional encoding. Advances in Neural Information Processing Systems , 38: 15984–16009. Lin, B.; Ge, Y.; Cheng, X.; Li, Z.; Zhu, B.; Wang, S.; He, X.; Ye, Y.; Yuan, S.; Chen, L.; et al. 2024. Open-sora plan: Open-source large video generation model. arXiv preprint arXiv:2412.00131 .Lin, H.; Chen, S.; Liew, J.; Chen, D. Y.; Li, Z.; Shi, G.; Feng, J.; and Kang, B. 2025. Depth anything 3: Recovering the vi-sual space from any views. arXiv preprint arXiv:2511.10647 .Lipman, Y.; Chen, R. T.; Ben-Hamu, H.; Nickel, M.; and Le, M. 2022. Flow matching for generative modeling. In 
+
+The eleventh international conference on learning represen-tations .Loper, M.; Mahmood, N.; Romero, J.; Pons-Moll, G.; and Black, M. J. 2023. SMPL: A skinned multi-person linear model. In Seminal Graphics Papers: Pushing the Bound-aries, Volume 2 , 851–866. Luo, Y.; Shi, X.; Bai, J.; Xia, M.; Xue, T.; Wang, X.; Wan, P.; Zhang, D.; and Gai, K. 2025. Camclonemaster: Enabling reference-based camera control for video generation. In Pro-ceedings of the SIGGRAPH Asia 2025 Conference Papers ,1–10. Ning, M.; Zhu, B.; Xie, Y.; Lin, B.; Cui, J.; Yuan, L.; Chen, D.; and Yuan, L. 2025. Video-bench: A comprehensive benchmark and toolkit for evaluating video-based large lan-guage models. Computational Visual Media .Pavlakos, G.; Choutas, V.; Ghorbani, N.; Bolkart, T.; Osman, A. A.; Tzionas, D.; and Black, M. J. 2019. Expressive body capture: 3d hands, face, and body from a single image. In 
+
+Proceedings of the IEEE/CVF conference on computer vision and pattern recognition , 10975–10985. Pavlakos, G.; Shan, D.; Radosavovic, I.; Kanazawa, A.; Fouhey, D.; and Malik, J. 2024. Reconstructing hands in 3d with transformers. In Proceedings of the IEEE/CVF Con-ference on Computer Vision and Pattern Recognition , 9826– 9836. Srivastava, N.; Hinton, G.; Krizhevsky, A.; Sutskever, I.; and Salakhutdinov, R. 2014. Dropout: a simple way to prevent neural networks from overfitting. The journal of machine learning research , 15(1): 1929–1958. Su, J.; Lu, Y.; Pan, S.; Murtadha, A.; Wen, B.; and Liu, Y. 2021. Roformer: Enhanced transformer with rotary position embedding. arXiv preprint arXiv:2104.09864 .Tan, S.; Gong, B.; Wang, X.; Zhang, S.; Zheng, D.; Zheng, R.; Zheng, K.; Chen, J.; and Yang, M. 2024. Animate-x: Universal character image animation with enhanced motion representation. arXiv preprint arXiv:2410.10306 .Unterthiner, T.; Van Steenkiste, S.; Kurach, K.; Marinier, R.; Michalski, M.; and Gelly, S. 2019. FVD: A new metric for video generation. Wan, T.; Wang, A.; Ai, B.; Wen, B.; Mao, C.; Xie, C.-W.; Chen, D.; Yu, F.; Zhao, H.; Yang, J.; et al. 2025. Wan: Open and advanced large-scale video generative models. arXiv preprint arXiv:2503.20314 .Wang, Q.; Luo, Y.; Shi, X.; Jia, X.; Lu, H.; Xue, T.; Wang, X.; Wan, P.; Zhang, D.; and Gai, K. 2025a. Cinemaster: A 3d-aware and controllable framework for cinematic text-to-video generation. In Proceedings of the Special Interest Group on Computer Graphics and Interactive Techniques Conference Conference Papers , 1–10. Wang, Q.; Shi, Y.; Ou, J.; Chen, R.; Lin, K.; Wang, J.; Jiang, B.; Yang, H.; Zheng, M.; Tao, X.; et al. 2025b. Koala-36m: A large-scale video dataset improving consistency between fine-grained conditions and video content. In Proceedings of the Computer Vision and Pattern Recognition Conference ,8428–8437. Wang, X.; Zhang, S.; Gao, C.; Wang, J.; Zhou, X.; Zhang, Y.; Yan, L.; and Sang, N. 2025c. Unianimate: Taming unified video diffusion models for consistent human image anima-tion. Science China Information Sciences , 68(10): 200103. Wang, Y.; Sun, Y.; Patel, P.; Daniilidis, K.; Black, M. J.; and Kocabas, M. 2025d. Prompthmr: Promptable human mesh recovery. In Proceedings of the computer vision and pattern recognition conference , 1148–1159. Wang, Z.; Li, Y.; Zeng, Y.; Fang, Y.; Guo, Y.; Liu, W.; Tan, J.; Chen, K.; Xue, T.; Dai, B.; et al. 2024. Humanvid: Demys-tifying training data for camera-controllable human image animation. Advances in Neural Information Processing Sys-tems , 37: 20111–20131. Yan, W.; Guo, F.; Yang, Z.; and Tang, J. 2026a. SCAIL-2: Unifying Controlled Character Animation with End-to-end In-Context Conditioning. arXiv preprint arXiv:2606.10804 .Yan, W.; Ye, S.; Yang, Z.; Teng, J.; Dong, Z.; Wen, K.; Gu, X.; Liu, Y.-J.; and Tang, J. 2026b. Scail: Towards studio-grade character animation via in-context learning of 3d-consistent pose representations. In Proceedings of the IEEE/CVF Con-ference on Computer Vision and Pattern Recognition , 4450– 4460. Yang, X.; Kukreja, D.; Pinkus, D.; Sagar, A.; Fan, T.; Park, J.; Shin, S.; Cao, J.; Liu, J.; Ugrinovic, N.; et al. 2026. Sam 3d body: Robust full-body human mesh recovery. arXiv preprint arXiv:2602.15989 .Yang, Z.; Teng, J.; Zheng, W.; Ding, M.; Huang, S.; Xu, J.; Yang, Y.; Hong, W.; Zhang, X.; Feng, G.; et al. 2025. Cogvideox: Text-to-video diffusion models with an expert transformer. In International Conference on Learning Rep-resentations , volume 2025, 83048–83077. Yang, Z.; Zeng, A.; Yuan, C.; and Li, Y. 2023. Effective whole-body pose estimation with two-stages distillation. In 
+
+Proceedings of the IEEE/CVF International Conference on Computer Vision , 4210–4220. Yu, M.; Hu, W.; Xing, J.; and Shan, Y. 2025. Trajec-torycrafter: Redirecting camera trajectory for monocular videos via diffusion models. In Proceedings of the IEEE/CVF international conference on computer vision , 100–111. Yu, Y.; Zhang, W.; and Deng, Y. 2021. Frechet inception distance (fid) for evaluating gans. China University of Mining Technology Beijing Graduate School , 3(11). Zhang, L.; Rao, A.; and Agrawala, M. 2023. Adding condi-tional control to text-to-image diffusion models. In Proceed-ings of the IEEE/CVF international conference on computer vision , 3836–3847. Zhang, Y.; Gu, J.; Wang, L.-W.; Wang, H.; Cheng, J.; Zhu, Y.; and Zou, F. 2024. Mimicmotion: High-quality human mo-tion video generation with confidence-aware pose guidance. 
+
+arXiv preprint arXiv:2406.19680 .Zhang, Y.; Lin, J.; Zeng, A.; Wu, G.; Lu, S.; Fu, Y.; Cai, Y.; Zhang, R.; Wang, H.; and Zhang, L. 2025. Motion-x++: A large-scale multimodal 3d whole-body human motion dataset. arXiv preprint arXiv:2501.05098 .Zheng, S.; Peng, Z.; Zhou, Y.; Zhu, Y.; Xu, H.; Huang, X.; and Fu, Y. 2026a. Vidcraft3: Camera, object, and lighting control for image-to-video generation. IEEE Transactions on Visualization and Computer Graphics .Zheng, S.; Yin, M.; Hu, W.; Li, X.; Shan, Y.; and Fu, Y. 2026b. Versecrafter: Dynamic realistic video world model with 4d geometric control. arXiv preprint arXiv:2601.05138 .Zhou, J.; Wang, B.; Chen, W.; Bai, J.; Li, D.; Zhang, A.; Xu, H.; Yang, M.; and Wang, F. 2024. Realisdance: Equip controllable character animation with realistic hands. arXiv preprint arXiv:2409.06202 .Zhou, J.; Wu, Y.; Li, S.; Wei, M.; Fan, C.; Chen, W.; Jiang, W.; and Wang, F. 2025. Realisdance-dit: Simple yet strong baseline towards controllable character animation in the wild. 
+
+arXiv preprint arXiv:2504.14977 .Zou, Y.; Yang, J.; Ceylan, D.; Zhang, J.; Perazzi, F.; and Huang, J.-B. 2020. Reducing Footskate in Human Motion Reconstruction with Ground Contact Constraints. In Pro-ceedings of the IEEE/CVF Winter Conference on Applica-tions of Computer Vision (WACV) .

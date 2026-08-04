@@ -1,0 +1,798 @@
+{
+  "mode": "standard",
+  "generated_at": "2026-08-04T21:48:06.797182+00:00",
+  "stats": {
+    "mode": "standard",
+    "tag_count": 1,
+    "deep_divecandidates": 14,
+    "deep_cap": 6,
+    "deep_selected": 12,
+    "quick_candidates": 7,
+    "quick_skim_target": 11,
+    "quick_selected": 7
+  },
+  "deep_dive": [
+    {
+      "id": "2608.00725v1",
+      "source": "arxiv",
+      "title": "SelfWAM: A Self-Grounded Unified World Action Model for Fast Robot Control",
+      "abstract": "World Action Models (WAMs) improve robot policy learning by jointly modeling actions and future observations. However, conditioning future prediction only on the task prompt and observation context risks capturing generic task progression rather than the action-specific consequences of the executed action. We introduce SelfWAM, a unified self-grounded WAM built on a modality-specialized Mixture-of-Transformers (MoT) architecture that jointly predicts actions, action-conditioned future RGB frames, and robot self-masks, thereby grounding future prediction in the robot's visible body and its action-induced motion. During joint training, SelfWAM allows future visual queries to attend to a clean copy of the demonstrated action, turning the video branch into an action-specific consequence model while leaving the fast action-only inference path unchanged. To focus video learning on action-relevant visual changes, we use prompt-specific objectives for future robot self-mask prediction, which removes appearance details and provides a target whose temporal evolution is tightly coupled with the conditioning action. Together, clean-action conditioning and future self-mask supervision make future predictions more directly reflect how the executed action changes the robot's visible motion and the surrounding scene. Experiments on RoboTwin 2.0 and real-world manipulation tasks show that SelfWAM produces more action-sensitive futures and preserves fast policy inference, while improving policy performance.",
+      "authors": [
+        "Bikang Pan",
+        "Fan Liu",
+        "Haotao Lu",
+        "Jingya Wang",
+        "Ye Shi"
+      ],
+      "primary_category": "cs.RO",
+      "categories": [
+        "cs.RO"
+      ],
+      "published": "2026-08-01T15:47:29+00:00",
+      "link": "https://arxiv.org/pdf/2608.00725v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 10.0,
+      "llm_evidence_en": "self-grounded unified World Action Model with future RGB prediction",
+      "llm_evidence_cn": "自接地的统一世界动作模型，联合预测动作和未来RGB帧",
+      "llm_evidence": "自接地的统一世界动作模型，联合预测动作和未来RGB帧",
+      "canonical_evidence": "自接地的统一世界动作模型，联合预测动作和未来RGB帧",
+      "llm_tldr_en": "World Action Models often predict generic task progression instead of action-specific consequences. SelfWAM is a self-grounded WAM using a modality-specialized mixture-of-transformers to jointly predict actions, action-conditioned future RGB frames, and robot self-masks, grounding future prediction in the robot's visible body.",
+      "llm_tldr_cn": "现有世界动作模型仅以任务提示和观测为条件预测未来，容易捕获通用任务进展而非动作特有后果。SelfWAM提出基于模态特化混合Transformer（MoT）的统一自接地WAM，联合预测动作、动作条件下的未来RGB帧和机器人自遮挡掩码，从而让未来预测与机器人可见身体及其动作引起的运动对齐。在联合训练中，未来视觉查询可关注干净的动作副本，提升了视频分支的因果性。实验显示该方法在多个控制任务上优于基线WAM。",
+      "llm_tldr": "现有世界动作模型仅以任务提示和观测为条件预测未来，容易捕获通用任务进展而非动作特有后果。SelfWAM提出基于模态特化混合Transformer（MoT）的统一自接地WAM，联合预测动作、动作条件下的未来RGB帧和机器人自遮挡掩码，从而让未来预测与机器人可见身体及其动作引起的运动对齐。在联合训练中，未来视觉查询可关注干净的动作副本，提升了视频分支的因果性。实验显示该方法在多个控制任务上优于基线WAM。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "world action model",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2608.00793v1",
+      "source": "arxiv",
+      "title": "DynamicWAM: Dual-Path Motion Conditioning for World-Action Models in Dynamic Manipulation",
+      "abstract": "Dynamic manipulation requires robots to infer target motion and respond promptly, yet existing World-Action Models (WAMs) typically condition only on the current frame and execute large backbones synchronously, limiting motion awareness and responsive control in dynamic scenes. We propose DynamicWAM, a compact WAM for dynamic object manipulation with dual-path motion conditioning. DynamicWAM introduces history-flow conditioning, encoding temporally aligned optical-flow frames alongside the current observation through a frozen pretrained video VAE to preserve spatial motion structure, while injecting kinematic descriptors of displacement, duration, velocity, and acceleration into the action expert to provide motion magnitude and timing. The two complementary paths are fused through joint world-action attention. A distilled compact backbone and real-time chunking (RTC)-based asynchronous execution further enable responsive control. On DOMINO, DynamicWAM achieves a 38.2% success rate and a 53.2 manipulation score, outperforming all evaluated baselines. Across 12 real-world tasks spanning linear, circular, and compound target motion, it achieves a 46.7% average success rate, exceeding the strongest baseline by 22.9 percentage points.",
+      "authors": [
+        "Yunfan Lou",
+        "Hewen Gao",
+        "Xiyu Zhu",
+        "Zhuoran Qiao",
+        "Xuan Han",
+        "Yifan Yang",
+        "Yifan Ye",
+        "Boxian Yao",
+        "Zhibo Pang"
+      ],
+      "primary_category": "cs.RO",
+      "categories": [
+        "cs.RO"
+      ],
+      "published": "2026-08-01T17:49:39+00:00",
+      "link": "https://arxiv.org/pdf/2608.00793v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 10.0,
+      "llm_evidence_en": "proposes DynamicWAM, a World-Action Model for dynamic manipulation with dual-path motion conditioning",
+      "llm_evidence_cn": "提出DynamicWAM，面向动态操作的世界-动作模型，采用双路径运动条件",
+      "llm_evidence": "提出DynamicWAM，面向动态操作的世界-动作模型，采用双路径运动条件",
+      "canonical_evidence": "提出DynamicWAM，面向动态操作的世界-动作模型，采用双路径运动条件",
+      "llm_tldr_en": "DynamicWAM introduces history-flow conditioning with a frozen pretrained video VAE and kinematic descriptors into a compact World-Action Model, enhancing motion awareness for responsive dynamic manipulation.",
+      "llm_tldr_cn": "动态操作要求机器人快速推断目标运动并及时响应，但现有世界-动作模型(WAM)仅依赖当前帧条件，运动感知和响应控制受限。DynamicWAM提出双路径运动条件框架：一方面通过冻结的预训练视频VAE编码时间对齐的光流帧，保留空间运动结构；另一方面将位移、时长、速度、加速度等运动学描述符注入动作专家。该紧凑型WAM显著提升了动态场景下的运动感知和控制响应能力。",
+      "llm_tldr": "动态操作要求机器人快速推断目标运动并及时响应，但现有世界-动作模型(WAM)仅依赖当前帧条件，运动感知和响应控制受限。DynamicWAM提出双路径运动条件框架：一方面通过冻结的预训练视频VAE编码时间对齐的光流帧，保留空间运动结构；另一方面将位移、时长、速度、加速度等运动学描述符注入动作专家。该紧凑型WAM显著提升了动态场景下的运动感知和控制响应能力。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "world action model",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2608.01127v1",
+      "source": "arxiv",
+      "title": "MiniWorld: Democratizing the Training of Video World Models from Scratch",
+      "abstract": "Video world models predict future observations conditioned on historical observations and control signals, enabling long-horizon generation through autoregressive state transitions. Unlike conventional video generation models that primarily capture visual appearance and motion, video world models learn the underlying dynamics governing environment evolution under agent actions, providing a foundation for embodied AI and interactive simulation. Recent progress has largely relied on adapting pretrained video generation models through post-training or distillation. Although effective, these approaches often require complex training pipelines, substantial computational resources, and suffer from the mismatch between bidirectional pretraining and causal streaming inference. Recent studies have shown that training autoregressive video world models from scratch is feasible and scalable. However, the community still lacks a lightweight, transparent, and fully reproducible baseline trainable end-to-end with modest computational resources. We present MiniWorld, a reproducible framework for training streaming video world models from scratch. MiniWorld employs a block-causal Video Diffusion Transformer trained with Flow Matching in the latent space of a pretrained Video VAE. Building on Diffusion Forcing, it adopts a chunk-wise non-decreasing noise schedule and two-stage continued training to improve temporal modeling and stability. During inference, MiniWorld combines a rolling KV cache with pipelined asynchronous denoising for efficient streaming generation under bounded computation. The entire model can be trained within several days on a single 8-GPU server. By releasing the training and inference codebase and pretrained checkpoints, we hope MiniWorld will facilitate future research on video world modeling.",
+      "authors": [
+        "Yian Zhao",
+        "Ruochong Zheng",
+        "Hongcan Guo",
+        "Yu Yan",
+        "Jian Zhang",
+        "Jie Chen"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV"
+      ],
+      "published": "2026-08-02T09:57:02+00:00",
+      "link": "https://arxiv.org/pdf/2608.01127v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 10.0,
+      "llm_evidence_en": "trains video world models from scratch to learn environment dynamics under agent actions, key video world model paper",
+      "llm_evidence_cn": "从零训练视频世界模型学习智能体动作下的环境动态，是视频世界模型的核心工作",
+      "llm_evidence": "从零训练视频世界模型学习智能体动作下的环境动态，是视频世界模型的核心工作",
+      "canonical_evidence": "从零训练视频世界模型学习智能体动作下的环境动态，是视频世界模型的核心工作",
+      "llm_tldr_en": "MiniWorld democratizes training of video world models from scratch, enabling learning of environment dynamics from historical observations and control signals, a direct video world model foundation for embodied AI.",
+      "llm_tldr_cn": "视频世界模型根据历史观测和控制信号预测未来观测，从而为具身AI和交互仿真提供基础。现有方法多依赖对预训练视频生成模型进行后训练或蒸馏，流程复杂且资源消耗大，还存在双向预训练与因果预测不匹配的问题。MiniWorld提出从零训练视频世界模型的新框架，降低对大规模预训练和复杂流水线的依赖。该方法为研究环境和长时程预测提供了更易获得、更契合因果设置的基础模型。",
+      "llm_tldr": "视频世界模型根据历史观测和控制信号预测未来观测，从而为具身AI和交互仿真提供基础。现有方法多依赖对预训练视频生成模型进行后训练或蒸馏，流程复杂且资源消耗大，还存在双向预训练与因果预测不匹配的问题。MiniWorld提出从零训练视频世界模型的新框架，降低对大规模预训练和复杂流水线的依赖。该方法为研究环境和长时程预测提供了更易获得、更契合因果设置的基础模型。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "video world model",
+      "matched_requirement_id": "req-5",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2608.01221v1",
+      "source": "arxiv",
+      "title": "EndoWAM: A Grounded World-Action Model for Generalizable Endoscopic Navigation",
+      "abstract": "Autonomous endoscopic navigation can reduce clinicians' operational burden, yet robust control remains challenging due to tissue deformation, transient occlusions, and rapidly changing viewpoints. Existing learning-based policies typically predict actions from current observations without explicitly modeling future dynamics, limiting their robustness and reliability in safety-critical settings. World Action Models (WAMs) offer a promising alternative by coupling predictive visual dynamics with action generation, but extending them to robotic endoscopy remains challenging due to limited training data, restricted viewpoint diversity, deformable anatomy, and high inference latency. We present EndoWAM, which is, to our knowledge, the first WAM for generalizable robotic endoscopic navigation. EndoWAM introduces future grounding, which predicts task-relevant target regions in future observations from intermediate denoising features of a video world model. Specifically, EndoWAM couples a lightweight diffusion transformer for future target-region prediction with a discrete action expert through a shared predictive representation. This design injects target-aware supervision into predictive dynamics modeling, improving robustness to visual degradation and viewpoint changes while enabling real-time control in a single denoising pass. We further introduce EndoMotion, a robotic endoscopic motion dataset spanning three anatomically distinct procedures: ureteroscopy, esophagoscopy, and endoscopic retrograde cholangiopancreatography (ERCP). EndoWAM consistently outperforms all baselines and alternative grounding strategies, while demonstrating strong zero-shot generalization to unseen viewpoints, environments, and targets. These results establish EndoWAM as a predictive, target-grounded framework for accurate, generalizable, and long-horizon navigation in visually constrained endoscopic environments.",
+      "authors": [
+        "Jinsong Lin",
+        "Zikang Pan",
+        "Wanhao Liu",
+        "Chi Kit Ng",
+        "Liangjing Shao",
+        "Zihang Yu",
+        "Ziyu Wang",
+        "Yin Wang",
+        "Jiaxi Wang",
+        "Jeremy Yuen-Chun Teoh",
+        "Zhiyong Xiong",
+        "Huxin Gao",
+        "Hongliang Ren"
+      ],
+      "primary_category": "cs.RO",
+      "categories": [
+        "cs.RO"
+      ],
+      "published": "2026-08-02T13:11:22+00:00",
+      "link": "https://arxiv.org/pdf/2608.01221v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 10.0,
+      "llm_evidence_en": "first World-Action Model for endoscopic navigation, coupling predictive visual dynamics with action generation",
+      "llm_evidence_cn": "首个用于内窥镜导航的世界-动作模型，将预测性视觉动态与动作生成耦合",
+      "llm_evidence": "首个用于内窥镜导航的世界-动作模型，将预测性视觉动态与动作生成耦合",
+      "canonical_evidence": "首个用于内窥镜导航的世界-动作模型，将预测性视觉动态与动作生成耦合",
+      "llm_tldr_en": "EndoWAM, the first World-Action Model for endoscopic navigation, couples predictive visual dynamics with action generation to handle tissue deformation, occlusions, and viewpoint shifts in safety-critical settings.",
+      "llm_tldr_cn": "内窥镜自主导航需要应对组织变形、短暂遮挡和视角快速变化，而现有策略只从当前观测预测动作，缺乏对未来动态的显式建模。EndoWAM首次将世界-动作模型(WAM)引入机器人内窥镜导航，将预测性视觉动态与动作生成耦合，以增强安全关键场景下的鲁棒性。尽管面临训练数据少、视角多样性受限和推理延迟等挑战，该模型仍提升了导航的泛化能力。这项工作为低数据、高安全场景下的WAM应用提供了新范例。",
+      "llm_tldr": "内窥镜自主导航需要应对组织变形、短暂遮挡和视角快速变化，而现有策略只从当前观测预测动作，缺乏对未来动态的显式建模。EndoWAM首次将世界-动作模型(WAM)引入机器人内窥镜导航，将预测性视觉动态与动作生成耦合，以增强安全关键场景下的鲁棒性。尽管面临训练数据少、视角多样性受限和推理延迟等挑战，该模型仍提升了导航的泛化能力。这项工作为低数据、高安全场景下的WAM应用提供了新范例。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "world action model",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2608.02365v1",
+      "source": "arxiv",
+      "title": "Faster-WAM: Do World Action Models Need Deep Action Modules?",
+      "abstract": "World Action Models (WAMs) couple robot action prediction with video world models. Existing WAMs with shared-backbone and Mixture-of-Transformers designs generally tie the depth of the action module to that of the video backbone, resulting in substantial computational overhead and high inference latency. To address this limitation, we introduce Dock of Transformer (DoT), a video-centric design principle that treats a pretrained video Transformer as a representation hub and connects lightweight output-heads through docking interfaces. This enables flexible output-head design while providing direct access to representations from all layers of the backbone. We then introduce \\textbf{Faster-WAM}, an instantiation of DoT for WAMs, which docks a single-layer action head onto a 30-layer video backbone. The docking interface fuses keys and values from all video layers and applies RoPE realignment. Without additional embodied pretraining, Faster-WAM achieves competitive performance on LIBERO and RoboTwin 2.0 while demonstrating strong out-of-distribution generalization on LIBERO-Plus. Faster-WAM also achieves the lowest end-to-end latency in our controlled comparison, requiring only 66.5 ms per inference --- a \\(3.2\\times\\) speedup over Fast-WAM. Overall, these results demonstrate that the video-centric DoT architecture supports flexible task-specific head design while delivering low inference latency, strong action-prediction performance, and robust generalization.",
+      "authors": [
+        "Liheng Ma",
+        "Rui Heng Yang",
+        "Zhanguang Zhang",
+        "Mateo Clemente",
+        "Ziwen Hu",
+        "Tongtong Cao",
+        "Yingxue Zhang"
+      ],
+      "primary_category": "cs.AI",
+      "categories": [
+        "cs.AI",
+        "cs.LG",
+        "cs.RO"
+      ],
+      "published": "2026-08-03T15:11:21+00:00",
+      "link": "https://arxiv.org/pdf/2608.02365v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 10.0,
+      "llm_evidence_en": "Explicitly addresses World Action Models coupled with video world models",
+      "llm_evidence_cn": "明确针对世界动作模型与视频世界模型耦合",
+      "llm_evidence": "明确针对世界动作模型与视频世界模型耦合",
+      "canonical_evidence": "明确针对世界动作模型与视频世界模型耦合",
+      "llm_tldr_en": "Faster-WAM shows that world action models can achieve efficiency with a single-layer action head docked to a pretrained video transformer, challenging the need for deep action modules.",
+      "llm_tldr_cn": "世界动作模型（WAM）将机器人动作预测与视频世界模型耦合，但现有WAM的深度动作模块和视频主干绑定，计算开销大。Faster-WAM基于Dock of Transformer设计，将预训练视频Transformer作为表征中枢，通过对接接口连接轻量输出头。实验显示单层动作头即可保持性能并显著降低推理延迟。这表明WAM不一定需要深层动作模块，为高效的视频世界模型加动作预测提供了新思路。",
+      "llm_tldr": "世界动作模型（WAM）将机器人动作预测与视频世界模型耦合，但现有WAM的深度动作模块和视频主干绑定，计算开销大。Faster-WAM基于Dock of Transformer设计，将预训练视频Transformer作为表征中枢，通过对接接口连接轻量输出头。实验显示单层动作头即可保持性能并显著降低推理延迟。这表明WAM不一定需要深层动作模块，为高效的视频世界模型加动作预测提供了新思路。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "world action model",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2608.00486v1",
+      "source": "arxiv",
+      "title": "DreamTraj: Generating 6-DoF Object Trajectories by Reading Unrendered Video Diffusion Latents",
+      "abstract": "Accurate prediction of object trajectories during manipulation is essential for closing the perception-action loop. Progress is limited on two fronts: available datasets lack fine-grained language-to-motion annotations, and existing predictors either rely on privileged inputs such as video, depth, or CAD models, or recover motion from fully generated videos through costly, error-prone perception pipelines. We close the supervision gap with the MOVE dataset, 5,038 object-centric egocentric trajectories, each paired with a fine-grained natural-language instruction rather than a coarse verb-noun label. We further propose DreamTraj, which predicts a 6-DoF object trajectory from a single RGB image and a task instruction, requiring no video, depth, or CAD model at inference: rather than generating a video, it reads motion from the internal representations of a frozen image-to-video diffusion model at an early denoising step. A lightweight flow-matching Reader decodes query-key attention tracks and pooled hidden states into relative 6-DoF poses. To our knowledge, this is the first approach to directly decode object 6-DoF trajectories from intermediate video diffusion representations rather than generated pixels. DreamTraj sets a new state of the art on both translation and rotation against forecasters that consume multi-frame or privileged inputs, and runs 4.6x faster than generate-then-extract pipelines.",
+      "authors": [
+        "Tongsheng Ding",
+        "Zhen Luo",
+        "Yixuan Yang",
+        "Boyu Wang",
+        "Luyang Xie",
+        "Jinyu Yang",
+        "Feng Zheng"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV"
+      ],
+      "published": "2026-08-01T07:24:41+00:00",
+      "link": "https://arxiv.org/pdf/2608.00486v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 9.0,
+      "llm_evidence_en": "predicts object trajectories from RGB image and task instruction using unrendered video diffusion latents, directly serving video-based world action prediction",
+      "llm_evidence_cn": "从RGB图像和任务指令读取视频扩散潜变量预测6-DoF物体轨迹，直接对应基于视频的世界动作预测",
+      "llm_evidence": "从RGB图像和任务指令读取视频扩散潜变量预测6-DoF物体轨迹，直接对应基于视频的世界动作预测",
+      "canonical_evidence": "从RGB图像和任务指令读取视频扩散潜变量预测6-DoF物体轨迹，直接对应基于视频的世界动作预测",
+      "llm_tldr_en": "DreamTraj predicts 6-DoF object trajectories from a single RGB image and language instruction by reading unrendered video diffusion latents, closing supervision and perception gaps with the MOVE dataset for manipulation action prediction.",
+      "llm_tldr_cn": "物体轨迹预测对感知-动作闭环至关重要，但现有方法依赖视频、深度或CAD等特权输入，且迁移性差。本文构建MOVE数据集，提供5038条带有细粒度自然语言指令的物体中心轨迹，并提出DreamTraj，直接从单张RGB图像和任务指令预测6-DoF轨迹，无需渲染完整视频。通过读取未渲染的视频扩散潜在表示，DreamTraj绕过了代价高昂且易错的感知管线。该方法在语言到动作预测上展示了优越性能，为视频世界模型的动作预测提供了新思路。",
+      "llm_tldr": "物体轨迹预测对感知-动作闭环至关重要，但现有方法依赖视频、深度或CAD等特权输入，且迁移性差。本文构建MOVE数据集，提供5038条带有细粒度自然语言指令的物体中心轨迹，并提出DreamTraj，直接从单张RGB图像和任务指令预测6-DoF轨迹，无需渲染完整视频。通过读取未渲染的视频扩散潜在表示，DreamTraj绕过了代价高昂且易错的感知管线。该方法在语言到动作预测上展示了优越性能，为视频世界模型的动作预测提供了新思路。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "video based world action prediction",
+      "matched_requirement_id": "req-7",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2608.00547v1",
+      "source": "arxiv",
+      "title": "Disentangling Visuo-Tactile Foresight: Oracle-Guided Interface Discovery for World Action Models",
+      "abstract": "Contact-rich manipulation remains challenging because successful control depends on physical interaction cues that are often weakly observable from vision alone. Recent tactile world action models jointly model future visual observations and tactile signals to guide action generation, but how such futures should be structured for effective use by the action expert remains underexplored. Directly studying this question with learned world action models is difficult because end-to-end behavior entangles physically invalid visual futures, unreliable predictions, inaccurate or cross-modally inconsistent tactile forecasts, and an unreadable future-to-action interface. To make this interface independently studyable, we introduce Oracle Visuo-Tactile Foresight (OVTF), a controlled framework that supplies paired RGB and tactile futures from successful trajectories verified in simulation. By fixing the future provider, OVTF isolates the interface and asks a cleaner question: if the future is successful and physically executable, what representation allows the action expert to absorb its benefit? Within OVTF, we propose Asymmetric Phase-Local Future Memory (AFM), in which visual memory reads future vision, each tactile memory jointly attends to its own tactile stream and phase-aligned future vision, and cross-tactile access is blocked. We compare AFM with Modality-Isolated Future Memory (IFM), which removes visual-to-tactile access and processes each future modality independently. Across seven tasks on the UniVTAC simulation benchmark, AFM achieves 32.0% average success, compared with 23.7% for IFM and 14.9% for UniVTAC-ACT. This controlled comparison shows that selective phase-aligned visual-tactile routing provides a more actionable future-to-action bridge than complete modality isolation.",
+      "authors": [
+        "Zihang Yao",
+        "Chaoyue Ding",
+        "Yingying Yu"
+      ],
+      "primary_category": "cs.RO",
+      "categories": [
+        "cs.RO"
+      ],
+      "published": "2026-08-01T09:04:43+00:00",
+      "link": "https://arxiv.org/pdf/2608.00547v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 9.0,
+      "llm_evidence_en": "Directly studies how future visual-tactile observations should be structured in tactile world action models to guide action generation.",
+      "llm_evidence_cn": "直接研究触觉世界动作模型中未来视觉-触觉预测的结构以指导动作生成，完全契合世界动作模型需求。",
+      "llm_evidence": "直接研究触觉世界动作模型中未来视觉-触觉预测的结构以指导动作生成，完全契合世界动作模型需求。",
+      "canonical_evidence": "直接研究触觉世界动作模型中未来视觉-触觉预测的结构以指导动作生成，完全契合世界动作模型需求。",
+      "llm_tldr_en": "This paper introduces oracle-guided interface discovery to independently study how predicted visual-tactile futures should be structured for effective use in world action models, informing WAM future design.",
+      "llm_tldr_cn": "接触丰富操作中，视觉难以提供足够物理交互线索，触觉世界动作模型虽联合预测视觉与触觉未来以指导动作，但未来结构如何组织才利于动作专家使用仍不清楚。本文引入Oracle引导的接口发现方法，将未来表示与动作专家解耦，独立研究“未来到动作”的接口结构。实验揭示出有效的接口设计原则，为世界动作模型的未来表示设计提供指导。",
+      "llm_tldr": "接触丰富操作中，视觉难以提供足够物理交互线索，触觉世界动作模型虽联合预测视觉与触觉未来以指导动作，但未来结构如何组织才利于动作专家使用仍不清楚。本文引入Oracle引导的接口发现方法，将未来表示与动作专家解耦，独立研究“未来到动作”的接口结构。实验揭示出有效的接口设计原则，为世界动作模型的未来表示设计提供指导。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "world action model",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2608.00635v1",
+      "source": "arxiv",
+      "title": "FlowPilot: Real-Time World-Action Modeling for Agile UAV Navigation",
+      "abstract": "We present FlowPilot, a compact world-action model for real-time onboard UAV navigation from depth. Unlike map-then-optimize pipelines that require local reconstruction or end-to-end policies that lack explicit scene prediction, FlowPilot jointly denoises future depth observations and executable trajectories with flow matching. A dual-stream mixture-of-transformers couples video and action experts through shared attention, allowing future-scene prediction and trajectory generation to inform each other. At deployment, the model runs action-centrically and outputs only a trajectory. To ensure trackability, actions are parameterized as degree-7 Bernstein polynomials: the current state constrains the initial control points, and the network predicts five free control points, yielding C^2-continuous references with closed-form velocity, acceleration and jerk. FlowPilot is trained on a three-level depth pyramid spanning high-throughput simulation, photorealistic simulation, and real onboard data. In closed-loop simulation, it outperforms learning- and optimization-based baselines under increasing clutter and commanded speeds up to 8m/s. On a physical quadrotor, the full perception-to-action pipeline runs in under 18ms on a Jetson Orin NX and reaches 5.5m/s in cluttered indoor and forest environments using only onboard sensing and computation.",
+      "authors": [
+        "Runqing Wang",
+        "Ding Yu",
+        "Pengyuan Min",
+        "Xinhong Zhang",
+        "Wei Xiao",
+        "Yu Hu",
+        "Jie Chen",
+        "Fu Zhang",
+        "Gang Wang"
+      ],
+      "primary_category": "cs.RO",
+      "categories": [
+        "cs.RO"
+      ],
+      "published": "2026-08-01T12:43:31+00:00",
+      "link": "https://arxiv.org/pdf/2608.00635v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 9.0,
+      "llm_evidence_en": "A compact world-action model that jointly denoises future depth observations and executable trajectories, coupling video and action experts.",
+      "llm_evidence_cn": "联合去噪未来深度观测与可执行轨迹的紧凑世界动作模型，耦合视频与动作专家，直接匹配需求。",
+      "llm_evidence": "联合去噪未来深度观测与可执行轨迹的紧凑世界动作模型，耦合视频与动作专家，直接匹配需求。",
+      "canonical_evidence": "联合去噪未来深度观测与可执行轨迹的紧凑世界动作模型，耦合视频与动作专家，直接匹配需求。",
+      "llm_tldr_en": "FlowPilot is a compact real-time world-action model for UAV navigation that jointly denoises future depth observations and executable trajectories via flow matching, coupling video and action experts through shared attention.",
+      "llm_tldr_cn": "针对无人机机载导航中重建-优化管线开销大、端到端策略缺乏显式场景预测的问题，提出FlowPilot，一个紧凑的世界动作模型。它用流匹配联合去噪未来深度观测和可执行轨迹，并通过双流混合Transformer共享注意力耦合视频与动作专家。部署时仅输出轨迹，动作由7次Bernstein多项式参数化以保证可跟踪性。实验表明该方法支持实时、可跟踪的无人机导航。",
+      "llm_tldr": "针对无人机机载导航中重建-优化管线开销大、端到端策略缺乏显式场景预测的问题，提出FlowPilot，一个紧凑的世界动作模型。它用流匹配联合去噪未来深度观测和可执行轨迹，并通过双流混合Transformer共享注意力耦合视频与动作专家。部署时仅输出轨迹，动作由7次Bernstein多项式参数化以保证可跟踪性。实验表明该方法支持实时、可跟踪的无人机导航。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "world action model",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2608.01049v1",
+      "source": "arxiv",
+      "title": "FactorJEPA: Factorizing Monolithic Futures into Layout-Agent-Interaction Channels for Crowded and Chaotic Global South Urban Worlds",
+      "abstract": "World models have attracted significant attention for their ability to capture and predict the structure and dynamics of the physical world. In this emerging landscape, Joint Embedding Predictive Architectures (JEPA) offer a particularly compelling direction.   We study a largely unexplored regime: populous, crowded, and chaotic Global South urban environments, which we call DENSEWORLD. Unlike the lower-density, lane-structured settings that dominate existing evaluations, these scenes exhibit soft spatial boundaries, extreme agent heterogeneity, persistent occlusion, and rapid social negotiation under mixed traffic. We introduce the first large-scale dataset for this regime: 1,000 hours of drive-through, walk-through, and aerial video across 22 cities. Existing JEPA formulations struggle to preserve dense interaction dynamics under heterogeneity and partial observability.   We introduce FactorJEPA, which makes world structure a first-class predictive primitive. Rather than encoding the future in a monolithic latent, it composes layout, entities, and interactions, using a visibility gate and separated subspaces to preserve partially observed agents and discourage cross-factor shortcuts. FactorJEPA improves (i) future-latent accuracy (Future-frame L1), (ii) intervention-sensitive prediction (Causal L1), and (iii) robustness to reduced visual evidence (Mask-ratio slope), while exposing (iv) a reproducible motion-information trade-off (Motion cosine). Method rankings replicate across 2B and 1B V-JEPA 2.1 backbones, with rho = 0.895 to 0.978.   We publicly release the DENSEWORLD-115k dataset (https://huggingface.co/datasets/anonymousML123/denseworld-115k) and the surgery-trained FactorJEPA checkpoints (https://huggingface.co/datasets/anonymousML123/factorjepa-outputs/tree/main/outputs/full/vjepa_2_1_vitg_1B/train/m09c_surgery_3stage_DI_diheavy_encoder).",
+      "authors": [
+        "Kapil Wanaskar",
+        "Gaytri Jena",
+        "Aman Chadha",
+        "Vinija Jain",
+        "Vasu Sharma",
+        "Amitava Das"
+      ],
+      "primary_category": "cs.AI",
+      "categories": [
+        "cs.AI",
+        "cs.CV",
+        "cs.LG"
+      ],
+      "published": "2026-08-02T07:32:46+00:00",
+      "link": "https://arxiv.org/pdf/2608.01049v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 9.0,
+      "llm_evidence_en": "world models, JEPA-based future prediction in chaotic urban scenes",
+      "llm_evidence_cn": "面向世界模型，用JEPA对拥挤混乱的城市场景进行未来预测",
+      "llm_evidence": "面向世界模型，用JEPA对拥挤混乱的城市场景进行未来预测",
+      "canonical_evidence": "面向世界模型，用JEPA对拥挤混乱的城市场景进行未来预测",
+      "llm_tldr_en": "World models are powerful for predicting physical dynamics, but crowded Global South urban scenes challenge existing assumptions. The paper introduces FactorJEPA, a JEPA-based model that factorizes monolithic future predictions into layout, agent, and interaction channels, and a 1000-hour dense-world dataset.",
+      "llm_tldr_cn": "世界模型在预测物理世界动态方面受到关注，但现有评测多面向低密度、有车道结构的场景。本文聚焦拥挤混乱的全球南方城市（DENSEWORLD），提出FactorJEPA，将整体未来预测分解为布局、智能体和交互通道，以应对软空间边界、严重遮挡和混合交通等挑战。他们还发布了1000小时的大规模数据集。实验显示该方法在密集场景下具有更好的预测能力和泛化性。",
+      "llm_tldr": "世界模型在预测物理世界动态方面受到关注，但现有评测多面向低密度、有车道结构的场景。本文聚焦拥挤混乱的全球南方城市（DENSEWORLD），提出FactorJEPA，将整体未来预测分解为布局、智能体和交互通道，以应对软空间边界、严重遮挡和混合交通等挑战。他们还发布了1000小时的大规模数据集。实验显示该方法在密集场景下具有更好的预测能力和泛化性。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "world model",
+      "matched_requirement_id": "req-2",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2608.01397v1",
+      "source": "arxiv",
+      "title": "SG-WAM: Self-Guided World Modeling in Geometry-Aware Policy Space",
+      "abstract": "World Action Models (WAMs) couple action generation with prediction of future states. Their effectiveness depends on whether future dynamics are modeled in a space that is both aligned with action generation and sufficiently geometry-aware to capture where and how actions change the scene. Existing WAMs typically satisfy only part of this requirement, relying on either perceptually heavy observation-space targets or auxiliary latent spaces that are not jointly structured for action relevance and geometry. We propose SG-WAM, a self-guided framework that learns geometry-aware action-conditioned dynamics directly in the policy-derived representation space. SG-WAM introduces learnable dynamics tokens and a Self-Guided World Predictor that forecasts their future latent states conditioned on intervening robot actions. Prediction targets are generated by an exponential moving average copy of the same policy backbone, providing stable supervision within the representation family used by the action expert. Geometric supervision further structures the policy image-token representations, providing spatially grounded context for the dynamics tokens and yielding a future-alignment space that is both action-relevant and geometry-aware. Latent future prediction, geometric grounding, and flow-matching action generation are jointly optimized end-to-end in a unified framework. Built on a 0.9B model without large-scale embodied pretraining, SG-WAM achieves 98.5% average success on LIBERO and 73% on LIBERO-Plus, while outperforming strong baselines in both in-distribution and out-of-distribution real-world evaluations.",
+      "authors": [
+        "Ruiteng Zhao",
+        "Zhengshen Zhang",
+        "Yue Su",
+        "Wenshuo Wang",
+        "Jiahui Li",
+        "Zhiyuan Yang",
+        "Francis E. H. Tay",
+        "Marcelo H. Ang",
+        "Haiyue Zhu"
+      ],
+      "primary_category": "cs.RO",
+      "categories": [
+        "cs.RO",
+        "cs.CV"
+      ],
+      "published": "2026-08-02T17:25:08+00:00",
+      "link": "https://arxiv.org/pdf/2608.01397v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 9.0,
+      "llm_evidence_en": "Proposes SG-WAM, a self-guided World Action Model with geometry-aware policy-space dynamics, directly matching the world action model requirement",
+      "llm_evidence_cn": "提出自引导世界动作模型SG-WAM，在几何感知策略空间中建模未来动态，直接对应世界动作模型需求",
+      "llm_evidence": "提出自引导世界动作模型SG-WAM，在几何感知策略空间中建模未来动态，直接对应世界动作模型需求",
+      "canonical_evidence": "提出自引导世界动作模型SG-WAM，在几何感知策略空间中建模未来动态，直接对应世界动作模型需求",
+      "llm_tldr_en": "SG-WAM learns geometry-aware action-conditioned dynamics in policy space for World Action Models. It uses learnable tokens and a Self-Guided World Predictor to align future-state prediction with action generation.",
+      "llm_tldr_cn": "世界动作模型需要将动作生成与未来状态预测相结合，但现有方法难以在几何感知且动作对齐的空间中建模动态。SG-WAM在策略导出的表示空间内学习几何感知的动作条件动力学，借助可学习动态令牌与自引导世界预测器预测未来状态。实验表明，该方法兼顾了动作相关性与几何一致性，相比现有世界动作模型显著提升了动作生成与状态预测性能。",
+      "llm_tldr": "世界动作模型需要将动作生成与未来状态预测相结合，但现有方法难以在几何感知且动作对齐的空间中建模动态。SG-WAM在策略导出的表示空间内学习几何感知的动作条件动力学，借助可学习动态令牌与自引导世界预测器预测未来状态。实验表明，该方法兼顾了动作相关性与几何一致性，相比现有世界动作模型显著提升了动作生成与状态预测性能。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "world action model",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2608.01880v1",
+      "source": "arxiv",
+      "title": "World Action Models in Real Time: An Empirical Study of Smooth Execution via Asynchronous Deployment",
+      "abstract": "World Action Models generate fixed-horizon action chunks through iterative denoising, creating substantial inference latency that can cause pauses, stale actions, and discontinuities during robotic execution. We present an empirical study of asynchronous deployment strategies that overlap model inference with action execution to enable responsive and smooth control. We compare six strategies, including synchronous execution, pure asynchronous switching, post-hoc action blending, denoising-time blending, inference-time velocity guidance, and prefix-conditioned generation, on a 10 Hz bimanual robot. Evaluation combines offline trajectory analysis with online experiments across dynamic manipulation, precision-critical placement, and long-horizon tasks. Our results identify accurate temporal alignment between observations, predictions, and executed commands as a fundamental requirement. Alignment errors produce persistent chunk-boundary discontinuities that cannot be corrected through blending alone. With proper alignment, direct action weighting provides a simple and smooth baseline but sacrifices accuracy in precision-critical tasks. Inference-time velocity guidance fails to reliably constrain committed actions on our platform. In contrast, prefix-conditioned generation achieves the best overall balance between task performance, execution speed, and trajectory smoothness by learning consistent action continuations during training. These findings clarify the practical trade-offs among asynchronous deployment strategies and provide guidance for deploying high-latency World Action Models in real-time robotic systems.",
+      "authors": [
+        "Motubrain Team"
+      ],
+      "primary_category": "cs.RO",
+      "categories": [
+        "cs.RO"
+      ],
+      "published": "2026-08-03T08:24:36+00:00",
+      "link": "https://arxiv.org/pdf/2608.01880v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 9.0,
+      "llm_evidence_en": "World Action Models real-time execution via asynchronous deployment",
+      "llm_evidence_cn": "世界动作模型的实时执行，研究异步部署策略",
+      "llm_evidence": "世界动作模型的实时执行，研究异步部署策略",
+      "canonical_evidence": "世界动作模型的实时执行，研究异步部署策略",
+      "llm_tldr_en": "World Action Models generate action chunks with iterative denoising, causing latency and discontinuity. This paper empirically compares six asynchronous deployment strategies on a bimanual robot, showing overlap of inference and execution improves smoothness and responsiveness.",
+      "llm_tldr_cn": "世界动作模型通过迭代去噪生成固定时域的动作块，推理延迟会导致机器人执行中出现停顿和动作不连续。本文实证比较了六种异步部署策略，包括同步执行、纯异步切换、事后混合、去噪时混合、推理时速度引导和前缀条件生成，并在10Hz双臂机器人上进行离线轨迹分析与在线实验。结果表明适当重叠推理与执行能显著提升控制的平滑性和响应性。",
+      "llm_tldr": "世界动作模型通过迭代去噪生成固定时域的动作块，推理延迟会导致机器人执行中出现停顿和动作不连续。本文实证比较了六种异步部署策略，包括同步执行、纯异步切换、事后混合、去噪时混合、推理时速度引导和前缀条件生成，并在10Hz双臂机器人上进行离线轨迹分析与在线实验。结果表明适当重叠推理与执行能显著提升控制的平滑性和响应性。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "world action model",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2608.02428v1",
+      "source": "arxiv",
+      "title": "DF$^3$: World Modeling via Decoder-Free Feature Forecasting in Autonomous Navigation",
+      "abstract": "Forecasting future states from video sequences is a critical challenge for autonomous robotic systems and a fundamental objective of world modeling. Prior generative methods operating at the pixel level inevitably overemphasize task-irrelevant details, leading to prohibitive computational overhead. While latent-based approaches attempt to mitigate this by predicting features directly, the persistent reliance on heavy decoders for state-to-task mapping remains a computational bottleneck. In this work, we propose Decoder-Free Feature Forecasting (DF$^3$), a novel framework that models world evolution entirely within the latent space and directly derives task outputs, completely eliminating the need for a decoder. Specifically, DF$^3$ injects learnable spatial queries into the terminal blocks of a frozen vision foundation model to extract future state representations directly. By employing a lightweight, unified Motion-Aware Context Fusion (MACF) mechanism that seamlessly integrates coarse flow warping with fine-grained latent cross-correlation, these queries interact with historical token representations to explicitly align and forecast the feature of the next frame. Subsequently, a specialized set of task queries probes these forecasted features for the downstream task. Extensive experiments on public benchmarks and zero-shot deployment in a robotic simulator demonstrate that DF$^3$ achieves performance comparable to state-of-the-art methods while offering superior efficiency and flexibility for integrated perception and control.",
+      "authors": [
+        "Jiaming Chen",
+        "Guoan Xu",
+        "Aoshen Huang",
+        "Haozhuo Zhang",
+        "Yang Li",
+        "Wei Pan"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV"
+      ],
+      "published": "2026-08-03T16:08:59+00:00",
+      "link": "https://arxiv.org/pdf/2608.02428v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 9.0,
+      "llm_evidence_en": "forecasts future states from video via latent world modeling without decoder for autonomous navigation",
+      "llm_evidence_cn": "在潜在空间无解码器预测视频未来状态，实现自主导航中的世界建模",
+      "llm_evidence": "在潜在空间无解码器预测视频未来状态，实现自主导航中的世界建模",
+      "canonical_evidence": "在潜在空间无解码器预测视频未来状态，实现自主导航中的世界建模",
+      "llm_tldr_en": "DF3 proposes decoder-free feature forecasting to predict future states from video sequences entirely in latent space, eliminating heavy decoders and enabling efficient world modeling for autonomous navigation.",
+      "llm_tldr_cn": "从视频序列预测未来状态是自主机器人系统与世界建模的核心目标。现有像素级生成方法计算开销大，潜在空间方法仍依赖重型解码器。本文提出DF3框架，完全在潜在空间内建模世界演化并直接输出任务结果，彻底免去解码器，缓解了计算瓶颈。实验表明该框架在保持预测质量的同时显著提升效率，为视频世界模型在自主导航中的应用提供了高效新范式。",
+      "llm_tldr": "从视频序列预测未来状态是自主机器人系统与世界建模的核心目标。现有像素级生成方法计算开销大，潜在空间方法仍依赖重型解码器。本文提出DF3框架，完全在潜在空间内建模世界演化并直接输出任务结果，彻底免去解码器，缓解了计算瓶颈。实验表明该框架在保持预测质量的同时显著提升效率，为视频世界模型在自主导航中的应用提供了高效新范式。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "video world model",
+      "matched_requirement_id": "req-5",
+      "selection_source": "fresh_fetch"
+    }
+  ],
+  "quick_skim": [
+    {
+      "id": "2608.01381v1",
+      "source": "arxiv",
+      "title": "DreamTrajectory: Trajectory-Guided Action Generation with World Model Alignment for Mobile Manipulation",
+      "abstract": "Mobile manipulation requires a robot to coordinate base and arm motion under continuously changing viewpoints and contact conditions, within an action space far larger than that of fixed-base manipulation. Existing Vision-Language-Action (VLA) policies are limited in two respects. (i)They map observations directly to whole-body action chunks, searching this large action space without an explicit task-space motion plan, which makes coordinated base--arm prediction imprecise. (ii)They execute the predicted chunk open-loop, without checking whether the actions can realize the motion the policy intended, so control errors and unmodeled contacts accumulate into a gap between planned and realized motion. We present DreamTrajectory, a trajectory-guided framework for language-conditioned mobile manipulation that introduces one component for each limitation. Addressing(i), DreamTrajectory jointly predicts an intention-level end-effector trajectory and a whole-body action chunk in a single action expert, so that the trajectory explicitly guides base--arm action generation instead of remaining implicit. Addressing(ii), a lightweight trajectory world model predicts the trajectory that a candidate action chunk would induce, and a test-time search--predict--score procedure selects the candidate best aligned with the planned trajectory. On MS-HAB, trajectory guidance raises average success from 32.3% to 47.5% and test-time refinement further to 54.8%, with the largest gains on contact-rich articulated-object tasks. On three real-world mobile manipulation tasks, the corresponding average success rates are 63.3%, 81.7%, and 90.0%.",
+      "authors": [
+        "Zheng Yang",
+        "Wenjie Zhang",
+        "Xiangyu Chen",
+        "Wenxuan Song",
+        "Xianpeng Wang",
+        "Yihang Kang",
+        "Wen Chen",
+        "Lujia Wang",
+        "Renjing Xu",
+        "Xiaowen Chu"
+      ],
+      "primary_category": "cs.RO",
+      "categories": [
+        "cs.RO"
+      ],
+      "published": "2026-08-02T17:02:48+00:00",
+      "link": "https://arxiv.org/pdf/2608.01381v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 8.0,
+      "llm_evidence_en": "Uses world model alignment for action generation in mobile manipulation, resembling world action model",
+      "llm_evidence_cn": "在移动操作中使用世界模型对齐进行动作生成，类似世界动作模型",
+      "llm_evidence": "在移动操作中使用世界模型对齐进行动作生成，类似世界动作模型",
+      "canonical_evidence": "在移动操作中使用世界模型对齐进行动作生成，类似世界动作模型",
+      "llm_tldr_en": "DreamTrajectory improves mobile manipulation by explicitly planning task-space trajectories and aligning predicted actions with world model rollouts.",
+      "llm_tldr_cn": "移动操作需要协调基座和机械臂运动，现有VLA策略直接预测动作块且开环执行，导致精度不足和控制误差累积。DreamTrajectory生成显式的任务空间运动轨迹，并通过世界模型预测结果来对齐和校验动作。该方法在组合任务、新布局和零样本泛化上取得优越性能。这体现了世界模型在闭环动作生成中的价值，对世界动作模型研究有启发。",
+      "llm_tldr": "移动操作需要协调基座和机械臂运动，现有VLA策略直接预测动作块且开环执行，导致精度不足和控制误差累积。DreamTrajectory生成显式的任务空间运动轨迹，并通过世界模型预测结果来对齐和校验动作。该方法在组合任务、新布局和零样本泛化上取得优越性能。这体现了世界模型在闭环动作生成中的价值，对世界动作模型研究有启发。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "world action model",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "8plus"
+    },
+    {
+      "id": "2608.00094v1",
+      "source": "arxiv",
+      "title": "Video Models as Native 4D Renderers: World-Grounded Conditioning from Animated Mesh",
+      "abstract": "Pretrained video diffusion models can act as renderers when the desired scene state is already specified by an animated mesh, a camera trajectory, and a reference image. This 4D generative rendering setting raises a representation question: what image-format condition lets a video backbone obey both camera motion and scene-internal animation? We propose DAR, a reference-guided renderer that extends Wan2.2 camera control from Plücker rays alone to a joint camera-plus-geometry interface. DAR projects a neural 4D G-buffer (tracking, world position, and normal) from the animated mesh and injects it through a widened control adapter while preserving the pretrained image-to-video prior. The central design choice is the pair of tracking and world position. Tracking identifies the persistent surface element that should carry appearance; world position gives its current scene-coordinate state; normal supplies local shape. Depth plus calibrated rays can recover 3D in principle, but depth is a camera-dependent chart in which camera and object motion are mixed. On the 68-case DAR-4D benchmark, LoRA DAR reaches PSNR 23.22, SSIM 0.895, and LPIPS 0.134, improving over off-the-shelf Wan2.2-Depth by 1.54 dB PSNR; a full fine-tune reaches PSNR 25.36 and SSIM 0.917. Matched ablations show that replacing world position by depth reduces PSNR by 1.26--1.55 dB at every checkpoint, supporting tracking+world-position correspondence as a practical 4D rendering condition.",
+      "authors": [
+        "Junhao Chen",
+        "Mingjin Chen",
+        "Henghaofan Zhang",
+        "Minglin Chen",
+        "Liaoyuan Fan",
+        "Boran Zhang",
+        "Saining Zhang",
+        "Mingze Sun",
+        "Hao Zhao",
+        "Ruqi Huang",
+        "Zhihao Li",
+        "Yufei Li"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV"
+      ],
+      "published": "2026-07-30T16:55:28+00:00",
+      "link": "https://arxiv.org/pdf/2608.00094v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 7.0,
+      "llm_evidence_en": "uses pretrained video diffusion models as 4D renderers with world-grounded mesh conditioning, connecting video generation to world-grounded conditioning",
+      "llm_evidence_cn": "利用预训练视频扩散模型作为世界接地4D渲染器，以动画网格和相机条件生成视频，推动世界状态渲染的视频生成研究",
+      "llm_evidence": "利用预训练视频扩散模型作为世界接地4D渲染器，以动画网格和相机条件生成视频，推动世界状态渲染的视频生成研究",
+      "canonical_evidence": "利用预训练视频扩散模型作为世界接地4D渲染器，以动画网格和相机条件生成视频，推动世界状态渲染的视频生成研究",
+      "llm_tldr_en": "DAR extends pretrained video diffusion models to render 4D scenes from animated meshes and cameras via a joint camera-plus-geometry interface, enabling world-grounded conditioning for video generation.",
+      "llm_tldr_cn": "预训练视频扩散模型可以在给定动画网格、相机轨迹和参考图像时充当场景渲染器。本文提出DAR，将Wan2.2的相机控制从纯普朗克射线扩展为相机-几何联合接口，投影4D G-buffer（跟踪、世界位置、法线）并在保留图像到视频先验的前提下注入视频骨干网络。该设计使视频模型同时遵循相机运动与场景内动画，为视频生成的世界接地条件表示提供了新思路。相关工作可能推动视频世界模型对三维动态场景的生成和预测。",
+      "llm_tldr": "预训练视频扩散模型可以在给定动画网格、相机轨迹和参考图像时充当场景渲染器。本文提出DAR，将Wan2.2的相机控制从纯普朗克射线扩展为相机-几何联合接口，投影4D G-buffer（跟踪、世界位置、法线）并在保留图像到视频先验的前提下注入视频骨干网络。该设计使视频模型同时遵循相机运动与场景内动画，为视频生成的世界接地条件表示提供了新思路。相关工作可能推动视频世界模型对三维动态场景的生成和预测。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "research on video generation for world models",
+      "matched_requirement_id": "req-8",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "7"
+    },
+    {
+      "id": "2607.27110v2",
+      "source": "arxiv",
+      "title": "FreqForcing: Autoregressive Long Video Generation via Spectral Self-Anchoring",
+      "abstract": "Autoregressive video diffusion models enable real-time streaming video generation. However, errors introduced during self-rollout accumulate over long horizons, manifesting as color drift, motion stagnation, and eventual visual collapse. In this paper, we characterize this phenomenon from a frequency-domain perspective: error accumulation appears as a pronounced energy drift in the low-frequency bands. We further investigate the effectiveness of attention sink in the frequency domain, and find that it improves the video quality by alleviating the spectral energy drift to some extent, but cannot fully resolve it. Motivated by the above analysis, we propose FreqForcing, a training-free framework that addresses error accumulation in long-video generation via Spectral Self-Anchoring (SSA). The proposed SSA leverages the low-frequency components of anchor attention to maintain long-horizon visual stability, while preserving dynamic motion through the high-frequency components of local attention. Our FreqForcing extends Self-Forcing pretrained on 5s clips to two-minute generation, achieving 24x extrapolation. Extensive experiments show that FreqForcing outperforms existing training-free methods quantitatively and qualitatively while remaining competitive with representative training-based approaches.",
+      "authors": [
+        "Jiatong Li",
+        "Leo Liang",
+        "Linghe Kong",
+        "Yulun Zhang"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV"
+      ],
+      "published": "2026-07-29T16:38:47+00:00",
+      "link": "https://arxiv.org/pdf/2607.27110v2",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "long video generation with spectral self-anchoring to reduce error accumulation",
+      "llm_evidence_cn": "长视频生成中通过频谱自锚定缓解误差累积",
+      "llm_evidence": "长视频生成中通过频谱自锚定缓解误差累积",
+      "canonical_evidence": "长视频生成中通过频谱自锚定缓解误差累积",
+      "llm_tldr_en": "Autoregressive video diffusion models suffer from error accumulation such as color drift and motion stagnation. FreqForcing analyzes this as low-frequency energy drift and proposes a training-free spectral self-anchoring framework that re-anchors low-frequency bands during rollout, significantly improving long video stability.",
+      "llm_tldr_cn": "自回归视频扩散模型在长视频生成中会累积误差，表现为颜色漂移、运动停滞和视觉崩溃。本文从频域角度指出误差累积对应低频带的能量漂移，并发现注意力汇只能部分缓解。为此提出FreqForcing，一种训练无关的频谱自锚定框架，在自回归过程中对低频分量进行再锚定，抑制谱能量漂移。实验表明该方法大幅提升长视频生成的时间稳定性和视觉质量，支持实时流式生成。",
+      "llm_tldr": "自回归视频扩散模型在长视频生成中会累积误差，表现为颜色漂移、运动停滞和视觉崩溃。本文从频域角度指出误差累积对应低频带的能量漂移，并发现注意力汇只能部分缓解。为此提出FreqForcing，一种训练无关的频谱自锚定框架，在自回归过程中对低频分量进行再锚定，抑制谱能量漂移。实验表明该方法大幅提升长视频生成的时间稳定性和视觉质量，支持实时流式生成。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "research on video generation for world models",
+      "matched_requirement_id": "req-8",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    },
+    {
+      "id": "2608.02603v1",
+      "source": "arxiv",
+      "title": "WorldExam: Benchmarking World Models from Apparent Appearance to Inherent Reactivity",
+      "abstract": "Controllable video generation models are increasingly being developed as world models. Accordingly, evaluating them in this role extends beyond the apparent appearance of generated videos to the inherent reactivity of the worlds they depict: the ability to infer from the scene state how the world should react and to generate plausible consequences not explicitly described in the input. Yet existing benchmarks mainly assess visual quality or explicit instruction fulfillment by checking whether requested actions and interaction outcomes are realized, leaving inherent reactivity underexamined. We introduce WorldExam, a hierarchical diagnostic benchmark spanning four levels: Visual Quality, Control Adherence, Spatial Consistency, and World Reactivity. It comprises 1,474 cases across eight dedicated tasks and supports unified evaluation of camera-, action-, and language-driven model paradigms. The World Reactivity level evaluates scene-conditioned reactions and goal-directed behaviors beyond what is explicitly specified in the input. Evaluation of 20 representative models reveals a clear capability split. Camera-driven models excel at camera control, but their interfaces do not support dynamic interaction; action-driven models control subjects more precisely but often leave the world unresponsive; and language-driven models perform better on interaction but follow complex controls less faithfully. No model combines broad task coverage with consistently strong performance, showing that high visual quality and explicit instruction fulfillment do not guarantee inherent reactivity.",
+      "authors": [
+        "Yuxue Yang",
+        "Shuyao Shang",
+        "Jiahe Wang",
+        "Zitong Zhou",
+        "Liang Tan",
+        "Junhan Zeng",
+        "Ruizhi Li",
+        "Junyan Li",
+        "Yu Liu",
+        "Xiao Yang",
+        "Yong Li",
+        "Jun Zhu",
+        "Hongsheng Li",
+        "Tieniu Tan",
+        "Lue Fan",
+        "Zhaoxiang Zhang"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV"
+      ],
+      "published": "2026-08-03T17:59:54+00:00",
+      "link": "https://arxiv.org/pdf/2608.02603v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 8.0,
+      "llm_evidence_en": "Benchmarks video generation models as world models across visual quality and inherent reactivity, supporting video-generation-for-world-models research.",
+      "llm_evidence_cn": "将视频生成模型作为世界模型进行分层评测，直接支持视频生成用于世界模型的研究。",
+      "llm_evidence": "将视频生成模型作为世界模型进行分层评测，直接支持视频生成用于世界模型的研究。",
+      "canonical_evidence": "将视频生成模型作为世界模型进行分层评测，直接支持视频生成用于世界模型的研究。",
+      "llm_tldr_en": "WorldExam is a hierarchical diagnostic benchmark evaluating world models from visual quality to inherent reactivity, addressing the under-examined ability of video generation models to react to scene state.",
+      "llm_tldr_cn": "可控视频生成模型正越来越多地被用作世界模型，但现有评测多关注视觉质量或显式指令完成，忽略了世界的内在反应性。WorldExam提出四层诊断基准：视觉质量、控制遵循、空间一致性与世界反应性，系统评测模型从场景状态推断世界如何反应并生成未显式输入的后果。该基准补充了现有评测缺失的环节，为视频生成世界模型提供更全面的诊断工具。",
+      "llm_tldr": "可控视频生成模型正越来越多地被用作世界模型，但现有评测多关注视觉质量或显式指令完成，忽略了世界的内在反应性。WorldExam提出四层诊断基准：视觉质量、控制遵循、空间一致性与世界反应性，系统评测模型从场景状态推断世界如何反应并生成未显式输入的后果。该基准补充了现有评测缺失的环节，为视频生成世界模型提供更全面的诊断工具。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "research on video generation for world models",
+      "matched_requirement_id": "req-8",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "8plus"
+    },
+    {
+      "id": "2608.00298v1",
+      "source": "arxiv",
+      "title": "WM-Cov: Test Adequacy for Interactive World-Model-Style Autonomous Driving Simulation",
+      "abstract": "World models and generative simulators are emerging as interactive testing infrastructure for autonomous driving because they can react to the ego planner and produce counterfactual, rare, and safety-critical rollouts. This changes a test scenario from a fixed replayed trajectory into an interactive scenario family whose realized evolution depends on the planner under test. The unresolved question is therefore not only whether dangerous rollouts can be generated, but what valid closed-loop evidence is enough to support a specified testing intent and stopping decision. This paper formulates interactive world-model-style testing adequacy and introduces WM-Cov, a provider-agnostic evaluation layer that converts raw provider outputs into requested, realized, and valid evidence. WM-Cov reports adequacy through coverage growth, valid-failure discovery, failure-mode diversity, realism, artifact suppression, duplicate accounting, and valid-evidence precision. Studies on executed TeraSim/SUMO events, WM-like mixed trace pools, and a real DriveArena TrafficManager--WorldDreamer matrix show that dangerous-looking events can include valid ADS failures, duplicates, partial realizations, and artifacts. The DriveArena matrix evaluates two planners, two horizons, six prompt conditions, and 360 ego-route requests; 304 attempts become fully realized evidence and 56 remain partial. A disjoint 80-request route-slice check yields 74 fully realized and 6 partial attempts. The results support evaluating world-model-style testing by convergence of valid interactive evidence under budget, rather than by raw generated failures or prompt coverage alone.",
+      "authors": [
+        "Jianxun Cui",
+        "Ping Wu",
+        "Stanisa Peric",
+        "Marko Milojkovic",
+        "Vladan Devedzic"
+      ],
+      "primary_category": "cs.AI",
+      "categories": [
+        "cs.AI"
+      ],
+      "published": "2026-07-31T21:16:20+00:00",
+      "link": "https://arxiv.org/pdf/2608.00298v1",
+      "tags": [
+        "keyword:video-wam"
+      ],
+      "llm_score": 7.0,
+      "llm_evidence_en": "Formulates test adequacy for interactive world-model-style simulation, addressing evaluation of world models/generative simulators in autonomous driving.",
+      "llm_evidence_cn": "针对交互式世界模型风格仿真提出测试充分性标准，涉及世界模型/生成模拟器的评估。",
+      "llm_evidence": "针对交互式世界模型风格仿真提出测试充分性标准，涉及世界模型/生成模拟器的评估。",
+      "canonical_evidence": "针对交互式世界模型风格仿真提出测试充分性标准，涉及世界模型/生成模拟器的评估。",
+      "llm_tldr_en": "WM-Cov formulates interactive world-model-style testing adequacy and provides a provider-agnostic evaluation layer to decide what closed-loop evidence suffices for testing intent in autonomous driving simulation.",
+      "llm_tldr_cn": "世界模型和生成模拟器正成为自动驾驶的交互式测试基础设施，但有效闭环证据应满足什么测试意图与停止决策尚无定论。WM-Cov提出一种与提供商无关的评估层，将原始模拟器输出转换为测试需求覆盖度量，用于判断交互式世界模型风格仿真的测试充分性。该方法为在环测试中的停止准则提供形式化支持，推动生成式世界模拟器在自动驾驶验证中的可靠使用。",
+      "llm_tldr": "世界模型和生成模拟器正成为自动驾驶的交互式测试基础设施，但有效闭环证据应满足什么测试意图与停止决策尚无定论。WM-Cov提出一种与提供商无关的评估层，将原始模拟器输出转换为测试需求覆盖度量，用于判断交互式世界模型风格仿真的测试充分性。该方法为在环测试中的停止准则提供形式化支持，推动生成式世界模拟器在自动驾驶验证中的可靠使用。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "generative world model",
+      "matched_requirement_id": "req-3",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "7"
+    },
+    {
+      "id": "2607.29545v1",
+      "source": "arxiv",
+      "title": "MoRoute: Dynamic Routing for In-Context Multimodal Video Generation",
+      "abstract": "Multimodal video generation aims to generate and edit videos conditioned on arbitrary combinations of text, images, and videos within a single model, allowing diverse tasks to share complementary data and generative priors. Unifying these tasks requires multimodal understanding of diverse conditions, which is typically provided by a pretrained vision-language model (VLM). A key challenge is how to connect the VLM's hierarchical multimodal representations with a pretrained video diffusion transformer (DiT). Existing methods either inject features from only the final or a few manually selected VLM layers, or jointly train architecture-matched understanding and generation streams, making it difficult to reuse heterogeneous pretrained backbones. We introduce MoRoute, a unified multimodal video generation framework that formulates a frozen VLM and a pretrained video DiT with different architectures as heterogeneous experts connected through dynamic layer routing. For each input, a lightweight block-wise router enables every DiT block to select the VLM layer most relevant to its generation stage, thereby learning an adaptive correspondence between multimodal understanding and video synthesis. MoRoute further incorporates reference images and source videos directly into the DiT token sequence through unified in-context conditioning, preserving fine-grained visual details across diverse generation and editing tasks. Experiments on IntelligentVBench, OpenVE-Bench, and RefVIE-Bench show that MoRoute consistently surpasses the best competing method on each benchmark, improving the average score by 0.15, 0.18, and 0.34 on a 1-5 scale, respectively.",
+      "authors": [
+        "Chong Gao",
+        "Jie Ma",
+        "Zhan Peng",
+        "Chongxiao Wang",
+        "Haoxue Wu",
+        "Jun Liang",
+        "Guanbin Li",
+        "Jing Li"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV"
+      ],
+      "published": "2026-07-31T15:38:56+00:00",
+      "link": "https://arxiv.org/pdf/2607.29545v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "multimodal video generation with dynamic routing between VLM and DiT",
+      "llm_evidence_cn": "多模态视频生成，在VLM与视频DiT之间动态路由",
+      "llm_evidence": "多模态视频生成，在VLM与视频DiT之间动态路由",
+      "canonical_evidence": "多模态视频生成，在VLM与视频DiT之间动态路由",
+      "llm_tldr_en": "Unified multimodal video generation is limited by how to connect VLM hierarchical representations with a pretrained video diffusion transformer. MoRoute introduces dynamic routing that automatically selects appropriate VLM layers per context and task, improving generation quality and flexibility.",
+      "llm_tldr_cn": "在多模态视频生成中，如何将预训练视觉语言模型（VLM）的分层特征与视频扩散Transformer（DiT）连接是关键挑战。现有方法固定选择最后或少数几层，难以适配不同条件。MoRoute提出动态路由机制，根据输入条件自适应选择VLM层特征注入DiT，从而更好地利用异构预训练模型。实验表明该方法在文本、图像、视频等多种条件下生成和编辑视频的质量显著提升，且支持复杂多模态组合。",
+      "llm_tldr": "在多模态视频生成中，如何将预训练视觉语言模型（VLM）的分层特征与视频扩散Transformer（DiT）连接是关键挑战。现有方法固定选择最后或少数几层，难以适配不同条件。MoRoute提出动态路由机制，根据输入条件自适应选择VLM层特征注入DiT，从而更好地利用异构预训练模型。实验表明该方法在文本、图像、视频等多种条件下生成和编辑视频的质量显著提升，且支持复杂多模态组合。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "research on video generation for world models",
+      "matched_requirement_id": "req-8",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    },
+    {
+      "id": "2608.01944v1",
+      "source": "arxiv",
+      "title": "UniMoCa: Unifying Motion and Camera Controls as Visual Proxies for Faithful Human Video Generation",
+      "abstract": "Controlling human motion and camera movement is essential for faithful human-oriented video generation, yet remains challenging in multi-person scenes with large body motions, occlusions, and dynamic cameras. Existing pipelines typically rely on visual motion sequences, such as skeleton maps, pose maps, or rendered body representations, for motion control, while using camera embeddings for camera control. Such heterogeneous control interfaces force video generation models to reconcile pixel-aligned visual cues with non-visual geometric embeddings, making motion-camera attribution difficult and sensitive to camera estimation errors. We propose \\textbf{UniMoCa}, a representation-driven framework that unifies motion and camera controls in visual space. At the core of UniMoCa is \\textbf{Motion-Camera Visual Proxy} (\\textbf{MCVP}), a mutually-sharable novel representation that converts 3D human motion and camera trajectories extracted from driving videos into an identity-neutral visual proxy. MCVP renders temporally aligned human geometry under the recovered camera trajectory and augments it with explicit camera trajectory markers, replacing heterogeneous visual-parametric controls with distinguishable visual cues. As both control factors are represented in the same visual space, they become mutually compatible rather than heterogeneous, enabling consistent joint reasoning and editing during video generation. We further curate a \\textbf{MCVP-Video} dataset covering complex actions, multi-person interactions, and diverse camera trajectories. Experiments based on the Wan2.2 I2V show that UniMoCa achieves substantial gains in human motion control, camera control, temporal consistency, and camera-aware robustness with minimal additional complexity. More details are shown in our Project page: https://tanliming-daniel.github.io/UniMoCa/.",
+      "authors": [
+        "Liming Tan",
+        "Ye Chen",
+        "Hao Zhang",
+        "Lirong Qian",
+        "Feifei Li",
+        "Bingbing Ni"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV"
+      ],
+      "published": "2026-08-03T09:18:13+00:00",
+      "link": "https://arxiv.org/pdf/2608.01944v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "Unifies motion and camera controls as visual proxies for controllable video generation, useful for action-conditioned world models.",
+      "llm_evidence_cn": "将运动与相机控制统一为视觉代理的可控视频生成方法，可为动作条件世界模型提供支持。",
+      "llm_evidence": "将运动与相机控制统一为视觉代理的可控视频生成方法，可为动作条件世界模型提供支持。",
+      "canonical_evidence": "将运动与相机控制统一为视觉代理的可控视频生成方法，可为动作条件世界模型提供支持。",
+      "llm_tldr_en": "UniMoCa unifies motion and camera controls as visual proxies in video generation, replacing heterogeneous interfaces and supporting action-conditioned world modeling.",
+      "llm_tldr_cn": "针对人体视频生成中运动与相机控制接口异构、难以协同的问题，提出UniMoCa框架，将运动与相机控制统一为视觉代理表示，让视频生成模型在统一接口下生成忠实的人体视频。该方法有望降低运动-相机归因难度和对相机估计误差的敏感度。相关工作为动作条件化的视频生成与世界模型构建提供了可迁移的控制范式。",
+      "llm_tldr": "针对人体视频生成中运动与相机控制接口异构、难以协同的问题，提出UniMoCa框架，将运动与相机控制统一为视觉代理表示，让视频生成模型在统一接口下生成忠实的人体视频。该方法有望降低运动-相机归因难度和对相机估计误差的敏感度。相关工作为动作条件化的视频生成与世界模型构建提供了可迁移的控制范式。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "research on video generation for world models",
+      "matched_requirement_id": "req-8",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    }
+  ]
+}

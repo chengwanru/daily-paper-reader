@@ -1,0 +1,498 @@
+Title: FreqForcing: Autoregressive Long Video Generation via Spectral Self-Anchoring
+
+URL Source: https://arxiv.org/pdf/2607.27110v2
+
+Published Time: Tue, 04 Aug 2026 02:50:40 GMT
+
+Number of Pages: 9
+
+Markdown Content:
+# FreqForcing: Autoregressive Long Video Generation via Spectral Self-Anchoring 
+
+## Jiatong Li 1, Leo Liang 2, Linghe Kong 1∗, Yulun Zhang 1∗
+
+> 1
+
+Shanghai Jiao Tong University, 2Tencent HY Team 
+
+Abstract 
+
+Autoregressive video diffusion models enable real-time streaming video generation. However, errors introduced dur-ing self-rollout accumulate over long horizons, manifesting as color drift, motion stagnation, and eventual visual col-lapse. In this paper, we characterize this phenomenon from a frequency-domain perspective: error accumulation appears as a pronounced energy drift in the low-frequency bands. We further investigate the effectiveness of attention sink in the frequency domain, and find that it improves the video qual-ity by alleviating the spectral energy drift to some extent, but cannot fully resolve it. Motivated by the above analy-sis, we propose FreqForcing , a training-free framework that addresses error accumulation in long-video generation via Spectral Self-Anchoring (SSA). The proposed SSA leverages the low-frequency components of anchor attention to main-tain long-horizon visual stability, while preserving dynamic motion through the high-frequency components of local at-tention. Our FreqForcing extends Self-Forcing pretrained on 
+
+5s clips to two-minute generation, achieving 24 × extrap-olation. Extensive experiments show that FreqForcing out-performs existing training-free methods quantitatively and qualitatively while remaining competitive with representative training-based approaches. 
+
+Code — https://github.com/jiatongli2024/FreqForcing 
+
+## Introduction 
+
+Video diffusion models have advanced rapidly, with large-scale diffusion transformers and video foundation models such as Sora (Brooks et al. 2024), HunyuanVideo (Wu et al. 2025), and Wan (Wan et al. 2025) synthesizing realistic, tem-porally coherent, and instruction-following videos. However, applications like interactive world models (Bruce et al. 2024) and embodied decision-making (Yang et al. 2023) demand streaming frame generation with low latency, high through-put, and online controllability. Autoregressive video diffusion models (Yin et al. 2025; Huang et al. 2025) offer an efficient alternative by gener-ating frames sequentially while reusing cached key-value states. In particular, Self-Forcing (Huang et al. 2025) per-forms autoregressive self-rollout during training to bridge 
+
+> ∗
+
+Corresponding authors: Yulun Zhang, yulun100@gmail.com; Linghe Kong, linghe.kong@sjtu.edu.cn. Collapse 
+
+Distribution 
+
+Shift 
+
+Distribution 
+
+> Self-Forcing
+> w/ Attention Sink
+> Desirable
+> Distribution
+> Autoregressive
+> Inference
+> Corrected Path
+> FreqForcing
+> Pretrained
+> Distribution
+> Corrected
+> Distribution
+> (Ours)
+> Self-Forcing
+> Negligible
+> Discrepancy
+
+Figure 1: Comparison of different autoregressive video generation paradigms. The original Self-Forcing (Huang et al. 2025) suffers from severe error accumulation, while at-tention sink can alleviate it to some extent. Our FreqForcing 
+
+corrects this via Spectral Self-Anchoring (SSA). the train-test gap, enabling real-time streaming generation with competitive quality. However, the causal attention that enables streaming generation also conditions each chunk on imperfect histories, so errors are repeatedly fed back and ac-cumulate over long horizons, manifesting as visual collapse. Existing remedies fall into two groups. Training-based methods (Liu et al. 2025; Zhu et al. 2026; Cui et al. 2026) im-prove long-horizon stability through better distillation strate-gies, but they are computationally demanding. Training-free methods instead intervene at inference time, either improv-ing RoPE (Yesiltepe et al. 2026; Yi et al. 2026; Li et al. 2026b) or adopting more effective KV cache management strategies (Yi et al. 2026; Li et al. 2026a). However, these methods still cannot guarantee the visual quality when gen-erating minute-long videos. To intuitively characterize the error accumulation during autoregressive generation, we conduct a frequency-domain analysis in both the latent-space and pixel-space with pre-trained Self-Forcing (Huang et al. 2025). As shown in Fig. 3 (a), the error accumulation performs as a pronounced energy drift in the direct current (DC) and low-frequency bands (color tone, layout, identity), while high-frequency compo-nents (local motion, fine detail) become unstable. Moreover, arXiv:2607.27110v2 [cs.CV] 3 Aug 2026 3D 
+
+FFT 
+
+Spectral Anchoring 
+
+Local Attention 
+
+Fused Output   
+
+> Attention Sink
+> Recent Tokens
+> Anchor Tokens
+> Current Tokens
+> N-2, N-1, N ... Temporal RoPE Index
+
+Anchor Attention 
+
+3D 
+
+IFFT 
+
+3D 
+
+FFT 
+
+Local KV Cache     
+
+> N
+> Current Block
+> N-6 N-5 N-4 N-3 N-2
+
+Anchor KV Cache     
+
+> N-1 N
+> N-2
+> N
+> N-1 NN-9 N-8 N-7
+
+# Local-Anchor Attention Figure 2: Overview of FreqForcing. FreqForcing eliminates spectral energy drift during autoregressive video generation via Spectral Self-Anchoring (SSA). SSA consists of two steps. First , we design local-anchor attention branches. The local attention branch follows the standard sliding-window causal attention with attention sink to produce Aloc , while the anchor attention branch uses high-quality anchor frames to generate Aanc . Second , we employ Spectral Anchoring to fuse the high-frequency components of Aloc with the low-frequency components of Aanc , yielding the final fused output Afused .to further demonstrate the correlation between spectral en-ergy and visual quality, we conduct additional experiments. Specifically, we incorporate attention sink into the KV cache during inference, which consists of a few initial tokens to preserve global context and stabilize the attention distribu-tion. It has proven effective in both LLM inference (Ghadia et al. 2025; Shi et al. 2025; Xiao et al. 2024) and in autore-gressive video generation (Liu et al. 2025; Yang et al. 2026). Deep Forcing (Yi et al. 2026) demonstrates that a larger at-tention sink leads to better video quality. The results in Fig. 3 (b) show that a larger attention sink slows down the spectral energy drift, thereby yielding better videos. Nevertheless, a large attention sink alone cannot resolve the energy drift. Motivated by the prior works (Lu et al. 2024; Lu and Yang 2025; Chen et al. 2026) and the above analysis, we propose 
+
+FreqForcing , a training-free framework that addresses er-ror accumulation spectrally for long-video generation with Spectral Self-Anchoring (SSA). Our SSA runs two attention branches during inference: a local branch preserves high-frequency details and recent changes, while an anchor branch supplies stable low-frequency guidance. The two outputs are fused in the frequency domain, suppressing low-frequency drift without sacrificing dynamic visual content. As shown in Fig. 1, our FreqForcing steers the drifted autoregressive tra-jectory back toward the desirable distribution by correcting the spectral drift. Extensive quantitative and qualitative re-sults show that our FreqForcing extends Self-Forcing (Huang et al. 2025) pretrained on 5-second clips to stable two-minute generation ( 24 × extrapolation) with improved consistency. Our contributions are summarized as follows: 
+
+• We analyze the relationship between error accumulation and spectral energy during the autoregressive video dif-fusion inference, and qualitatively examine how attention sink of varying sizes affect the spectral energy drift. 
+
+• We propose FreqForcing, a training-free framework that resolves spectral energy drift via Spectral Self-Anchoring (SSA). Our SSA fuses local and anchor attention outputs in the frequency domain to stabilize visual quality during autoregressive self-rollout. 
+
+• Extensive experiments demonstrate that FreqForcing en-ables stable long-video generation, surpassing state-of-the-art training-free methods while remaining competi-tive with training-based approaches. 
+
+## Related Work 
+
+Autoregressive Video Generation. Natively autoregres-sive models (Teng et al. 2025; Chen et al. 2025; Ruhe et al. 2024; Deng et al. 2025) generate frames or video chunks sequentially under causal temporal dependencies, but typ-ically require substantial computational resources for train-ing. Distillation-based methods (Yin et al. 2025; Huang et al. 2025; Yang et al. 2026; Liu et al. 2025; Zhu et al. 2026) in-stead adapt a pretrained multi-step bidirectional teacher into a few-step causal student, inheriting strong visual priors, enabling real-time streaming generation and requiring less training overhead. FreqForcing enhances the capability of autoregressive video generation without additional training. 
+
+Attention Sink in Language and Video Models. Atten-tion sink (Xiao et al. 2024; Gu et al. 2025) was first identified (a) w/o Attention Sink  (b) w/ Attention Sink  
+
+> Collapse!
+> Drift! Jitter!
+
+Figure 3: Illustration of the relative spectral energy variations in both latent space and pixel space during 60s generation ,including the DC component, low-frequency energy, and high-frequency energy. (a) The relative spectral energy of Self-Forcing (Huang et al. 2025) collapses rapidly when attention sink is absent. (b) We investigate Self-Forcing with different attention sink sizes S ∈ { 3, 12 }. Increasing S alleviates the temporal drift to some extent, but does not eliminate it entirely. Moreover, Deep Forcing (Yi et al. 2026) suffers from frequency jitter. Our FreqForcing stabilizes the spectral energy and produces visually stable videos. in autoregressive language models, where a few initial tokens are retained in the rolling KV cache to preserve global con-text over extended horizons. Recent studies on autoregressive video generation (Li et al. 2026b; Yang et al. 2026; Yi et al. 2026) similarly observe that attention sink plays a crucial role in stabilizing the generated video frames. In this pa-per, we illustrate the effectiveness of attention sink through a frequency-domain energy analysis, showing that it preserves visual quality by alleviating spectral energy drift. 
+
+Frequency-Domain Guidance for Video Generation. 
+
+Frequency-domain guidance has been widely explored in video generation. FreeU (Si et al. 2024) rebalances low- and high-frequency features in the denoising U-Net without re-training. FreeInit (Wu et al. 2024) iteratively refines the initial noise by retaining its low-frequency components while re-sampling the high-frequency ones, and FreqPrior (Yuan et al. 2025) improves this frequency-filtered noise design to better preserve details and approximate a standard Gaussian dis-tribution. FreeLong (Lu et al. 2024) utilizes SpectralBlend temporal attention to improve long-video generation. These methods, however, operate on bidirectional video generation models. FreqForcing instead performs frequency-domain fu-sion within autoregressive self-rollout, enabling training-free long-video generation. 
+
+## Preliminaries 
+
+Autoregressive Video Diffusion Models. Autoregressive video diffusion models predict the next frame conditioned on previously generated ones, with each prediction formulated as a diffusion denoising process. Let {t0, t 1, . . . , t T } denote the denoising schedule, where t0 = 0 and tT = 1000 . In the VAE-encoded latent space, the joint distribution of an 
+
+N -frame latent video is factorized as: 
+
+pθ
+
+
+
+x[0 ,N ) 
+
+> t0
+
+| c
+
+
+
+= pθ
+
+ x0 
+
+> t0
+
+| c N −1Y
+
+> i=1
+
+pθ
+
+
+
+xit0 | x[0 ,i ) 
+
+> t0
+
+, c 
+
+
+
+, (1) where c denotes the context. For the i-th latent frame, the transition from noise level tj to tj−1 is given by: 
+
+xitj−1 = Ψ 
+
+
+
+Gθ
+
+
+
+xitj , t j , x [0 ,i ) 
+
+> t0
+
+, c 
+
+
+
+, t j−1
+
+
+
+≈ Ψ
+
+
+
+Gθ
+
+
+
+xitj , t j , Φsw  
+
+> i
+
+, c 
+
+
+
+, t j−1
+
+
+
+,
+
+(2) where Gθ is the denoising model and Ψ denotes the for-ward diffusion operator. In practice, the complete generation history x[0 ,i ) 
+
+> t0
+
+is approximated by a fixed-capacity sliding-window KV cache Φsw  
+
+> i
+
+.
+
+Self-Forcing. Teacher Forcing (Jin et al. 2025) and Dif-fusion Forcing (Chen et al. 2024) train models on GT dis-tribution, which leads to a train-test gap. By contrast, Self-Forcing (Huang et al. 2025) populates the KV cache with frames produced by the model itself during training. This de-sign narrows the train-test gap and mitigates exposure bias. Self-Forcing further adopts a four-step denoising process which substantially reduces sampling latency and enables real-time streaming video generation. 
+
+Sliding-window Causal Attention with Attention Sink. 
+
+The cache Φsw  
+
+> i
+
+in Eq. (2) maintains a local window of size w
+
+and the current chunk occupies the latest f positions. When attention sink is used, we reserve the first s positions of the visible window for sink frames, and the available recent context is restricted to the preceding w −f −s frames. Using Method Dynamic Degree ↑
+
+Motion Smoothness ↑
+
+Overall Consistency ↑
+
+Imaging Quality ↑
+
+Aesthetic Quality ↑
+
+Subject Consistency ↑
+
+Background Consistency ↑
+
+Training-based 60s generation 
+
+Self-Forcing 33.29 98.45 18.81 66.90 56.77 96.53 96.32 LongLive 41.96 98.77 20.89 69.25 61.23 97.78 96.69 Rolling Forcing 30.95 98.76 20.52 71.15 59.89 98.01 96.77 
+
+Training-free 
+
+Infinity-RoPE 54.61 97.72 18.52 68.91 58.28 96.50 95.53 Deep Forcing 46.17 98.15 20.84 68.12 59.83 97.40 96.53 
+
+FreqForcing (Ours) 59.58 98.07 20.94 69.52 60.91 97.27 96.47 
+
+Training-based 120s generation 
+
+Self-Forcing 27.42 98.34 16.17 61.40 51.22 97.02 96.29 LongLive 41.91 98.79 20.75 68.84 61.47 97.83 96.66 
+
+Rolling Forcing 31.30 98.69 20.37 70.72 58.89 97.73 96.57 
+
+Training-free 
+
+Infinity-RoPE 56.12 97.68 17.96 68.15 57.03 96.43 95.44 Deep Forcing 41.78 98.25 20.80 67.58 59.52 97.52 96.59 
+
+FreqForcing (Ours) 58.97 98.22 20.98 68.89 60.68 97.38 96.47 
+
+Table 1: Quantitative comparison on VBench-Long (Huang et al. 2024). All metrics are reported on 60s and 120s generations. The best results are highlighted in bold , and the second-best results are underlined. Prompt:  A 3D animation of a small, round, fluffy creature with big, expressive eyes exploring a vibrant, enchanted forest ...   
+
+> LongLive
+> Rolling
+> Forcing
+> Infinity-
+> RoPE
+> Deep
+> Forcing
+> Freq
+> Forcing
+> (Ours)
+> Self-
+> Forcing
+> Prompt: A charming comic-style illustration depicting a cozy living room scene where a fluffy gray cat ...
+> LongLive
+> Rolling
+> Forcing
+> Infinity-
+> RoPE
+> Deep
+> Forcing
+> Freq
+> Forcing
+> (Ours)
+> Self-
+> Forcing
+
+Figure 4: Qualitative comparisons on 120s videos. We compare FreqForcing with representative autoregressive video gener-ation methods. Please refer to the supplementary material for more details. the absolute frame index n and sink set S = {1, 2, . . . , s },the local historical set for the i-th chunk is: 
+
+bi = max ( s + 1 , if − w + s + 1) , (3) 
+
+Rlocal 
+
+i = {n | bi ≤ n ≤ (i − 1) f } . (4) The final context with attention sink becomes: 
+
+Φsw 
+
+i = KV   xn
+
+0 | n ∈ S ∪ R local 
+
+i
+
+ . (5) When computing the attention score in each layer, the visible window can be ordered as:  S|{z} 
+
+sink positions 1: s
+
+, Rlocal 
+
+i
+
+| {z } 
+
+recent history 
+
+, Ii
+
+|{z} 
+
+current chunk 
+
+ , (6) where Ii = {(i−1) f +1 , . . . , if } denotes the current chunk. Thus, the attention sink is placed at the leftmost positions of each local window, serving as persistent anchor tokens. 
+
+## Method 
+
+Overview 
+
+We introduce a novel training-free approach to alleviate er-ror accumulation in autoregressive video generation from a frequency-domain perspective. We first characterize the visual degradation in autoregressive video generation as spectral energy drift, and further demonstrate that attention sink (Liu et al. 2025; Yi et al. 2026) improves visual qual-ity by partially addressing the issue. Motivated by the above observations, we introduce Spectral Self-Anchoring (SSA), which suppresses spectral energy drift with high-quality an-chor frames. Our method is illustrated in Fig. 2. 
+
+Error Accumulation in the Frequency Domain 
+
+Prior studies (Yi et al. 2026; Liu et al. 2025) have observed that streaming video generation is prone to drift temporally, (b) Self-Forcing w/ Attention Sink  Spectral Drift  ☹   
+
+> (a) Self-Forcing Spectral Collapse ☹
+> Prompt: A close-up shot of a steaming cappuccino in a ceramic cup, with a rich brown foam on top and a slight milk ...
+> (c) FreqForcing (Ours) Spectral Preservation
+
+## ☺Figure 5: Visual comparison for ablation. (a) Self-Forcing (Huang et al. 2025) suffers from severe color drift and visual fading. 
+
+(b) Self-Forcing with attention sink size S = 12 alleviates color drift but still exhibits unsatisfactory results because of spectral drift. (c) Our FreqForcing produces visually stable videos by preserving the spectral features. and to comprehensively understand this phenomenon, we provide a frequency-domain explanation. Following Self-Forcing (Huang et al. 2025), we generate 60s videos with prompts sampled from MovieGen (Polyak et al. 2024). Dur-ing generation, we record the Self-Attention (Vaswani et al. 2017) outputs of each DiT (Peebles and Xie 2023) layer, along with the corresponding pixel frames. We then apply Short-Time Fourier Transform (STFT) (Allen 1977) to these sequences to track how the frequency band energy changes over time. As shown in Fig. 3 (a), in the frequency domain, the error accumulation manifests as a noticeable energy drift in the DC and low-frequency bands. This is because the rolling KV cache only retains recent imperfect frames, which deviate significantly from the initially generated high-quality frames, and this mechanism ultimately leads to visual collapse. Attention sink has been proven effective for autoregressive video diffusion in prior works (Yang et al. 2026; Liu et al. 2025). We therefore analyze the spectral energy of videos generated by Self-Forcing with attention sinks of various sizes. To keep consistent with prior works (Liu et al. 2025) at inference time, we further adjust the temporal RoPE (Su et al. 2024) to align the attention sink with the current sliding window. The results are reported in Fig. 3 (b), showing that introducing attention sink suppresses spectral energy drift in both the output of self-attention and the frames in pixel space. Moreover, a larger attention sink preserves the spectral energy better and thus improves video quality more signifi-cantly. Qualitative results in Fig. 5 confirm that the attention sink yields a clear improvement in generation quality. We additionally compare Deep Forcing (Yi et al. 2026) and our FreqForcing in Fig. 3. Due to its participative KV cache compression, Deep Forcing exhibits prominent jitter in the spectral energy of its attention outputs, which manifests as abrupt temporal flickering in pixel-space frames. This phe-nomenon substantially degrades video quality. In contrast, FreqForcing shows no evident spectral energy drift during long-horizon inference and consequently maintains higher visual quality and better temporal consistency in pixel space. 
+
+Spectral Self-Anchoring 
+
+Motivation. While attention sink mitigates context forget-ting by preserving persistent anchor tokens, we can observe that unsatisfactory detail degradation still appears in Fig. 5 (b) when generating minute-long videos. This is because the attention sink implicitly guides the model output by affecting the attention. However, it cannot effectively correct the gen-eration trajectory once recent tokens have been corrupted by erroneous model outputs, ultimately leading to spectral drift. Therefore, stronger guidance is needed. Motivated by the above observations, we propose Spectral Self-Anchoring (SSA) , which consists of two steps: local-anchor attention branches and spectral anchoring. Our SSA not only provides high-quality historical context but also explicitly stabilizes the spectral energy of generated frames over time. 
+
+Local-anchor Attention Branches. Our method adopts a dual-branch inference paradigm consisting of local attention and anchor attention. The local attention performs attention computation with a sliding window equipped with a deep attention sink: 
+
+Aloc = Softmax 
+
+ QK ⊤
+
+> loc
+
+√d
+
+
+
+Vloc . (7) In contrast, the anchor attention branch is not computed when the generated video length does not exceed the pretrained range. Instead, it maintains an anchor cache that collects high-quality frames generated within the pretrained horizon and freezes the cache once it is filled. Specifically, the anchor cache has a capacity of Nanc = 6 . For every three generated latent frames, one is appended to the anchor cache. Updating stops once the cache reaches capacity. When the inference length Lgen exceeds the pretrained length Lpre = 21 , the model begins to compute anchor attention: 
+
+Aanc =
+
+
+
+0, Lgen ≤ Lpre ,
+
+Softmax 
+
+ QK ⊤
+
+> anc
+
+√d
+
+
+
+Vanc , Lgen > L pre . (8) 
+
+Spectral Anchoring. After obtaining local attention Aloc 
+
+and anchor attention Aanc , we rectify low-frequency compo-nents of local attention via spectral anchoring, resulting in a fused attention output Afused . When the inference length ex-ceeds the pretrained range, the specific process is as follows: 
+
+ˆAloc = F3D (Aloc ), ˆAanc = F3D (Aanc ), (9) 
+
+Hlp (kt, k xy ) = exp 
+
+
+
+− k2
+
+> t
+
+2σ2
+
+> t
+
+− ∥kxy ∥2
+
+2σ2
+
+> xy
+
+
+
+, (10) 
+
+ˆAfused = (1 − λH lp ) ˆAloc + λH lp ˆAanc 
+
+= ˆAloc + λH lp ( ˆAanc − ˆAloc ), (11) 
+
+Afused = F−1 
+
+> 3D
+
+( ˆAfused ), (12) where F3D denotes the Fast Fourier Transform over the spa-tial and temporal dimensions, F−1 
+
+> 3D
+
+is the Inverse Fast Fourier Transformation that converts the fused features from the fre-quency domain, and Hlp denotes the spatial-temporal Gaus-sian low-pass filter, where σxy and σt control the frequency ranges of the spatial and temporal filtering, respectively. The scalar λ ∈ [0 , 1] is a coefficient that controls the strength of the low-frequency anchoring: as the second line of Eq. (11) makes explicit, λH lp acts as a frequency-selective gate that injects the low-frequency residual ( ˆAanc − ˆAloc ) from the anchor attention into the local attention. Setting λ = 0 re-covers the original local attention Aloc , while larger λ pulls the low-frequency components of Afused progressively to-ward those of the anchor attention Aanc , thereby suppressing spectral energy drift. 
+
+Temporal RoPE Alignment. Modern video diffusion DiTs (Wan et al. 2025) typically use 3D RoPE for relative positional encoding. As the indices of the generated frames increase, their distance to the sink frames eventually exceeds the pretrained range and eventually produces unnatural arti-facts. To address this issue, we follow the same treatment as prior work (Liu et al. 2025). As illustrated in Fig. 2, we shift the temporal indices of both the attention sink frames in the local KV cache and the anchor frames in the anchor cache to right before the current window. This strategy keeps the relative temporal positions within the pretrained range. 
+
+Efficiency. Our SSA introduces computational overhead from two sources: (a) anchor attention computation and (b) 
+
+spectral anchoring. Since Spectral Anchoring operates en-tirely in the latent space, its cost is negligible. The dominant overhead therefore stems from computing the anchor atten-tion, which we curtail through two design choices. 
+
+Figure 6: Effectiveness of SSA. SSA not only keeps the relative spectral energy closer to that of the initial frames, but also effectively suppresses its temporal drift. First, we exploit the coarse-to-fine nature of the denoising process. Prior works (Balaji et al. 2022; Cao et al. 2023) ob-serve that latent diffusion models synthesize different levels of visual content across denoising stages: the global scene layout and object structure are established in the early, high-noise steps, whereas fine-grained details emerge in the later steps. Since low-frequency anchoring is most beneficial when the global layout is being formed, applying SSA through-out the entire trajectory is unnecessary. We therefore restrict SSA to the first two denoising steps of Self-Forcing (i.e., 
+
+t4 = 1000 and t3 = 937 ), which is sufficient to align the overall layout and object appearance with the anchored low-frequency guidance, thereby preserving long-range temporal consistency. Second, we set the anchor cache size Nanc = 6 ,which further reduces additional attention computation. With these designs, SSA incurs only about a 16 .5% in-crease in inference latency over Self-Forcing (Huang et al. 2025) on NVIDIA RTX A6000 GPUs, yet it successfully ex-tends Self-Forcing trained on 5-second clips to minute-long video generation ( i.e. , 24 × extrapolation). 
+
+## Experiments 
+
+Experimental Settings 
+
+Implementation Details. We adopt chunk-wise Self-Forcing (Huang et al. 2025) as our base model. Following Self-Forcing, the local attention KV cache and window size are both set to 21 , with attention sink size S = 12 ; the anchor cache size is set to Nanc = 6 . For both local and anchor attention, we use a Rolling Forcing-style (Liu et al. 2025) temporal RoPE alignment to keep relative positions within the pretrained range. For spectral anchoring, we set 
+
+σxy = σt = 0 .125 and λ = 0 .6 to balance visual consistency with dynamic content changes. 
+
+Evaluation. To evaluate the performance of long-video generation, we use the first 128 prompts from MovieGen (Polyak et al. 2024) under the same prompt se-lection protocol as Self-Forcing++ (Cui et al. 2026), with each prompt refined by Qwen/Qwen2.5-7B-Instruct (Yang et al. 2025) as in Self-Forcing (Huang et al. 2025). We report σ λ                                     
+
+> Dynamic Degree ↑
+> Overall Consistency ↑
+> Repetitive Rate ↓
+> 60s generation
+> 0.125 0.256.48 20.49 0.675
+> 0.457.38 20.75 0.714
+> 0.6(Ours) 59.58 20.94 0.749
+> 0.859.88 21.12 0.794
+> 0.25 0.256.58 20.52 0.669
+> 0.457.84 20.78 0.717
+> 0.660.17 20.82 0.795
+> 0.860.94 21.23 0.848
+> 0.50.258.04 20.58 0.647
+> 0.459.98 20.92 0.741
+> 0.662.68 21.22 0.841
+> 0.861.64 21.38 0.877
+
+Table 2: Ablation on the spectral anchoring parameters. 
+
+We set σxy = σt = σ and report Dynamic Degree, Overall Consistency and Repetitive Rate on 60s videos. seven VBench-Long (Huang et al. 2024) metrics to compre-hensively evaluate our method for 60s and 120s generation. 
+
+Comparison 
+
+We compare our proposed FreqForcing against several state-of-the-art autoregressive video diffusion models. Specif-ically, we compare with training-based methods Self-Forcing (Huang et al. 2025), Rolling Forcing (Liu et al. 2025), and LongLive (Yang et al. 2026), as well as training-free methods Infinity-RoPE (Yesiltepe et al. 2026) and Deep Forcing (Yi et al. 2026). All methods are built upon the Wan2.1-T2V-1.3B (Wan et al. 2025) base model. We ana-lyze the results quantitatively and qualitatively. 
+
+Quantitative Results. As shown in Table 1, FreqForcing achieves the best performance on dynamic degree and overall consistency, while maintaining competitive performance on other metrics. This demonstrates its superior ability to pre-serve long-range temporal consistency and dynamic changes over minute-scale generation. Compared to training-based methods, FreqForcing achieves comparable or better perfor-mance without additional training. 
+
+Qualitative Results. Fig. 4 presents qualitative compar-isons of 120s videos generated by different methods. Self-Forcing (Huang et al. 2025) and Rolling Forcing (Liu et al. 2025) exhibit visual fading, while LongLive suffers from repetitive scenes. Infinity-RoPE (Yesiltepe et al. 2026) and Deep Forcing (Yi et al. 2026) mitigate drift to some extent but still show noticeable degradation in motion dynamics and consistency. In contrast, FreqForcing produces visually stable videos with consistent color, preserved motion, and reduced artifacts, confirming the benefits of our Spectral Self-Anchoring. We have provided more visual comparisons in the supplementary material.                     
+
+> Method Dyn. ↑Over. ↑Subj. ↑Back. ↑
+> 60s generation
+> Self-Forcing 33.29 18.81 96.53 96.32 w/o SSA 56.85 20.26 96.88 96.19 w/o Attention Sink 44.18 20.00 97.16 96.38 FreqForcing (Ours) 59.58 20.94 97.27 96.47
+
+Table 3: Ablation study on the proposed components. 
+
+Ablation Studies 
+
+Effectiveness of SSA. We generate a set of 60s videos and validate the effectiveness of our method through both quan-titative and qualitative evaluations. The quantitative results are reported in Table 3. As shown in the table, FreqForcing consistently improves overall performance. Fig. 6 shows that compared with using the attention sink alone, our SSA effectively suppresses the spectral energy drift of the generated videos. We observe that the attention sink alone cannot prevent error accumulation, and the DC energy still drifts slowly. Our SSA effectively remedies this error accumulation process in autoregressive inference. As shown in Fig. 5, SSA suppresses local color drift, allowing high-quality minute-scale video generation. 
+
+Hyperparameter Ablation. We report the ablation study on the hyperparameters σ and λ in Tab. 2. To further quantify content repetition, we introduce the repetitive rate, where a higher value indicates a larger proportion of visually similar frames in the generated video, and vice versa. For reference, the repetitive rate of Deep Forcing is 0.812 . As shown in the table, within a specific range, increasing σ and λ generally improves dynamic degree and overall consistency, indicating better temporal consistency. However, it also leads to a higher repetitive rate, suggesting that excessive low-frequency in-tervention in the attention outputs may reduce visual diver-sity. To balance consistency and diversity, we therefore set 
+
+σ = 0 .125 and λ = 0 .6 in our experiments. Additional abla-tion studies, qualitative results and experimental details are provided in the supplementary material. 
+
+## Conclusion 
+
+In this paper, we introduce FreqForcing, a training-free framework for robust autoregressive long-video generation. Our study reveals that the error accumulation in autoregres-sive generation manifests as energy drift in the frequency domain, and further shows that the attention sink improves visual quality by suppressing this drift. Building on this anal-ysis, we propose Spectral Self-Anchoring (SSA) to further mitigate the visual degradation caused by spectral energy drift. SSA leverages the low-frequency components of high-quality early frames to keep the subsequent frames from drift-ing. Extensive experiments demonstrate that our FreqForcing significantly suppresses low-frequency energy drift and en-ables training-free minute-scale video generation ( 24 × ex-trapolation in our setting). FreqForcing surpasses existing training-based and training-free methods on metrics such as dynamic degree and overall consistency, while delivering superior visual quality in qualitative comparisons. References 
+
+Allen, J. B. 1977. Short term spectral analysis, synthesis, and modification by discrete Fourier transform. IEEE Trans-actions on Acoustics, Speech, and Signal Processing . 5 Balaji, Y.; Nah, S.; Huang, X.; Vahdat, A.; Song, J.; Zhang, Q.; Kreis, K.; Aittala, M.; Aila, T.; Laine, S.; et al. 2022. ediff-i: Text-to-image diffusion models with an ensemble of expert denoisers. arXiv preprint arXiv:2211.01324 . 6 Brooks, T.; Peebles, B.; Holmes, C.; DePue, W.; Guo, Y.; Jing, L.; Schnurr, D.; Taylor, J.; Luhman, T.; Luhman, E.; Ng, C.; Wang, R.; and Ramesh, A. 2024. Video generation models as world simulators. 1 Bruce, J.; Dennis, M. D.; Edwards, A.; Parker-Holder, J.; Shi, Y.; Hughes, E.; Lai, M.; Mavalankar, A.; Steigerwald, R.; Apps, C.; et al. 2024. Genie: Generative interactive environments. In ICML . 1 Cao, M.; Wang, X.; Qi, Z.; Shan, Y.; Qie, X.; and Zheng, Y. 2023. Masactrl: Tuning-free mutual self-attention control for consistent image synthesis and editing. In ICCV . 6 Chen, B.; Martí Monsó, D.; Du, Y.; Simchowitz, M.; Tedrake, R.; and Sitzmann, V. 2024. Diffusion forcing: Next-token prediction meets full-sequence diffusion. In NeurIPS . 3 Chen, F.; Zhao, S.; Yang, L.; Xu, C.; Luo, Z.; and Lan, L. 2026. FreeSpec: Training-Free Long Video Genera-tion via Singular-Spectrum Reconstruction. arXiv preprint arXiv:2605.06509 . 2 Chen, G.; Lin, D.; Yang, J.; Lin, C.; Zhu, J.; Fan, M.; Zhang, H.; Chen, S.; Chen, Z.; Ma, C.; et al. 2025. Skyreels-v2: Infinite-length film generative model. arXiv preprint arXiv:2504.13074 . 2 Cui, J.; Wu, J.; Li, M.; Yang, T.; Li, X.; Wang, R.; Bai, A.; Ban, Y.; and Hsieh, C.-J. 2026. Self-forcing++: Towards minute-scale high-quality video generation. In ICLR . 1, 6 Deng, H.; Pan, T.; Diao, H.; Luo, Z.; Cui, Y.; Lu, H.; Shan, S.; Qi, Y.; and Wang, X. 2025. Autoregressive video generation without vector quantization. In ICLR . 2 Ghadia, R.; Kumar, A.; Jain, G.; Nair, P.; and Das, P. 2025. Dialogue without limits: Constant-sized KV caches for extended responses in LLMs. arXiv preprint arXiv:2503.00979 . 2 Gu, X.; Pang, T.; Du, C.; Liu, Q.; Zhang, F.; Du, C.; Wang, Y.; and Lin, M. 2025. When attention sink emerges in language models: An empirical view. In ICLR . 2 Huang, X.; Li, Z.; He, G.; Zhou, M.; and Shechtman, E. 2025. Self forcing: Bridging the train-test gap in autoregressive video diffusion. In NeurIPS . 1, 2, 3, 5, 6, 7 Huang, Z.; He, Y.; Yu, J.; Zhang, F.; Si, C.; Jiang, Y.; Zhang, Y.; Wu, T.; Jin, Q.; Chanpaisit, N.; Wang, Y.; Chen, X.; Wang, L.; Lin, D.; Qiao, Y.; and Liu, Z. 2024. VBench: Compre-hensive Benchmark Suite for Video Generative Models. In 
+
+CVPR . 4, 7 Jin, Y.; Sun, Z.; Li, N.; Xu, K.; Xu, K.; Jiang, H.; Zhuang, N.; Huang, Q.; Song, Y.; Mu, Y.; and Lin, Z. 2025. Pyramidal Flow Matching for Efficient Video Generative Modeling. In 
+
+ICLR . 3 Li, H.; Liu, S.; Lin, Z.; and Chandraker, M. 2026a. Rolling sink: Bridging limited-horizon training and open-ended testing in autoregressive video diffusion. arXiv preprint arXiv:2602.07775 . 1 Li, J.; Fu, X.; Peng, X.; Chen, W.; Zheng, Y.; Zhao, T.; Wang, J.; Chen, F.; Wang, X.; and So, H. K.-H. 2026b. Train short, inference long: Training-free horizon extension for autore-gressive video generation. arXiv preprint arXiv:2602.14027 .1, 3 Liu, K.; Hu, W.; Xu, J.; Shan, Y.; and Lu, S. 2025. Rolling Forcing: Autoregressive Long Video Diffusion in Real Time. 
+
+arXiv preprint arXiv:2509.25161 . 1, 2, 4, 5, 6, 7 Lu, Y.; Liang, Y.; Zhu, L.; and Yang, Y. 2024. Freelong: Training-free long video generation with spectralblend tem-poral attention. In NeurIPS . 2, 3 Lu, Y.; and Yang, Y. 2025. Freelong++: Training-free long video generation via multi-band spectralfusion. arXiv preprint arXiv:2507.00162 . 2 Peebles, W.; and Xie, S. 2023. Scalable diffusion models with transformers. In ICCV . 5 Polyak, A.; Zohar, A.; Brown, A.; Tjandra, A.; Sinha, A.; Lee, A.; Vyas, A.; Shi, B.; Ma, C.-Y.; Chuang, C.-Y.; et al. 2024. Movie gen: A cast of media foundation models. arXiv preprint arXiv:2410.13720 . 5, 6 Ruhe, D.; Heek, J.; Salimans, T.; and Hoogeboom, E. 2024. Rolling diffusion models. arXiv preprint arXiv:2402.09470 .2Shi, D.; Fu, Y.; Yuan, X.; Yu, Z.; You, H.; Li, S.; Dong, X.; Kautz, J.; Molchanov, P.; and Lin, Y. C. 2025. La-Cache: Ladder-Shaped KV Caching for Efficient Long-Context Modeling of Large Language Models. In ICML .2Si, C.; Huang, Z.; Jiang, Y.; and Liu, Z. 2024. FreeU: Free Lunch in Diffusion U-Net. In CVPR . 3 Su, J.; Ahmed, M.; Lu, Y.; Pan, S.; Bo, W.; and Liu, Y. 2024. Roformer: Enhanced transformer with rotary position embedding. Neurocomputing . 5 Teng, H.; Jia, H.; Sun, L.; Li, L.; Li, M.; Tang, M.; Han, S.; Zhang, T.; Zhang, W.; Luo, W.; et al. 2025. Magi-1: Autoregressive video generation at scale. arXiv preprint arXiv:2505.13211 . 2 Vaswani, A.; Shazeer, N.; Parmar, N.; Uszkoreit, J.; Jones, L.; Gomez, A. N.; Kaiser, Ł.; and Polosukhin, I. 2017. Attention is all you need. In NeurIPS . 5 Wan, T.; Wang, A.; Ai, B.; Wen, B.; Mao, C.; Xie, C.-W.; Chen, D.; Yu, F.; Zhao, H.; Yang, J.; et al. 2025. Wan: Open and advanced large-scale video generative models. arXiv preprint arXiv:2503.20314 . 1, 6, 7 Wu, B.; Zou, C.; Li, C.; Huang, D.; Yang, F.; Tan, H.; Peng, J.; Wu, J.; Xiong, J.; Jiang, J.; et al. 2025. Hunyuanvideo 1.5 technical report. arXiv preprint arXiv:2511.18870 . 1 Wu, T.; Si, C.; Jiang, Y.; Huang, Z.; and Liu, Z. 2024. Freeinit: Bridging initialization gap in video diffusion mod-els. In ECCV . 3 Xiao, G.; Tian, Y.; Chen, B.; Han, S.; and Lewis, M. 2024. Efficient streaming language models with attention sinks. In 
+
+ICLR . 2 Yang, A.; Li, A.; Yang, B.; Zhang, B.; Hui, B.; Zheng, B.; Yu, B.; Gao, C.; Huang, C.; Lv, C.; et al. 2025. Qwen3 technical report. arXiv preprint arXiv:2505.09388 . 6 Yang, S.; Huang, W.; Chu, R.; Xiao, Y.; Zhao, Y.; Wang, X.; Li, M.; Xie, E.; Chen, Y.; Lu, Y.; et al. 2026. Longlive: Real-time interactive long video generation. In ICLR . 2, 3, 5, 7 Yang, Z.; Chen, Y.; Wang, J.; Manivasagam, S.; Ma, W.-C.; Yang, A. J.; and Urtasun, R. 2023. Unisim: A neural closed-loop sensor simulator. In CVPR . 1 Yesiltepe, H.; Meral, T.; Akan, A. K.; Oktay, K.; and Ya-nardag, P. 2026. Infinity-rope: Action-controllable infinite video generation emerges from autoregressive self-rollout. In CVPR . 1, 7 Yi, J.; Jang, W.; Cho, P. H.; Nam, J.; Yoon, H.; and Kim, S. 2026. Deep forcing: Training-free long video generation with deep sink and participative compression. In ICML . 1, 2, 3, 4, 5, 7 Yin, T.; Zhang, Q.; Zhang, R.; Freeman, W. T.; Durand, F.; Shechtman, E.; and Huang, X. 2025. From slow bidirectional to fast autoregressive video diffusion models. In CVPR . 1, 2 Yuan, Y.; Guo, Y.; Wang, C.; Zhang, W.; Xu, H.; and Zhang, L. 2025. FreqPrior: Improving Video Diffusion Models with Frequency Filtering Gaussian Noise. In ICLR . 3 Zhu, H.; Zhao, M.; He, G.; Su, H.; Li, C.; and Zhu, J. 2026. Causal Forcing: Autoregressive Diffusion Distillation Done Right for High-Quality Real-Time Interactive Video Gener-ation. arXiv preprint arXiv:2602.02214 . 1, 2

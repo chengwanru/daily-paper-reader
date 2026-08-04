@@ -1,0 +1,477 @@
+Title: FlowPilot: Real-Time World-Action Modeling for Agile UAV Navigation
+
+URL Source: https://arxiv.org/pdf/2608.00635v1
+
+Published Time: Tue, 04 Aug 2026 00:40:04 GMT
+
+Number of Pages: 8
+
+Markdown Content:
+# FlowPilot: Real-Time World-Action Modeling for Agile UAV Navigation 
+
+Runqing Wang, Ding Yu, Pengyuan Min, Xinhong Zhang, Wei Xiao, Yu Hu, Jie Chen, Fellow, IEEE , Fu Zhang, Senior Member, IEEE , and Gang Wang, Senior Member, IEEE 
+
+Abstract — We present FlowPilot, a compact world-action model for real-time onboard UAV navigation from depth. Unlike map-then-optimize pipelines that require local reconstruction or end-to-end policies that lack explicit scene prediction, FlowPi-lot jointly denoises future depth observations and executable trajectories with flow matching. A dual-stream mixture-of-transformers couples video and action experts through shared attention, allowing future-scene prediction and trajectory gen-eration to inform each other. At deployment, the model runs action-centrically and outputs only a trajectory. To ensure trackability, actions are parameterized as degree-7 Bernstein polynomials: the current state constrains the initial control points, and the network predicts five free control points, yielding C2-continuous references with closed-form velocity, acceleration and jerk. FlowPilot is trained on a three-level depth pyramid spanning high-throughput simulation, photorealistic simulation, and real onboard data. In closed-loop simulation, it outperforms learning- and optimization-based baselines under increasing clutter and commanded speeds up to 8 m/s. On a physical quadrotor, the full perception-to-action pipeline runs in under 18 ms on a Jetson Orin NX and reaches 5.5 m/s in cluttered indoor and forest environments using only onboard sensing and computation. 
+
+I. I NTRODUCTION 
+
+Autonomous flight through unknown clutter is a core capability for search and rescue, inspection, and last-mile delivery [1], [2]. The difficulty is not perception or planning alone, but their combination under the timing and tracking constraints of a small aerial robot. A quadrotor must convert onboard depth and state feedback into a reference trajectory within a few milliseconds, and that reference must be smooth enough for a high-rate controller to track with velocity, acceleration, and jerk feedforward terms. Existing systems approach this problem from two direc-tions. Classical map-then-optimize pipelines build a local map and solve a trajectory optimization problem [1], [3], [4]. They provide strong geometric structure and smooth                                              
+
+> This work was supported in part by the National Natural Science Foundation of China under Grants U23B2059, the Zhongguancun Academy under Grant 02012407, and the Beijing Natural Science Foundation under Grant QY25271. (Corresponding author: Gang Wang.)
+> Runqing Wang, Ding Yu, Pengyuan Min, Xinhong Zhang, Wei Xiao, Jie Chen, and Gang Wang are with the National Key Lab of Autonomous Intelligent Unmanned Systems, Beijing Insti-tute of Technology, Beijing 100081, China (e-mail: bitwrq@bit.edu.cn; yd@bit.edu.cn; mpy@bit.edu.cn; xhzhang@bit.edu.cn; xiaowei@bit.edu.cn; chenjie@bit.edu.cn; gangwang@bit.edu.cn). Pengyuan Min and Xinhong Zhang are also with the Zhongguancun Academy, Beijing 100094, China. Yu Hu is with Shanghai Jiao Tong University, Shanghai 200240, China (e-mail: henryhy1994@gmail.com). Fu Zhang is with the Department of Mechanical Engineering, The University of Hong Kong, Hong Kong (e-mail: fuzhang@hku.hk).
+
+trajectories, but every plan is computed from geometry that has already been reconstructed; the resulting latency, map noise, and accumulated perception errors become increas-ingly important as speed and clutter increase. Learning-based policies instead regress motion directly from observa-tions [2], [5]–[7]. They reduce perception-to-action latency and can tolerate imperfect sensing, but many such policies remain reactive: the action is predicted from the current observation without explicitly co-training a model of future scene evolution. Thus, neither paradigm directly provides a compact onboard model that couples anticipated future geometry with an immediately executable trajectory. World-action models (WAMs) offer a natural way to introduce this coupling by learning future observations and actions in one generative model. In manipulation domains, future-video prediction provides dense supervision for how the world evolves, and jointly training video and action streams can yield policies that generalize better than action-only predictors [8], [9]. Recent results further suggest that the control benefit can come largely from video co-training rather than from expensive test-time video generation, en-abling action-centric inference [10], [11]. However, these models are typically designed for tabletop manipulation, where large backbones output low-dimensional action chunks at modest rates. Agile UAV navigation imposes a different set of critical constraints: the model must run on an embedded processor, the output must be directly trackable by a flight controller, and consecutive replans must remain temporally consistent. We propose FlowPilot, a lightweight depth-based WAM for real-time onboard UAV navigation (Fig. 1). FlowPilot couples a depth-video expert and an action expert in a dual-stream mixture-of-transformers (MoT). During training, the two streams are jointly denoised with flow matching so that future-depth prediction and trajectory generation condition on each other through shared attention. During deployment, FlowPilot runs action-centrically: the controller consumes the generated trajectory, while future-depth decoding is not required in the control loop. The action representation is critical. Rather than predicting independent waypoints, FlowPilot predicts the free control points of a degree-7 Bernstein polynomial whose initial con-trol points are constrained by the current position, velocity and acceleration. The generated reference is thus smooth, state-consistent, and differentiable in closed form, while the denoised action latent remains small enough for real-time onboard inference. To reduce oscillation between replans, the arXiv:2608.00635v1 [cs.RO] 1 Aug 2026 Depth observation 
+
+> Proprioception
+> Previous trajectory
+> Speed command
+
+Dual -stream World Action Model with MoT architecture Dual -stream World Action Model with MoT architecture Executable 
+
+trajectory 
+
+> Represented in Bernstein
+> control points
+> C2-continuous
+
+Future depth 
+
+···
+
+# FlowPilot FlowPilot FlowPilot  
+
+> Provides
+> dense supervision
+> Onboard inference
+> Onboard
+> inference
+> Executable
+> trajectory
+> Downstream
+> Controller
+> Multi -source dataset
+
+Data  
+
+> Flightmare IsaacLab Real world
+
+Deployment 
+
+Action expert Video expert Action expert Video expert 
+
+Shared Attention 
+
+Action expert Video expert 
+
+Shared Attention    
+
+> &&
+> Learn ing visual dynamics
+
+Phase 1   
+
+> World modeling World -action alignment
+> Learn ing action generation
+
+Phase 2 Fig. 1. Overview of FlowPilot. FlowPilot receives the current depth observation, state-goal information, commanded speed, and previous trajectory in the current body frame. A dual-stream world-action model jointly trains future-depth prediction and Bernstein-trajectory generation through shared video-action attention. Training uses a three-level depth pyramid and proceeds from world-modeling pretraining to world-action alignment. At deployment, FlowPilot runs action-centrically onboard and sends smooth reference trajectories to a 100 Hz tracking controller. 
+
+model also receives previous trajectory as a soft conditioning token rather than warm-starting the denoising process from the last command. Our contributions are summarized as follows.  
+
+> •
+
+A compact WAM for onboard UAV navigation. Flow-Pilot brings flow-matching world-action modeling to real-time depth-based UAV navigation, coupling future-depth prediction and trajectory generation in a single dual-stream network.  
+
+> •
+
+A controller-trackable generative action space. Flow-Pilot predicts only the free control points of a state con-strained Bernstein polynomial, yielding C2-continuous references with analytic velocity, acceleration, and jerk.  
+
+> •
+
+Closed-loop onboard validation. FlowPilot runs fully onboard a Jetson Orin NX within a sub-18 ms perception-to-action budget and is evaluated against optimization- and learning-based baselines in simulation and in indoor and forest flights at up to 5.5 m/s. II. R ELATED WORK 
+
+A. Mapping-and-Planning UAV Navigation 
+
+Classical vision-based UAV navigation builds a local representation of free space and then optimizes a smooth trajectory over that representation. Systems such as EGO-Planner, MINCO/GCOPTER-style planners, safety-oriented high-speed planners, and perception-aware time-optimal planners remain strong references because they expose ge-ometric structure and produce controller-friendly trajecto-ries [1], [3], [4], [12]. Their limitation is structural: planning quality depends on the latency and accuracy of the recon-structed map. At high speed or in clutter, the vehicle can be forced to plan from incomplete or delayed geometry. 
+
+B. Learning-Based Visual Navigation 
+
+Learning-based UAV navigation reduces latency by pre-dicting motion directly from depth, images, or learned state representations. Agile flight policies, end-to-end depth-based obstacle-avoidance networks, one-shot planners such as YOPO, and goal-conditioned visual policies have shown that learned controllers and planners can fly quickly and tolerate imperfect sensing [2], [5]–[7], [13]–[15]. However, many such methods are primarily reactive and output way-points or motion primitives without explicitly co-training a model of future observations. Related learning-augmented control studies improve quadrotor robustness by correcting learned dynamics or estimating disturbances online [16], [17]. These methods address model uncertainty and tracking, whereas our focus is to generate collision-aware reference trajectories from onboard depth. 
+
+C. World Models and World-Action Models 
+
+World models learn predictive representations of environ-ment dynamics for planning and control [18], [19]. They have also been applied to vision-based drone flight through model-based reinforcement learning [20]. WAMs extend this idea by generating actions jointly with predicted future observations, so the policy is grounded in an evolving world representation rather than learned as a separate head. Recent WAMs use dif-fusion or flow-style objectives and mixture-of-transformers architectures to couple video and action streams [8], [9], [21]. Efficiency-oriented work further shows that future-video co-training can improve control even when future frames are not decoded at test time [10], [11]. Existing WAMs mainly target manipulation with large backbones and low-frequency action chunks. Recent work on aerial world models has addressed flight through long-horizon visual generation and navigation in 3D space [22]. However, this line of work does not focus on real-time onboard trajectory generation for agile quadrotors. 
+
+D. Trajectory Representations for Learned Planners 
+
+The action representation determines whether a learned plan is merely accurate in position or actually trackable. Independent waypoint regression is simple to supervise, but it provides no smoothness coupling between neighboring points and can yield large derivative oscillations after nu-merical differentiation. Optimization-based planners avoid this problem with smooth polynomial, B-spline, or MINCO representations that provide analytic derivatives [1], [3], [23]. Recent residual-learning approaches also optimize control-friendly trajectory quality by learning corrections from ex-ecution feedback [24]. Diffusion and flow policies, on the other hand, are attractive because they can model multi-modal trajectory distributions [25], [26]. III. M ETHOD 
+
+A. Problem Formulation 
+
+We consider goal-directed navigation from a single on-board depth camera. At each control instant, the vehicle observes a depth image o ∈ RH×W and proprioceptive state, and outputs a short-horizon reference trajectory for a downstream controller while replanning at high rate. All observations, states, goals, and trajectories are ex-pressed in a per-sample body frame anchored at the drone’s current position and heading, so the network reasons in ego-centric rather than global geometry. We stack the proprio-ceptive state and the navigation goal into a single state-goal vector 
+
+s =  p0, v0, a0, j0, q, pg , vg , ag
+
+ ∈ R25 , (1) where p0, v0, a0, j0 ∈ R3 are the current position, velocity, acceleration, and jerk, q ∈ R4 the orientation quaternion, and pg , vg , ag ∈ R3 denotes the goal position, velocity, and acceleration, respectively, all in the body frame. FlowPilot, parameterized by θ, maps the current depth observation o, the state–goal vector s, a commanded cruise speed c ∈ R, and the previously predicted trajectory τprev to two outputs 
+
+fθ (o, s, c, τ prev ) →  ˆzV, ˆzA, (2) where ˆzV denotes the future-depth latent and ˆzA ∈ R5×3
+
+denotes the five free control points of the action trajectory in normalized Bernstein space. The trajectory is represented by the free control points of a state-constrained Bernstein Wan Video Encoder Poly -Action Encoder              
+
+> ······
+> Wan Video Decoder Action Decoder
+> ···
+> tₐtᵥ
+> Predicted future depth
+> State &
+> Goal
+> State &
+> Goal
+> Velocity
+> command
+> Velocity
+> command
+> Previous
+> trajectory
+> Previous
+> trajectory
+> Noisy free
+> control points
+> Noisy free
+> control points
+> Register
+> tokens
+> Register
+> tokens
+> &
+> Current depth Noisy future depth
+> Video Model
+> FFN
+> Action Model
+> FFN
+> QKV -projection
+> Joint Video -Action Attention
+> Dual -Stream MoT Layer ×N
+> QKV -projection
+> b₃b₄b₅
+> b₆b₇
+> Predicted free control points
+> Fig. 2. Architecture of the dual-stream MoT in FlowPilot. The video stream encodes the current depth observation and noisy future-depth latents, while the action stream encodes the state–goal vector, speed command, previous trajectory, noisy Bernstein control points, and register tokens. At each MoT layer, the two streams keep modality-specific projections and feed-forward networks, but exchange information through joint video-action attention modulated by independent flow-matching times tvand ta.
+
+polynomial (Sec. III-C), and both outputs are produced jointly in a single flow-matching pass (Sec. III-E) so that predicted future geometry and motion condition on each other. 
+
+B. Network Architecture 
+
+FlowPilot couples world modeling and action generation in a single MoT (Fig. 2), where video and action experts keep modality-specific weights but exchange information through joint self-attention. The future-geometry and motion representations are denoised together during training, while deployment remains action-centric. 
+
+a) Video expert: models how the scene evolves. It takes the depth observation—one conditioning frame and eight future frames—and encodes it with a frozen Wan2.2 VAE [27] into latent tokens that carry rotary 3D (RoPE-3D [28]) position encodings. From the noisy future-depth latent the expert predicts a velocity field in the VAE latent space, i.e., the denoising direction of the future depth. 
+
+b) Action expert: produces the motion. A state–action encoder embeds the state–goal vector s (1), the commanded cruise speed c, the noisy action latent, and a previous-trajectory token. From these tokens, the expert predicts an action-latent velocity field that denoises the free Bernstein control points of the trajectory (Sec. III-C). 
+
+c) Shared attention: couples the two streams. In ev-ery MoT layer, both streams are modulated by their flow-matching times ( tv for video, ta for action), projected into a shared attention space, attended jointly, and split back to modality-specific feed-forward paths. Through this shared attention, the action tokens attend to the predicted future geometry while the video tokens attend to the action being denoised, within the same step. The future-depth prediction is therefore conditioned on the action being denoised, not merely on the current frame, state, and goal; conversely, the action stream can attend to a representation trained to predict future geometry. This mutual conditioning makes FlowPilot a world action model rather than a goal-conditioned visual prior with a separate policy head. Keeping modality-specific weights and feed-forward paths lets each stream preserve its own representation while still sharing information at the attention layers. 
+
+d) Action-centric deployment: uses the jointly trained model without requiring future-depth decoding in the con-trol loop. During training, the video stream supplies dense supervision for scene evolution and couples to the action stream through shared attention. During onboard flight, the controller consumes only the denoised Bernstein control points; future-depth tokens may be decoded for diagnostics, but are not needed to issue the next reference. This design lets the policy benefit from world-model co-training while keeping the deployed perception-to-action path compact. 
+
+C. Bernstein Polynomial Action Representation 
+
+The action representation determines whether a generated plan can be tracked, and the most direct choice does not suffice. A sequence of independent waypoints is easy to su-pervise but its weakness is hidden by position-error metrics: a waypoint mean absolute error (MAE) measures only zeroth-order accuracy, whereas a flight controller also tracks the trajectory’s velocity, acceleration, and jerk as feedforward terms. Predicted independently, adjacent waypoints carry no smoothness coupling, so even small per-point errors are amplified by numerical differentiation into large oscillations in those derivatives, as illustrated in Fig. 3 (b). The plan is then accurate in position yet noisy in its derivatives, hence hard to track, and it forces a downstream smoothing stage that adds latency and may break the predicted plan. We therefore represent the action not as waypoints but as a smooth curve with closed-form derivatives: a degree-7
+
+Bernstein polynomial in R3 over the horizon T ,
+
+p(t) = 
+
+> 7
+
+X
+
+> k=0
+
+bk Bk, 7(t/T ), Bk, 7(u) = 
+
+7
+
+k
+
+
+
+uk(1 − u)7−k,
+
+(3) with eight control points bk ∈ R3. The first three are hard-constrained from the current state so that the trajectory matches the drone’s position p0, velocity v0, and accelera-tion a0 at t = 0 :
+
+b0 = p0, b1 = b0 + T 
+
+> 7
+
+v0, b2 = 2 b1 − b0 + T 2 
+
+> 42
+
+a0. (4) Fixing b0, b1, b2 consumes three of the eight control points, leaving exactly five free ones, so the action expert predicts only b3, . . . , b7 (in a normalized space). Stacking these five points row-wise gives the 5 × 3 action latent that flow matching denoises; its 15 degrees of freedom are precisely the trajectory’s remaining degrees of freedom, so the action dimension and the polynomial are matched by construction. Differentiating the Bernstein form yields velocity, accel-eration, and jerk again as Bernstein polynomials of the collision      
+
+> start goal
+> (a) Multimodality
+> pos.
+> (b) Smoothness
+> acc.
+> expert modes
+> flow-matching samples
+> regression (mean)
+> independent waypoints
+> Bernstein polynomial
+> Fig. 3. FlowPilot generates a multimodal distribution over smooth trajectories. (a) Multimodality: when several detours around an obstacle are valid, a deterministic regressor averages the modes into an infeasible mean (collision), whereas flow matching samples each mode. (b) Smoothness: independent per-step waypoints are jagged and their acceleration oscillates, while a Bernstein polynomial stays smooth.
+
+differenced control points, 
+
+˙p(t) = 7
+
+> T
+
+P6
+
+> k=0
+
+(bk+1 − bk) Bk, 6(t/T ), (5) 
+
+¨p(t) = 42  
+
+> T2
+
+P5
+
+> k=0
+
+(bk+2 − 2bk+1 + bk) Bk, 5(t/T ), (6) ... 
+
+p (t) = 210  
+
+> T3
+
+P4
+
+> k=0
+
+(bk+3 − 3bk+2 + 3 bk+1 − bk) Bk, 4(t/T ),
+
+(7) so the full kinematic state is available in closed form. A Bernstein polynomial is smooth for fixed control points, so every sampled trajectory has velocity, acceleration, and jerk in closed form rather than through numerical differen-tiation of noisy samples; the intra-chunk oscillation of the free-waypoint representation cannot occur by construction, and no downstream smoother is required. The hard con-straints enforce consistency with the drone’s current position, velocity, and acceleration, so the executed trajectory starts from the measured state rather than from a free regressed waypoint. Dynamic feasibility still depends on the down-stream tracking controller and vehicle limits; the role of the Bernstein representation is to provide a smooth, state-consistent reference with analytic derivatives. Predicting five control points instead of waypoints also shrinks the action stream from tens of tokens to five, reducing the joint-attention length and inference cost. 
+
+D. Training Data: A Three-Level Depth Pyramid 
+
+Learning a navigation prior demands a scale of experience that real flight cannot provide, while grounding that prior demands a fidelity that only real flight has. We reconcile the two with a three-level pyramid of onboard depth observa-tions, ordered from a broad, inexpensive base to a narrow, high-fidelity apex. The base consists of 16 h of depth from a GPU-parallel, high-throughput IsaacLab simulation [29], which supplies the raw scale needed to cover diverse geom-etry and motion. The middle level contains 8 h of photorealis-tic and geometrically complex depth rendered in Flightmare, adding visual and structural realism that the faster simulator omits. The apex contains 2 h of depth collected on a physical quadrotor, which carries the true onboard sensor statistics— including noise, dropouts, and range limits—that the model must face at deployment. This hierarchy lets the model use simulated depth for coverage and real depth for grounding, without requiring either source to provide what the other supplies more efficiently. The resulting data pyramid is summarized together with the two-phase training masks in Fig. 4. 
+
+E. Flow-Matching Objective 
+
+We model a distribution over trajectories rather than re-gressing a single one, so that distinct valid maneuvers are represented as separate modes instead of being averaged. This matters especially for navigation tasks whenever several maneuvers are valid—for example, passing an obstacle on either side—a deterministic regressor averages such diverse modes into an infeasible mean, whereas a generative model samples each mode, as depicted in Fig. 3 (a). Both streams are trained with linear-interpolation flow matching [26]. Given a clean latent z0 and noise ϵ ∼ N (0 , I), the noisy latent at noise level σ ∈ [0 , 1] and its velocity target are 
+
+zσ = (1 − σ)z0 + σϵ, u = ϵ − z0, (8) and the network predicts the velocity field vθ = fθ (zσ , σ, c)
+
+from the conditioning c, where θ denotes the network pa-rameters introduced in Sec. III-A. We draw σ from a shifted schedule that concentrates training on the high-noise regime, 
+
+˜σ = s σ 
+
+1 + ( s − 1) σ , s = 5 . (9) FlowPilot applies this objective to two latents within one forward pass: the normalized free Bernstein control points 
+
+zA0 and the future-depth VAE latent zV0 . Following UniD-iffuser [21], the two streams use independent noise levels 
+
+σA, σ V, and the model minimizes the sum of their velocity losses 
+
+Lθ 
+
+> action
+
+= E(o,s,c, zA0 ,zV0 )∼D  
+
+> σA∼U (0 ,1)
+> ϵA∼N (0,I)
+
+vθ 
+
+> A
+
+− (ϵA − zA0 ) 22, (10) 
+
+Lθ 
+
+> video
+
+= E(o,s,c, zA0 ,zV0 )∼D    
+
+> σV∼U (0 ,1)
+> ϵV∼N (0,I)
+
+vθ 
+
+> V
+
+− (ϵV − zV0 ) 22, (11) 
+
+Lθ = Lθ 
+
+> action
+
++ λ Lθ
+
+> video
+
+, (12) where vθ 
+
+> A
+
+and vθ 
+
+> V
+
+are the two streams’ predicted velocity fields, and λ balances the two loss terms. Because the two noise levels are sampled independently, training spans all 
+
+(σA, σ V) pairs, including the world-model regime (clean action, noisy video) and the policy regime (clean video, noisy action). The joint behavior of Sec. III-B is learned rather than hand-designed, and a single network serves as both a world model as well as a policy. 
+
+F. Two-Phase Training: A Navigation Prior, then World-Action Alignment 
+
+We train FlowPilot in two phases that separate learning how the world evolves from learning how to act in it . The motivation mirrors that of foundation models: grounding a precise, high-quality policy on top of a model that already captures broad navigation dynamics is easier than learning both at once from scarce expert trajectories. Fig. 4 shows how the depth pyramid of Sec. III-D is used together with different token-level attention patterns in the two phases. Data                          
+
+> Pyramid
+> Query
+> Key
+> w/ Attention W/OAttention
+> Phase 1 Phase 2
+> Real world
+> Apex· 2h
+> Flightmare
+> Middle· 8h
+> IsaacLab
+> Base· 16h
+> VcVPSTpA
+> Vc
+> V
+> P
+> S
+> Tp
+> A
+> VcVPSTpA
+> Vc
+> V
+> P
+> S
+> Tp
+> A
+> (a) (b)
+> Fig. 4. Two-phase training of FlowPilot. Left: the three-level depth pyramid. Right: token-level attention masks used in the two training phases. In Phase 1, attention is restricted to the world-modeling tokens, including the conditioning-frame token Vc, future-video tokens V, and the state– goal conditioning token P; the speed-command token S, previous-trajectory token Tp, and action token Aare masked out. In Phase 2, full joint attention over all tokens is enabled, allowing future-depth prediction and trajectory generation to condition on each other during joint denoising.
+
+a) Phase 1: World-modeling pretraining: We pretrain the video stream alone on the depth pyramid. From the current observation and the state–goal conditioning token, the model learns to predict future depth frames, instilling a broad prior over how cluttered scenes evolve as a drone flies through them. As shown in Fig. 4, the attention mask in this stage is restricted to the world-modeling tokens: the conditioning-frame token Vc, future-video tokens V , and state–goal conditioning token P attend to one another, while the speed-command token S, previous-trajectory token Tp,and action token A are masked out. This stage therefore learns a broad navigation dynamics prior, which serves as the representation on which the action policy is later built. 
+
+b) Phase 2: World-action alignment: This phase adds the action expert and trains the full dual-stream model jointly, specializing the navigation prior into a precise policy. In contrast to the restricted attention used during pretraining, Phase 2 enables full joint attention over all tokens, so the future-depth representation and the action representation can directly condition on each other within the same denoising process. Here the supervision quality matters, so the ac-tion targets are high-quality expert trajectories generated by SUPER [4], a LiDAR-based high-speed navigation system, rather than by the optimizer used only for coarse coverage in Phase 1. To keep this supervision both high-quality and diverse, we collect SUPER trajectories only in forested Flightmare environments. In Phase 2, both losses of Sec. III-E are active. The video loss continues to sharpen the world model toward a higher-quality motion trend, while the action loss aligns the generated trajectory with the predicted future geometry. Keeping the action loss on the predicted velocity of the normalized free control points, rather than expanding to waypoints and matching them, avoids amplifying the predic-tion error through the polynomial’s derivatives. Because the action is supervised in the same forward pass that predicts the future depth, the policy is grounded in the model’s predicted geometry rather than learned in isolation. 
+
+c) Previous-trajectory conditioning for replan consis-tency: FlowPilot replans continuously, and each inference is an independent draw from noise. Two consecutive plans computed from nearly identical observations can therefore (b) 
+
+> RealSense
+> D455
+> Jetson Orin NX
+> Super 16GB
+> Battery
+> Motors
+> 2150KV
+> NxtPX4v2 +
+> MicoAir 33A 4 -in -1
+
+(c) 
+
+(a) Fig. 5. Real-world UAV platform and indoor test environments. (a)   
+
+> Onboard platform used for closed-loop flight. (b), (c) Cluttered indoor scenes with unseen man-made obstacles, used to evaluate zero-shot transfer beyond the training environments.
+
+differ, and this inter-replan inconsistency excites oscillation in the downstream controller. An intuitive remedy is to 
+
+warm-start the denoising process from the previous plan, hard-anchoring each new trajectory to the last one. In practice this shortcut backfires: the model learns the trivial solution of reproducing its previous output, either collapsing the flow-matching stochasticity into a near-copy of the last plan or progressively shortening the trajectory toward a degenerate fixed point—both of which we observed when warm-starting at inference time. We instead supply the previous plan as a 
+
+soft conditioning signal. The action expert receives an addi-tional token encoding the previously predicted trajectory— its eight Bernstein control points projected into the current body frame—and is trained classifier-free [30] style, with this token replaced by a learned null embedding with probability 
+
+0.2 so the model learns both with and without it. Acting as a soft regularizer rather than a hard constraint, the conditioning steers successive plans toward temporal consistency while preserving the multimodality of the flow-matching distribu-tion and the full trajectory horizon. IV. E XPERIMENTS 
+
+In this section, we demonstrate that FlowPilot generates robust, trackable trajectories for agile navigation from on-board depth. We first compare FlowPilot with optimization-and learning-based baselines in closed-loop simulation under increasing clutter and commanded speed. We then use a targeted ablation to examine how synchronous future-depth denoising improves action quality. Finally, we validate the onboard timing and real-world transfer of the same stack through indoor and outdoor flight experiments. 
+
+A. Experimental Setup 
+
+The experimental setup separates workstation-based eval-uation from onboard execution. All simulation experiments, ablation studies, and baseline comparisons are conducted on a workstation equipped with an Intel Core i9-14900K CPU and an NVIDIA GeForce RTX 4090 GPU. Unless noted otherwise, FlowPilot decodes each action with three Euler denoising steps over a 1.6-second horizon. All real-world experiments use the onboard platform shown in Fig. 5. The quadrotor is built on an OddityRC 35Pro frame with T-Motor F60 PRO IV 2150 KV motors, an 3 4 5 6 7 8                 
+
+> Velocity (m/s)
+> 0
+> 20
+> 40
+> 60
+> 80
+> 100
+> Success rate (%)
+> (a) dense scenario
+> 345678
+> Velocity (m/s)
+> 0
+> 20
+> 40
+> 60
+> 80
+> 100
+> Success rate (%)
+> (b) sparse scenario
+> FlowPilot FlowPilot (action-only) EGO-Planner YOPO
+> Fig. 6. Success rate under different obstacle sparsities and commanded velocities. FlowPilot is compared with an action-only variant, EGO-Planner, and YOPO over 20 trials per velocity and sparsity level. (a) Sparsity = 10 .
+> (b) Sparsity = 15 .
+
+NxtPX4v2 flight controller, a MicoAir 33A 4-in-1 electronic speed controller, and an NVIDIA Jetson Orin NX Super 16 GB module for onboard computation. An Intel RealSense D455 camera (maximum range 6 m) provides depth, resized to 160 × 96 pixels before processing. The entire stack runs onboard without ground-station computation or offline map-ping: VINS-Fusion [31] estimates the vehicle state, FlowPilot replans in real time, and OMMPC [32] tracks the latest reference trajectory at 100 Hz. 
+
+B. Simulation Experiments 
+
+We evaluate closed-loop navigation in simulated forests with randomly distributed obstacles. Smaller sparsity denotes denser clutter; sparsity 10 corresponds to 1/10 tree /m2. Each method uses the same scenes, start-goal pairs, commanded speeds, and success criteria, and must reach the goal from onboard depth and state feedback without a prebuilt map. We compare FlowPilot with EGO-Planner, YOPO, and Flow-Pilot (action-only), which removes the future-depth stream and shared video-action attention while keeping the same Bernstein action output. Fig. 7 shows a representative smooth, map-free traversal. Across commanded speeds from 3 m/s to 8 m/s (Fig. 6), FlowPilot maintains the highest overall success rate, whereas the action-only variant, EGO-Planner, and YOPO degrade as speed or clutter increases. This indicates that coupling (a)                                                  
+
+> (b)
+> start
+> goal
+> start
+> goal
+> Fig. 7. Representative closed-loop simulation of FlowPilot. (a) Executed trajectory in a cluttered simulated forest, with the red curve denoting the closed-loop path from start to goal. (b) Velocity profile during traversal. FlowPilot accelerates in open space, slows near clutter, and decelerates near the goal. TABLE I ABLATION OF SYNCHRONOUS FUTURE -DEPTH DENOISING IN PX4 SITL. Metric Full Depth-frozen Collision rate 4.0% 26.0% Task time (s) 12 .98 ±1.29 14 .17 ±1.51
+> Mean speed (m/s) 4.14 ±0.32 3.83 ±0.34
+> Peak speed (m/s) 6.14 ±0.18 5.67 ±0.24
+> vcmd ratio 0.518 ±0.040 0.479 ±0.043
+> Normalized jerk 65 .4±31 .963 .9±41 .2t + 0.4 s tt + 0.8 s t + 1.2 s t + 1.6 s
+> Ground
+> Truth  Predicted
+> condition
+> frame
+> 1.6 s 1.6 s
+> Fig. 8. Future-depth rollout predicted by FlowPilot. The rollout preserves obstacle layout and ego-motion trend over the action horizon.
+
+predicted future geometry with action denoising is most beneficial under tight replanning margins. To assess whether synchronous future-depth denoising contributes to action generation, we compare the standard FlowPilot with a depth-frozen variant that denoises the action latents while keeping the future-depth latents fixed as noises throughout the denoising process. Freezing the depth stream removes informative future-geometry guidance, thereby pre-venting the action expert from exploiting the intermediate future-prediction results. Importantly, this intervention does not introduce an out-of-distribution inference regime, since both modes are covered during training by independently sampled video and action noise levels. Under this setting, the depth-frozen variant relies only on the imitation-learning objective of training, and its best achievable behavior is therefore bounded by the privileged planner, SUPER, used for data collection. We evaluate FlowPilot and its depth-frozen variant in PX4 SITL. As shown in Tab. I, enabling synchronous future-depth denoising improves both safety and traversal efficiency over the depth-frozen variant. This result indicates that future-depth latents encode informative anticipatory priors that effectively guide action generation. More broadly, the improvement suggests that FlowPilot’s future-prediction ob-jective helps the model internalize generalizable trajectory-planning strategies from privileged planners, rather than merely imitating their demonstrated actions. Fig. 8 provides qualitative support: the rollout gives the action stream a temporally aligned estimate of upcoming free space. Freezing these tokens makes the policy more reactive and reduces both safety and speed, indicating that synchronous depth denoising acts as action guidance rather than only an auxiliary prediction task.                          
+
+> TABLE II ONBOARD PERCEPTION -TO -ACTION LATENCY .Module Mean (ms) Std. (ms) Max (ms) Depth preprocessing 4.747 1.036 8.854
+> Distilled depth encoder 1.163 0.022 1.263
+> Flow denoising, 3steps 14 .924 0.148 15 .428
+> Total inference latency 16 .294 0.180 17 .055
+> MPC latency 2.384 0.741 4.787 start 3
+> 4
+> 1234
+> start goal
+> 1
+> 2
+> goal
+
+(b) 
+
+(a)                          
+
+> Fig. 9. Real-world autonomous flights in a dense forest with hilly terrain. Each flight is shown from both onboard first-person and external third-person views. (a) An 80 m flight reaching 2.7m/s in a dense region
+> 1⃝and 4.8m/s in a sparse region 2⃝, with a maximum elevation variation of 4m. (b) A100 m flight reaching 4m/s in a dense region 3⃝and 5.5m/s in a sparse region 4⃝.
+
+C. Real-World Flight Experiments 
+
+The real-world experiments test whether the simulated be-havior remains feasible under onboard latency, sensor limits, and unstructured geometry. We first measure runtime on the Jetson Orin NX. The deployed stack runs FlowPilot through TensorRT and reconstructs Bernstein trajectories analytically on the host. The distilled encoder reduces depth-encoding latency from 21 ms to under 1.5 ms, and the neural inference path runs in under 18 ms (Table II). The downstream MPC adds 2.384 ms on average while tracking the latest reference at 100 Hz. Using this onboard stack, we evaluate FlowPilot in con-trolled indoor obstacle fields and natural outdoor forests. Indoors, we test generalization to unseen scenes: trained only on forest-style obstacles, FlowPilot faces the two man-made layouts in Fig. 5(b,c), packed far more tightly than any training scene and well beyond the densest simulated setting (sparsity 10 ). It navigates both zero-shot, reaching 3.8 m/s in the first and 3.1 m/s in the second, more constrained one. This shows that FlowPilot transfers to arbitrary, unstructured obstacle distributions rather than memorizing the training geometry, while adapting its speed to the available free space. We further test FlowPilot in a natural forest on hilly terrain, where the tree density is comparable to our densest simulated setting (sparsity 10 ), trunk diameters are roughly 
+
+0.3-0.6 m, and the ground rises and falls by up to 4 m along the route. As shown in Fig. 9, FlowPilot completes flights over a range of distances, speeds, and elevation changes; during an aggressive 100 m traversal it reaches a peak speed of 5.5 m/s and maintains up to 4 m/s in densely cluttered regions. The colored map is used only for visualization and is not available to the navigation system. These outdoor flights demonstrate onboard perception and closed-loop control in unstructured terrain under the evaluated conditions. V. C ONCLUSIONS 
+
+We presented FlowPilot, a world action model that brings the joint video-action paradigm to agile, onboard UAV nav-igation. A single mixture-of-transformers couples a depth-video expert and an action expert through shared attention, so that anticipating the future scene and generating the trajectory are one flow-matching computation rather than two separated stages. The key to making this practical on a drone is the action representation: by predicting the free control points of a state-constrained Bernstein polynomial, FlowPilot outputs trajectories that are C2-continuous and dynamically feasible by construction, which a flight controller can track directly and which keep the denoised action latent small enough for real-time inference. Trained on a three-level depth pyramid spanning large-scale IsaacLab simulation, photorealistic Flightmare render-ing, and real onboard flight, FlowPilot transfers to physical quadrotors without ground-station computation or offline mapping. It achieves higher closed-loop success rates than optimization- and learning-based baselines under increasing obstacle density and commanded speed, and runs the full perception-to-action pipeline in under 18 ms on a Jetson Orin NX, reaching 5.5 m/s in cluttered indoor and forest environments. However, FlowPilot remains limited to short-horizon, goal-directed navigation from a single depth camera, making it vulnerable to thin obstacles, transparent surfaces, and regions outside the depth camera’s reliable sensing range. Future work should extend the model with longer-horizon or memory-based prediction and complementary sensing modalities, moving toward more general onboard autonomy. REFERENCES [1] X. Zhou, Z. Wang, H. Ye, C. Xu, and F. Gao, “EGO-Planner: An ESDF-free gradient-based local planner for quadrotors,” IEEE Robot. Autom. Lett. , vol. 6, no. 2, pp. 478–485, 2021. [2] A. Loquercio, E. Kaufmann, R. Ranftl, M. M¨ uller, V. Koltun, and D. Scaramuzza, “Learning high-speed flight in the wild,” Sci. Robot. ,vol. 6, no. 59, p. eabg5810, 2021. [3] Z. Wang, X. Zhou, C. Xu, and F. Gao, “Geometrically constrained trajectory optimization for multicopters,” IEEE Trans. Robot. , vol. 38, no. 5, pp. 3259–3278, 2022. [4] Y. Ren et al. , “Safety-assured high-speed navigation for MAVs,” Sci. Robot. , vol. 10, no. 98, p. eado6187, 2025. [5] J. Lu et al. , “You only plan once: A learning-based one-stage planner with guidance learning,” IEEE Robot. Autom. Lett. , vol. 9, no. 7, pp. 6083–6090, 2024. [6] F. Yang, C. Wang, C. Cadena, and M. Hutter, “iPlanner: Imperative path planning,” in Proc. Robot. Sci. Syst. , Daegu, Republic of Korea, Jul. 10–14 2023. [7] A. Sridhar, D. Shah, C. Glossop, and S. Levine, “NoMaD: Goal masked diffusion policies for navigation and exploration,” 
+
+arXiv:2310.07896 , 2023. [8] S. Ye, Y. Ge, K. Zheng et al. , “World action models are zero-shot policies,” arXiv:2602.15922 , 2026. [9] H. Bi, H. Tan, S. Xie, Z. Wang, S. Huang, H. Liu, R. Zhao, Y. Feng, C. Xiang, Y. Rong et al. , “Motus: A unified latent action world model,” 
+
+arXiv:2512.13030 , 2025. [10] T. Yuan, Z. Dong, Y. Liu, and H. Zhao, “Fast-WAM: Do world action models need test-time future imagination?” arXiv:2603.16666 , 2026. [11] A. Ye, B. Wang, C. Ni et al. , “GigaWorld-Policy: An efficient action-centered world-action model,” arXiv:2603.17240 , 2026. [12] C. Qin, J. Xing, R. Reiter, A. Romero, Y. Lin, H. H.-T. Liu, and D. Scaramuzza, “Perception-aware time-optimal planning for quadro-tor waypoint flight,” arXiv:2603.04305 , 2026. [13] A. Bhattacharya, N. Rao, D. Parikh, P. Kunapuli, Y. Wu, Y. Tao, N. Matni, and V. Kumar, “Vision transformers for end-to-end vision-based quadrotor obstacle avoidance,” in IEEE Int. Conf. Robot. Autom. ,Atlanta, GA, USA, May 19-23 2025, pp. 1–8. [14] E. Kaufmann, L. Bauersfeld, A. Loquercio, M. M¨ uller, V. Koltun, and D. Scaramuzza, “Champion-level drone racing using deep reinforce-ment learning,” Nature , vol. 620, no. 7976, pp. 982–987, 2023. [15] X. Zhang, R. Wang, Y. Ren, D. Yu, B. Zhou, J. Sun, F. Deng, J. Chen, and G. Wang, “MAD: Mapping-aware world models for agile quadrotor flight,” arXiv:2606.04534 , 2026. [16] J. Jia, Z. Yang, M. Wang, K. Guo, J. Yang, X. Yu, and L. Guo, “Feed-back favors the generalization of neural ODEs,” arXiv:2410.10253 ,2024. [17] Z. Yang, J. Jia, M. Wang, Y. Liu, K. Guo, and X. Yu, “Unified meta-representation and feedback calibration for general disturbance estimation,” arXiv:2601.02762 , 2026. [18] D. Hafner, J. Pasukonis, J. Ba, and T. Lillicrap, “Mastering diverse control tasks through world models,” Nature , vol. 640, no. 8059, pp. 647–653, 2025. [19] A. Bar, G. Zhou, D. Tran, T. Darrell, and Y. LeCun, “Navigation world models,” in Proc. IEEE/CVF Conf. Comput. Vis. Pattern Recogn. ,Nashville, TN, USA, Jun. 11–15 2025, pp. 15 791–15 801. [20] A. Romero, A. Shenai, I. Geles, E. Aljalbout, and D. Scaramuzza, “Dream to fly: Model-based reinforcement learning for vision-based drone flight,” arXiv:2501.14377 , 2025. [21] F. Bao, S. Nie, K. Xue, C. Li, S. Pu, Y. Wang, G. Yue, Y. Cao, H. Su, and J. Zhu, “One transformer fits all distributions in multi-modal diffusion at scale,” in Proc. Int. Conf. Mach. Learn. , vol. 202, Honolulu, HI, USA, Jul. 23–29 2023, pp. 1692–1717. [22] W. Zhang, P. Tang, X. Zeng et al. , “Aerial world model for long-horizon visual generation and navigation in 3D space,” 
+
+arXiv:2512.21887 , 2025. [23] D. Mellinger and V. Kumar, “Minimum snap trajectory generation and control for quadrotors,” in Proc. IEEE Int. Conf. Robot. Autom. ,Shanghai, China, May 9–13 2011, pp. 2520–2525. [24] K. Guo, Z. Yang, Y. Liu, J. Jia, and X. Yu, “Optimizing control-friendly trajectories with self-supervised residual learning,” 
+
+arXiv:2601.02738 , 2026. [25] C. Chi, Z. Xu, S. Feng, E. Cousineau, Y. Du, B. Burchfiel, R. Tedrake, and S. Song, “Diffusion policy: Visuomotor policy learning via action diffusion,” Int. J. Robot. Res. , vol. 44, no. 10–11, pp. 1684–1704, 2025. [26] Y. Lipman, R. T. Q. Chen, H. Ben-Hamu, M. Nickel, and M. Le, “Flow matching for generative modeling,” in Proc. Int. Conf. Learn. Represent. , Kigali, Rwanda, May 1–5 2023. [27] Wan Team, A. Wang, B. Ai, B. Wen, C. Mao, C.-W. Xie, D. Chen, F. Yu, H. Zhao, J. Yang et al. , “Wan: Open and advanced large-scale video generative models,” arXiv:2503.20314 , 2025. [28] J. Su, M. Ahmed, Y. Lu, S. Pan, W. Bo, and Y. Liu, “RoFormer: Enhanced transformer with rotary position embedding,” Neurocomput. ,vol. 568, p. 127063, 2024. [29] X. Zhang, R. Wang, Y. Ren, J. Sun, H. Fang, J. Chen, and G. Wang, “DiffAero: A GPU-accelerated differentiable simulation framework for efficient quadrotor policy learning,” arXiv:2509.10247 , 2025. [30] J. Ho and T. Salimans, “Classifier-free diffusion guidance,” in Proc. NeurIPS Wksp. Deep Generative Models Downstream Appl. , Virtual event, Dec. 14 2021. [31] T. Qin, J. Pan, S. Cao, and S. Shen, “A general optimization-based framework for local odometry estimation with multiple sensors,” 
+
+arXiv:1901.03638 , 2019. [32] G. Lu, W. Xu, and F. Zhang, “On-manifold model predictive control for trajectory tracking on robotic systems,” IEEE Trans. Ind. Electron. ,vol. 70, no. 9, pp. 9192–9202, 2023.
