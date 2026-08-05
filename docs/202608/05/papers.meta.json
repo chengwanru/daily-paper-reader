@@ -1,0 +1,54 @@
+{
+  "label": "2026-08-05",
+  "date": "2026-08-05",
+  "generated_at": "2026-08-05T20:46:22",
+  "count": 3,
+  "papers": [
+    {
+      "paper_id": "202608/05/2608.03701v1-lila-wam-lightweight-latent-reasoning-world-action-model-for-robotic-manipulation",
+      "section": "deep",
+      "title_en": "LiLa-WAM: Lightweight Latent Reasoning World-Action Model for Robotic Manipulation",
+      "authors": "Fan Yang, Yuting Su, Xiaobo Wang, Yuncheng You, Fugui Fan, Yuting Wu, Minghui Wu, Chenxu Zhao, JiaHong Ning, Peiguang Jing",
+      "date": "2026-08-04",
+      "pdf": "https://arxiv.org/pdf/2608.03701v1",
+      "score": "10.0",
+      "evidence": "面向机器人控制的轻量级潜在世界动作模型",
+      "tldr": "现有世界动作模型在机器人控制中计算开销大，像素空间方法关注无关细节，潜空间方法需多阶段训练。为此提出LiLa-WAM，在紧凑潜空间中由未来状态预测与动作生成联合塑造推理空间，可端到端在单张24GB GPU上训练。引入无语言任务表示Visual Transition Token，将任务编码为视觉特征空间方向。在RoboTwin 2.0等任务上以单卡训练达到90.48%成功率。",
+      "tags": "query:video-wam",
+      "abstract_en": "World-action modeling has emerged as a promising paradigm for robotic control, as it empowers models to go beyond reacting to observations and anticipate how a scene will evolve. However, existing WAMs often incur substantial computational overhead. Pixel-space methods often allocate substantial capacity to visual details that may not be directly relevant to control, while some latent-space methods require multi-stage training to construct the reasoning space. The resulting training cost can make such methods difficult to train under modest computational budgets. In this work, we propose LiLa-WAM, a lightweight world-action model that reasons about the future in a compact latent space and can be trained end-to-end on a single 24GB GPU. Its core design is a compact latent reasoning space jointly shaped by future-state prediction and action generation, which keeps the model lightweight while remaining well aligned with control. For task specification, we further propose the Visual Transition Token(VTT), a language-free task representation that encodes each task as a direction in visual feature space. Experiments on RoboTwin~2.0, LIBERO, and real-robot tasks demonstrate LiLa-WAM's effectiveness, achieving 90.48\\% success across 50 RoboTwin tasks with single-GPU training.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "paper_id": "202608/05/2608.03244v1-uninav-a-unified-world-action-diffusion-model-for-visual-navigation",
+      "section": "deep",
+      "title_en": "UniNav: A Unified World-Action Diffusion Model for Visual Navigation",
+      "authors": "Changqing Zhou, Yueru Luo, Zeyu Jiang, Changhao Chen",
+      "date": "2026-08-04",
+      "pdf": "https://arxiv.org/pdf/2608.03244v1",
+      "score": "9.0",
+      "evidence": "统一世界-动作扩散模型，同时生成未来观测与航点动作",
+      "tldr": "现有视觉导航策略擅长预测航点轨迹，但缺少视觉前瞻；导航世界模型能预测未来，却需昂贵的规划滚动。UniNav 将视觉预测与动作生成统一进一个扩散过程，在共享 transformer 中对未来观测和航点 token 联合去噪，并使用几何感知相机令牌增强空间定位。借助轨迹标注与纯视频双源训练，UniNav 在所有数据集上 ATE 超越最强基线；Fast 变体一步推理仅 0.1 秒，精度几乎不降，兼顾可解释性与效率。",
+      "tags": "query:video-wam",
+      "abstract_en": "Image-goal visual navigation is a fundamental capability for embodied agents. Existing navigation policies efficiently predict waypoint trajectories but lack visual foresight, while navigation world models can anticipate future observations but often require costly planning rollouts. We present UniNav, a unified world-action model that generates future visual observations and continuous waypoint trajectories through a single diffusion process. Given history frames and a goal image, UniNav jointly denoises visual and waypoint tokens within a single transformer, unifying future prediction and action generation in a shared framework. To improve spatial grounding, we incorporate geometry-aware camera tokens. We also train on both trajectory-labeled navigation data and video-only data, enabling the model to benefit from diverse videos without waypoint annotations. Based on this unified framework, we introduce two variants: UniNav-Full jointly predicts interpretable future observations and their corresponding trajectories, while UniNav-Fast removes future-image tokens at inference for efficient trajectory prediction. Experiments on navigation benchmarks show that UniNav outperforms the strongest baseline in ATE across all datasets. With one-step inference, UniNav-Fast achieves a latency of 0.1s without a substantial accuracy drop. Code will be released.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "paper_id": "202608/05/2608.02953v1-realweather-realistic-and-scene-faithful-weather-translation-with-driving-world-models",
+      "section": "quick",
+      "title_en": "RealWeather: Realistic and Scene-Faithful Weather Translation with Driving World Models",
+      "authors": "Yuwei Ning, Liangzhi Wang, Yi Xiao, Zhenhua Wu, Yun Pang, Mingkun Chan, Jichang Li, Guanbin Li",
+      "date": "2026-08-03",
+      "pdf": "https://arxiv.org/pdf/2608.02953v1",
+      "score": "7.0",
+      "evidence": "用于场景保真天气转换的驾驶世界模型",
+      "tldr": "真实天气翻译因难以获取同场景配对视频而极具挑战，现有方法常牺牲天气真实感或场景保真度。本文提出RealWeather驾驶世界模型，利用渐进式真实感自举策略从真实视频学习天气动态，逐步用自生成视频替换伪条件输入，并引入场景保真强化学习优化以严格保持结构。实验表明其在视觉真实感和结构保持上显著超越现有方法，并支持长尾天气生成与零样本泛化。",
+      "tags": "query:video-wam",
+      "abstract_en": "Realistic weather translation is valuable for developing and evaluating autonomous driving systems, yet collecting paired videos of the same scenes under different weather conditions at scale is impractical. Existing methods therefore rely on synthetic data, 3D weather editing, or geometry-conditioned generation, often compromising weather realism or scene fidelity. We propose RealWeather, a driving world model for both realistic and scene-faithful weather translation. Our key idea is to learn authentic weather dynamics directly from real-world videos. Specifically, RealWeather employs Progressive Realism Bootstrapping, an iterative data-refinement strategy. Assisted by an auxiliary Pseudo-Clear Generation pipeline, training initially starts with pseudo-style conditioning videos. As training proceeds, these inputs are progressively replaced with increasingly realistic videos generated by the model itself. This strategy bridges the pseudo-to-real domain gap, allowing the model to adapt seamlessly to real-world input distributions and naturally support bidirectional clear adverse translation. Furthermore, to strictly enforce structural integrity and suppress hallucinations, we introduce Scene-Fidelity RL Optimization, a reward-driven policy optimization strategy that explicitly penalizes alterations to safety-critical driving elements. Extensive experiments demonstrate that RealWeather significantly outperforms existing methods in visual realism and structural preservation, while enabling robust long-tail weather scenario generation and strong zero-shot out-of-distribution generalization.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    }
+  ],
+  "errors": []
+}
