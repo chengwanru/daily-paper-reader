@@ -104,6 +104,22 @@ class LlmBaseUrlTest(unittest.TestCase):
             "https://api.openai.com/v1/chat/completions",
         )
 
+    @patch("llm.requests.post")
+    def test_chat_keeps_aliyun_maas_compatible_mode_base(self, mock_post):
+        mock_post.return_value = self._mock_response()
+        client = LLMClient(
+            api_key="sk-ws-test",
+            model="deepseek-v3",
+            base_url="https://ws-demo.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+        )
+
+        client.chat([{"role": "user", "content": "hello"}])
+
+        self.assertEqual(
+            mock_post.call_args.args[0],
+            "https://ws-demo.cn-beijing.maas.aliyuncs.com/compatible-mode/v1/chat/completions",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

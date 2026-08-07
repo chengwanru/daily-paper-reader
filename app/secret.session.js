@@ -297,6 +297,11 @@
     if (typeof utils.inferProviderType === 'function') {
       return utils.inferProviderType(secret);
     }
+    const safeSecret = secret && typeof secret === 'object' ? secret : {};
+    const explicit = normalizeText(
+      (safeSecret.llmProvider && (safeSecret.llmProvider.type || safeSecret.llmProvider.provider)) || '',
+    ).toLowerCase();
+    if (explicit === 'openai-compatible') return 'openai-compatible';
     return 'deepseek';
   };
   const getDefaultDeepSeekBaseUrl = () => {
@@ -312,6 +317,13 @@
             'deepseek-v4-pro',
           ];
     return sanitizeModelList(defaults, 99);
+  };
+  const getOpenAICompatiblePreset = (key) => {
+    const utils = getLLMUtils();
+    if (typeof utils.getOpenAICompatiblePreset === 'function') {
+      return utils.getOpenAICompatiblePreset(key);
+    }
+    return null;
   };
   const RERANKER_PROFILES = [
     {
@@ -1127,6 +1139,7 @@
           ? currentSecret.chatLLMs[0] || {}
           : {};
       const currentReranker = resolveRerankerConfig(currentSecret);
+      const currentProviderType = inferProviderType(currentSecret);
 
       const initialGithubToken = normalizeText(
         currentSecret.github && currentSecret.github.token,
@@ -1134,6 +1147,27 @@
       const initialApiKey = normalizeText(currentSummaryLLM.apiKey || '');
       const initialDeepSeekModel =
         normalizeText(currentSummaryLLM.model || '') || 'deepseek-v4-flash';
+      const initialCustomApiKey =
+        currentProviderType === 'openai-compatible'
+          ? normalizeText(currentSummaryLLM.apiKey || currentChatEntry.apiKey || '')
+          : normalizeText(currentChatEntry.apiKey || '');
+      const initialCustomBaseUrl =
+        currentProviderType === 'openai-compatible'
+          ? normalizeBaseUrlForStorage(
+              currentSummaryLLM.baseUrl || currentChatEntry.baseUrl || '',
+            )
+          : normalizeBaseUrlForStorage(currentChatEntry.baseUrl || '');
+      const initialCustomModels =
+        currentProviderType === 'openai-compatible'
+          ? sanitizeModelList(
+              [
+                currentSummaryLLM.model || '',
+                ...(Array.isArray(currentChatEntry.models) ? currentChatEntry.models : []),
+              ],
+              3,
+            )
+          : sanitizeModelList(currentChatEntry.models || [], 3);
+      const aliyunPreset = getOpenAICompatiblePreset('aliyun_maas') || {};
       const deepseekSummaryModels = getDefaultDeepSeekChatModels().map((model) => ({
         value: model,
         label: model === 'deepseek-v4-flash'
@@ -1169,6 +1203,21 @@
               </div>
             </div>
 
+            <div class="secret-setup-step2-block">
+              <div class="secret-setup-step2-title">大模型来源</div>
+              <p class="secret-setup-step2-note">
+                工作流总结、过滤、query enrich 与聊天区共用此处配置；Reranker 仍在右侧单独选择。
+              </p>
+              <label class="secret-setup-provider-choice">
+                <input type="radio" name="secret-setup-provider" value="deepseek" />
+                <span><strong>DeepSeek 官方</strong>使用 <code>https://api.deepseek.com</code>，适合直接申请 DeepSeek API Key 的用户。</span>
+              </label>
+              <label class="secret-setup-provider-choice">
+                <input type="radio" name="secret-setup-provider" value="openai-compatible" />
+                <span><strong>OpenAI 兼容（阿里云 MaaS 等）</strong>粘贴控制台里的 API Key 与「OpenAI 兼容地址」，例如阿里云百炼 / MaaS 的 <code>.../compatible-mode/v1</code>。</span>
+              </label>
+            </div>
+
             <div id="secret-setup-deepseek-section" class="secret-setup-step2-block">
               <div class="secret-setup-step2-title">DeepSeek API（必填）</div>
               <p class="secret-setup-step2-note">
@@ -1197,13 +1246,71 @@
                 用于工作流总结 / 过滤的大模型
                 <span class="secret-model-tip">!
                   <span class="secret-model-tip-popup">
-                    当前只保留 DeepSeek 官方 API。<br/>
-                    Reranker API Key 与 DeepSeek 分开配置。
+                    DeepSeek 官方 API 会固定使用 api.deepseek.com。<br/>
+                    若要使用阿里云 MaaS，请切换到上方「OpenAI 兼容」。
                   </span>
                 </span>
               </div>
               <div id="secret-setup-deepseek-models" style="font-size:13px;">
                 <select id="secret-setup-deepseek-model-select" class="secret-setup-select"></select>
+              </div>
+            </div>
+
+            <div id="secret-setup-custom-section" class="secret-setup-step2-block" style="display:none;">
+              <div class="secret-setup-step2-title">OpenAI 兼容 API（必填）</div>
+              <p class="secret-setup-step2-note">
+                请从阿里云控制台「保存你的 API Key」弹窗复制 <strong>API Key</strong> 与
+                <strong>OpenAI 兼容地址</strong>（形如 <code>.../compatible-mode/v1</code>）。
+                模型 1 用于工作流总结/过滤，最多 3 个模型可用于聊天区。
+              </p>
+              <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px;">
+                <button id="secret-setup-preset-aliyun" type="button" class="secret-gate-btn secondary">
+                  填入阿里云 MaaS 提示
+                </button>
+                <button id="secret-setup-preset-deepseek" type="button" class="secret-gate-btn secondary">
+                  填入 DeepSeek 预设
+                </button>
+              </div>
+              <input
+                id="secret-setup-custom-api-key"
+                type="password"
+                autocomplete="off"
+                placeholder="API Key，例如：sk-ws-xxxx"
+                style="width:100%; box-sizing:border-box; padding:6px 8px; margin-bottom:6px; font-size:13px;"
+              />
+              <input
+                id="secret-setup-custom-base-url"
+                type="text"
+                autocomplete="off"
+                placeholder="${aliyunPreset.baseUrlPlaceholder || 'https://你的实例.cn-beijing.maas.aliyuncs.com/compatible-mode/v1'}"
+                style="width:100%; box-sizing:border-box; padding:6px 8px; margin-bottom:6px; font-size:13px;"
+              />
+              <input
+                id="secret-setup-custom-model-1"
+                type="text"
+                autocomplete="off"
+                placeholder="模型 1（工作流 + 聊天，必填）"
+                style="width:100%; box-sizing:border-box; padding:6px 8px; margin-bottom:6px; font-size:13px;"
+              />
+              <input
+                id="secret-setup-custom-model-2"
+                type="text"
+                autocomplete="off"
+                placeholder="模型 2（可选，仅聊天）"
+                style="width:100%; box-sizing:border-box; padding:6px 8px; margin-bottom:6px; font-size:13px;"
+              />
+              <input
+                id="secret-setup-custom-model-3"
+                type="text"
+                autocomplete="off"
+                placeholder="模型 3（可选，仅聊天）"
+                style="width:100%; box-sizing:border-box; padding:6px 8px; margin-bottom:6px; font-size:13px;"
+              />
+              <button id="secret-setup-custom-test" type="button" class="secret-gate-btn secondary secret-setup-step2-actions">
+                测试当前配置
+              </button>
+              <div id="secret-setup-custom-status" style="min-height:18px; font-size:12px; color:#999; margin-top:6px;">
+                将依次用已填写模型发送 <code>hello world</code>，检查接口与模型是否可用。
               </div>
             </div>
           </div>
@@ -1242,17 +1349,6 @@
                 </div>
               </div>
               <div id="secret-setup-reranker-status" style="font-size:12px; color:#666; line-height:1.6;"></div>
-              <input type="radio" name="secret-setup-provider" value="deepseek" checked style="display:none;" />
-            </div>
-
-            <div id="secret-setup-custom-section" style="display:none;">
-              <input id="secret-setup-custom-api-key" type="hidden" />
-              <input id="secret-setup-custom-base-url" type="hidden" />
-              <input id="secret-setup-custom-model-1" type="hidden" />
-              <input id="secret-setup-custom-model-2" type="hidden" />
-              <input id="secret-setup-custom-model-3" type="hidden" />
-              <button id="secret-setup-custom-test" type="button" style="display:none;"></button>
-              <div id="secret-setup-custom-status" style="display:none;"></div>
             </div>
           </div>
         </div>
@@ -1280,11 +1376,14 @@
         document.querySelectorAll('input[name="secret-setup-provider"]'),
       );
       const deepseekSection = document.getElementById('secret-setup-deepseek-section');
+      const customSection = document.getElementById('secret-setup-custom-section');
       const deepseekInput = document.getElementById('secret-setup-deepseek');
       const deepseekVerifyBtn = document.getElementById('secret-setup-deepseek-verify');
       const deepseekTestBtn = document.getElementById('secret-setup-deepseek-test');
       const deepseekStatusEl = document.getElementById('secret-setup-deepseek-status');
       const deepseekModelSelect = document.getElementById('secret-setup-deepseek-model-select');
+      const aliyunPresetBtn = document.getElementById('secret-setup-preset-aliyun');
+      const deepseekPresetBtn = document.getElementById('secret-setup-preset-deepseek');
       const customApiKeyInput = document.getElementById('secret-setup-custom-api-key');
       const customBaseUrlInput = document.getElementById('secret-setup-custom-base-url');
       const customModel1Input = document.getElementById('secret-setup-custom-model-1');
@@ -1310,11 +1409,14 @@
         !githubStatusEl ||
         !providerInputs.length ||
         !deepseekSection ||
+        !customSection ||
         !deepseekInput ||
         !deepseekVerifyBtn ||
         !deepseekTestBtn ||
         !deepseekStatusEl ||
         !deepseekModelSelect ||
+        !aliyunPresetBtn ||
+        !deepseekPresetBtn ||
         !customApiKeyInput ||
         !customBaseUrlInput ||
         !customModel1Input ||
@@ -1342,10 +1444,18 @@
         .join('');
 
       githubInput.value = initialGithubToken;
-      deepseekInput.value = initialApiKey;
+      deepseekInput.value =
+        currentProviderType === 'deepseek' ? initialApiKey : '';
+      customApiKeyInput.value =
+        currentProviderType === 'openai-compatible' ? initialCustomApiKey : '';
+      customBaseUrlInput.value =
+        currentProviderType === 'openai-compatible' ? initialCustomBaseUrl : '';
+      customModel1Input.value = initialCustomModels[0] || '';
+      customModel2Input.value = initialCustomModels[1] || '';
+      customModel3Input.value = initialCustomModels[2] || '';
 
       providerInputs.forEach((input) => {
-        input.checked = input.value === 'deepseek';
+        input.checked = input.value === currentProviderType;
       });
       deepseekModelSelect.value = initialDeepSeekModel || 'deepseek-v4-flash';
       if (!deepseekModelSelect.value) {
@@ -1365,7 +1475,13 @@
       rerankerBaseUrlInput.value = currentReranker.baseUrl || '';
 
       let githubOk = !!initialGithubToken;
-      let deepseekOk = !!initialApiKey;
+      let deepseekOk =
+        currentProviderType === 'deepseek' && !!initialApiKey;
+      let customOk =
+        currentProviderType === 'openai-compatible'
+        && !!initialCustomApiKey
+        && !!initialCustomBaseUrl
+        && initialCustomModels.length > 0;
 
       const setErrorText = (text, color) => {
         if (!errorEl) return;
@@ -1373,6 +1489,10 @@
         errorEl.style.color = color || '#999';
       };
 
+      const selectedProvider = () => {
+        const checked = providerInputs.find((input) => input.checked);
+        return checked ? checked.value : 'deepseek';
+      };
       const selectedDeepSeekModel = () => {
         return normalizeText(deepseekModelSelect.value || '');
       };
@@ -1418,7 +1538,10 @@
         rerankerStatusEl.textContent = `${profile.note} 模型：${profile.model}`;
       };
       const syncProviderSections = () => {
-        deepseekSection.style.display = 'block';
+        const provider = selectedProvider();
+        deepseekSection.style.display = provider === 'deepseek' ? 'block' : 'none';
+        customSection.style.display =
+          provider === 'openai-compatible' ? 'block' : 'none';
       };
 
       const resetGithubStatus = () => {
@@ -1434,8 +1557,9 @@
         deepseekStatusEl.style.color = '#999';
       };
       const resetCustomStatus = () => {
+        customOk = false;
         customStatusEl.innerHTML =
-          '将依次用已填写聊天模型发送 <code>hello world</code>，检查接口与模型是否可用。';
+          '将依次用已填写模型发送 <code>hello world</code>，检查接口与模型是否可用。';
         customStatusEl.style.color = '#999';
       };
       const resetRerankerTestStatus = () => {
@@ -1444,6 +1568,76 @@
           ? '将发送一次最小 rerank 请求验证 API Key、Base URL 与模型是否可用。'
           : '将发送一次最小 rerank 请求验证 Base URL 与模型是否可用。';
         rerankerTestStatusEl.style.color = '#999';
+      };
+      const applyOpenAICompatiblePreset = (presetKey) => {
+        const preset = getOpenAICompatiblePreset(presetKey);
+        if (!preset) return;
+        providerInputs.forEach((input) => {
+          input.checked = input.value === 'openai-compatible';
+        });
+        syncProviderSections();
+        if (presetKey === 'aliyun_maas') {
+          customApiKeyInput.value = '';
+          customBaseUrlInput.value = '';
+          customModel1Input.value = '';
+          customModel2Input.value = '';
+          customModel3Input.value = '';
+          customBaseUrlInput.placeholder =
+            preset.baseUrlPlaceholder
+            || 'https://你的实例.cn-beijing.maas.aliyuncs.com/compatible-mode/v1';
+          resetCustomStatus();
+          customStatusEl.textContent =
+            preset.note
+            || '已切换到阿里云 MaaS：请粘贴控制台中的 API Key、OpenAI 兼容地址与模型名。';
+          customStatusEl.style.color = '#666';
+          customApiKeyInput.focus();
+          setErrorText(
+            '请从阿里云「保存你的 API Key」弹窗复制 API Key 与 OpenAI 兼容地址。',
+            '#666',
+          );
+          return;
+        }
+        customApiKeyInput.value = '';
+        customBaseUrlInput.value = preset.baseUrl || '';
+        customModel1Input.value = preset.models[0] || '';
+        customModel2Input.value = preset.models[1] || '';
+        customModel3Input.value = preset.models[2] || '';
+        resetCustomStatus();
+        customApiKeyInput.focus();
+        setErrorText(
+          `已填入 ${preset.label} 预设，请补充 API Key 后点击“测试当前配置”。`,
+          '#666',
+        );
+      };
+      const validateCustomDraft = () => {
+        const apiKey = normalizeText(customApiKeyInput.value);
+        const baseUrl = normalizeBaseUrlForStorage(customBaseUrlInput.value);
+        const models = sanitizeModelList(
+          [
+            customModel1Input.value,
+            customModel2Input.value,
+            customModel3Input.value,
+          ],
+          3,
+        );
+
+        if (!apiKey) {
+          throw new Error('请先输入 OpenAI 兼容 API Key。');
+        }
+        if (!baseUrl) {
+          throw new Error('请先输入 OpenAI 兼容地址（Base URL）。');
+        }
+        if (!/^https?:\/\//i.test(baseUrl)) {
+          throw new Error('OpenAI 兼容地址需要以 http:// 或 https:// 开头。');
+        }
+        if (!models.length) {
+          throw new Error('请至少填写 1 个模型名称。');
+        }
+        return {
+          apiKey,
+          baseUrl,
+          models,
+        };
       };
       const buildRerankerDraft = (fallbackApiKey, fallbackBaseUrl) => {
         const profile = selectedRerankerProfile();
@@ -1481,6 +1675,26 @@
       };
 
       const collectProviderDraft = () => {
+        const provider = selectedProvider();
+        if (provider === 'openai-compatible') {
+          const customDraft = validateCustomDraft();
+          const reranker = buildRerankerDraft(
+            customDraft.apiKey,
+            customDraft.baseUrl,
+          );
+          return {
+            providerType: 'openai-compatible',
+            summaryApiKey: customDraft.apiKey,
+            summaryBaseUrl: customDraft.baseUrl,
+            summaryModel: customDraft.models[0],
+            chatModels: customDraft.models,
+            skipRerank: false,
+            reranker: {
+              ...reranker,
+            },
+          };
+        }
+
         const apiKey = normalizeText(deepseekInput.value);
         const model = selectedDeepSeekModel();
         if (!apiKey) {
@@ -1504,6 +1718,16 @@
       };
 
       const buildPingEntries = () => {
+        const provider = selectedProvider();
+        if (provider === 'openai-compatible') {
+          const customDraft = validateCustomDraft();
+          return customDraft.models.map((model) => ({
+            apiKey: customDraft.apiKey,
+            baseUrl: customDraft.baseUrl,
+            model,
+          }));
+        }
+
         const apiKey = normalizeText(deepseekInput.value);
         const model = selectedDeepSeekModel();
         if (!apiKey || !model) {
@@ -1530,9 +1754,18 @@
         githubStatusEl.textContent = '已载入当前加密配置；如更换 GitHub Token，保存前请重新验证。';
         githubStatusEl.style.color = '#666';
       }
-      if (initialApiKey) {
+      if (currentProviderType === 'deepseek' && initialApiKey) {
         deepseekStatusEl.textContent = '已载入当前 DeepSeek 配置；如更换 API Key 或模型，建议点击测试按钮。';
         deepseekStatusEl.style.color = '#666';
+      }
+      if (
+        currentProviderType === 'openai-compatible'
+        && initialCustomApiKey
+        && initialCustomBaseUrl
+      ) {
+        customStatusEl.textContent =
+          '已载入当前 OpenAI 兼容配置；如更换 API Key / 地址 / 模型，建议重新点击测试。';
+        customStatusEl.style.color = '#666';
       }
 
       syncProviderSections();
@@ -1548,6 +1781,21 @@
       bindResetOnInput([rerankerApiKeyInput, rerankerBaseUrlInput], resetRerankerTestStatus);
       rerankerProfileSelect.addEventListener('change', syncRerankerFields);
       rerankerProfileSelect.addEventListener('change', resetRerankerTestStatus);
+      providerInputs.forEach((input) => {
+        input.addEventListener('change', () => {
+          syncProviderSections();
+          setErrorText(
+            '所有密钥信息将加密写入 GitHub Secrets（用于 GitHub Actions），并同步生成本地 secret.private 备份。',
+            '#999',
+          );
+        });
+      });
+      aliyunPresetBtn.addEventListener('click', () => {
+        applyOpenAICompatiblePreset('aliyun_maas');
+      });
+      deepseekPresetBtn.addEventListener('click', () => {
+        applyOpenAICompatiblePreset('deepseek');
+      });
       rerankerTestBtn.addEventListener('click', async () => {
         let draft = null;
         try {
@@ -1728,6 +1976,22 @@
         }
       });
 
+      customTestBtn.addEventListener('click', async () => {
+        customTestBtn.disabled = true;
+        try {
+          const models = await pingChatModels(buildPingEntries(), customStatusEl);
+          customStatusEl.textContent = `✅ 配置可用：${models.join(', ')}`;
+          customStatusEl.style.color = '#28a745';
+          customOk = true;
+        } catch (e) {
+          customStatusEl.textContent = `❌ 测试失败：${e.message || e}`;
+          customStatusEl.style.color = '#c00';
+          customOk = false;
+        } finally {
+          customTestBtn.disabled = false;
+        }
+      });
+
       genBtn.addEventListener('click', async () => {
         const githubToken = normalizeText(githubInput.value);
         const localOnly = isLocalDebugHost();
@@ -1745,7 +2009,11 @@
         }
 
         if (providerDraft.providerType === 'deepseek' && !deepseekOk) {
-          setErrorText('请先点击“测试当前配置”，确认 DeepSeek 配置可用。', '#c00');
+          setErrorText('请先点击“测试”，确认 DeepSeek 配置可用。', '#c00');
+          return;
+        }
+        if (providerDraft.providerType === 'openai-compatible' && !customOk) {
+          setErrorText('请先点击“测试当前配置”，确认 OpenAI 兼容接口可用。', '#c00');
           return;
         }
 

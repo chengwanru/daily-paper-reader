@@ -76,12 +76,11 @@ window.PrivateDiscussionChat = (function () {
       return utils.inferChatApiProfile(baseUrl, model);
     }
     const normalizedBaseUrl = String(baseUrl || '').trim().toLowerCase();
-    const normalizedModel = String(model || '').trim().toLowerCase();
-    if (
-      /(^|\/\/)(api\.)?deepseek\.com(?:$|\/)/i.test(normalizedBaseUrl)
-      || normalizedModel.startsWith('deepseek-')
-    ) {
+    if (/(^|\/\/)(api\.)?deepseek\.com(?:$|\/)/i.test(normalizedBaseUrl)) {
       return 'deepseek';
+    }
+    if (normalizedBaseUrl) {
+      return 'generic-openai';
     }
     return 'unsupported';
   };

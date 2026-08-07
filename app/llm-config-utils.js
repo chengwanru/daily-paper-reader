@@ -21,6 +21,23 @@
       models: Object.freeze(['deepseek-v4-flash', 'deepseek-v4-pro']),
     }),
   });
+  const OPENAI_COMPATIBLE_PRESETS = Object.freeze({
+    aliyun_maas: Object.freeze({
+      key: 'aliyun_maas',
+      label: '阿里云 MaaS',
+      baseUrl: '',
+      baseUrlPlaceholder:
+        'https://你的实例.cn-beijing.maas.aliyuncs.com/compatible-mode/v1',
+      models: Object.freeze([]),
+      note: '请从阿里云控制台「保存你的 API Key」弹窗复制 OpenAI 兼容地址与 API Key。',
+    }),
+    deepseek: Object.freeze({
+      key: 'deepseek',
+      label: 'DeepSeek 官方',
+      baseUrl: 'https://api.deepseek.com',
+      models: Object.freeze(['deepseek-v4-flash', 'deepseek-v4-pro']),
+    }),
+  });
 
   const normalizeText = (value) => String(value || '').trim();
 
@@ -41,6 +58,16 @@
       return `${normalized}/chat/completions`;
     }
     return `${normalized}/v1/chat/completions`;
+  };
+
+  const isOfficialDeepSeekBaseUrl = (baseUrl) => {
+    const normalized = normalizeBaseUrlForStorage(baseUrl || '').toLowerCase();
+    return /(^|\/\/)(api\.)?deepseek\.com(?:$|\/)/i.test(normalized);
+  };
+
+  const isAliyunMaasBaseUrl = (baseUrl) => {
+    const normalized = normalizeBaseUrlForStorage(baseUrl || '').toLowerCase();
+    return /maas\.aliyuncs\.com/i.test(normalized) || /compatible-mode/i.test(normalized);
   };
 
   const sanitizeModelList = (values, maxCount = 3) => {
@@ -113,10 +140,17 @@
     const safeSecret = secret && typeof secret === 'object' ? secret : {};
     const llmProvider = safeSecret.llmProvider || {};
     const explicit = normalizeText(llmProvider.type || llmProvider.provider || '').toLowerCase();
-    if (explicit === 'deepseek') {
+    if (explicit === 'deepseek' || explicit === 'openai-compatible') {
+      return explicit;
+    }
+    const summary = resolveSummaryLLM(safeSecret);
+    if (!summary || !summary.baseUrl) {
       return 'deepseek';
     }
-    return 'deepseek';
+    if (isOfficialDeepSeekBaseUrl(summary.baseUrl)) {
+      return 'deepseek';
+    }
+    return 'openai-compatible';
   };
 
   const getDeepSeekPreset = (key) => {
@@ -131,14 +165,35 @@
     };
   };
 
+  const getOpenAICompatiblePreset = (key) => {
+    const presetKey = normalizeText(key).toLowerCase();
+    const preset = OPENAI_COMPATIBLE_PRESETS[presetKey];
+    if (!preset) return null;
+    return {
+      key: preset.key,
+      label: preset.label,
+      baseUrl: preset.baseUrl || '',
+      baseUrlPlaceholder: preset.baseUrlPlaceholder || '',
+      models: [...(preset.models || [])],
+      note: preset.note || '',
+    };
+  };
+
   const inferChatApiProfile = (baseUrl, model) => {
-    const normalizedBaseUrl = normalizeBaseUrlForStorage(baseUrl || '').toLowerCase();
-    const normalizedModel = normalizeText(model || '').toLowerCase();
-    if (/(^|\/\/)(api\.)?deepseek\.com(?:$|\/)/i.test(normalizedBaseUrl)) {
+    if (isOfficialDeepSeekBaseUrl(baseUrl)) {
       return 'deepseek';
     }
-    if (normalizedModel.startsWith('deepseek-')) {
+    if (isAliyunMaasBaseUrl(baseUrl)) {
+      return 'generic-openai';
+    }
+    const normalizedModel = normalizeText(model || '').toLowerCase();
+    // 仅官方 DeepSeek host 才走 deepseek 特化参数；自定义兼容端点一律按 generic 处理，
+    // 避免把 DeepSeek V4 的超大 max_tokens 误打到阿里云等网关。
+    if (normalizedModel.startsWith('deepseek-') && !normalizeBaseUrlForStorage(baseUrl || '')) {
       return 'deepseek';
+    }
+    if (normalizeBaseUrlForStorage(baseUrl || '')) {
+      return 'generic-openai';
     }
     return 'unsupported';
   };
@@ -200,14 +255,18 @@
     DEFAULT_DEEPSEEK_BASE_URL,
     DEFAULT_DEEPSEEK_CHAT_MODELS,
     DEEPSEEK_PRESETS,
+    OPENAI_COMPATIBLE_PRESETS,
     normalizeText,
     normalizeBaseUrlForStorage,
     buildChatCompletionsEndpoint,
+    isOfficialDeepSeekBaseUrl,
+    isAliyunMaasBaseUrl,
     sanitizeModelList,
     resolveChatModels,
     resolveSummaryLLM,
     inferProviderType,
     getDeepSeekPreset,
+    getOpenAICompatiblePreset,
     inferChatApiProfile,
     resolveJsonResponseMode,
     isDeepSeekV4Model,
