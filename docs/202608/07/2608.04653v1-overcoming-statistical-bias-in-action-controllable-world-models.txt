@@ -1,0 +1,543 @@
+Title: Overcoming Statistical Bias in Action-Controllable World Models
+
+URL Source: https://arxiv.org/pdf/2608.04653v1
+
+Published Time: Thu, 06 Aug 2026 00:55:04 GMT
+
+Number of Pages: 9
+
+Markdown Content:
+# Overcoming Statistical Bias in Action-Controllable World Models 
+
+Yuhong Shi 1, Zhenhao Chu 1, Jie Wei 2, Jun Hao 2, Jianyi Liu 1 * , Jingwen Fu 3 *  
+
+> 1
+
+Institute of Artificial Intelligence and Robotics, Xi’an Jiaotong University, Xi’an, China  
+
+> 2
+
+China Mobile (Shanghai) Information and Communication Technology Co., Ltd., Shanghai, China  
+
+> 3
+
+Zhongguancun Academy, Beijing, China 
+
+Abstract 
+
+Action-conditioned world models aim to predict how visual environments evolve under an agent’s actions. Yet future frames are often highly predictable from visual inertia and re-curring motion patterns alone. This creates a shortcut: models can fit the data by exploiting statistical biases without making their visible dynamics meaningfully depend on the action. As a result, different actions may produce similar futures, while motion may persist even under zero action. The key question is how to reduce reliance on statistical shortcuts from dom-inating action-conditioned prediction. We argue that action control requires more than injecting action features; it re-quires enforcing consistency under counterfactual changes to actions and observations. Based on this insight, we introduce 
+
+CoCo , a Counterfactual Consistency framework to enhance action controllability through two complementary constraints. Multi-step counterfactual consistency constrains reference, inverse-action, and zero-action rollouts, while action-spatial counterfactual consistency enforces consistent predictions un-der mirrored scenes and transformed actions. Together, they reduce reliance on statistical shortcuts from substituting for action-dependent dynamics. We further introduce Action Re-sponse Consistency (ARC) and Drift Energy (DE) to assess ac-tion controllability, together with Mini-SSMB for same-state, multi-action counterfactual evaluation. On Mini-SSMB, our full model achieved ARC inv of 0.412 and ARC ref of 0.483, while reducing DE by 17.07% relative to the baseline. On VP 2 visual planning, it achieves the highest average success rate among SOTA models, at 73.1%. Experiments on BAIR and RoboNet further show that these gains preserve video prediction quality and transfer across model settings. 
+
+Introduction 
+
+Recent advances in autoregressive token models (Wu et al. 2025), diffusion models (Zhang et al. 2025b), and large-scale interactive simulators (Bi et al. 2026; Wu et al. 2025) have substantially improved the fidelity and scale of visual world modeling. At their core, world models are learned predictive simulators that enable agents to simulate future frames and evaluate candidate actions before interacting with the envi-ronment (Zhou et al. 2025). However, future frames are often highly predictable from visual inertia and recurring motion patterns alone, stemming from the statistical bias prevalent in data-driven learning, as shown in Fig. 1. When optimized to minimize empirical prediction error, a model naturally ex-ploits the most frequent and easiest-to-predict correlations 11          
+
+> Action Controllability in Mini-SSMB
+> Visual planning
+> ARC-inv↑ ARC-ref ↑DE ↓
+> 0.406
+> 0.417
+> 0.483
+> 0.478
+> 7.82
+> 6.49
+> 17.07%
+> Video Prediction
+> BAIR Ro boNet
+> 0.095
+> 0.119 0.176
+> 0.018
+> ARC-ref ↑DE ↓
+> 89.77%
+> 25.26%
+> -0.004
+> 0.027 0.945
+> 0.091
+> 775% 90.37%
+> ARC-ref ↑DE ↓
+> Context
+> a_0
+> a_ref
+> a_inv
+> Prediction GT
+> Is it
+> symmetrical?
+> Spurious
+> drift ?
+> Temporal
+> Consistency
+> Spatial
+> Consistency
+> Statistical Bias
+
+Figure 1: Motivation and overview of CoCo. Existing mod-els are affected by statistical biases, resulting in asymmetric responses between reference and inverse actions, as well as spurious drift in zero actions. CoCo mitigates these statistical shortcuts by simultaneously enforcing counterfactual consis-tency in both temporal and spatial dimensions. in the training data, rather than the mechanisms that actually determine future outcomes. This issue is particularly con-sequential for world models, since a planner relies on them to compare the consequences of alternative actions (Vafa et al. 2025). If distinct actions are mapped to nearly identi-cal high-probability futures, the model may generate realistic videos while failing to function as an interactive simulator for decision-making (Li et al. 2025b). Most existing work attempts to address this problem by strengthening how actions are represented and injected into world models (Wang et al. 2024). Actions are incorporated through concatenated tokens (Wu et al. 2024), latent controls (Maes et al. 2026), cross-attention (Ma et al. 2024), feature modulation (Wu et al. 2024), or motion prompts (Wang et al. 2025), while complementary approaches improve represen-tations and objectives through disentanglement and causal modeling (Lin et al. 2024), task-aware reconstruction (Hut-son, Kauvar, and Haber 2024), and robustness regularization (Ramasubramanian et al. 2025). Although these methods can increase apparent action responsiveness and improve predic-tion accuracy on observed trajectories, they cannot remove statistical bias at its source (Pan and Bareinboim 2024). The reason is that their supervision remains observational. For arXiv:2608.04653v1 [cs.CV] 5 Aug 2026 each visual context, the training data contain only the fu-ture produced by the executed action, but not the futures that would have resulted from alternative or zero actions. Consequently, a model can satisfy the training objective by encoding the action while still predicting mainly from vi-sual inertia, recurring motion, and dataset-level correlations (Gu et al. 2024). Standard factual losses cannot distinguish such shortcut predictions from genuinely action-driven tran-sitions because both can match the future equally well (Liu et al. 2025). The limitation of prior work is therefore not in-sufficient action capacity, but the absence of supervision that identifies the causal effect of changing the action (Lancaster et al. 2024; Yamada et al. 2024). Without explicit counter-factual constraints, stronger action injection may reduce the symptoms of statistical bias, but cannot prevent the model from relying on it. To address this issue, we propose CoCo , a Counterfactual Consistency framework. CoCo is built on the principle that an action-driven world model should produce a correspond-ingly transformed future whenever an intervention changes the action, the scene, or both. Therefore, temporal and spa-tial constraints are two complementary instances of the same structural requirement. In the temporal domain, an action sequence followed by its inverse should form a cycle that ap-proximately recovers the initial state, whereas a zero action should act as an identity intervention that preserves the state. 
+
+Multi-Step Counterfactual Consistency (MSC2) encodes these relations across rollouts, preserving the directional ef-fect of actions. In the spatial domain, the joint transformation of the agent’s current space and actions defines the equivari-ance relation of the world model, that is, the prediction of the mirror input should be equal to the predicted mirror. Action-Spatial Counterfactual Consistency (ASC2) explicitly en-forces this spatial equivariance. Together, these constraints enable CoCo to improve its measurement of the controllabil-ity of actions under the proposed counterfactual assessment, thereby enhancing its performance on downstream tasks. Our contributions are summarized as: 
+
+• We characterize how statistical shortcuts undermine ac-tion controllability in world models, showing that a model can achieve accurate factual prediction by exploiting vi-sual regularities while failing to encode the observable effect of an action. 
+
+• We introduce counterfactual consistency as a struc-tural principle for addressing statistical bias in action-conditioned world models. Under this principle, we pro-pose MSC2 and ASC2, which jointly impose counterfac-tual constraints through temporal intervention relations and spatial transformation relations. 
+
+• We introduce Action Response Consistency (ARC) and Drift Energy (DE) to directly evaluate action-induced mo-tion and zero-action stability, and construct Mini-SSMB for same-state, multi-action counterfactual evaluation. Extensive experiments validate the proposed framework on video prediction, visual planning, and model-based reinforcement learning. 
+
+Related Work 
+
+Statistical Bias in World Models 
+
+Recent studies show that predictive accuracy alone does not guarantee that a world model captures decision-relevant dynamics. Policy-shaped Prediction demonstrates that reconstruction-based models can allocate capacity to predictable yet policy-irrelevant visual distractions, thereby neglecting task-critical dynamics (Li et al. 2025a). In MBRL (Hu, Mirchandani, and Sadigh 2024), BECAUSE attributes the mismatch between accurate model prediction and policy performance to confounders in observational data, and miti-gates it through causal state-action representations (Lin et al. 2024). Related work further addresses model bias and dis-tribution shift during policy optimization (Feng et al. 2023; Cheng et al. 2025), as well as robustness to optimization-induced model errors (Ramasubramanian et al. 2025). More fundamentally, inductive-bias probes show that models can perform well on sequence prediction while relying on task-specific heuristics rather than learning the underlying dynam-ics (Vafa et al. 2025). These works reveal that world models can exploit statistical regularities instead of causal structure (Richens and Everitt 2024; Gkountouras et al. 2025; Zhang et al. 2025a). Consequently, they leave an overlooked failure mode in which a world model can be accurate and robust yet remain action-insensitive at the pixel level, because it is never required to distinguish counterfactual futures induced by alternative actions from the same visual state. 
+
+Counterfactual Consistency 
+
+Counterfactual consistency asks whether a learned dynam-ics model predicts the appropriate change in future states after an intervention (Hao et al. 2025; Bar et al. 2025; De Sousa Ribeiro et al. 2023). Adversarial counterfactual environment model learning identifies behavior-policy selec-tion bias as a source of unreliable counterfactual prediction (Haugh and Singal 2023), and uses adversarially weighted model learning to improve off-policy dynamics prediction and decision making (Chen et al. 2023; Richens and Everitt 2024). DALI (Röder et al. 2025) learns latent environmen-tal contexts from interactions and shows that intervening on context factors, such as gravity, induces physically plau-sible imagined rollouts. In visual modeling, CWM (Bear et al. 2023) uses counterfactual input perturbations to ex-pose structured physical factors, while CWMDT (Shen et al. 2025) enables scene-level hypothetical interventions through digital-twin representations. Related controllable world mod-els improve fine-grained motion prediction or long-horizon rollout quality through richer control signals and architec-tures (Jiang et al. 2025; Hassan et al. 2025). 
+
+Method 
+
+Problem Definition 
+
+Given an observed video sequence S1: T = {s1, . . . , s T }
+
+and its corresponding action sequence A1: T −1 =
+
+{a1, . . . , a T −1}, the objective of an action-conditioned world model is to learn a conditional generative mapping fθ that au-toregressively predicts the next H frames from the historical …     
+
+> …
+> Observed video frames
+> Action sequence
+> 1a2a1Ta
+> 1:T S
+> 1:T 1 A
+> Vision
+> Tokenizer
+> Action
+> Encoder &
+> Injection
+> 1z
+> 1z
+> [ ] s
+> 2ˆz
+> 2ˆz
+> [ ] s
+> 2z
+> 2z
+> [ ] s
+> 3ˆz
+> 3ˆz
+> [ ] s
+> Vision
+> Detokenizer
+> 1) Forward intervention path (o riginal-action )
+> ta1t
+
+a 
+
+> t
+
+s 1 
+
+> ˆts
+> 2
+
+ˆts 
+
+> 1
+> 1ta
+> 
+> 1
+> ta
+> 1t
+
+s 
+
+ts
+
+> 2）Backward counterfactual rollback path ( Inverse-action )
+> 3) Zero-action stability path
+> t
+
+s     
+
+> 0ta10ta
+> 1
+
+ˆzero 
+
+> t
+
+s  2
+
+ˆzero 
+
+> t
+
+s            
+
+> zero 12
+> ˆˆ:zero zero
+> tttsssL
+> c yc
+
+L 
+
+> Original World
+> …
+> Mirrored World
+> …
+
+[ , , , ]A d x d y d z c  ( ) [ , , , ]ag A dx dy dz c  
+
+> 1: T
+
+S 1:T 1:T ( )= HorizontalFlip( )g S S                       
+
+> (,)AHfSA
+> ((), ()) BHfgSgA
+> ((,)) BHgfSA
+> 
+> 
+
+Flip mirror L
+
+> CE
+
+L       
+
+> ASC2 CE mir mir
+> LLL
+> ASC2: Action-Spatial Counterfactual Consistency
+
+## Co Co 
+
+Flip                      
+
+> C o C o M S C 2 A S C 2 LLL
+> …
+> Reward
+> 2r3rTr
+> 1:T 1 R
+> Counterfactual Consistency for
+> Action-Controllable World Models
+> MSC2: Multi-Step Counterfactual Consistency
+> …
+> Predicted future frames 2:T S
+> 
+> ref L
+> M SC 2 ref ref cyc cyc zero zero
+> LLLL
+
+Figure 2: Overview of the CoCo framework. Given observed frames and future actions, a shared action-conditioned Transformer predicts future video tokens, frames, and rewards. MSC2 improves temporal controllability by combining original-action forward prediction, inverse-action rollback, and zero-action stability constraints. ASC2 further enforces spatial action semantics by aligning predictions between the original and horizontally mirrored worlds with correspondingly transformed actions. context S≤t as 
+
+ˆSt+1: t+H = fθ (S≤t, A t:t+H−1) . (1) For models operating on discrete video tokens, the input frames are first encoded into a sequence of discrete latent variables by a tokenizer Z1: T = E(S1: T ). An autoregressive Transformer (Vaswani et al. 2017) then models the condi-tional distribution pθ (Zt+1: t+H | Z≤t, A t:t+H−1), and the predicted tokens are mapped back to pixel space through a detokenizer ˆSt+1: t+H = D
+
+ ˆZt+1: t+H
+
+
+
+. Existing world models are typically trained using maximum likelihood esti-mation or a token-level reconstruction objective. However, this objective primarily encourages the model to generate plausible future frames under the observational data distribution. It does not ensure that the generated outcomes are genuinely controlled by the specified actions. In other words, the model generally learns the observational distri-bution pθ (Zt+1: t+H | Z≤t, A t:t+H−1), rather than the inter-ventional distribution of primary interest for robotic world modeling pθ
+
+ Zt+1: t+H Z≤t, do  At:t+H−1
+
+ . The differ-ence lies in that the former allows the model to use historical visual inertia, background relevance, or statistical bias to pre-dict the future, while the latter requires action to be the causal variable driving the change. Therefore, the focus of this paper is not merely on improving the quality of video reconstruc-tion, but on overcoming this statistical bias and improving the controllability of action on the generated results. 
+
+Multi-Step Counterfactual Consistency 
+
+To address the aforementioned issues, we design a super-visory signal using counterfactual consistency in the world model prediction process, proposing the MSC2 module as shown in Fig. 2. It aims to constrain the model to learn the causal relationship between actions and state changes by uti-lizing the multi-step consistency of the action world model and counterfactual action branches (i.e., the inverse action branch, and the zero action branch). In principle, the original actions should drive consistent state transitions, the inverse actions should produce opposite changes, and the zero ac-tions should suppress unrelated drift. Specifically, given the current state St and an action se-quence At:t+K−1 = {at, · · · , a t+K−1}, MSC2 evaluates the model under counterfactual rollouts. The original-action branch predicts the future ˆSref  
+
+> t+1: t+K
+
+= fθ (St, A t:t+K−1),where H denotes the global video prediction horizon and satisfies K ≤ H. MSC2 is constrained to follow the real action-induced dynamics by a multi-step prediction loss 
+
+Lref = PKk=1 d
+
+ ˆSref 
+
+> t+k
+
+, S t+k
+
+
+
+.
+
+To test whether the learned transition is action-reversible, we further construct an inverse-action sequence 
+
+I(At:t+K−1), where each action is replaced by its inverse counterpart. Starting from the predicted endpoint ˆSref  
+
+> t+K
+
+, the model performs a backward counterfactual rollout 
+
+˜St = fθ
+
+ ˆSref  
+
+> t+K
+
+, I(At:t+K−1)
+
+
+
+. (2) If the model has learned action-consistent dynamics, the in-verse rollout should recover the initial state, yielding the multi-step cycle constraint Lcyc = d
+
+ ˜St, S t
+
+
+
+. The forward reference rollout is greedily generated with stop-gradient. Its predicted endpoint is re-tokenized as the inverse-branch con-text, and the inverse rollout is optimized with teacher forcing. In addition, MSC2 introduces a zero-action branch 
+
+ˆSzero  
+
+> t+1: t+K
+
+= fθ (St, 01: K ), (3) which penalizes state drift when zero action is applied 
+
+Lzero = PKk=1 d
+
+ ˆSzero  
+
+> t+k
+
+, S t
+
+
+
+, where d(·, ·) denotes the frame-wise mean absolute error. Together, the three branches impose complementary con-straints. The original-action branch aligns predicted motion with real dynamics, the inverse-action branch enforces re-versibility under counterfactual inverse controls, and the zero-action branch suppresses action-independent drift. The resulting objective can be written as 
+
+LMSC2 = λref Lref + λcyc Lcyc + λzero Lzero , (4) where the non-negative coefficients λref , λcyc , and λzero bal-ance the three objectives. By applying these constraints to K-step counterfactual rollouts, MSC2 regularizes the consistency of generated tra-jectories beyond the standard one-step prediction objective. It jointly enforces forward consistency, backward recovery, and zero-action stability, thereby encouraging the model to learn the direction and magnitude of future frame changes with action. 
+
+Action-Spatial Counterfactual Consistency 
+
+Multi-step counterfactual consistency constrains action-conditioned dynamics over time but does not capture the spatial meaning of actions. We therefore introduce ASC2, requiring the model’s predictions to transform consistently when the visual scene and corresponding actions undergo the same spatial transformation. Let the action-conditional world model be (1), when a reflection-compatible action coordinate is available, for spa-tial transformation g, there exists a corresponding action-space transformation ga such that 
+
+g (fθ (S≤t, A t:t+K−1)) ≈ fθ (g(S≤t), g a(At:t+K−1)) .
+
+(5) This equation expresses the spatial equivariance of action-conditioned dynamics: applying a spatial transformation to an action-conditioned future prediction should be equiva-lent to predicting the future from the correspondingly trans-formed observation and action. For ASC2, g is horizon-tal image mirroring. In MiniGrid, ga swaps left and right while preserving forward and zero. We use this as a dataset-dependent approximate regularizer, rather than assuming an exact physical symmetry. Specifically, we construct two parallel branches with shared parameters. The original branch takes 
+
+(S≤t, A t:t+K−1) as input, while the mirrored branch takes 
+
+(g(S≤t), g a(At:t+K−1)) . The CoCo produces continuous hidden representations at the future token positions 
+
+Hfut = fθ (S≤t, A t:t+K−1) ,
+
+˜Hfut = fθ (g(S≤t), g a(At:t+K−1)) , (6) where Hfut and ˜Hfut denote the continuous hidden repre-sentations for the original and mirrored branches, respec-tively. Since the discrete codebook indices produced by the video tokenizer do not have inherent geometric meanings, we do not directly impose the mirroring constraint on token IDs. Instead, we align the continuous hidden representations. After reshaping the hidden states of future dynamic tokens into spatial grids, we apply a flipping operator Fw along the width dimension of the original branch and define the mirror-equivariance loss as Lmir = ℓ
+
+
+
+Fw(Hfut ), ˜Hfut 
+
+
+
+, where we use the SmoothL1 loss for ℓ. The final objective of ASC2 is 
+
+LASC2 = LCE + λmir Lmir , (7) where LCE maintains the autoregressive prediction quality in the original visual space, Lmir encourages the model to learn action-spatial counterfactual consistency, and λmir is a non-negative balanced coefficient. 
+
+Experiment 
+
+We conduct experiments to answer four questions. Q1: 
+
+whether conventional reconstruction metrics adequately re-flect action controllability; Q2: whether the proposed coun-terfactual constraints improve action response and sup-press action-independent drift; Q3: whether these gains hold across discrete and continuous control settings without sac-rificing visual quality; and Q4: whether improved controlla-bility benefits downstream decision-making. 
+
+Action Controllability Metrics 
+
+Conventional world-model metrics, including FVD (Ge et al. 2024), LPIPS(Zhang et al. 2018), PSNR (Keleş et al. 2021), and SSIM (Wang et al. 2004), primarily assess visual quality and cannot determine whether generated videos are con-trolled by the input actions. To answer Q1 , we introduce two counterfactual metrics, ARC and DE. They capture com-plementary aspects of action controllability. ARC measures whether generated motion follows the action, whereas DE measures whether the model remains stable in the zero ac-tion. By comparing predictions under reference, inverse, and zero actions, these metrics more directly assess action-driven dynamics than conventional visual-quality metrics. Detailed definitions are provided in the Appendix A. 
+
+Action Controllability in Mini-SSMB 
+
+Setup 1) Dataset construction: To systematically evaluate CoCo’s ability to controllably generate discrete actions ( Q2 ), we constructed a dataset based on MiniGrid with the same state and multiple branches (Mini-SSMB). Unlike single-trajectory datasets, Mini-SSMB applies multiple actions to the same state st and records their corresponding next states 
+
+sat+1 . As in Fig. 3, we use MiniGrid (Chevalier-Boisvert et al. 2023) with 64 ×64 RGB observations and three navigation actions: left, right, and forward. Detailed information about the Mini-SSMB is provided in Appendix B. 
+
+2) Training and evaluation. We train our model on Mini-SSMB to evaluate action-state consistency. All models are initialized from the pretrained checkpoint and trained with Figure 3: The overview of the Mini-SSMB Dataset. Mini-SSMB contains 30,000 training and 3,000 test states, each paired with next-frame observations for left, right, and for-ward. Left and right rotate the agent, while forward moves it ahead unless blocked by a wall. 0 10k 20k 30k 40k 50k           
+
+> Training Steps
+> 0.37
+> 0.38
+> 0.39
+> 0.40
+> 0.41
+> ARC inv
+> (a) Inverse-Action Consistency
+> Baseline
+> Ours-MSC2
+> Ours-ASC2
+> Ours
+> 010k 20k 30k 40k 50k
+> Training Steps
+> 0.38
+> 0.40
+> 0.42
+> 0.44
+> 0.46
+> 0.48
+> ARC ref
+> (b) Action Branch Accuracy
+> Baseline
+> Ours-MSC2
+> Ours-ASC2
+> Ours
+> 010k 20k 30k 40k 50k
+> Training Steps
+> 0.0
+> 2.5
+> 5.0
+> 7.5
+> 10.0
+> 12.5
+> 15.0
+> DE
+> 46.4% lower
+> vs. Baseline
+> (c) Static Drift Energy
+> Baseline
+> Ours-MSC2
+> Ours-ASC2
+> Ours
+> MiniGrid Action-Control Evaluation
+
+Figure 4: Training dynamics of action-control metrics on Mini-SSMB. Ours-MSC2 and Ours-ASC2 each contain one module, and Ours serves as the full model. The baseline model is presented by iVideoGPT. two-frame clips. We compare the baseline with Ours-MSC2, Ours-ASC2, and the full Ours model, using 50K optimization steps, batch size 16, learning rate (1 ×10 −5), cosine schedul-ing, and (64 ×64) resolution. All experiments are conducted on a server equipped with eight NVIDIA A800 GPUs. 
+
+Results Analysis Fig. 4 shows a comparison of the action controllability of our model and the baseline. All models achieve ARC scores above the random baseline of 1/3, in-dicating that they successfully learn the basic action-state correspondence. However, the base model still exhibits sub-stantial drift under zero actions (see Fig.4 (c)). Ours-MSC2 model reduces DE from 7.82 to 6.75 (13.7%), while Ours-ASC2 further lowers it to 4.19 (46.4%), without sacrific-ing reference- or inverse-action accuracy. The higher motion ARC (0.624) than rotation ARC (0.406) also shows that for-ward displacement is easier to capture than fine-grained in-place rotations. Overall, CoCo achieves better control over predicted following actions and effectively suppresses action-independent variations, resulting in better dynamic control than baseline methods. 
+
+Video Prediction 
+
+Setup To answer Q3 and evaluate the action-conditional video prediction performance of CoCo, we conducted exper-iments on the BAIR (Ebert et al. 2017) and RoboNet (Dasari et al. 2020). BAIR contains 64 ×64 RGB videos of robotic pushing interactions with 4-D continuous actions, providing a controlled setting for evaluating whether the model can cap-ture fine-grained action-induced object motion. RoboNet is a larger and more diverse multi-robot manipulation dataset; we use its preprocessed 64 ×64 videos with 5-D continuous control signals to evaluate generalization under more hetero-geneous robots, scenes, and object interactions. 
+
+Results Analysis The baselines for this experiment can be divided into two categories. The first includes action-enhanced methods, such as CA(Perez et al. 2018) and MR(Zhang, Rao, and Agrawala 2023), which inject action information through conditional modulation or motion resid-uals but do not explicitly enforce counterfactual control-lability. The second includes video prediction or action-conditioned baselines, such as FitVid (Babaeizadeh et al. 2021), MaskViT (Gupta et al. 2023), iVideoGPT (Wu et al. 2024), and SAMPO (Wang et al. 2025), which mainly opti-mize visual prediction quality. As shown in Table 1, on action controllability, CoCo consistently achieves the best results. On BAIR, the full Ours obtains the highest ARC inv and ARC ref scores, 0.100 and 0.119, outperforming iVideoGPT by 35.1% and 25.3%, respectively. It also reduces DE from 0.176 to 0.018, showing a substantial reduction in static drift. Ours-MSC2 already lowers DE to 0.023, confirming that counterfactual consistency directly improves zero-action stability, while Ours-ASC2 improves ARC inv to 0.086, indi-cating better directional action response. The improvement is more pronounced on RoboNet, where existing baselines suffer from severe drift. iVideoGPT and FitVid obtain DE values of 0.945 and 0.921, respectively, while our model reduces DE to 0.091. Meanwhile, Ours achieves the best ARC inv and ARC ref scores among action-conditioned mod-els, indicating that the generated transitions are better aligned with the conditioned action branch rather than visual inertia or spurious dynamics. Visualization of video predictions is shown in Fig. 5. For visual prediction quality, Ours remains competitive and often improves over the action-conditioned backbone. On BAIR, Ours reduces FVD from 73.46 to 71.27, LPIPS from 5.88 to 4.84, and improves PSNR from 23.33 to 28.35 compared with iVideoGPT. On RoboNet, Ours achieves the best FVD of 43.81 and the best LPIPS of 1.32 among the compared models. Although SAMPO achieves higher PSNR (29.30) and SSIM (94.10), likely due to its scale-wise autoregressive design prioritizing pixel-level fidelity, CoCo demonstrates stronger action controllability by explicitly enforcing coun-terfactual consistency. Overall, these results indicate that CoCo effectively mitigates statistical bias while maintaining competitive video generation quality. Sensitivity analysis of hyperparameters are in Appendix C. 
+
+Visual Planning 
+
+Setup To answer Q4 and evaluate object-conditional vi-sual planning, we conduct experiments on the VP 2 bench-mark (Tian, Finn, and Wu 2023) using both RoboDesk and robosuite. The planner receives RGB observations re-sized to 64 ×64, conditions the video model on two con-text frames, and predicts future observations under can-Model ARC inv ↑ ARC ref ↑ DE ↓
+
+Action-conditioned at 64 ×64 resolution on BAIR 
+
+CA 0.022 -0.022 0.239 MR 0.034 -0.034 0.272 FitVid -0.062 -0.302 0.050 iVideoGPT 0.074 0.095 0.176 Ours-MSC2 0.083 0.105 0.023 Ours-ASC2 0.086 0.102 0.071 
+
+Ours 0.100 0.119 0.018 
+
+Action-conditioned at 64 ×64 resolution on RoboNet 
+
+CA 0.002 -0.002 0.253 MR 0.008 -0.007 0.218 FitVid -0.045 -0.158 0.921 iVideoGPT 0.013 -0.004 0.945 Ours-MSC2 0.049 0.036 0.095 Ours-ASC2 0.042 0.027 0.104 
+
+Ours 0.055 0.064 0.091 
+
+Model FVD ↓ LPIPS ↓ PSNR ↑ SSIM ↑
+
+Action-conditioned at 64 ×64 resolution on BAIR 
+
+CA 382.48 12.74 18.29 77.88 MR 375.63 12.75 18.29 77.88 iVideoGPT 73.46 5.88 23.33 88.17 SAMPO 55.50 5.00 26.70 94.70 
+
+Ours-MSC2 73.12 4.92 26.38 88.27 Ours-ASC2 74.15 4.87 27.36 88.18 
+
+Ours 71.27 4.84 28.35 88.10 
+
+Action-conditioned at 64 ×64 resolution on RoboNet 
+
+FitVid 62.50 2.40 28.20 89.30 MaskViT 133.50 4.20 23.20 80.50 iVideoGPT 94.07 2.01 19.35 65.87 SAMPO 57.10 3.30 29.30 94.10 
+
+Ours-MSC2 67.01 1.57 26.15 82.78 Ours-ASC2 59.77 1.36 27.27 85.60 
+
+Ours 43.81 1.32 27.33 85.75 
+
+Table 1: Video prediction and action controllability performance on the BAIR and RoboNet datasets. We evaluate action-conditioned world models on BAIR and RoboNet using both controllability metrics and standard visual quality metrics. Each reported metric is calculated as the mean and standard deviation over three runs. LPIPS and SSIM scores are scaled by 100 for convenient display. 
+
+Method / Task robosuite Push Flat Block Open Drawer Open Slide Blue Button Green Button Red Button Upright Block Avg. Success ↑
+
+Simulator 93.5 ±1.2 13.3 ±0.0 76.7 ±0.0 71.7 ±1.4 100.0 ±0.0 96.7 ±0.0 90.0 ±0.0 90.0 ±0.0 100.0 FitVid 67.7 ±6.4 9.2 ±2.8 25.3 ±8.2 35.3 ±5.5 94.0 ±4.2 84.0 ±5.5 58.7 ±5.5 51.3 ±2.9 65.6 MCVD 77.3 ±2.1 4.0 ±1.4 11.7 ±1.4 18.3 ±1.4 95.0 ±4.1 83.3 ±0.0 73.3 ±2.7 56.7 ±2.7 64.3 MaskViT 82.6 ±2.5 4.0 ±4.1 4.0 ±4.1 8.7 ±5.5 94.7 ±1.4 64.0 ±4.1 24.0 ±8.2 62.2 ±9.5 52.1 iVideoGPT 78.3 ±0.8 3.3 ±0.7 37.5 ±1.7 16.1 ±2.7 95.6 ±2.1 82.5 ±3.4 92.2 ±1.4 44.7 ±1.7 70.1 SAMPO 80.7 ±1.4 5.5 ±1.2 40.3 ±2.3 18.3 ±3.3 97.3 ±1.7 85.3 ±3.3 94.7 ±2.1 46.1 ±2.7 72.2 
+
+Ours 83.8 ±1.9 4.1 ±2.4 32.5 ±7.9 21.5 ±4.3 98.3 ±1.7 88.3 ±3.7 89.8 ±2.8 54.2 ±4.3 73.1 
+
+Table 2: Visual planning performance in VP 2. We report the success rates across 7 tasks in RoboDesk and 1 task in robosuite, and the average success rate is calculated by normalizing against the Simulator’s success rate and excluding FlatBlock. In addition, we provide the mean and standard deviation of the success rates (in %) on average across 4 random seeds. didate action sequences. We evaluate RoboDesk tasks in-cluding object pushing, drawer/slide opening, and block-off-table manipulation, and robosuite manipulation tasks with the agentview_shift_2 camera. RoboDesk uses a 5-D continuous action space, while robosuite uses a 4-D action space. At each step, we use CEM to optimize candidate ac-tion sequences over a horizon of 10 by minimizing the RGB mean-squared error between predicted frames and the goal image. 
+
+Results Analysis Table 2 compares three classes of meth-ods: generic video prediction baselines (FitVid, MCVD, MaskViT, and iVideoGPT), an action-conditioned planning baseline (SAMPO), and our model. Our method achieves the best average success rate 73.1, outperforming iVideoGPT by 3.0 points and SAMPO by 0.9 points. This improvement is especially clear on tasks that require stable directional execu-tion and long-horizon control, such as robosuite Push, Open Slide, Blue Button, Green Button, and Upright Block, where our model consistently matches or exceeds the strongest base-lines. These gains are consistent with our design. The cycle constraint reduces rollout drift and enforces action reversibil-ity, while the equivariance constraint aligns action direction with spatial action. As a result, the model converts action information into more reliable planning behavior rather than merely producing visually plausible rollouts. 
+
+Model-based Reinforcement Learning 
+
+Setup To answer Q4 , we conducted experiments on six metaworld operation tasks to verify the performance of re-inforcement learning based on the visual model. The agent receives RGB observations from the corner camera with a frame stack of 3, and acts in the continuous 4-D MetaWorld action space. Each episode lasts up to 100 environment steps. We compare the model-free baseline DrQ-v2 (Yarats et al. 2022) with the model-based agent in MBPO (Wu et al. 2024), which is augmented by a pre-trained world model. We com-pare the performance of the CoCo model with the iVideoGPT model in MBPO. 
+
+Results Analysis Fig. 6 shows that CoCo improves the aggregate success rate of MBPO over both the iVideoGPT-Figure 5: Visualization of video prediction results across datasets. We visualize ground-truth and predicted rollouts on BAIR, RoboNet datasets, and VP 2 tasks including robosuite and RoboDesk. 0 2 4 6 8 10                               
+
+> Environment Steps (x10 4)
+> 0
+> 20
+> 40
+> 60
+> 80
+> 100
+> Success Rate (%)
+> Button Press Topdown Wall
+> 0246810
+> Environment Steps (x10 4)
+> 0
+> 20
+> 40
+> 60
+> 80
+> 100
+> Success Rate (%)
+> Plate Slide
+> 0246810
+> Environment Steps (x10 4)
+> 0
+> 20
+> 40
+> 60
+> 80
+> 100
+> Success Rate (%)
+> Hammer
+> 0246810
+> Environment Steps (x10 4)
+> 0
+> 20
+> 40
+> 60
+> 80
+> Success Rate (%)
+> Door Lock
+> 0246810
+> Environment Steps (x10 4)
+> 0
+> 20
+> 40
+> 60
+> 80
+> 100
+> Success Rate (%)
+> Handle Pull Side
+> 0246810
+> Environment Steps (x10 4)
+> 0
+> 6
+> 12
+> 18
+> 24
+> Success Rate (%)
+> Coffee Push
+> 0.0 0.2 0.4 0.6 0.8 1.0
+> Normalized Environment Steps
+> 0
+> 20
+> 40
+> 60
+> 80
+> Success Rate (%)
+> MetaWorld Aggregated
+> DrQ-v2
+> MBPO(iVideoGPT)
+> MBPO(Ours)
+
+Figure 6: Model-based reinforcement learning on MetaWorld. Success rate learning curves on six manipulation tasks and their normalized aggregate. Curves show the mean over five random seeds, and shaded regions denote 95% confidence intervals. based world model and the model-free DrQ-v2 baseline. The gain is most pronounced on Button Press Topdown Wall and Handle Pull Side, where MBPO(Ours) achieves faster learning and a substantially higher final success rate. On Plate Slide, CoCo reaches a similar final performance to MBPO(iVideoGPT) while improving learning progress in the later stage. It remains competitive on Hammer and Door Lock, indicating that the counterfactual constraints do not compromise performance on tasks where the baseline world model is already effective. Yet Coffee Push remains chal-lenging for all methods, and CoCo does not provide a clear advantage on this task. Overall, these results suggest that the proposed counterfactual constraints can benefit model-based policy learning, particularly for tasks requiring reliable action-conditioned state transitions. The overlapping confi-dence intervals on several tasks indicate task-dependent gains and motivate broader evaluation in future work. 
+
+Conclusion 
+
+This paper explores how to reduce the impact of statistical bias on the controllability of actions in world models through counterfactual consistency. We introduce CoCo, a counter-factual consistency framework that enforces multi-step inter-vention consistency and spatial equivariance through MSC2 and ASC2, respectively. Together with the ARC and DE metrics and the Mini-SSMB dataset, CoCo makes action-controllable world models trainable and measurable. Experi-ments on video prediction and downstream decision-making tasks show that CoCo improves action controllability while maintaining competitive video prediction quality. However, constructing multiple counterfactual branches and spatially transformed inputs introduces additional com-putation. Moreover, predefined inverse actions and spatial transformations may be ill-defined for irreversible contacts or complex semantic actions. In the future, we will inves-tigate learning valid transformations directly from data and improving the efficiency of counterfactual training. References 
+
+Babaeizadeh, M.; Saffar, M. T.; Nair, S.; Levine, S.; Finn, C.; and Erhan, D. 2021. FitVid: Overfitting in Pixel-Level Video Prediction. arXiv:2106.13195. Bar, A.; Zhou, G.; Tran, D.; Darrell, T.; and LeCun, Y. 2025. Navigation World Models. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , 15791–15801. Nashville, TN: IEEE. Bear, D. M.; Feigelis, K.; Chen, H.; Lee, W.; Venkatesh, R.; Kotar, K.; Durango, A.; and Yamins, D. L. K. 2023. Uni-fying (Machine) Vision via Counterfactual World Modeling. arXiv:2306.01828. Bi, H.; Tan, H.; Xie, S.; Wang, Z.; Huang, S.; Liu, H.; Zhao, R.; Feng, Y.; Xiang, C.; Rong, Y.; Zhao, H.; Liu, H.; Su, Z.; Ma, L.; Su, H.; and Zhu, J. 2026. Motus: A Unified Latent Action World Model. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition ,35101–35113. Denver, CO: IEEE. Chen, X.-H.; Yu, Y.; Zhu, Z.; Yu, Z.; Chen, Z.; Wang, C.; Wu, Y.; Qin, R.-J.; Wu, H.; Ding, R.; and Huang, F. 2023. Adversarial Counterfactual Environment Model Learning. In 
+
+Advances in Neural Information Processing Systems , 70654– 70706. New Orleans, LA: NeurIPS. Cheng, J.; Qiao, R.; Ma, Y.; Li, B.; Xiong, G.; Miao, Q.; Li, Y.; and Lv, Y. 2025. Scaling Offline Model-Based RL via Jointly-Optimized World-Action Model Pretraining. In 
+
+International Conference on Learning Representations . Sin-gapore: ICLR. Chevalier-Boisvert, M.; Dai, B.; Towers, M.; Perez-Vicente, R.; Willems, L.; Lahlou, S.; Pal, S.; Castro, P. S.; and Terry, J. K. 2023. Minigrid & Miniworld: Modular & Customizable Reinforcement Learning Environments for Goal-Oriented Tasks. In Advances in Neural Information Processing Sys-tems , volume 36. New Orleans, LA: NeurIPS. Dasari, S.; Ebert, F.; Tian, S.; Nair, S.; Bucher, B.; Schmeck-peper, K.; Singh, S.; Levine, S.; and Finn, C. 2020. RoboNet: Large-Scale Multi-Robot Learning. In Proceedings of the Conference on Robot Learning , volume 100, 885–897. PMLR. De Sousa Ribeiro, F.; Xia, T.; Monteiro, M.; Pawlowski, N.; and Glocker, B. 2023. High Fidelity Image Counterfactuals with Probabilistic Causal Models. In Proceedings of the 40th International Conference on Machine Learning , volume 202, 7390–7425. PMLR. Ebert, F.; Finn, C.; Lee, A. X.; and Levine, S. 2017. Self-Supervised Visual Planning with Temporal Skip Connec-tions. In Proceedings of the 1st Annual Conference on Robot Learning , volume 78, 344–356. PMLR. Feng, Y.; Hansen, N.; Xiong, Z.; Rajagopalan, C.; and Wang, X. 2023. Finetuning Offline World Models in the Real World. In Tan, J.; Toussaint, M.; and Darvish, K., eds., Proceedings of The 7th Conference on Robot Learning , volume 229, 425– 445. PMLR. Ge, S.; Mahapatra, A.; Parmar, G.; Zhu, J.-Y.; and Huang, J.-B. 2024. On the Content Bias in Fréchet Video Distance. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , 7277–7288. Seattle, WA: IEEE. Gkountouras, J.; Lindemann, M.; Lippe, P.; Gavves, E.; and Titov, I. 2025. Language Agents Meet Causality – Bridging LLMs and Causal World Models. In International Confer-ence on Learning Representations . Singapore: ICLR. Gu, X.; Wang, Y.-J.; Zhu, X.; Shi, C.; Guo, Y.; Liu, Y.; and Chen, J. 2024. Advancing Humanoid Locomotion: Mas-tering Challenging Terrains with Denoising World Model Learning. In Proceedings of Robotics: Science and Systems .Delft, Netherlands: RSS. Gupta, A.; Tian, S.; Zhang, Y.; Wu, J.; Martín-Martín, R.; and Fei-Fei, L. 2023. MaskViT: Masked Visual Pre-Training for Video Prediction. In The Eleventh International Conference on Learning Representations . ICLR. Hao, C.; Lu, W.; Xu, Y.; and Chen, Y. 2025. Neural Motion Simulator Pushing the Limit of World Models in Reinforce-ment Learning. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , 27608–27617. Nashville, TN: IEEE. Hassan, M.; Stapf, S.; Rahimi, A.; Rezende, P. M. B.; Haghighi, Y.; Brüggemann, D.; Katircioglu, I.; Zhang, L.; Chen, X.; Saha, S.; Cannici, M.; Aljalbout, E.; Ye, B.; Wang, X.; Davtyan, A.; Salzmann, M.; Scaramuzza, D.; Pollefeys, M.; Favaro, P.; and Alahi, A. 2025. GEM: A Generalizable Ego-Vision Multimodal World Model for Fine-Grained Ego-Motion, Object Dynamics, and Scene Composition Control. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , 22404–22415. Nashville, TN: IEEE. Haugh, M. B.; and Singal, R. 2023. Counterfactual Analysis in Dynamic Latent State Models. In Proceedings of the 40th International Conference on Machine Learning , volume 202, 12647–12677. PMLR. Hu, H.; Mirchandani, S.; and Sadigh, D. 2024. Imitation Bootstrapped Reinforcement Learning. In Proceedings of Robotics: Science and Systems . Delft, Netherlands: RSS. Hutson, M.; Kauvar, I.; and Haber, N. 2024. Policy-shaped Prediction: Avoiding Distractions in Model-based Reinforce-ment Learning. In Advances in Neural Information Process-ing Systems , volume 37. Vancouver, Canada: NeurIPS. Jiang, H.; Huang, B.; Wu, R.; Li, Z.; Garg, S.; Nayyeri, H.; Wang, S.; and Li, Y. 2025. RoboEXP: Action-Conditioned Scene Graph via Interactive Exploration for Robotic Ma-nipulation. In Agrawal, P.; Kroemer, O.; and Burgard, W., eds., Proceedings of The 8th Conference on Robot Learning ,volume 270, 3027–3052. PMLR. Keleş, O.; Yılmaz, M. A.; Tekalp, A. M.; Korkmaz, C.; and Doğan, Z. 2021. On the Computation of PSNR for a Set of Images or Video. In 2021 Picture Coding Symposium , 1–5. IEEE. Lancaster, P.; Hansen, N.; Rajeswaran, A.; and Kumar, V. 2024. MoDem-V2: Visuo-Motor World Models for Real-World Robot Manipulation. In 2024 IEEE International Conference on Robotics and Automation , 7530–7537. IEEE. Li, J.; Wang, Q.; Wang, Y.; Jin, X.; Li, Y.; Zeng, W.; and Yang, X. 2025a. Open-World Reinforcement Learning over Long Short-Term Imagination. In International Conference on Learning Representations . Singapore: ICLR. Li, W.; Zhao, H.; Yu, Z.; Du, Y.; Zou, Q.; Hu, R.; and Xu, K. 2025b. PIN-WM: Learning Physics-INformed World Models for Non-Prehensile Manipulation. In Proceedings of Robotics: Science and Systems . Los Angeles, CA: RSS. Lin, H.; Ding, W.; Chen, J.; Shi, L.; Zhu, J.; Li, B.; and Zhao, D. 2024. BECAUSE: Bilinear Causal Representa-tion for Generalizable Offline Model-based Reinforcement Learning. In Advances in Neural Information Processing Systems , volume 37. Vancouver, Canada: NeurIPS. Liu, H.; Zhang, Y.; Betala, V.; Zhang, E.; Liu, J.; Ding, C.; and Zhu, Y. 2025. Multi-Task Interactive Robot Fleet Learn-ing with Visual World Models. In Agrawal, P.; Kroemer, O.; and Burgard, W., eds., Proceedings of The 8th Conference on Robot Learning , volume 270, 4286–4313. PMLR. Ma, M.; Ni, T.; Gehring, C.; D’Oro, P.; and Bacon, P.-L. 2024. Do Transformer World Models Give Better Policy Gradients? In Proceedings of the 41st International Con-ference on Machine Learning , volume 235, 33855–33879. PMLR. Maes, L.; Le Lidec, Q.; Scieur, D.; LeCun, Y.; and Balestriero, R. 2026. LeWorldModel: Stable End-to-End Joint-Embedding Predictive Architecture from Pixels. arXiv:2603.19312. Pan, Y.; and Bareinboim, E. 2024. Counterfactual Image Editing. In Proceedings of the 41st International Conference on Machine Learning , volume 235, 39087–39101. PMLR. Perez, E.; Strub, F.; de Vries, H.; Dumoulin, V.; and Courville, A. 2018. FiLM: Visual Reasoning with a General Conditioning Layer. In Proceedings of the AAAI Conference on Artificial Intelligence , volume 32. AAAI. Ramasubramanian, S.; Freed, B.; Capone, A.; and Schneider, J. G. 2025. Improving Model-Based Reinforcement Learning by Converging to Flatter Minima. In Advances in Neural Information Processing Systems , volume 38. NeurIPS. Richens, J.; and Everitt, T. 2024. Robust Agents Learn Causal World Models. In International Conference on Learning Representations . ICLR. Röder, F.; Benad, J.; Eppe, M.; and Banerjee, P. 2025. Dynamics-Aligned Latent Imagination in Contextual World Models for Zero-Shot Generalization. In Advances in Neural Information Processing Systems , volume 38. NeurIPS. Shen, Y.; Maksutova, A.; Li, C.; and Unberath, M. 2025. Counterfactual World Models via Digital Twin-conditioned Video Diffusion. arXiv:2511.17481. Tian, S.; Finn, C.; and Wu, J. 2023. A Control-Centric Bench-mark for Video Prediction. In International Conference on Learning Representations . ICLR. Vafa, K.; Chang, P. G.; Rambachan, A.; and Mullainathan, S. 2025. What Has a Foundation Model Found? Using Inductive Bias to Probe for World Models. In Proceedings of the 42nd International Conference on Machine Learning , volume 267, 60727–60747. PMLR. Vaswani, A.; Shazeer, N.; Parmar, N.; Uszkoreit, J.; Jones, L.; Gomez, A. N.; Kaiser, Ł.; and Polosukhin, I. 2017. At-tention Is All You Need. In Advances in Neural Information Processing Systems , volume 30. NeurIPS. Wang, S.; Tian, J.; Wang, L.; Liao, Z.; Li, J.; Dong, H.; Xia, K.; Zhou, S.; Tang, W.; and Gang, H. 2025. SAMPO: Scale-Wise Autoregression with Motion Prompt for Gener-ative World Models. In Advances in Neural Information Processing Systems , volume 38. NeurIPS. Wang, Z.; Bovik, A. C.; Sheikh, H. R.; and Simoncelli, E. P. 2004. Image Quality Assessment: From Error Visibility to Structural Similarity. IEEE Transactions on Image Process-ing , 13(4): 600–612. Wang, Z.; Zhang, L.; Wu, W.; Zhu, Y.; Zhao, D.; and Chen, C. 2024. Meta-DT: Offline Meta-RL as Conditional Se-quence Modeling with World Model Disentanglement. In 
+
+Advances in Neural Information Processing Systems , vol-ume 37. NeurIPS. Wu, J.; Yin, S.; Feng, N.; He, X.; Li, D.; Hao, J.; and Long, M. 2024. iVideoGPT: Interactive VideoGPTs are Scalable World Models. In Advances in Neural Information Process-ing Systems , volume 37, 68082–68119. NeurIPS. Wu, J.; Yin, S.; Feng, N.; and Long, M. 2025. RLVR-World: Training World Models with Reinforcement Learning. In 
+
+Advances in Neural Information Processing Systems , vol-ume 38. NeurIPS. Yamada, J.; Rigter, M.; Collins, J.; and Posner, I. 2024. TWIST: Teacher-Student World Model Distillation for Ef-ficient Sim-to-Real Transfer. In 2024 IEEE International Conference on Robotics and Automation , 9190–9196. IEEE. Yarats, D.; Fergus, R.; Lazaric, A.; and Pinto, L. 2022. Mastering Visual Continuous Control: Improved Data-Augmented Reinforcement Learning. In International Con-ference on Learning Representations . ICLR. Zhang, A.; Sikchi, H.; Biswas, J.; and Zhang, A. 2025a. CREStE: Scalable Mapless Navigation with Internet Scale Priors and Counterfactual Guidance. In Proceedings of Robotics: Science and Systems . Los Angeles, CA: RSS. Zhang, L.; Rao, A.; and Agrawala, M. 2023. Adding Con-ditional Control to Text-to-Image Diffusion Models. In Pro-ceedings of the IEEE/CVF International Conference on Com-puter Vision , 3836–3847. IEEE. Zhang, R.; Isola, P.; Efros, A. A.; Shechtman, E.; and Wang, O. 2018. The Unreasonable Effectiveness of Deep Features as a Perceptual Metric. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition ,586–595. IEEE. Zhang, Y.; Li, X.; Ye, J.; Qiu, S.; Qu, D.; Li, X.; Zhang, C.; and Bai, C. 2025b. Revisiting Multi-Agent World Modeling from a Diffusion-Inspired Perspective. In Advances in Neural Information Processing Systems , volume 38. NeurIPS. Zhou, S.; Du, Y.; Yang, Y.; Han, L.; Chen, P.; Yeung, D.-Y.; and Gan, C. 2025. Learning 3D Persistent Embodied World Models. In Advances in Neural Information Processing Sys-tems , volume 38. NeurIPS.
