@@ -1,0 +1,1319 @@
+Title: Predict, Then Retrieve: Cross-Instance Future-State Retrieval from Video Prefixes
+
+URL Source: https://arxiv.org/pdf/2608.04426v1
+
+Published Time: Thu, 06 Aug 2026 00:27:55 GMT
+
+Number of Pages: 38
+
+Markdown Content:
+## Predict, Then Retrieve: Cross-Instance Future-State Retrieval from Video Prefixes 
+
+Quynh Vo Thong Nguyen † Vinh-Hien Do Cong-Duy Nguyen Anh-Tuan Luu 
+
+Centre for AI Research, VinUniversity National University of Singapore Email: thong.nguyen@u.nus.edu 
+
+Abstract 
+
+We introduce Predictive State Retrieval (PSR) , a task in which a model observes a short video prefix and a temporal question about an object’s future state, then retrieves instances from other videos or images that depict that state. Unlike action anticipation, which pre-dicts a label, moment retrieval, which localizes an observed event within a video, or video gen-eration, which synthesizes pixels, PSR com-bines anticipation with cross-instance retrieval 
+
+across multiple temporal horizons. We con-struct a benchmark from four datasets with graded, human-validated ground truth, diffi-culty tiers, and an oracle ceiling. We also pro-pose LFTR , a lightweight retriever with frozen encoders that predicts a question- and horizon-conditioned future latent and matches it in com-plementary semantic and visual spaces. A ceil-ing decomposition reveals a clear bottleneck: the true future state is highly retrievable once specified, whereas every predictor we evaluate, including a large multimodal language model with access to the prefix frames, remains far below the oracle. Thus, forecasting rather than perception is the central learnable challenge .LFTR narrows this gap at substantially lower inference cost, and ablations attribute its gains to cross-space fusion and hard-negative train-ing rather than latent rollout. We release the benchmark, code, and evaluation scripts. 
+
+1 Introduction 
+
+Anticipating how a scene will change is central to how people act in the world: seeing a glass tip over the edge of a table, we expect it to shatter, and can immediately bring to mind other scenes that show the same outcome. Reproducing this ability has driven a large body of video under-standing. Action anticipation forecasts the la-bel of a not-yet-observed action (Grauman et al., 
+
+> †Corresponding author.
+
+2022; Damen et al., 2018; Furnari and Farinella, 2021; Girdhar and Grauman, 2021; Vondrick et al., 2016); world models roll a scene forward in a la-tent space for planning and control (Assran et al., 2025; van den Oord et al., 2019); and video gener-ation synthesizes future frames outright, increas-ingly with retrieval-augmented motion (Zhu et al., 2025). In parallel, video–text retrieval and moment localization let us search large corpora with lan-guage (Luo et al., 2022; Xu et al., 2021; Wang et al., 2025; Bain et al., 2021; Hou et al., 2026; Lei et al., 2020; Gao et al., 2017; Lei et al., 2021), and vision–language models now describe and reason over scenes at scale (Radford et al., 2021; Zhai et al., 2023; Li et al., 2023; Liu et al., 2023). Yet these threads stop short of the capability the opening example takes for granted: from what has been observed so far , predict how an object will look next and retrieve concrete examples of that future state from other videos and images. Antici-pation predicts a future but collapses it to a fixed label rather than an open set of instances (Grauman et al., 2022; Damen et al., 2018); moment retrieval searches a corpus but targets a described moment that has already occurred , within a single video (Hou et al., 2026; Lei et al., 2020); composed and cross-instance retrieval match across instances, but from a present query rather than a predicted future (Vo et al., 2019; Liu et al., 2021; Ventura et al., 2024); and world models predict the future but keep it latent and internal , never surfacing match-ing evidence (Assran et al., 2025). No existing benchmark asks a model to forecast a state and then retrieve cross-instance evidence of it — and this gap is what we set out to fill. We introduce Predictive State Retrieval (PSR) 
+
+(Fig. 1): from a video prefix and a temporal ques-tion about an object, retrieve instances — from a corpus of other videos and images — that depict the object’s predicted future state. PSR is hard for two reasons that set it apart from existing tasks. arXiv:2608.04426v1 [cs.CV] 5 Aug 2026 OBSERVED PREFIX (one video)    
+
+> time
+> “What will the tree look like next?”
+> predict
+> predicted future state
+> falling over
+> not in the prefix retrieve
+> RETRIEVED (other videos & images)
+> same state, by meaning not appearance
+
+Figure 1: Predictive State Retrieval (PSR). From a video prefix (blue) and a temporal question, a model must 
+
+predict the object’s future state (gold) and retrieve instances from other videos/images (green) that depict it — the answer is never in the prefix, so retrieval is cross-instance and matches by meaning , not appearance. 
+
+The target is not observed , so the model must pre-dict a future that grows more uncertain with the horizon; and the answer lives in different videos, so it must be matched by meaning , not appear-ance — retrieving frames that merely look like the present will not do. Because ground truth links instances through their shared semantic state , PSR is language-grounded by design : the bridge across instances is linguistic, and we show empirically (Sec. 5.3) that raw appearance cannot recover this ground truth whereas the semantic-state abstraction is highly retrievable. Our method follows the same two steps a per-son would — anticipate, then recall by meaning .We propose LFTR , a frozen -encoder retriever that predicts a question- and horizon-conditioned future latent from the prefix and matches it against the corpus in two complementary spaces: a semantic 
+
+space for what state is expected and a visual space for how it looks, fused at the score level. Build-ing the predictor on frozen encoders keeps it cheap and transparent, and isolates forecasting as the one component that must be learned. That isolation yields our central finding, a ceiling decomposition :the true future state is highly retrievable and nearly horizon-flat, yet no predictor we run — including a sighted large multimodal model — comes close to that ceiling, so forecasting, not perception, is the core learnable bottleneck . LFTR narrows the gap at a fraction of the cost, with its gains com-ing from fusing complementary spaces and from hard negatives rather than from rolling the latent forward. We make three contributions: • We introduce Predictive State Retrieval (PSR) , a benchmark that asks a model to pre-dict an object’s future state from a short video prefix and retrieve cross-instance examples of it from other videos and images, with graded difficulty tiers, an oracle ceiling, and human-validated ground truth. • We propose LFTR , a cheap frozen-encoder retriever that predicts a question- and horizon-conditioned future latent and retrieves it by 
+
+cross-space fusion of a semantic and a visual match — where what helps is complementar-ity, not count .• We establish, through a ceiling decomposition ,that the learnable bottleneck is forecasting, not perception , and turn the method–ceiling gap into a concrete, measurable open problem — one our cheap retriever already narrows fur-ther than a far larger zero-shot MLLM. 
+
+2 Related Work 
+
+2.1 Anticipation, world models, and object states 
+
+Work on predicting the future spans three threads that PSR draws on but differs from. Action antici-pation benchmarks (Grauman et al., 2022; Damen et al., 2018) and models (Girdhar and Grauman, 2021; Furnari and Farinella, 2021) forecast the la-bel of an upcoming action a few seconds ahead — closed-vocabulary classification over a fixed hori-zon, not open cross-instance retrieval. Future-representation prediction — anticipating future visual features from unlabeled video (Vondrick et al., 2016), joint-embedding predictive architec-tures (Assran et al., 2025), and contrastive predic-tive coding (van den Oord et al., 2019) — predicts a 
+
+latent future, but for recognition or planning within 
+
+a video (e.g. procedure planning (Niu et al., 2024)), never as a cross-instance retrieval target with a graded ground truth. Object-state recognition and state-change discovery (Isola et al., 2015; Pham et al., 2021; Xue et al., 2024; Souˇ cek et al., 2022) supplies our state vocabulary but treats state as per-image classification or within-video localiza-tion. Most related, object state-change anticipation Table 1: PSR vs. prior settings. Each prior task covers only part: anticipation predicts the future but classifies 
+
+a label; retrieval/grounding target an observed moment; world models predict a latent within one video. PSR is the only setting that is future-targeted, cross-instance, retrieval-native, multi-horizon, spans both video and image corpora, and is scored against a graded ground truth with an oracle ceiling. ( ✓ yes ✗ no ∼ partial; scale figures for prior work are approximate.)                                                                                                                                                                             
+
+> Capabilities Media Scale
+> Benchmark Future Cross-inst. Retrieval Multi-horiz. Open-vocab Video Image Corpus #Queries #Q-types
+> Prediction — action / state-change anticipation, procedure planning
+> Ego4D (Grauman et al., 2022) ✓✗✗∼✗✓✗∼9.6k 3.5k1EPIC-100 (Damen et al., 2018) ✓✗✗∼✗✓✗700 ∼90k 1CrossTask (Zhukov et al., 2019) ✓✗✗∼∼✓✗4.8k∼2.7k 1
+> Retrieval / grounding
+> QVHighlights (Lei et al., 2021) ✗✗✓✗✓✓✗10 .1k10 .3k1DiDeMo (Hendricks et al., 2017) ✗✗✓✗✓✓✗10 .5k∼40k 1TVR (Lei et al., 2020) ✗✗✓✗✓✓✗21 .8k109 k1Charades-STA (Gao et al., 2017) ✗✗✓✗✓✓✗6.7k16 k1MSR-VTT (Xu et al., 2016) ✗✓✓✗✓✓✗10 k200 k1WebVid (Bain et al., 2021) ✗✓✓✗✓✓✗2.5M2.5M1CIRR (Liu et al., 2021) ✗✓✓✗✓✗✓21 .6k36 .5k1WebVid-CoVR (Ventura et al., 2024) ✗✓✓✗✓✓✗131 k1.6M1
+> Object states / understanding
+> MIT-States (Isola et al., 2015) ✗∼∼✗∼✗✓63 k63 k1VAW (Pham et al., 2021) ✗∼∼✗∼✗✓72 k260 k1ChangeIt (Souˇ cek et al., 2022) ✗∼∼✗∼✓✗34 k34 k1HowToChange (Xue et al., 2024) ✗∼∼✗∼✓✗5.4k5.4k1
+> PSR (ours) ✓✓✓✓✓✓✓218k +333k 20,182 5
+
+(Manousaki et al., 2024) forecasts an object’s forth-coming state transition — but within a single proce-dural video and as anticipation/classification, not as cross-instance retrieval against a corpus. PSR uni-fies these into a predictive, cross-instance retrieval 
+
+task across horizons: the target is unobserved, lives in other videos, and is matched by state meaning .LFTR borrows the predict-in-latent idea but con-ditions on the question and horizon , reads into a retrieval space, and trains with hard-negative con-trastive learning (Robinson et al., 2021). 
+
+2.2 Retrieval and vision–language models 
+
+A large body of work learns joint video–text spaces for retrieval (Luo et al., 2022; Xu et al., 2021; Bain et al., 2021; Wang et al., 2022, 2025; Zhu et al., 2024), and video (corpus) moment retrieval (Hou et al., 2026; Lei et al., 2021) localizes a described moment within a video; broad image–text models (Radford et al., 2021; Zhai et al., 2023) and multi-modal LLMs (Li et al., 2023; Alayrac et al., 2022; Liu et al., 2023; Lin et al., 2024) add strong zero-shot recognition and captioning. In all of these the query describes an observed moment; PSR’s query is a prefix plus a future question, so the target has not yet occurred and lives in other videos — re-quiring prediction, not just matching. We use the strongest such encoders as both zero-shot baselines and LFTR target spaces (App. F), and find native video–text alignment does not, on its own, yield a better predictable target than a self-supervised image space. Closest in form, composed image retrieval (Vo et al., 2019; Liu et al., 2021; Saito et al., 2023) — and its video counterpart, composed video retrieval (Ventura et al., 2024) — retrieves a target given a source image/video plus a mod-ification text (“current state + transformation →
+
+target”), which is PSR minus the prediction of the transformation. This invites the objection that PSR reduces to (forecast a state caption) + (text →Xretrieval); our multimodal-LLM baseline ( M3 , §5) is exactly that pipeline, and our fair-comparison study (§5.3, Table 3) shows it underperforms amodel that predicts a native visual latent — a tar-get no text-caption forecaster can reach with any text encoder. 
+
+Closest work and novelty. PSR is not the first task to predict a future (action anticipation) or to retrieve across instances (composed/video re-trieval); its novelty is their union , and that the union is not trivial. Concurrent efforts touch parts but none combine the ingredients: STATUS Bench (Ukai et al., 2025) and CAST (Liu et al., 2026) handle object-state transitions and retrieval but from observed inputs, not a future forecast; com-posed video retrieval (Ventura et al., 2024) matches cross-instance but is given the transformation as text rather than predicting it (our M3 baseline is exactly that pipeline, and loses; §5). To our knowledge PSR is thus the first benchmark to unite 
+
+future-state prediction with cross-instance corpus retrieval across horizons, scored against a graded ground truth and an oracle ceiling (Table 1) — and its ceiling decomposition (§5.3) shows the union exposes a genuinely new bottleneck ( forecasting ), not a solved composition. 
+
+3 The PSR Benchmark 
+
+3.1 Task and Construction Task definition. A query is q = ( x, τ, h ) where x
+
+is a video prefix, τ a question type, and h a tempo-ral horizon. Given a frozen corpus C of instances (video segments / images), the goal is to rank C
+
+so that the ground-truth set Pq ⊂ C — instances depicting the queried future state — appears at the top, for all question types with one model — a capability profile no prior benchmark offers (Ta-ble 1). We report Recall@ {1, 5, 10 , 20 , 50 } and MRR. The graded structure of the GT (difficulty tiers, state granularity, consensus) is exploited by 
+
+stratifying the evaluation (App. M, N) rather than by collapsing it into a single graded score; a tier-weighted nDCG variant is included in the released evaluation code for users who prefer one number. 
+
+Question types. Q1 next state ; Q2 end state ; Q3 
+
+state after k seconds ; Q4 intermediate state (be-fore reaching a named state); Q5 multi-object (the joint future states of several objects). Each maps to a horizon h, so a question is an index into the future trajectory of the object. App. C gives the full taxonomy—per-type definitions, worked examples, query counts, and horizon coverage (Table 6). 
+
+Construction (Fig. 3). From four source do-mains we run a vision-language model (Gemini-2.5-Flash) to inventory objects and their timed state trajectories, generate the five question types, and mine ground-truth instances both within and 
+
+across datasets (plus embedding-similar candi-dates). Candidates pass multi-pass verification (independent multi-frame re-verification and ob-ject/state re-checks), and we additionally release a high-precision consensus pool (intersection of min-ing and verification). Prefixes are real early clips so that the target state is strictly in the future. Full details and prompts are in the appendix; all scripts are released. 
+
+Human validation. Because the GT is machine-mined, we validate it with humans. Five annota-tors (in-house graduate researchers; §Ethics) inde-pendently judged a stratified sample spanning all difficulty tiers and question types — both mined GT positives and top-ranked retrieved candidates — marking each as correct / incorrect / uncer-tain depiction of the queried future state (“un-certain” counted as incorrect, the conservative choice). We report, on two distinct sub-populations of the 500 -query sample, GT precision (fraction of the mined-GT positives confirmed correct) and a 
+
+suspected-miss rate (fraction of retrieved non-GT 
+
+items judged correct, i.e. recall gaps). GT preci-sion is 89 .4% (approx. 95% Wilson CI [86 , 92] ), the suspected-miss rate is 4.8% , and agreement is substantial (Fleiss κ = 0 .76 over the 3-way label; note κ is somewhat optimistic under the “correct”-heavy class balance). The pools are nonetheless re-liable with few corrections; the consensus pool (the intersection of mining and verification, as above) is released for the highest-precision setting. Because that 4.8% suspected-miss rate means mining oc-casionally omits a correct instance, every reported Recall@ k is a conservative lower bound (missed positives can only depress recall), so the method– ceiling gap we analyse is if anything under-stated. 
+
+No temporal leakage and quality. Prefixes are cut strictly before the event: across all benchmark queries the target state starts after the prefix ends in 
+
+100% of cases (a construction guarantee; median prefix-to-target gap 1.9 s). Consistently, prefix-only baselines that do not predict (persistence, zero-shot encoders) score far below the oracle (R@5 ≤ 11 
+
+vs. 53 ): the prefix does not reveal the answer, and the task genuinely requires prediction. Because states, questions, and GT are VLM-assisted, the benchmark can inherit generator biases; we miti-gate this with two independent verification passes, a consensus pool, and the human study above, and flag it as a limitation. 
+
+3.2 Dataset Composition and Statistics Difficulty tiers. The corpus mixes instances from all sources, so for each query the GT is split by 
+
+where the correct instance lives : in-video (the query’s own video, easiest), in-dataset (a different video, same domain), and cross-dataset (a differ-ent domain, the honest generalization test); Fig. 5 shows an example query with its three-tier pool. We further provide subject+predicate (type1) vs. predicate-only (type2) targets and the consensus pool, enabling robustness checks to GT definition. 
+
+Statistics. The benchmark has 20,182 queries drawn from 5,061 prefixes (one per (video, object) pair) over 1,448 source video clips (train/val/test 
+
+14 ,390 /2,996 /2,796 , sample_id-disjoint to pre-vent video leakage). The primary retrieval corpus is video : exactly 218 ,276 video segments ( 51 ,362 Q1                      
+
+> next
+> Q2
+> end
+> Q3
+> after-k
+> Q4
+> inter.
+> 0
+> 2000
+> 4000
+> 6000
+> 8000
+> 4k 4k 3k
+> 7k
+> (a) Question type
+> 1234567
+> steps into the future
+> 0
+> 2500
+> 5000
+> 7500
+> 10000
+> 12500 11k
+> 4k
+> 2k
+> 1k 521 261 58
+> (b) Horizon
+> Oops HowTo
+> Change
+> SSv2 MOST
+> 0
+> 2000
+> 4000
+> 6000
+> 8000 7k 7k
+> 3k
+> 1k
+> (c) Source domain
+> in-video
+> (self)
+> in-dataset cross-
+> dataset
+> 0
+> 2500
+> 5000
+> 7500
+> 10000
+> 12500 10k
+> 9k
+> 12k
+> (d) GT difficulty tier
+> Q1 Q2 Q3 Q4
+> 0
+> 20
+> 40
+> 60
+> 80
+> 100
+> % of type's queries
+> (e) Horizon within type
+> horizon
+> h1
+> h2
+> h3
+> h4
+> h5+
+
+PSR benchmark composition (20,182 queries) Figure 2: PSR benchmark composition over all 20,182 queries: (a) question types; (b) horizon; (c) source domains; (d) difficulty tier (by where the correct instance lives); (e) horizon within each question type. Queries skew to near horizons and the cross-dataset (hardest) tier dominates. Sources          
+
+> j4 video domains
+> Oops ·SSv2 ·How-ToChange ·MOST
+> (+ optional images: VG ·MIT-States)
+
+Inventory ˎ     
+
+> a VLM logs each object’s timed state trajectory (walking
+> →falling →lying)
+
+Questions   
+
+> 5 temporal types Q1– Q5 , each an index into the future; prefix cut
+> strictly before target
+
+Mine GT     
+
+> find other instances of the future state: in-dataset ·cross-dataset
+> ·embedding-similar
+
+Verify ˎ  
+
+> multi-pass VLM re-check →
+> high-precision
+> consensus pool
+
+Human audit í                      
+
+> 5 annotators judge a stratified sample
+> →89 .4% GT precision ( κ=0 .76 )
+> 123456
+> ƁPSR benchmark =20,182 queries with graded ,human-validated ground truth (difficulty tiers ×
+> type1/type2 ×consensus), each an unobserved future state to be retrieved cross-instance , with an oracle ceiling
+
+Figure 3: How the PSR benchmark is built. A VLM inventories each object’s timed state trajectory in four video sources; we generate five temporal question types (each prefix cut strictly before its target), mine ground truth within /across datasets plus embedding-similar candidates, and validate by multi-pass re-checking and a five-annotator audit — yielding graded, cross-instance ground truth with an oracle ceiling. 
+
+unique predicate states), each segment represented for retrieval by its middle frame (visual space) or canonical state text (semantic space). Because a fu-ture end -state can be depicted across modalities (shattered as a video clip or a still image), we also ship an optional 333 k-image corpus (VG +
+
+MIT-States) as a cross-modal test — which turns out to be hard precisely for the dynamic states (falling , being pushed ) that only video fully cap-tures (App. P). The full release is ≈28 GB: the 
+
+20 ,182 query/GT annotations ( 45 MB), the 5,061 
+
+cut prefix clips ( 18 GB), and the retrieval corpora (≈10 GB total — a 5.0 GB video corpus of 218 ,276 
+
+segments and a 5.1 GB image corpus of 332 ,707 
+
+images, each shipped with precomputed feature in-dices). Horizons run 1–7, near-skewed ( 56% h=1 ); we fold the tiny h≥6 tail into h=5 and report h1–
+
+h5. The corpus draws on four source datasets 
+
+(HOWTOCHANGE (Xue et al., 2024)/ OOPS (Ep-stein et al., 2020)/ SSV 2 (Goyal et al., 2017)/ MOST ;Fig. 2(c)) that define the difficulty tiers, spanning everyday themes (cooking, household, sports, driv-ing, animals). A full statistics table is in the ap-pendix. 
+
+4 LFTR: A Latent-Rollout Retriever 
+
+4.1 Model and inference 
+
+LFTR rolls a latent trajectory of the future and reads it at the question’s horizon (Fig. 4). A
+
+frozen encoder E maps the 8-frame prefix to to-kens; a small Transformer forms a context ¯h that initializes s0, and the question is embedded as 
+
+qc = Wq BGE( question ). A transition operator rolls the latent forward, 
+
+sj+1 = sj +Φ θ(sj , ¯h, q c), j = 0 , . . . , H −1,
+
+(1) and we read at the query horizon, μh = Wo sh.To model growing predictive uncertainty we emit 
+
+K samples zk = μh + σθ(h) ϵk and score a corpus item m by multi-query max-similarity 
+
+max k cos( zk, e m). We keep the multi-step roll-out for generality but ablate it (Sec. 5.3) to be non-essential : a single horizon-conditioned read ( H=1 )performs comparably. 
+
+Cross-space fusion. An object’s future state can be matched both semantically (a text-state space, BGE) and visually (a DINOv2 image space). We run LFTR in both and z-score–fuse the per-item scores; this complementary fusion is our strongest configuration. 
+
+Naming. “LFTR” denotes the recipe — a hard-negative-trained semantic-state head, read into a Inside the LFTR head    
+
+> Video prefix
+> Temporal question
+> :What does the dog
+> do next?
+> Video
+> encoder
+> ❄
+> Text
+> encoder
+> ❄
+> LFTR head
+> (predict future latent)
+> Latent space
+> Semantic space ❄
+> Text embedding of predicted state
+> ⋯
+> Visual space ❄
+> Predicted visual latent
+> ⋯
+> -score
+> fusion
+> Top-retrieved results
+> 1
+> 2
+
+⋮  
+
+> Step 1: Roll a latent trajectory, read it at horizon h Step 2: Pull samples to the true future, push embedding-similar hard negatives
+> Learned latent transition
+> context from
+> encoders
+> sample Semantic space retrieval
+> Cross-space fusion
+> Visual space retrieval
+
+# ★  
+
+> top-top-
+> Final ranking
+> (Top-)
+> 1
+> 2
+> K
+> ⋮
+> Fused score
+> 3
+
+Figure 4: The LFTR method. (Top) Frozen video and text encoders feed the only trained module ( ∼12M), the 
+
+LFTR head , which predicts the future latent and reads it into a semantic and a visual space; the two scores are 
+
+z-score fused to return the top-k cross-instance results. (Bottom) Inside the head. Step 1: roll a latent trajectory to horizon h and sample zk=μh+σθ (h)ϵ. Step 2: retrieve by max-similarity in each space, then fuse. Encoders stay frozen throughout. 
+
+retrieval space and fused across a semantic and a vi-sual space — which is what produces the gain; the rollout (the “R”) is kept only because one forward pass yields the whole future trajectory, useful for the trajectory-richness analysis (App. L), not be-cause it improves accuracy. LFTR is thus a strong, honestly-analyzed baseline built from known com-ponents (hard-negative InfoNCE, z-score fusion), not a novel predictor. 
+
+4.2 Training What is a training sample. The query side is the short prefix video (8 frames → 8 tokens). Each 
+
+corpus/candidate item—positive or negative—is a completed future segment represented by its middle frame (a single still image) in the visual space, or by its canonical state text in the semantic space; positives and negatives are thus single frames (or state strings) standing for future segments, not full clips. Hard negatives are mined from the entire 
+
+218 k-segment cross-instance corpus as the near-est neighbours of the positive in the target space, 
+
+excluding the query’s ground-truth set . They are therefore other instances—overwhelmingly differ-ent videos (in our audited samples 47 /48 ), oc-casionally a different-state segment of the same source clip—never the query’s own labelled future. 
+
+Objective. Only the lightweight head ( ∼12M parameters) is trained, with a multi-query InfoNCE objective using random and hard (embedding-similar) negatives plus a grounding term that an-chors μh to the ground-truth embedding; the en-coder remains frozen and its features are precom-puted. 
+
+5 Experiments 
+
+5.1 Experimental setup Protocol. We train on the train split, select on validation R@5, and report on the fair test set of 
+
+n=2 ,430 queries whose ground truth is present in the retrieval space (of 2,796 total test queries; the 
+
+366 dropped have no GT segment in the target cor-pus). All main results retrieve over the video corpus 
+
+(the primary benchmark); the image corpus is an optional cross-modal probe (App. P). The encoder is frozen. Reporting convention. A value with “±” is a 5-seed mean ±std; a bare value is a seed-0 single run (per-table protocol and a seed-0-vs-mean crosswalk are in the Table 8 caption). The baselines are (i) naive (random, question-only, kNN-future, persistence), (ii) zero-shot frozen encoders, (iii) trained heads and LoRA fine-tuned encoders, and (iv) M3 , our zero-shot 32B multimodal-LLM base-line. LFTR is instead a trained retriever ( ∼12 Mparams), so the comparison is a cheap trained re-triever vs. a zero-shot 32B MLLM (M3) — a dif-ferent family from the Gemini-2.5-Flash generator, so unconfounded by same-family affinity. Oracles (glossary). All encode the true future state and re-trieve. We use three: the semantic-text oracle (state text → BGE, R@5 53 ), our clean ceiling; the state-prototype oracle (mean DINOv2 frame, R@5 59 ), 
+
+mildly optimistic ; and the independent-appearance 
+
+oracle (observed future frame, ≤ 6.6), probing raw pixels. “Oracle ceiling” means the semantic-text 
+
+53 .
+
+5.2 Main results 
+
+Table 2 shows LFTR-fusion reaches 16 .1±1.0
+
+R@5, a significant improvement over the zero-shot 32B MLLM (paired bootstrap +4 .81 pp, 95% CI 
+
+[3 .00 , 6.58] , p < 10 −4), at ∼12 M trainable param-eters and ∼0.06 ms/query — four orders of magni-tude cheaper than a 32 B generator (App. R). Stack-ing further complementary spaces reaches R@5 
+
+18 .6±0.6 (App. I); we keep the 2-space fusion as the headline. The naive persistence baseline is sur-prisingly strong ( 10 .8): a method must predict , not copy the present, to win. By question type, fusion wins on every one and the far-horizon end-state (Q2) is hardest for all learned methods while the Oracle stays flat ( ∼51 –56 ; Table 7, App. C), locat-ing the difficulty in far-horizon prediction rather than a question form. 
+
+Is the comparison to M3 fair? We stress-test fairness two ways (Table 3), and neither closes the gap. (a) Giving M3 the strongest text space (Em-beddingGemma) does not help it ( 11 .2 ≈ 11 .4)though it helps LFTR ( 11 .3→12 .3): a short pre-dicted string cannot exploit a richer semantic space, a learned latent can. (b) Giving M3 a CLIP text →image path, or fusing, is weak or hurts (3.1–
+
+10 .3), because a predicted string is a poor visual query. LFTR-fusion wins by predicting a native visual latent no text-predicting MLLM can reach with any text encoder — the advantage is method-ological, not “more spaces”. 
+
+5.3 Discussion Where the gain comes from (honest ablation). 
+
+Three effects are robust across five seeds. (i) Cross-space fusion is the largest: fusing the semantic (BGE) and visual (DINOv2) spaces lifts R@5 from 
+
+∼12 .8 to 16 .1, and what matters is complementar-ity, not count — a redundant same-type space adds nothing, whereas stacking complementary strong spaces (BGE, Gemma, DINOv2, boundary-SSL LingBot) reaches 18 .6±0.6, a significant +2 .5pp over the 2-space fusion (App. I). (ii) Hard neg-atives give a large, monotone gain in the visual space — mining embedding-similar (visually con-fusable but wrong) future states adds +3 .9pp R@5 (p < 10 −3), saturating near 128 (App. H) — but are neutral in the text-state space, where states are already lexically separated: visual, not semantic, confusability is the binding constraint. (iii) Ques-tion conditioning, grounding, the uncertainty head, and K/H each move a single-space model within seed noise ( ±0.7). 
+
+The multi-step rollout is not the source of the gain (honest negative). Under identical train-ing the full H=8 trajectory and an H=1 horizon-conditioned read are statistically indistinguishable (12 .80 ±0.72 vs. 12 .40 ±1.02 , p=0 .54 ; n.s. at ev-ery horizon), and intermediate-horizon supervision does not help. The gain comes from the future-state head, hard-negative visual training, and fusion — not the rollout mechanism. 
+
+The rollout is nonetheless a rich, under-exploited trajectory. It is not inert: one pass emits the whole future trajectory, and an oracle reading the best-per-query step reveals a large 
+
++4 .3/+4 .8pp of untapped signal in both spaces — turning that into a robust, oracle-free read rule is an open problem the benchmark exposes (App. L). 
+
+Encoders and tiers. LFTR is encoder-agnostic across eight frozen encoders, and a strong visual target can beat the text-state space (App. F). By difficulty tier, in-video retrieval is solved by appear-ance persistence (R@5 75 vs. ≤ 5 for all semantic methods, including the Oracle) — exactly why we score cross-instance ; the cross-dataset tier ( ≈ 8.4)is the honest generalization gap. 
+
+The task is predictor-bound: forecasting, not perception, is the bottleneck. Retrieval with the 
+
+true future state reaches R@5 53 .0 (BGE text) and 
+
+59 .1 (DINOv2 prototype), roughly flat across hori-zon (Table 4). Crucially, an independent oracle that queries with the object’s actual observed fu-ture frame and retrieves cross-instance is near the floor in every visual space (DINOv2 5.7, SigLIP 
+
+6.6, CLIP 3.0, LingBot 6.5; App. J): the same state looks very different across videos, so the task can-not be solved by raw appearance and demands a 
+
+semantic abstraction. Given that abstraction the future is highly retrievable ( 53 –59 ), yet the best learned predictor realises only ∼16 –18 , and every method collapses beyond h=2 . Two controls locate the residual in forecasting : a sighted 32 B MLLM (M3) reaches only 11 .9 (∼41 pp below the ceiling), Table 2: Main results (test n=2 ,430 ). Ours in bold; LFTR is a five-seed mean. R@ k is micro ; “macro” is R@5 averaged unweighted over horizons 1–5. “—”: macro not computed for the naive baselines. 
+
+Method R@1 R@5 R@10 MRR macro Random 0.0 0.0 0.0 0.0 0.0 kNN-future 1.5 4.5 5.6 3.0 —Question-only 1.6 5.5 8.5 3.8 —Zero-shot (Qwen-VL, frozen) 2.6 7.4 11.1 5.2 —Text-only predictor (32B) 3.9 9.3 12.5 6.6 —Persistence 3.9 10.8 14.0 7.4 —M3 (Qwen3-VL-32B) 5.2 11.9 15.4 8.6 7.7 LFTR → BGE (ours) 4.1 11.3 15.0 7.6 7.5 LFTR → EmbeddingGemma (ours) 4.7 12.3 16.3 8.4 8.4 LFTR → SigLIP (ours) 4.5 10.6 14.1 7.6 7.7 LFTR → LanguageBind (ours) 4.6 11.0 14.5 7.8 7.0 LFTR → InternVideo2 (ours) 4.4 11.4 15.2 8.0 7.9 LFTR → DINOv2 (ours) 5.0 12.8 16.4 8.8 8.3 LFTR → LingBot-Vision (ours) 5.8 13.6 17.3 9.6 9.2 
+
+LFTR-fusion (BGE +DINOv2, ours) 6.8 16.1 20.3 11.4 10.8 
+
+Oracle-BGE (ceiling) 23.9 53.0 67.8 37.6 51.5 Oracle-DINOv2 (ceiling) 48.3 59.1 63.2 53.5 59.8 
+
+Table 3: Fair MLLM comparison (test R@5). Giv-ing M3 the best text space, a visual path (CLIP text →image), or fusing does not close the gap; pre-dicting a native visual latent (LFTR) does. Rows use the intersection subset, so M3 →BGE is 11 .4 here vs. 
+
+11 .9 in Table 2. 
+
+Method R@5 M3 → BGE (text-state) 11.4 M3 → EmbeddingGemma (best text) 11.2 M3 → CLIP (text →image) 3.1 M3 fusion (BGE + CLIP) 10.3 M3 fusion (Gemma + CLIP) 9.9 
+
+LFTR-fusion (BGE + DINOv2, ours) 16.1 
+
+and a 7B→32 B text-LLM scale ladder forecasts to only 6.5→9.3 — so neither perception nor scale is the missing ingredient. The raw 16 →53 gap is partly a retrieval-canonicalization channel (free-form vs. canonical string); the genuine forecasting 
+
+gap a better predictor can close is ∼14 pp ( 16 →30 ;App. U), the core learnable open problem PSR poses. 
+
+Multi-object and qualitative behaviour. LFTR transfers to the multi-object setting per object, though joint all-objects-correct is combinatorial and near zero even for the Oracle, an open regime (App. Q). Qualitatively, fusion recovers the correct future where the naive and MLLM baselines re-turn a visually similar but wrong (hard-negative) state, and failures are almost always a semanti-cally adjacent state ( rolling on floor →“falling”; 
+
+lying on ground →“being pushed”) — precisely the fine-grained discrimination hard-negative train-ing targets (Robinson et al., 2021) (examples in 
+
+Table 4: Ceiling decomposition: R@5 by horizon (n=1356 /576 /312 /109 /49 for h=1 −5). The seman-tic -state oracles are high and roughly flat, but an inde-pendent oracle using the observed future frame is near the floor: the task is tractable semantically, not by ap-pearance. “all” is the micro mean; far-horizon cells are noisy.                               
+
+> Oracle all h1h2h3h4h5
+> Semantic: DINOv2 prototype 59.1 59.8 61.5 51.0 61.5 65.3 Semantic: BGE text (clean) 53.0 52.9 53.3 54.5 45.9 51.0 Visual: observed future (indep.) 5.7 7.4 5.3 3.3 1.7 0.0
+> LFTR 12.8 14.7 14.2 6.0 3.9 2.9
+
+App. V, H). 
+
+6 Conclusion 
+
+We pose Predictive State Retrieval — predict an object’s future state from a prefix and retrieve cross-instance examples across horizons — and show that a cheap frozen-encoder retriever, whose gain comes from cross-space fusion and hard negatives (not the latent rollout, which we find null), beats a zero-shot 32B MLLM at a fraction of the cost. Its ceiling decomposition isolates far-horizon fore-casting as the core learnable bottleneck — one of several measurable open problems (cross-dataset, multi-object) with large headroom that make PSR a useful forward-looking benchmark. PSR’s oracle ceiling and cheap baseline make it a testbed for the two open problems it exposes: an oracle-free read of the under-exploited rollout, and a cross-modal bridge for dynamic states. Limitations 
+
+The image modality is hard even for the Oracle (R@5 8.9) due to a vocabulary mismatch between video-derived queries and image-corpus states; joint multi-object and far-horizon prediction re-main open. Methodologically, our headline gain is driven by cross-space fusion and hard-negative visual training rather than by a fundamentally new predictor: a controlled isolation shows the multi-step latent rollout performs no better than a sin-gle horizon-conditioned read, and intermediate-horizon supervision does not help. Even end-to-end LoRA fine-tuning of the prefix encoder yields only a small, within-noise gain ( +0 .4–0.5 R@5 across DINOv2 and CLIP) at ∼10 3× the training cost (App. S), so the frozen prefix is a mild constraint, not the bottleneck. We therefore present LFTR as a strong, cheap baseline and—given the flat, high Oracle—position closing the far-horizon prediction 
+
+gap as the central future work. We flag five validity threats explicitly. (i) Single-generator authorship. States, questions, and GT candidates are produced by one VLM (Gemini-2.5-Flash). Two facts bound the resulting con-found: our M3 baseline (Qwen3-VL-32B) is a 
+
+different family from the generator, so the M3 com-parison is not confounded by same-family affinity (cross-family phrasing could in principle penalize M3, but its 11 .9 sits far below the ∼30 free-form ceiling, so it is forecasting-, not phrasing-limited; App. U); and a stronger automated judge (Gemini-3-Flash) agrees with the human labels at 93 .4% 
+
+(Cohen’s κ=0 .78 ) and estimates GT precision at 
+
+88 .6% , matching the human 89 .4% (App. B). The residual concern is that a single generator’s phras-ing conventions may still shape the GT; because that cross-model judge shares the generator’s Gem-ini family, a fully independent cross-family re-authoring of a held-out slice remains future work. 
+
+(ii) The appearance floor is partly by construc-tion. Because GT links instances by shared se-mantic state, a visual-appearance oracle is scored against a semantically-defined positive set; “appear-ance cannot solve PSR” should be read as “cannot recover the semantic-state GT,” not as a claim about a hypothetical visually-defined GT. (iii) Ceiling partition. Both semantic oracles are, by our own audit, mildly optimistic, so while a large method– ceiling gap is robust, we do not claim an exact split of that gap into prediction vs. retrieval error. (iv) Human study scope. Our validation is 500 queries by five in-house annotators (complemented by the automated cross-model check of App. B); it estab-lishes GT precision but is not a stratified, per-tier human audit, and there is no measured human per-formance on the retrieval task itself (so the 16 →53 
+
+headroom is an oracle bound, not a demonstrated human-achievable target). (v) Generalization is cross-source transfer within four domains, not a leave-one-domain-out generalization study. 
+
+Ethics Statement 
+
+The benchmark is built on publicly released video datasets ( OOPS , SSV 2, MOST , HOWTOCHANGE )and is redistributed only as query/GT annotations and precomputed feature indices, under the source datasets’ licenses; we release no raw video we do not have the right to. States, questions, and candi-date GT are produced with a vision-language model and may contain errors or social biases; we mitigate this with two independent verification passes, a high-precision consensus pool, and a five-annotator human study (Sec. 3), and we flag residual model bias as a limitation. The five annotators were vol-unteer graduate researchers fluent in English who judged only object-state depictions (no personal or sensitive attributes); they gave informed consent, were not compensated per-item (to avoid speed incentives), and each labelled the same stratified 
+
+500 -query sample, from which we report Fleiss 
+
+κ = 0 .76 (substantial, though optimistic under the “correct”-heavy class balance; §3). The task tar-gets retrieval of everyday object states and is not intended for surveillance or person identification. 
+
+Reproducibility 
+
+We release the dataset (queries, graded GT pools, splits), the 218k-segment corpus index, all baseline and method code, training configurations, and the evaluation scripts; every number in the paper is regenerated from released eval artifacts. 
+
+References     
+
+> Jean-Baptiste Alayrac, Jeff Donahue, Pauline Luc, Antoine Miech, Iain Barr, Yana Hasson, Karel Lenc, Arthur Mensch, Katherine Millican, Malcolm Reynolds, Roman Ring, Eliza Rutherford, Serkan Cabi, Tengda Han, Zhitao Gong, Sina Samangooei, Marianne Monteiro, Jacob L Menick, Sebastian Borgeaud, and 8 others. 2022. Flamingo: a visual lan-guage model for few-shot learning. In Advances in Neural Information Processing Systems , volume 35, pages 23716–23736. Curran Associates, Inc.
+
+Mido Assran, Adrien Bardes, David Fan, Quentin Gar-rido, Russell Howes, Mojtaba, Komeili, Matthew Muckley, Ammar Rizvi, Claire Roberts, Koustuv Sinha, Artem Zholus, Sergio Arnaud, Abha Gejji, Ada Martin, Francois Robert Hogan, Daniel Dugas, Piotr Bojanowski, Vasil Khalidov, and 11 others. 2025. V-jepa 2: Self-supervised video models enable understanding, prediction and planning. Preprint ,arXiv:2506.09985. Max Bain, Arsha Nagrani, Gül Varol, and Andrew Zis-serman. 2021. Frozen in time: A joint video and image encoder for end-to-end retrieval. In 2021 IEEE/CVF International Conference on Computer Vision (ICCV) , pages 1708–1718. Dima Damen, Hazel Doughty, Giovanni Maria Farinella, Sanja Fidler, Antonino Furnari, Evangelos Kazakos, Davide Moltisanti, Jonathan Munro, Toby Perrett, Will Price, and Michael Wray. 2018. Scaling egocen-tric vision: The dataset. In Computer Vision – ECCV 2018 , pages 753–771, Cham. Springer International Publishing. Dave Epstein, Boyuan Chen, and Carl Vondrick. 2020. Oops! predicting unintentional action in video. In 
+
+2020 IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , pages 916–926. Zelin Fu, Bin Tan, Changjiang Sun, Shaohui Liu, Kecheng Zheng, Yinghao Xu, Xing Zhu, Yujun Shen, and Nan Xue. 2026. Vision pretraining for dense spatial perception. Preprint , arXiv:2607.05247. Antonino Furnari and Giovanni Maria Farinella. 2021. Rolling-unrolling lstms for action anticipation from first-person video. IEEE Transactions on Pattern Analysis and Machine Intelligence , 43(11):4021– 4036. Jiyang Gao, Chen Sun, Zhenheng Yang, and Ram Neva-tia. 2017. Tall: Temporal activity localization via language query. In 2017 IEEE International Confer-ence on Computer Vision (ICCV) , pages 5277–5285. Rohit Girdhar and Kristen Grauman. 2021. Anticipa-tive video transformer. In 2021 IEEE/CVF Interna-tional Conference on Computer Vision (ICCV) , pages 13485–13495. Raghav Goyal, Samira Ebrahimi Kahou, Vincent Michalski, Joanna Materzynska, Susanne Westphal, Heuna Kim, Valentin Haenel, Ingo Fruend, Peter Yianilos, Moritz Mueller-Freitag, Florian Hoppe, Christian Thurau, Ingo Bax, and Roland Memisevic. 2017. The “something something” video database for learning and evaluating visual common sense. In 
+
+2017 IEEE International Conference on Computer Vision (ICCV) , pages 5843–5851. Kristen Grauman, Andrew Westbury, Eugene Byrne, Zachary Chavis, Antonino Furnari, Rohit Girdhar, Jackson Hamburger, Hao Jiang, Miao Liu, Xingyu Liu, Miguel Martin, Tushar Nagarajan, Ilija Ra-dosavovic, Santhosh Kumar Ramakrishnan, Fiona Ryan, Jayant Sharma, Michael Wray, Mengmeng Xu, Eric Zhongcong Xu, and 66 others. 2022. Ego4d: Around the world in 3,000 hours of egocentric video. In 2022 IEEE/CVF Conference on Computer Vi-sion and Pattern Recognition (CVPR) , pages 18973– 18990. Lisa Anne Hendricks, Oliver Wang, Eli Shechtman, Josef Sivic, Trevor Darrell, and Bryan Russell. 2017. Localizing moments in video with natural language. In 2017 IEEE International Conference on Computer Vision (ICCV) , pages 5804–5813. Danyang Hou, Liang Pang, Yanyan Lan, Huawei Shen, and Xueqi Cheng. 2026. Event-aware video corpus moment retrieval. In Advances in Information Re-trieval: 48th European Conference on Information Retrieval, ECIR 2026, Delft, The Netherlands, March 29 – April 2, 2026, Proceedings, Part I , page 3–17, Berlin, Heidelberg. Springer-Verlag. Phillip Isola, Joseph J. Lim, and Edward H. Adelson. 2015. Discovering states and transformations in im-age collections. In 2015 IEEE Conference on Com-puter Vision and Pattern Recognition (CVPR) , pages 1383–1391. Ranjay Krishna, Yuke Zhu, Oliver Groth, Justin John-son, Kenji Hata, Joshua Kravitz, Stephanie Chen, Yannis Kalantidis, Li-Jia Li, David A. Shamma, Michael S. Bernstein, and Li Fei-Fei. 2017. Vi-sual genome: Connecting language and vision us-ing crowdsourced dense image annotations. Int. J. Comput. Vision , 123(1):32–73. Jie Lei, Tamara L Berg, and Mohit Bansal. 2021. De-tecting moments and highlights in videos via natural language queries. In Advances in Neural Information Processing Systems , volume 34, pages 11846–11858. Curran Associates, Inc. Jie Lei, Licheng Yu, Tamara L. Berg, and Mohit Bansal. 2020. Tvr: A large-scale dataset for video-subtitle moment retrieval. In Computer Vision – ECCV 2020 ,pages 447–463, Cham. Springer International Pub-lishing. Junnan Li, Dongxu Li, Silvio Savarese, and Steven Hoi. 2023. Blip-2: bootstrapping language-image pre-training with frozen image encoders and large language models. In Proceedings of the 40th Interna-tional Conference on Machine Learning , ICML’23. JMLR.org. Bin Lin, Yang Ye, Bin Zhu, Jiaxi Cui, Munan Ning, Peng Jin, and Li Yuan. 2024. Video-LLaVA: Learn-ing united visual representation by alignment before projection. In Proceedings of the 2024 Conference on Empirical Methods in Natural Language Processing ,pages 5971–5984, Miami, Florida, USA. Association for Computational Linguistics. Haotian Liu, Chunyuan Li, Qingyang Wu, and Yong Jae Lee. 2023. Visual instruction tuning. In Advances in Neural Information Processing Systems , volume 36, pages 34892–34916. Curran Associates, Inc. Yanqing Liu, Yingcheng Liu, Fanghong Dong, Budianto Budianto, Cihang Xie, and Yan Jiao. 2026. Cast: Modeling visual state transitions for consistent video retrieval. Preprint , arXiv:2603.08648. Zheyuan Liu, Cristian Rodriguez-Opazo, Damien Teney, and Stephen Gould. 2021. Image retrieval on real-life images with pre-trained vision-and-language mod-els. In 2021 IEEE/CVF International Conference on Computer Vision (ICCV) , pages 2105–2114. Huaishao Luo, Lei Ji, Ming Zhong, Yang Chen, Wen Lei, Nan Duan, and Tianrui Li. 2022. Clip4clip: An empirical study of clip for end to end video clip retrieval and captioning. Neurocomputing , 508:293– 304. Victoria Manousaki, Konstantinos Bacharidis, Filippos Gouidis, Konstantinos Papoutsakis, Dimitris Plex-ousakis, and Antonis Argyros. 2024. Anticipating ob-ject state changes in long procedural videos. Preprint ,arXiv:2405.12789. Yulei Niu, Wenliang Guo, Long Chen, Xudong Lin, and Shih-Fu Chang. 2024. SCHEMA: State CHanges MAtter for procedure planning in instructional videos. In The Twelfth International Conference on Learning Representations .Maxime Oquab, Timothée Darcet, Théo Moutakanni, Huy V. Vo, Marc Szafraniec, Vasil Khalidov, Pierre Fernandez, Daniel HAZIZA, Francisco Massa, Alaaeldin El-Nouby, Mido Assran, Nicolas Ballas, Wojciech Galuba, Russell Howes, Po-Yao Huang, Shang-Wen Li, Ishan Misra, Michael Rabbat, Vasu Sharma, and 7 others. 2024. DINOv2: Learning robust visual features without supervision. Trans-actions on Machine Learning Research . Featured Certification. Khoi Pham, Kushal Kafle, Zhe Lin, Zhihong Ding, Scott Cohen, Quan Tran, and Abhinav Shrivastava. 2021. Learning to predict visual attributes in the wild. In 
+
+2021 IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , pages 13013–13023. Alec Radford, Jong Wook Kim, Chris Hallacy, Aditya Ramesh, Gabriel Goh, Sandhini Agarwal, Girish Sas-try, Amanda Askell, Pamela Mishkin, Jack Clark, Gretchen Krueger, and Ilya Sutskever. 2021. Learn-ing transferable visual models from natural language supervision. In Proceedings of the 38th International Conference on Machine Learning , volume 139 of 
+
+Proceedings of Machine Learning Research , pages 8748–8763. PMLR. Joshua David Robinson, Ching-Yao Chuang, Suvrit Sra, and Stefanie Jegelka. 2021. Contrastive learning with hard negative samples. In International Conference on Learning Representations .Kuniaki Saito, Kihyuk Sohn, Xiang Zhang, Chun-Liang Li, Chen-Yu Lee, Kate Saenko, and Tomas Pfister. 2023. Pic2word: Mapping pictures to words for zero-shot composed image retrieval. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , pages 19305–19314. Tomáš Souˇ cek, Jean-Baptiste Alayrac, Antoine Miech, Ivan Laptev, and Josef Sivic. 2022. Look for the change: Learning object states and state-modifying actions from untrimmed web videos. In 2022 IEEE/CVF Conference on Computer Vision and Pat-tern Recognition (CVPR) , pages 13936–13946. Mahiro Ukai, Shuhei Kurita, and Nakamasa Inoue. 2025. Status bench: A rigorous benchmark for evaluating object state understanding in vision-language models. 
+
+Preprint , arXiv:2510.22571. Aaron van den Oord, Yazhe Li, and Oriol Vinyals. 2019. Representation learning with contrastive predictive coding. Preprint , arXiv:1807.03748. Lucas Ventura, Antoine Yang, Cordelia Schmid, and Gül Varol. 2024. Covr-2: Automatic data construc-tion for composed video retrieval. IEEE Transac-tions on Pattern Analysis and Machine Intelligence ,46(12):11409–11421. Henrique Schechter Vera, Sahil Dua, Biao Zhang, Daniel Salz, Ryan Mullins, Sindhu Raghuram Pa-nyam, Sara Smoot, Iftekhar Naim, Joe Zou, Feiyang Chen, Daniel Cer, Alice Lisak, Min Choi, Lucas Gonzalez, Omar Sanseviero, Glenn Cameron, Ian Ballantyne, Kat Black, Kaifeng Chen, and 70 others. 2025. Embeddinggemma: Powerful and lightweight text representations. Preprint , arXiv:2509.20354. Nam Vo, Lu Jiang, Chen Sun, Kevin Murphy, Li-Jia Li, Li Fei-Fei, and James Hays. 2019. Composing text and image for image retrieval - an empirical odyssey. In 2019 IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , pages 6432–6441. Carl Vondrick, Hamed Pirsiavash, and Antonio Torralba. 2016. Anticipating visual representations from unla-beled video. In 2016 IEEE Conference on Computer Vision and Pattern Recognition (CVPR) , pages 98– 106. Yi Wang, Kunchang Li, Xinhao Li, Jiashuo Yu, Yi-nan He, Guo Chen, Baoqi Pei, Rongkun Zheng, Zun Wang, Yansong Shi, Tianxiang Jiang, Songze Li, Ji-lan Xu, Hongjie Zhang, Yifei Huang, Yu Qiao, Yali Wang, and Limin Wang. 2025. Internvideo2: Scal-ing foundation models for multimodal video under-standing. In Computer Vision – ECCV 2024 , pages 396–416, Cham. Springer Nature Switzerland. Yi Wang, Kunchang Li, Yizhuo Li, Yinan He, Bingkun Huang, Zhiyu Zhao, Hongjie Zhang, Jilan Xu, Yi Liu, Zun Wang, Sen Xing, Guo Chen, Junting Pan, Ji-ashuo Yu, Yali Wang, Limin Wang, and Yu Qiao. 2022. Internvideo: General video foundation models via generative and discriminative learning. Preprint ,arXiv:2212.03191. Shitao Xiao, Zheng Liu, Peitian Zhang, Niklas Muen-nighoff, Defu Lian, and Jian-Yun Nie. 2024. C-pack: Packed resources for general chinese embeddings. In 
+
+Proceedings of the 47th International ACM SIGIR Conference on Research and Development in Infor-mation Retrieval , SIGIR ’24, page 641–649, New York, NY, USA. Association for Computing Machin-ery. Hu Xu, Gargi Ghosh, Po-Yao Huang, Dmytro Okhonko, Armen Aghajanyan, Florian Metze, Luke Zettle-moyer, and Christoph Feichtenhofer. 2021. Video-CLIP: Contrastive pre-training for zero-shot video-text understanding. In Proceedings of the 2021 Con-ference on Empirical Methods in Natural Language Processing , pages 6787–6800, Online and Punta Cana, Dominican Republic. Association for Com-putational Linguistics. Jun Xu, Tao Mei, Ting Yao, and Yong Rui. 2016. Msr-vtt: A large video description dataset for bridging video and language. In 2016 IEEE Conference on Computer Vision and Pattern Recognition (CVPR) ,pages 5288–5296. Zihui Xue, Kumar Ashutosh, and Kristen Grauman. 2024. Learning object state changes in videos: An open-world perspective. In 2024 IEEE/CVF Confer-ence on Computer Vision and Pattern Recognition (CVPR) , pages 18493–18503. Xiaohua Zhai, Basil Mustafa, Alexander Kolesnikov, and Lucas Beyer. 2023. Sigmoid loss for language image pre-training. In 2023 IEEE/CVF Interna-tional Conference on Computer Vision (ICCV) , pages 11941–11952. Bin Zhu, Bin Lin, Munan Ning, Yang Yan, Jiaxi Cui, WANG HongFa, Yatian Pang, Wenhao Jiang, Junwu Zhang, Zongwei Li, Cai Wan Zhang, Zhifeng Li, Wei Liu, and Li Yuan. 2024. Languagebind: Ex-tending video-language pretraining to n-modality by language-based semantic alignment. In The Twelfth International Conference on Learning Representa-tions .Chenhui Zhu, Yilu Wu, Shuai Wang, Gangshan Wu, and Limin Wang. 2025. Motionrag: Motion retrieval-augmented image-to-video generation. In Advances in Neural Information Processing Systems , vol-ume 38, pages 173392–173415. Curran Associates, Inc. Dimitri Zhukov, Jean-Baptiste Alayrac, Ramazan Gok-berk Cinbis, David Fouhey, Ivan Laptev, and Josef Sivic. 2019. Cross-task weakly supervised learning from instructional videos. In 2019 IEEE/CVF Con-ference on Computer Vision and Pattern Recognition (CVPR) , pages 3532–3540. 
+
+A Benchmark and Protocol Details 
+
+State extraction and canonicalization. For each segment the VLM (Gemini-2.5-Flash) emits a free-form future-state description, which we parse into a predicate-level state ( type2 , e.g. falling )and a subject +predicate state ( type1 , e.g. ball falling ). Free-form descriptions are lexically noisy — falling , tumbling down , and dropping denote the same state — so we canonicalize synonyms by greedy BGE-embedding clustering: states are vis-ited most-frequent first , and each is merged into an existing canonical cluster if its BGE cosine sim-ilarity to the cluster seed is ≥ 0.85 , otherwise it seeds a new canonical state (the threshold was chosen on a pilot sweep over {0.80 , 0.85 , 0.90 }
+
+to balance merge rate against semantic coherence, keeping mean cluster size ≤5). Canonicalization reduces the raw state vocabulary to 51 ,362 canoni-cal predicate-level states, and every corpus segment and query target is re-keyed to its canonical state; all retrieval and ground truth are defined at this canonical level. 
+
+Ground-truth mining. For a query whose tar-get is canonical state s, we mine three comple-mentary GT pools: in-dataset (a different video of the same domain whose segment carries canonical state s), cross-dataset (a segment from a differ-ent domain with canonical state s — the honest cross-instance test), and bge-similar (BGE neigh-bours of s at cosine ≥ 0.85 , a looser recall-oriented pool). Candidates then pass multi-pass VLM re-verification (independent multi-frame object / state re-checks); the released high-precision consensus 
+
+pool is the intersection of the mining and verifica-tion passes. Structured hard negatives for training are the nearest BGE / visual neighbours of the tar-get that are excluded from every GT pool (App. H). Because mining is embedding-based and canonical, a 4.8% suspected-miss rate remains (§3), so every Recall@ k is a conservative lower bound. 
+
+Single-prefix protocol. Each (video, object) contributes one fixed early prefix (8 frames be-fore the event); multiple queries—across question types and horizons—share that prefix, so a method must predict rather than exploit a late, near-answer prefix. (We adopt this over the alternative of cut-ting a fresh near-answer prefix per horizon, which would leak the target; we use the single-prefix pro-tocol throughout.) Splits: train 14 ,390 / val 2,996 
+
+/ test 2,796 ; the fair test set with ground truth present in the retrieval space is n=2 ,430 . Ques-tion types are Q1 (next state), Q2 (end state), Q3 (after k seconds), Q4 (intermediate state), plus Q5 (multi-object end states, App. Q). The cor-pus holds 218 ,276 video segments (short watchable clips, each represented for retrieval by its middle frame) over 51 ,362 unique predicate-level states from four source domains ( HOWTOCHANGE , OOPS ,
+
+> SSV
+
+2, MOST ). An optional image corpus (Visual Genome (Krishna et al., 2017) + MIT-States (Isola et al., 2015)) is also provided (App. P). Table 5: Cross-model GT validation. Gemini-3-Flash re-scores the 500 -query human-validated sample: its GT-precision estimate matches the human audit, and it agrees with the human 3-way labels at 93 .4% (Cohen’s       
+
+> κ=0 .78 ).
+> value Human GT precision (5 annotators) 89 .4%
+> Gemini-3-Flash GT precision 88 .6%
+> Human–Gemini agreement (3-way label) 93 .4%
+> Cohen’s κ(human vs. Gemini) 0.78
+
+Difficulty tiers (where the correct future in-stance lives). For each query the ground-truth pool is partitioned into: in-video (self) —the query’s own source video’s future segment (future ≈
+
+present visually ); in-dataset —a different video, same domain; and cross-dataset —a different do-main, which forces matching the abstract state and is the honest generalization test. The main bench-mark excludes the self tier from the retrieval pool to force cross-instance prediction (App. M). 
+
+Ground-truth definitions. States come in two granularities: type2 (predicate only, the default index) and type1 (subject + predicate, stricter). A high-precision consensus pool (the intersection of mining and verification, §3) is also provided. Method rankings are stable across all definitions (App. N). 
+
+B Cross-Model GT Validation 
+
+Beyond the five-annotator human study (§3), we cross-check the same 500 -query sample with a stronger, automated judge — Gemini-3-Flash — prompted with the identical cor-rect / incorrect / uncertain rubric. It agrees with the human majority label at 93 .4% (Cohen’s κ=0 .78 ,on par with the 5-annotator κ=0 .76 ) and indepen-dently estimates GT precision at 88 .6% , corroborat-ing the human 89 .4% (Table 5). This thickens the reliability evidence with an automated second opin-ion. Because the judge shares the generator’s Gem-ini family, it does not substitute for a fully indepen-dent cross-family re-authoring (Limitation (i)); the M3 baseline (Qwen3-VL-32B), however, is cross-family from the generator, so the headline method-vs-MLLM comparison is already unconfounded by same-family affinity. 
+
+C Question-Type Taxonomy 
+
+PSR poses five temporal question types over each (video, object) prefix, each probing a different facet of future-state prediction (Table 6; a worked exam-ple per type in Fig. 7). Q1–Q4 constitute the main benchmark ( 20 ,182 queries; one shared early pre-fix per (video, object), queried at several horizons and types); Q5 is a separate multi-object stress test (App. Q). All types are generated by prompting a VLM over each object’s timed state trajectory 
+
+{(state i, t i)} and are answered against the same graded, cross-instance ground truth. Per-type re-trieval results are in Table 7. 
+
+Q1 — Next state. The immediately following 
+
+state after the prefix. Almost always a single step ahead ( h=1 for 98% of Q1), so it is the shortest-horizon, most perceptually anchored type, yet still requires predicting a transition rather than copying the present. 
+
+Q2 — End state. The object’s final state at the end of the video. Because “the end” is a variable distance away, Q2 spans the full horizon range 
+
+(h=1 –7) and is the hardest type (Table 7): the far future is genuinely multi-modal. 
+
+Q3 — After k seconds. The state a fixed k seconds ahead; k maps to a prediction horizon. Tests fixed-lead-time forecasting and, with k varied, gives the horizon-stratified curves in Fig. 6(b). 
+
+Q4 — Intermediate state. A state the object 
+
+passes through before reaching a named later state (“before losing balance, what state does it pass through?”). The largest type ( 7,981 ), it probes trajectory/ordering reasoning rather than endpoint prediction. 
+
+Q5 — Multi-object. The joint future states of ≥ 2
+
+objects in the scene, scored per object and jointly (App. Q); a compositional stress test kept separate from the single-object main benchmark. 
+
+D Implementation and Baseline Details 
+
+Encoders (exact models). Prefix/query encoders: 
+
+Qwen-VL (the vision tower of Qwen3-VL-32B), facebook/dinov2-large (Oquab et al., 2024), openai/clip-vit-base-patch32 (Rad-ford et al., 2021), and 
+
+facebook/vjepa2-vitl-fpc64-256 (As-sran et al., 2025). Text is encoded with 
+
+BAAI/bge-small-en-v1.5 (Xiao et al., 2024) (384 -d). The prefix is 8 frames sampled from the early clip; each image encoder yields one token per frame ( 8 tokens). Every corpus segment is embedded for retrieval by its middle frame in each visual space; the semantic space embeds the 51 ,362 canonical state strings with BGE. All QUERY VIDEO (prefix) Q: What will the christmas tree look like next? gold future state: falling over   
+
+> time
+> The predicted future “falling over” is retrieved from other instances, graded by difficulty:
+> in-video (self)
+> same clip’s future
+> in-dataset
+> same domain
+> cross-dataset
+> different domain
+
+Figure 5: Graded ground truth. The observed prefix (blue, ordered in time) and its predicted future state ( falling over ) as it appears in other instances, graded by difficulty: the query’s own video ( in-video , solved by appearance), another video of the same domain ( in-dataset ), and a different domain ( cross-dataset ). The main benchmark scores cross-instance retrieval and excludes the in-video tier. Table 6: Question-type taxonomy and statistics. Q1–Q4 form the main benchmark; Q5 is a separate multi-object evaluation (App. Q). “ N ” is train/val/test query counts; “ h” is the prediction-horizon coverage (steps ahead). Per-type R@5 is reported in Table 7.                                          
+
+> Type Asks for Example question →target N(tr/val/test) h
+> Q1 Next state the immediately next state “What will the man look like next?” →struggling with jellyfish 3028/634/588 1(98% )Q2 End state the final state at video end “What is the final state at the end?” →falling into water 2883/582/555 1–7
+> Q3 After-kthe state kseconds ahead “. . . look like after 3 seconds?” →swinging object toward grill 2784/585/562 1–7
+> Q4 Intermediate a state passed through first “Before losing balance, what state does it pass through?” →struggling with jellyfish 5695/1195/1091 1–7
+> Q5 Multi-object joint future of ≥2objects per-object end states (App. Q) separate eval —
+
+Table 7: R@5 by question type (test). Fusion wins on every type; the end-state Q2 is hardest for all learned methods while the Oracle is flat ( ∼51 –56 ), locating the difficulty in far-horizon prediction rather than a particular question form.                       
+
+> Method Q1 next Q2 end Q3 after-kQ4 inter. M3 (Qwen3-VL-32B) 15.0 7.2 11.2 13.0 LFTR →DINOv2 13.8 7.6 16.3 13.1
+> LFTR fusion (ours) 17.8 9.9 20.0 16.2
+> Oracle-BGE (ceiling) 51.0 51.1 55.7 53.6
+
+encoder features are precomputed and frozen. 
+
+LFTR (full configuration). Internal width 
+
+Dm=512 ; a 3-layer, 8-head Transformer encoder forms the context; the transition Φ is a 3-layer MLP (depth = 3 ); rollout depth H=8 ; K=32 samples; a horizon-conditioned σ head. Objective: multi-query max-similarity InfoNCE ( τ =0 .04 ) with 384 
+
+random + 128 hard negatives (nearest neighbours of the positive in the target space, excluding the query GT), plus a grounding MSE (weight 0.5) to the target embedding. AdamW (lr 3×10 −4, weight decay 10 −4), cosine schedule, 40 –60 epochs, batch 
+
+256 , best-val-R@5 selection, five seeds. Only the head ( ∼11 .98 M params) is trained. Cross-space fusion runs LFTR in the BGE and DINOv2 spaces and sums per-item z-scored scores. 
+
+Baselines (exact setup). 
+
+• Random : a random ranking of the corpus. • Question-only : BGE-encode the question text and retrieve in the BGE state space (no visual input) — isolates language priors. • Text-only predictor : a text LLM (Qwen2.5-VL-7B, run text-only) is given a symbolic tran-script of the observed prefix states (each state with its timestamp, truncated at the query time so the answer is never revealed) plus the ques-tion, and outputs a short future-state phrase; we BGE-encode it and retrieve. This isolates 
+
+prediction from perception: even with an or-acle textual description of the past, the fu-ture state is hard to forecast (R@5 6.5, only marginally above the question-only prior). • kNN-future (non-parametric): take the near-est training query by prefix features and use its ground-truth future state as the prediction; no learned parameters. • Persistence (“future =present”): the last ob-Random                
+
+> V-JEPA2
+> native
+> kNN-
+> future
+> Zero-shot
+> Qwen
+> Persistence
+> M3 (32B)
+> LFTR  BGE
+> (ours)
+> LFTR  DINOv2
+> (ours)
+> LFTR x-space
+> (ours)
+> Oracle
+> 0
+> 10
+> 20
+> 30
+> 40
+> 50
+> R@5 (%)
+> (a) Methods vs baselines vs ceiling
+> 12345
+> horizon (steps ahead)
+> 2.5
+> 5.0
+> 7.5
+> 10.0
+> 12.5
+> 15.0
+> 17.5
+> 20.0
+> R@5 (%)
+> (b) R@5 by horizon
+> M3
+> LFTR DINOv2 (ours)
+> LFTR x-space (ours)
+> 25 50 75 100 125 150 175 200 225
+> corpus size (k sids)
+> 8
+> 10
+> 12
+> 14
+> 16
+> 18
+> R@5 (%)
+> (c) R@5 vs corpus size (bigger = harder)
+> LFTR DINOv2 (ours)
+> LFTR BGE (ours)
+> M3
+> Persistence
+
+Figure 6: (a) Methods vs. baselines vs. ceiling (5-seed means, matching Table 2). (b) R@5 by horizon: LFTR holds the mid-horizon range where the MLLM collapses, but every learned predictor falls far below the (horizon-flat) Oracle beyond h=2 . (c) R@5 vs. corpus size: LFTR degrades more gracefully than M3 as the database grows. Panels (b,c) show a representative single run, so absolute values run ∼1pp above the seed-averaged Table 2. 
+
+served prefix frame’s embedding (Qwen-VL or DINOv2) retrieves in the same space — copies the present. • Zero-shot : mean-pool the 8 prefix tokens of a frozen encoder and retrieve in that encoder’s corpus; no training, no prediction. • Trained-head : the LFTR head with H=1 (a horizon-conditioned read, no multi-step roll-out), trained identically; and LoRA-fine-tuned encoders. • LoRA fine-tune : LoRA ( r=16 , α=32 , tar-gets q/k/v (+out for CLIP), dropout 0.1) on the encoder, mean-pool → projection → In-foNCE; batch 64 , ∼15 epochs. • M3 (MLLM): Qwen3-VL-32B-Instruct is shown the 8 prefix frames and the question and prompted to name the object’s future state in text; the prediction is BGE-encoded and retrieved in the BGE state space. Fair visual variants (CLIP text →image, and fusion) are in Table 3. • Oracle (ceiling): encode the true target state — as text (BGE) or as the state’s mean DINOv2 frame-prototype (visual) — and retrieve; the upper bound given perfect prediction. 
+
+Scoring. Cosine similarity; for LFTR the query score is the max over its K samples; a state-space method expands each retrieved state to its member segments. R@ k/MRR follow the standard defini-tions on the graded GT. Compute. The frozen-feature head trains in minutes on one GPU; end-to-end LoRA of the encoder costs ∼40 min/epoch (App. S). 
+
+E Full Baseline and Method Table 
+
+Table 8 reports every family at all cutoffs on the fair test set ( n=2 ,430 ). Highlights: Qwen-VL is the strongest prefix encoder and a DINOv2 visual space the strongest retrieval target (App. F); trained heads beat zero-shot and LoRA fine-tuning. Every other MLLM we tried — across families and scales 
+
+— trails the 32B Qwen-VL M3: an image MLLM (LLaVA-1.6-7B 4.2), a 27 B coding VLM ( 4.6), and a video -native MLLM at two sizes (LLaVA-NeXT-Video 7B→34 B: 2.8 → 4.2). Even a 34 Bvideo model reaching only 4.2 — below persistence (10 .8) — demonstrates PSR is not trivially solv-able by a strong MLLM. Crucially, none of these baselines — including the strongest, Qwen-VL M3 — is the family that generated the GT (Gemini-2.5-Flash), so M3’s lead reflects genuine forecast-ing ability, not same-family affinity; the one resid-ual question — whether the single Gemini gener-ator’s phrasing conventions advantage some fore-casters — would be settled by a full cross-family re-authoring (Limitations). A V-JEPA2 world-model encoder—even its native predictor—is weak for cross-instance semantic retrieval. 
+
+F Encoder × Target-Space Matrix 
+
+LFTR is encoder-agnostic (the prefix encoder is a swappable, frozen choice). Table 9 is the full 8×10 grid — eight diverse frozen pre-fix encoders (a multimodal LLM Qwen-VL, two video–language foundation models Intern-Video2/LanguageBind, two image–text encoders SigLIP/CLIP, a self-supervised image encoder DI-NOv2, a self-supervised video/world-model V-JEPA2, and a boundary-SSL encoder LingBot) ×
+
+ten target spaces (the same eight visual encoders Type Observed prefix Temporal question → predicted future state Q1        
+
+> next
+> time
+> What will the ATV look like next?
+> gold: moving through mud
+> Q2
+> end state
+> time
+> What is the final state of the car at the end of the video?
+> gold: submerged in floodwater
+> Q3
+> after ks
+> time
+> What will the pan look like after 8 seconds?
+> gold: tipping
+> Q4
+> intermediate
+> time
+> Before the pan reaches “oiled”, what state does it pass through?
+> gold: heated
+> Q5
+> multi-object
+> time
+> Joint future of both objects in the scene?
+> woman →swimming in pool
+> pool edge →remaining stationary
+
+Figure 7: One worked example per question type (Q1–Q5). Each row shows the observed prefix (blue frames, ordered left-to-right in time), the temporal question, and its predicted future state (gold). The types probe different horizons: Q1 the immediate next state, Q2 the end state, Q3 the state after k seconds, Q4 an intermediate state before a named later state, and Q5 the joint future of two objects in one scene (multi-object, scored per object and jointly; App. Q). The target never appears in the prefix; it must be predicted, then matched by meaning in other videos. 
+
+plus the two text-state spaces BGE/Gemma), all 
+
+80 cells trained under one config (LFTR, R@5, seed-0). Every visual encoder thus appears as 
+
+both a prefix row and a target column. LFTR trains and works with every encoder; it is not tied to Qwen-VL. The prefix-encoder ranking is Qwen-VL > InternVideo2 > SigLIP > DINOv2 
+
+> LingBot ≈ LanguageBind > CLIP > V-JEPA2: the multimodal LLM is strongest (it already fuses vision and language) — best for 7 of 10 target spaces — a strong video foundation model (Intern-Video2) and a strong image–text encoder (SigLIP) are close behind, and a world-model encoder (V-JEPA2) is not automatically a good retrieval en-coder. Qwen-VL is thus our default because it is best, not because the method requires it. On the tar-get axis, the boundary-SSL LingBot-Vision space is the strongest column (best target; Table 11) — so good that a DINOv2 prefix retrieving into it ( 13 .6)matches the best Qwen-VL cell — followed by the semantic (Gemma/BGE) and DINOv2 spaces, while a contrastive-visual (SigLIP, InternVideo2) or VLM (Qwen) target is weaker, and CLIP and especially V-JEPA2 are the weakest targets ( ≤ 9.3
+
+/ ≤ 6.1 from any prefix). The two axes are thus decoupled: Qwen-VL is the best prefix , LingBot the best target .
+
+Does fusing prefix encoders help? No—a re-vealing asymmetry. Cross-space fusion helps on the target (retrieval) side (App. I); we test whether it also helps on the prefix (encoding) side by con-catenating the per-frame features of multiple en-coders as the LFTR prefix (DINOv2 target; Ta-ble 10). It does not : the single strongest encoder, Qwen-VL, beats every fused prefix, and mixing in weaker per-frame features (DINOv2, SigLIP, and especially V-JEPA2) monotonically dilutes it. This asymmetry is informative: the target space is a 
+
+retrieval index that benefits from complementary views (semantic + visual cover different queries), whereas the prefix is a single input encoding best served by the one strongest representation—adding weaker, redundant feature dimensions only gives the frozen head more to overfit. Fusion helps where views are complementary, not where one view al-ready dominates. 
+
+Best zero-shot encoder ̸ = best target space (a target-space bake-off). We fix the strongest prefix encoder (Qwen-VL) and vary only the retrieval tar-get space, spanning a text-state space (BGE), image encoders (SigLIP, DINOv2), and two recent video-native video–language foundation models (Lan-guageBind (Zhu et al., 2024), InternVideo2 (Wang et al., 2025)), each encoding the corpus segment as an 8-frame clip (Table 11). Two things stand out. First, the zero-shot retrieval ranking is es-sentially inverted relative to the LFTR-target rank-ing : SigLIP is the best zero-shot retriever ( 7.74 )but the worst learned target of these five (10 .6), whereas DINOv2 is the worst zero-shot retriever (5.47 ) yet the best of the five (12 .8). Second, the two newest video–language models, despite native temporal modeling and strong zero-shot ( 6.8–7.1), do not beat DINOv2 as targets ( 11 .0/11 .4). The reason is consistent: image–text/video–text con-trastive features are optimized to match present appearance and are excellent zero-shot, but they are a harder, less structured target for a predictor to regress toward; self-supervised patch features re-trieve poorly zero-shot yet are the most predictable 
+
+future-state target. The clearest case is LingBot-Vision (“LingBot” for short) (Fu et al., 2026), an SSL image encoder trained with masked bound-ary modeling: it is the weakest zero-shot retriever (4.94 , below DINOv2) yet the best learned target of all ( 13 .6±0.2 over 5 seeds, above DINOv2’s 12 .8)— a spatial-/boundary-aware self-supervised objec-tive yields the most predictable target. Tellingly, the same LingBot encoder makes only a mid-tier prefix (9.75 as a prefix encoder, App. F, below Qwen-VL/InternVideo2/SigLIP/DINOv2): being a good target (a predictable retrieval index) and a good prefix (a rich input encoding) are differ-ent properties. Choosing a target space is thus a modeling decision about predictability , not a race for the best off-the-shelf retriever — and no purely visual space, video-native or not, closes the gap to the semantic ceiling, reinforcing our language-grounded thesis (Sec. 5.3). The seman-tic axis quality is a lever. Consistent with this, swapping the semantic text-state encoder from BGE-small to the stronger EmbeddingGemma-300m (Vera et al., 2025) lifts the semantic space (LFTR R@5 11 .3→12 .3, 5-seed) and the head-line fusion (BGE +Gemma +DINOv2 17 .6±0.8
+
+vs. BGE +DINOv2 16 .1±1.0; and the best 4-way BGE +Gemma +DINOv2 +LingBot reaches 
+
+18 .6±0.6; App. I). Unlike the visual encoder— interchangeable and capped near the visual floor— the semantic encoder’s quality directly improves retrieval, underscoring that the binding representa-tion in PSR is the language-aligned state. 
+
+G Ablations and Hyperparameters 
+
+Components (semantic space). In the BGE space, removing question conditioning, hard negatives, grounding, or the uncertainty head each moves R@5 within seed noise (Table 12); this is the find-ing that motivated the space-resolved hard-negative study (App. H), where the same knob is strongly significant in the visual space. Hyperparameters. 
+
+Samples K and rollout depth H are within noise on a single BGE model ( K∈{ 4, 16 , 32 , 64 }: 11 .1–
+
+12 .0; H∈{ 1, 2, 4, 8, 16 }: 11 .3–12 .7)—consistent with App. K showing the multi-step rollout is not the performance lever. We use K=32 , H=8 ,
+
+τ =0 .04 , grounding 0.5, transition depth 3, AdamW lr 3×10 −4, cosine schedule, 40 –60 epochs, batch 
+
+256 , select on val R@5. 
+
+H Hard Negatives: Space-Resolved 
+
+Hard negatives mine embedding-similar (visu-ally/semantically confusable) but wrong future states. In the DINOv2 visual space they yield a large, significant, monotone gain saturating near 
+
+128 (Table 13: +3 .9pp R@5, p < 10 −3, five seeds). In the BGE semantic space the same knob is neutral (Table 12), because text states are already lexically separated. Visual, not semantic, confus-ability is the binding constraint—matching the fail-ure analysis (Fig. 9), where top-1 errors are seman-tically adjacent states ( lying on ground →“being pushed”, BGE sim 0.61 ; being grated → “grat-ing parmesan”, 0.69 ). Fig. 8 makes this concrete: the correct future frame sits among hard negatives that are near-identical scenes in a different future state (chopping meat vs. cutting chicken / mincing garlic; falling into water vs. already submerged), which the multi-query contrastive objective must rank apart. 
+
+I Cross-Space Fusion 
+
+Which spaces? A full combination sweep. We put six trained target spaces (BGE, DINOv2, SigLIP, LanguageBind, InternVideo2, Qwen) into 
+
+one common fusion framework (each is an LFTR head on the Qwen-VL prefix, so they are directly gold future correct hard negatives (retrieved in its place) 
+
+> being mashed
+> roll dough
+> cutting mushrooms
+> falling
+> shattering
+> flattened
+
+Figure 8: Positive vs. hard-negative future states. Each row: the correct future-state frame (green) and the hard negative a model retrieves in its place (red)—a visually and semantically adjacent but wrong future drawn from 
+
+another video , with the BGE state-text cosine similarity that makes it confusable. Each panel is the single middle frame (the still image encoded for training), not a full clip. These near-miss states are what LFTR’s hard-negative objective is trained to separate; mining them in the visual space (not the text space) yields the significant gain in Table 13. 
+
+comparable) and z-score–fuse every pair, triple, and the full six-way combination (Table 14); we ad-ditionally evaluate the stronger EmbeddingGemma semantic space and the boundary-SSL LingBot visual space, and report all headline fusions over 5 seeds ( ∗∗ denotes a significant per-seed paired improvement over BGE +DINOv2). Three patterns emerge. (i) The semantic ×visual axis is what matters : every top combination pairs the semantic BGE space with a visual one, and 
+
+every combination without BGE plateaus ∼3pp lower (e.g., DINOv2 +SigLIP +IntVid2 14 .7). (ii) 
+
+The specific visual encoder is interchangeable :BGE +DINOv2/SigLIP/LangBind/InternVideo2 all land 16 .9–17 .4, with DINOv2 best. (iii) More spaces help only if each adds a complementary 
+
+strong axis, not a redundant one. Piling on a redundant same-type encoder is useless—a second contrastive-visual space on top of DINOv2 (BGE +DINOv2 +SigLIP 17 .4) or the full six-way fusion ( 17 .0) does not beat the best BGE +visual triple. But the best encoder of each distinct family 
+
+does stack: the strongest semantic space (Em-beddingGemma) and two differently-supervised 
+
+visual encoders (DINOv2 patch-SSL + LingBot boundary-SSL) each contribute, and combining all four—BGE +Gemma +DINOv2 +LingBot—is the best configuration at R@5 18 .6±0.6 over five seeds, a significant +2 .5pp over the 2-space BGE +DINOv2 (paired t, p=0 .002 ; every inter-mediate combo marked ∗∗ in Table 14 is also significant). So the rule is complementarity, not count : adding a space helps exactly when it orga-nizes states differently (a new semantic encoder, or a visual encoder with a different SSL objective), and not when it merely duplicates an axis already query (prefix → gold) LFTR-Fusion top-3 retrievals SUCCESS roll dough    
+
+> SUCCESS being mashed
+> FAILURE lying on ground
+> FAILURE flattened
+
+Figure 9: Positive (success, green) vs. negative (failure, red). For each query (observed prefix and gold future), LFTR-fusion’s top-1 retrieval: a success retrieves the correct future state; a failure retrieves a hard negative —a semantically adjacent but wrong future state drawn from another video, rather than an unrelated item. 
+
+covered. Fig. 10 shows this per query — one space is right exactly where the other is wrong — and Fig. 11 makes the mechanism concrete: BGE and DINOv2 solve different queries ( 4.4% BGE-only 
+
++ 6 .3% DINOv2-only; this coverage analysis uses a single run at fusion 16 .9 — a different seed from the 16 .75 run used for the paired test above, both within the 16 .1±1.0 band — and it nearly matches their union 17 .8), their per-pair state-similarity is weakly correlated ( r=0 .40 ), and semantic clusters are spatially mixed in the visual space—the two views organize states differently, so combining them adds information. Significance. 
+
+Five seed-paired fusions give R@5 16 .06 ±0.95 
+
+(= 16 .1 in Table 2) vs. M3 11 .93 (+4 .13 pp). For a clean, selection-free test we also compare fusion and M3 per query on the identical set of all n=2 ,430 test queries, using one representative fusion run (R@5 16 .75 , within the 16 .1±1.0 seed band) against M3’s deterministic (temperature-0)prediction. A paired bootstrap ( 10 4 resamples over queries; this tests query-sampling variance, not seed variance — M3 is a single deterministic decode) gives ∆R@5 = +4 .81 pp, 95% CI 
+
+[+3 .00 , +6 .58] , two-sided p < 10 −4; McNemar’s exact test on the discordant pairs (fusion right / M3 wrong = 305 ; M3 right / fusion wrong 
+
+= 188 ) gives p=1 .5×10 −7. Both agree fusion is a strongly significant improvement. The win is not confined to the easy near horizon. Stratifying the same paired bootstrap by horizon, fusion beats M3 significantly at h1 (+3 .8pp, p=0 .005 ), h2(+9 .9pp, p=10 −4 — the largest margin, exactly where the mid-horizon future first becomes multi-modal), and h3 (+4 .5pp, p=0 .04 ); at h4/h5 the tiny buckets (fusion ∩M3 common set, n=109 /77 )leave it non-significant ( −0.9/+6 .5pp). So the advantage holds precisely where forecasting starts to bite, not only at h1. Fusion also beats the strong 
+
+persistence baseline by a larger margin ( 16 .1 vs. 
+
+10 .8, +5 .3pp) than it beats M3, so “a method must predict” holds under the same test. Single-space LFTR over M3 is within seed noise ( +1 .65 pp, 
+
+p=0 .063 ), so fusion is the robust win. These are the paper’s two pre-registered comparisons (fusion vs. M3, fusion vs. persistence); the many exploratory per-combination tests in Tables 13, 14 are reported with raw p-values and should be read as exploratory (no multiple-comparison correction applied). 
+
+J Appearance Floor Across Visual Spaces 
+
+The central ceiling claim—that the future is not 
+
+matchable by raw appearance across instances, only by semantic state—rests on the independent observed-future-frame oracle (query = the object’s own future frame, retrieve cross-instance GT). A skeptic could object that its low score ( 5.7) reflects a poor choice of one visual space (DINOv2) or one 
+
+frame. Table 15 repeats the oracle in every visual space and with a multi-frame query. It stays near the floor everywhere— 3.0 (CLIP) to 6.6 (SigLIP)— and averaging all of the query’s own future frames does not help. Even the best visual oracle ( 6.6)is roughly 8× below the semantic ceiling ( 53 ), so “cannot solve by appearance” is a property of the 
+
+task , not of a particular encoder or single-frame query. 
+
+K Horizon, Ceiling, and the Rollout 
+
+The Oracle (perfect future-state) is flat across hori-zon in both spaces (main Table 4), yet every learned predictor collapses past h=2 (Fig. 12). We isolate the rollout: the full H=8 trajectory is statistically indistinguishable from an H=1 
+
+horizon-conditioned read (overall 12 .80 ±0.72 vs. 
+
+12 .40 ±1.02 , p=0 .54 ; n.s. at every horizon), and intermediate- horizon supervision does not help at any weight (Table 16). Per-horizon test support is 
+
+n=1356 /576 /312 /109 /49 for h=1 .. 5. Thus far-horizon prediction , not retrieval or the rollout mech-anism, is the bottleneck. 
+
+L Rollout: A Rich but Under-Exploited Trajectory 
+
+The rollout is not an accuracy lever (App. K), but it is a structured predictor with a distinc-tive, if untapped, property. (i) Single-pass, any-horizon. One rollout emits the full future trajec-tory (μ1, . . . , μ H ), so a shared single early prefix— queried at many horizons and question types—is answered by reading different steps of one forward pass, rather than recomputing per query. (ii) The trajectory is rich. Table 17 varies only which step of a fixed trained model is read. A horizon-agnostic 
+
+fixed step 1 read underperforms the default matched step h read, confirming the trajectory is horizon-ordered. Crucially, an oracle that reads the best step per query reaches R@5 17 .7 (DINOv2) / 16 .0
+
+(BGE) vs. 13 .4 / 11 .2 for the matched read—a large 
+
++4 .3/+4 .8pp head-room that replicates across both retrieval spaces . (iii) The signal is per-query and hard to harvest. A validation-learned per-horizon step calibration adds ≈ 0pp (the best step is query-, not horizon-, specific), and a multi-hypothesis read (max-similarity over all steps at once) helps only at far horizons in the visual space ( h≥3: 7.2
+
+vs. matched 5.1, +2 .1pp; near horizons and BGE: neutral-to-worse). So the rollout demonstrably en-codes retrievable future states across its steps, but converting that latent richness into a robust, oracle-free read rule is an open problem the benchmark surfaces—a concrete future direction rather than a solved contribution. 
+
+M Difficulty Tiers and Generalization 
+
+In-video (self). Appearance persistence dominates (R@5 75 .2) while every semantic method, includ-ing the Oracle , scores ≤ 5 (Fig. 13)—in-video retrieval is solved by visual instance-matching, not prediction, which is why the main pools exclude self. In- vs. cross-dataset. Cross-dataset R@5 is 
+
+≈ 8.4 for both LFTR variants (the honest gener-alization gap), well below in-dataset ( 13 –17 ); DI-NOv2’s advantage is mostly in-dataset ( 17 .2 vs. 
+
+8.4). 
+
+N Robustness to GT Definition 
+
+Across type2-all / type2-consensus / type1-all the method ranking is stable (LFTR →DINOv2 
+
+13 .7/12 .3/13 .4; M3 11 .9/11 .8/9.9; Oracle 
+
+53 .0/51 .0/38 .1)—results are not an artifact of one GT definition. Type1 (subject +predicate) is stricter, lowering the ceiling to 38 .query → gold BGE (semantic) top-3 DINOv2 (visual) top-3 
+
+> being mashed
+> visual wins
+> cutting mushrooms
+> semantic wins
+> The semantic and visual spaces are complementary — each ranks the correct future highly where the other fails — so cross-space fusion covers both.
+
+Figure 10: Why fusion works: complementarity. One query per row (observed prefix and gold future on the left; each method’s top-1 retrieval, green if correct, red otherwise). The semantic (BGE) and visual (DINOv2) spaces make different errors — top row the visual space is right and the semantic wrong, bottom row the reverse — so z-score cross-space fusion recovers the correct future where either space alone fails. BGE        
+
+> (semantic)
+> DINOv2
+> (visual)
+> Fusion
+> (ours)
+> Union
+> (ceiling)
+> 0
+> 5
+> 10
+> 15
+> 20
+> R@5 (% of test queries)
+> 11.5
+> 13.3
+> 16.9 17.8
+> (a) Fusion nears the union
+> of both spaces
+> 0.0 0.2 0.4 0.6 0.8 1.0
+> cosine sim in BGE (semantic)
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> cosine sim in DINOv2 (visual)
+> (b) The two spaces disagree on
+> state geometry ( r= 0.40 )
+> states coloured by BGE-semantic cluster
+> (c) Semantic clusters (colour) are
+> mixed in the visual space (DINOv2 PCA)
+> Why cross-space fusion works: the semantic (BGE) and visual (DINOv2) spaces are complementary
+
+Figure 11: Why cross-space fusion works. (a) Complementary coverage: of the test queries, 4.4% are solved only by the semantic (BGE) space and 6.3% only by the visual (DINOv2) space; z-score fusion ( 16 .9) nearly recovers their union (17 .8), far above either alone. (b) The two spaces disagree on state geometry: cosine similarity of state pairs in BGE vs. DINOv2 is weakly correlated ( r=0 .40 ). (c) States clustered by semantics (BGE, colour) are spatially mixed when laid out by visual similarity (DINOv2 PCA)—the two spaces organise the same states differently, which is the source of the complementarity fusion exploits. Panel (a) is a single representative run, so its absolute R@5 runs ∼1pp above the seed-averaged headline (fusion 16 .1, Table 2). 
+
+O Corpus-Size Ablation 
+
+As the corpus grows 20 k→218 k all methods de-grade monotonically, but LFTR →DINOv2 stays on top and widens its margin over M3 ( 20 k: 18 .4 vs. 
+
+18 .2; 218 k: 13 .5 vs. 11 .9; all values here are single seed-0 runs, so the 218 k LFTR →DINOv2 13 .5 is within run noise of the canonical 12 .8±0.7/13 .7-seed-0), i.e. it degrades more gracefully. The semantic-text oracle falls 78 .1 → 52 .9; the DINOv2-last-frame persistence variant 14 .9 → 8.5
+
+(the Qwen-last-frame headline persistence is 10 .8
+
+at 218 k). 
+
+P Image Modality 
+
+On an image-only corpus (VG + MIT-States, 333 kitems) retrieval is hard even for the semantic-text oracle (R@5 8.9), versus 49 .7 for the same or-acle restricted to this appendix’s image-eligible query subset on the video corpus (lower than the main-benchmark 53 .0 because this is a harder, smaller subset). The drop to 8.9 (Table 18) has two causes: a vocabulary/domain mismatch between video-derived query states and image-corpus labels, and—more fundamentally—that many PSR states are dynamic (falling , being pushed ), which a static 
+
+image captures poorly (VG and MIT-States depict static scenes) whereas a video segment shows the Figure 12: R@5 vs. horizon. The Oracle (perfect predic-tion, red) is flat ∼55% ; every learned method — LFTR with the full rollout ( H=8 ), without it ( H=1 ), with in-termediate supervision, plus persistence and the MLLM (M3) — collapses beyond h=2 and the rollout variants overlap. The gap to the flat Oracle is prediction error, and the rollout mechanism does not close it. Persistence         
+
+> (copy present)
+> LFTR DINOv2 M3 (MLLM) LFTR BGE Oracle
+> (true state)
+> 0
+> 10
+> 20
+> 30
+> 40
+> 50
+> 60
+> 70
+> 80
+> in-video R@5 (%)
+> 75.2
+> 4.8 2.0 2.0 2.4
+> every semantic method
+> (even the Oracle)
+> is near zero
+> In-video retrieval is solved by appearance, not prediction
+> The query's own future looks like its present, so copy-present persistence wins; matching state by meaning needs cross-instance retrieval (hence PSR excludes self).
+
+Figure 13: On the in-video (self) tier, copy-the-present persistence reaches R@5 75 .2 while every semantic 
+
+method — even the Oracle given the true state — is near zero. In-video is solved by appearance, so PSR excludes self and forces cross-instance retrieval. 
+
+motion. Images therefore match near-static end -states ( shattered , sliced ) far better than mid-action ones—an open cross-modal challenge of the bench-mark. 
+
+Q Multi-Object (Q5) 
+
+Applied per object, LFTR →DINOv2 matches its single-object end-state score (per-object R@5 8.84 
+
+vs. Q2 single 9.11 ) and leads M3 ( 7.67 ), so the method transfers. But joint all-objects-correct is combinatorial ( ≈ pK ) and near zero even for the Oracle ( 18 .8% joint for two objects, collapsing with more)—the low absolute scores stem from end-state difficulty plus the combinatorial joint met-ric, not method unsuitability. Joint multi-object prediction is an open regime. 
+
+R Efficiency 
+
+The LFTR head is 11 .98 M parameters and infer-ence is 0.06 ms/query (predict + retrieve) with the encoder frozen and features precomputed — roughly four orders of magnitude cheaper than gen-erating with a 32 B MLLM per query. Table 19 gives the full budget on a single NVIDIA H200: because encoders are frozen and their features pre-computed once, training the head is cheap ( < 1
+
+GPU-hour per run) and the whole multi-seed, multi-space study is only a few GPU-hours; the dominant one-time cost is precomputing the corpus feature indices, which we release so the benchmark repro-duces without re-encoding. 
+
+S Does Unfreezing the Encoder Help? 
+
+We probe whether LFTR is limited by its frozen prefix, its objective, or its target. Objective/target changes are null. Redirecting the grounding loss from the query’s GT-instance centroid to the state prototype the Oracle uses (a natural “align with the ceiling” idea) changes R@5 by −0.02 over five seeds ( p=0 .96 ); the multi-step rollout is sta-tistically indistinguishable from a single horizon-conditioned read; and intermediate-horizon super-vision does not help at any weight. Only un-freezing the encoder helps, and only slightly. 
+
+We LoRA-fine-tune the prefix encoder end-to-end through the LFTR head, with a frozen-encoder run of the same script as the control (Table 20). Un-freezing gives +0 .53 (DINOv2) and +0 .37 (CLIP) R@5 — consistent across two encoders but within single-seed noise ( ±0.7) and at ∼40 min/epoch ver-sus seconds/epoch for a frozen head on cached features. The frozen prefix is therefore a mild con-straint; even a fully adaptable encoder stays ∼45 pp below the horizon-flat Oracle, so far-horizon pre-diction — not the encoder, head, or loss — is the binding bottleneck. Frozen-LFTR is the efficient Pareto point. 
+
+T Prompt Templates 
+
+The exact prompts, including the multi-pass verifi-cation prompts used for GT quality control (omit-ted here for space but equally load-bearing for the reliability claims), are released with the code; we reproduce the generation prompts verbatim below. Braces are substituted per query. 
+
+Text-only predictor (oracle-perception con-trol, §5.3). 
+
+An object (’{subject}’) was observed with these states over time: {t 1s: state 1; t2s: state 2; . . . }. {question} Answer with ONLY the object’s predicted future state as a short phrase (2–5 words), no explanation. The state list is truncated to states with timestamp 
+
+< the query’s target time, so the answer is never revealed. 
+
+M3 (multimodal-LLM baseline). Identical to the text-only prompt but the 8 prefix frames are prepended as images and the state transcript is omitted, so the model must read the states off the frames:       
+
+> [8 prefix frames] {question} Answer with ONLY the object’s predicted future state as ashort phrase (2–5 words), no explanation.
+
+Decoding is temperature 0 (deterministic), 
+
+max_tokens = 24 ; the phrase is BGE-encoded and retrieved. 
+
+Benchmark construction (state/question gen-eration). A representative template; the full loop (object inventory, timed state trajectory, per-type question generation) is in the released 
+
+build_dataset scripts:                     
+
+> Watch this video segment. List each visible object and its state trajectory as (state, time) pairs. Then, for the object ’{subject}’, write a{Q-type} question whose answer is its {next / end /after-ks/intermediate} state, and give that ground-truth state as a short predicate phrase.
+
+U Retrieval-Channel Decomposition 
+
+The raw method–ceiling gap ( 16 → 53 ) mixes two distinct sub-problems, and separating them clari-fies what a better predictor can actually close. All learned methods retrieve a free-form predicted state string, whereas the semantic oracle ( 53 ) retrieves the dataset’s canonical string; so part of the gap is a retrieval-canonicalization channel (how well a correct-but-differently-phrased state matches the canonical index), not forecasting. 
+
+Forecasting vs. canonicalization (clean con-trol). We paraphrase each query’s true state with an LLM (reword, same meaning) and retrieve the paraphrase. This holds the content correct and varies only the phrasing , so any drop from 53 is pure canonicalization loss. The paraphrase oracle reaches R@5 29 .7 (Table 21). Two consequences: (i) the ceiling achievable by any free-form fore-caster is ∼30 , not 53 ; (ii) the genuine forecasting 
+
+gap a better predictor can close is therefore ∼14 pp (16 → 30 ), while the 30 → 53 residual is an arti-fact of exact-string canonicalization — a lever for future benchmark design (e.g., paraphrase-robust GT indices), not for the predictor. This sharpens rather than weakens the “prediction is the open problem” message: it gives a concrete, achievable target ( 30 ) and isolates the learnable portion of the gap. 
+
+Cross-model description (rough, confounded). 
+
+As a rough probe of whether the canonical vocab-ulary is generator-specific, we let a non-Gemini 
+
+VLM (LLaVA-1.6-7B) describe each query’s true GT segment from scratch and retrieve; it reaches only R@5 3.2. We do not lean on this number: it conflates genuine vocabulary mis-match with a much weaker single-frame cap-tioner describing a state that often needs tem-poral context (e.g. “falling into water” looks like “in water” in one frame). A clean test of generator-specificity requires full cross-generator 
+
+re-authoring of states/questions/GT with a differ-ent VLM family, which we leave to future work (Limitations). Table 8: Full baselines and method variants (fair test, n=2 ,430 ; R@ k/MRR, %). Encoder frozen unless noted (LoRA). “ →X” is the retrieval target space. †rows are 5-seed means; all other LFTR rows, including the two cross-space fusion rows, are seed-0 single runs from an independent all-cutoff snapshot , so they can differ from the 5-seed means and from the seed-0 encoder ×target grid (Table 9) by run-to-run noise (typically 0.4–1.5pp); where they con-flict, the 5-seed means (Tables 2, 14) and the grid (Table 9) are canonical. Crosswalk: this snapshot’s →BGE 12 .8
+
+/ →DINOv2 13 .7 / DINOv2 +BGE 17 .41 / DINOv2 +BGE +Gemma 18 .11 correspond to 5-seed 11 .3 / 12 .8±0.7 /
+
+16 .1±1.0 / 17 .6±0.8 respectively. The overall best configuration is the 4-way BGE +Gemma +DINOv2 +LingBot (18 .6±0.6, 5-seed; Table 14), not shown here as we lack its all-cutoff seed-0 breakdown. 
+
+Group Setup R@1 R@5 R@10 R@20 R@50 MRR Ceiling Oracle (true state → BGE) 23.95 52.96 67.82 80.78 89.63 37.62 MLLM M3 (Qwen3-VL-32B) 5.19 11.93 15.43 19.63 26.26 8.59 MLLM M3 (LLaVA-1.6-7B) 1.69 4.20 6.91 8.85 11.73 3.11 MLLM M3 (LLaVA-NeXT-Video-7B) 1.07 2.76 4.32 5.88 7.33 2.03 MLLM M3 (LLaVA-NeXT-Video-34B) 1.48 4.16 6.54 8.81 11.98 2.98 MLLM M3 (27B coding VLM) 1.32 4.57 6.50 8.52 11.24 2.98 Naive Random 0.0 0.0 0.04 0.04 0.12 0.01 Naive Question-only (text → BGE) 1.60 5.51 8.48 11.52 16.79 3.79 Naive Text-only predictor ( 7B, states → LLM) 2.76 6.50 8.77 11.48 15.43 4.69 Naive Text-only predictor ( 32 B, states → LLM) 3.91 9.30 12.51 16.17 20.66 6.61 Naive kNN-future (non-parametric) 1.48 4.53 5.64 7.86 10.99 2.97 Naive Persistence (Qwen last-frame) 3.91 10.82 13.95 18.02 25.06 7.40 Naive Persistence (DINOv2 last-frame) 3.05 8.48 11.48 14.65 20.21 5.66 World-model V-JEPA2 native predictor 1.44 3.83 4.57 5.19 7.08 2.56 Zero-shot Qwen-VL → Qwen 2.59 7.41 11.11 14.03 20.41 5.23 Zero-shot SigLIP → SigLIP 2.30 7.74 9.75 13.00 19.51 4.85 Zero-shot InternVideo2 → InternVideo2 1.52 7.12 9.84 13.42 19.38 4.53 Zero-shot LanguageBind → LanguageBind 1.98 6.83 10.16 13.70 19.75 4.64 Zero-shot DINOv2 → DINOv2 1.07 5.47 7.37 10.00 15.93 3.22 Zero-shot LingBot-Vision → LingBot 1.40 4.94 7.41 10.29 15.06 3.34 Zero-shot CLIP → CLIP 1.77 5.14 6.01 8.40 12.30 3.42 Zero-shot V-JEPA2 → V-JEPA2 1.03 3.70 4.36 5.68 7.41 2.20 Trained-head Qwen-VL → BGE 3.70 11.60 15.14 18.19 24.69 7.49 Trained-head Qwen-VL → DINOv2 4.28 10.95 15.27 20.21 25.35 7.72 Trained-head Qwen-VL → LanguageBind 4.53 10.33 13.13 17.65 24.86 7.40 Trained-head Qwen-VL → InternVideo2 3.17 8.44 11.81 16.26 24.40 6.07 Trained-head DINOv2 → BGE 3.87 9.79 12.63 15.35 19.88 6.83 Trained-head CLIP → DINOv2 2.80 7.98 10.00 13.79 19.63 5.41 Trained-head V-JEPA2 → BGE 3.29 6.09 8.07 10.62 14.44 4.88 LoRA DINOv2 2.10 7.74 10.12 12.18 16.58 4.73 LoRA V-JEPA2 2.22 6.34 9.18 11.28 17.24 4.38 LoRA Qwen-VL (sub-4k) 2.10 6.26 8.27 11.19 15.72 4.10 LFTR Qwen-VL → BGE 3.83 12.80 16.50 19.71 25.35 7.83 LFTR Qwen-VL → EmbeddingGemma † 4.68 12.32 16.31 19.87 25.61 8.36 LFTR Qwen-VL → LingBot-Vision † 5.83 13.56 17.33 21.50 28.34 9.62 LFTR Qwen-VL → SigLIP † 4.47 10.58 14.07 18.53 25.74 7.59 LFTR Qwen-VL → LanguageBind † 4.59 11.03 14.49 18.34 24.30 7.80 LFTR Qwen-VL → InternVideo2 † 4.44 11.43 15.17 19.64 26.83 8.01 LFTR Qwen-VL → DINOv2 5.60 13.70 17.04 21.19 27.90 9.47 LFTR InternVideo2 → DINOv2 5.76 12.59 15.84 18.72 24.57 8.96 LFTR SigLIP → DINOv2 4.77 11.73 15.39 18.60 24.90 8.19 LFTR LingBot-Vision → DINOv2 4.07 9.75 12.10 15.23 21.15 6.90 LFTR LanguageBind → DINOv2 2.63 7.61 11.23 14.86 20.33 5.32 LFTR SigLIP → BGE 3.66 9.55 12.76 15.51 20.08 6.64 LFTR both-cond (Qwen → BGE) 3.95 12.30 15.72 18.89 23.13 7.87 LFTR cross-space (DINOv2 +BGE) 6.50 17.41 21.65 25.39 31.52 11.62 
+
+LFTR cross-space (DINOv2 +BGE +Gemma) 8.11 18.11 21.60 25.56 31.19 12.96 Table 9: Full encoder × target-space grid (LFTR R@5, 8 frozen prefix encoders × 10 target spaces, one consistent config, seed-0). Rows: prefix encoder; columns: retrieval target (BGE/Gemma text-state 
+
+51 k; DINOv2/SigLIP/IntVid2/Qwen/LingBot/CLIP/V-JEPA2/LangBind visual 218 k). All 8 visual encoders ap-pear as both a prefix row and a target column (the grid is not symmetric—e.g. DINOv2 →LingBot 13 .6 vs. LingBot →DINOv2 9.8); all 8×10=80 cells are filled. Best prefix per column in bold . LFTR trains with every 
+
+frozen encoder; Qwen-VL is the best prefix for 7/10 targets, while LingBot is the best target (its column is high for 
+
+every prefix — 10 .5–13 .7 from any decent one — reached even from a DINOv2 prefix). Read down the columns: LingBot/DINOv2/Gemma are the strongest targets ; CLIP and especially V-JEPA2 are the weakest (their columns collapse regardless of prefix), confirming the target space is the binding constraint, not the prefix.                                                                                           
+
+> Prefix enc. →BGE →Gemma →DINOv2 →SigLIP →IntVid2 →Qwen →LingBot →CLIP →V-JEPA2 →LangBind Qwen-VL 11.3 13.2 13.3 11.5 10.6 12.1 13.7 9.3 5.8 10.2 InternVideo2 9.2 8.4 12.6 10.2 10.9 10.1 12.8 7.6 5.2 9.6 SigLIP 9.6 12.1 11.7 9.8 11.2 9.7 11.2 7.4 6.1 10.7 DINOv2 9.8 10.8 11.3 9.0 9.1 8.8 13.6 7.9 5.1 11.0
+> LanguageBind 6.8 9.1 7.6 8.3 7.1 8.4 11.7 4.6 3.8 7.4 CLIP 5.4 7.4 5.8 6.8 9.1 6.8 11.1 6.8 4.3 8.2 V-JEPA2 6.7 6.2 5.9 4.3 5.1 5.0 7.0 4.2 3.9 5.4 LingBot-Vision 7.5 7.9 9.8 7.9 9.9 8.4 10.5 6.0 5.3 8.2
+
+Table 10: Prefix-encoder fusion (concatenated per-frame features → DINOv2 target, R@5, seed-0). Qwen-VL alone wins; fusing prefix encoders only hurts. 
+
+Prefix encoder(s) R@5 Qwen-VL (single) 13.3 
+
+Qwen-VL + SigLIP 12.8 Qwen-VL + DINOv2 11.2 Qwen-VL + DINOv2 + V-JEPA2 7.9 Qwen-VL + V-JEPA2 7.5 DINOv2 + V-JEPA2 (no Qwen-VL) 7.2 
+
+Table 11: Target-space bake-off at the Qwen-VL prefix: zero-shot (prefix embedding → corpus, no prediction) vs. LFTR (5-seed mean R@5). Video-native encoders encode the corpus segment as an 8-frame clip. ‡For text-state targets there is no prefix-frame embedding, so zero-shot is the question-only baseline (question text 
+
+→ state space, no prediction). †Seed-0 (from the grid of App. F); all others are 5-seed means. The zero-shot order is inverted relative to the learned-target order, and CLIP/V-JEPA2 confirm the pattern at the low end — the two weakest learned targets.                               
+
+> Target space Corpus modality Zero-shot LFTR LingBot-Vision image (SSL, boundary) 4.94 13.6
+> DINOv2 image (SSL) 5.47 12.8 EmbeddingGemma text-state 6.95 ‡12.3 InternVideo2 video (V–L) 7.12 11.4 BGE text-state 5.51 ‡11.3 LanguageBind video (V–L) 6.83 11.0 SigLIP image (V–L) 7.74 10.6 CLIP image (V–L) 5.14 9.3 †
+> V-JEPA2 video (SSL, world) 3.70 5.8 †
+
+Table 12: LFTR component ablation (Qwen →BGE); all within ±0.6 seed noise. 
+
+Variant R@5 MRR full 11.32 7.48 
+
+− question conditioning 11.85 7.72 
+
+− hard negatives 11.93 7.94 
+
+− grounding 11.44 7.46 
+
+− uncertainty head ( K=1 ) 11.81 7.86 
+
+Table 13: Hard negatives in the DINOv2 (visual) space: R@5 vs. number of mined embedding-similar negatives (5 seeds). nhard =0 is random-negatives-only. 
+
+nhard R@5 ∆ vs. 0 (sig.) 0 (random only) 8.98 ±0.91 —32 11 .34 ±0.44 +2 .36 ( p=0 .004 )128 12 .80 ±0.72 +3 .82 ( p=2 ×10 −4 )256 12 .92 ±0.50 +3 .94 ( p=2 ×10 −4 )
+
+Table 14: Fusion combination sweep (R@5, n=2 ,430 ). Fusion rows with ± are 5-seed mean ±std with a per-seed paired t-test vs. BGE +DINOv2; single-space rows and the redundant-sweep block are seed-0. Complementary strong axes stack (best semantic Gemma + two differently-supervised visual encoders DINOv2/LingBot), giving the best config; redundant 
+
+same-type encoders (a 2nd contrastive-visual space, or the whole six-way) do not .                                              
+
+> Combination R@5
+> Single spaces (seed-0)
+> LingBot / DINOv2 / EmbeddingGemma 13.6 / 13.3 / 13.3 BGE 11.5 SigLIP / IntVid2 / LangBind / Qwen 11.1 / 10.8 / 10.3 / 10.2
+> Fusions (5-seed)
+> BGE +DINOv2 16 .1±1.0
+> BGE +LingBot 16 .7±0.6
+> Gemma +LingBot 17 .2±0.7
+> BGE +DINOv2 +LingBot 17 .5±0.8∗∗
+> BGE +Gemma +DINOv2 17 .6±0.8∗∗
+> BGE +Gemma +LingBot 17 .8±0.5∗∗
+> BGE +Gemma +DINOv2 +LingBot 18 .6±0.6∗∗
+> Redundant same-type (seed-0, no gain)
+> BGE +DINOv2 +SigLIP 17.4 All six spaces 17.0 DINOv2 +SigLIP +IntVid2 (no semantic) 14.7
+
+Table 15: Independent observed-future-frame oracle (query = the object’s own future frame → retrieve cross-instance GT; 95% bootstrap CIs), across every visual space and with a multi-frame (mean of all self future frames) query. Appearance is near the floor everywhere, far below the semantic ceiling ( 53 ). 
+
+Query space ( = own future frame) R@5 95% CI DINOv2 5.7 [4 .4, 7.0] 
+
+SigLIP 6.6 [5 .3, 8.1] 
+
+CLIP 3.0 [2 .1, 4.0] 
+
+LingBot-Vision 6.5 [5 .1, 7.9] 
+
+DINOv2 (multi-frame) 5.7 [4 .4, 7.0] 
+
+LingBot-Vision (multi-frame) 6.5 [5 .2, 7.9] 
+
+Semantic ceiling (BGE text oracle) 53.0 —
+
+Table 16: Intermediate-horizon supervision (A1) dose, long-horizon ( h≥3) and overall R@5 (5 seeds). 
+
+Weight h≥3 R@5 overall R@5 0 (H8 baseline) 5.15 ±0.31 12 .80 ±0.72 
+
+0.5 5.15 ±0.31 12 .80 ±0.73 
+
+1.0 5.40 ±0.48 12 .77 ±0.72 
+
+3.0 5.57 ±0.49 (p=0 .19 ) 13 .01 ±0.51 Table 17: Reading a fixed trained H=8 model different ways (R@5). Only the read strategy changes. The 
+
+oracle best step (per query) reveals +4 .3/+4 .8pp of untapped trajectory signal in both spaces; simple oracle-free rules (calibration, multi-hypothesis union) recover little of it on aggregate. 
+
+Read strategy DINOv2 BGE Fixed step 1 (horizon-agnostic) 12.2 10.6 Matched step h (default) 13.4 11.2 Val-calibrated step 13.6 11.2 Multi-hypothesis (union of steps) 12.7 7.6 
+
+Oracle best step (upper bound) 17.7 16.0 
+
+Table 18: Video vs. image corpus. Same semantic-text oracle and the same image-eligible query subset, retrieving from each corpus. The oracle drops from 49 .7
+
+(video) to 8.9 (image): retrieving image evidence for a video-derived future state is a hard cross-modal gener-alization test (vocabulary/domain mismatch), while the modality is fully supported by the released gt_image 
+
+pools. 
+
+Retrieval corpus (same queries, same oracle) R@5 Video corpus ( 218 k segments) 49.7 Image corpus (VG + MIT-States, 333 k) 8.9 
+
+Table 19: Compute budget (single NVIDIA H200). En-coders are frozen and their features precomputed once, so training the ∼12M head is cheap; precomputing the corpus feature indices is the dominant one-time cost. Inference is per query with features cached.                         
+
+> Stage Trained params Compute Corpus feature precompute (one-time) 0 (frozen) 2.5GPU-h LFTR head training (per run, 40 ep.) 11 .98 M<1GPU-h Full multi-seed ×space sweep 11 .98 M∼6GPU-h LoRA encoder fine-tune (per epoch) ∼18 .5M∼40 min Inference: predict +retrieve —0.06 ms/query
+
+Table 20: Frozen vs. LoRA end-to-end prefix encoder (same head, schedule, eval; R@5). Unfreezing helps marginally, within seed noise, at ∼10 3× the training cost. 
+
+Encoder frozen LoRA end-to-end ∆
+
+DINOv2 10.66 11.19 +0 .53 
+
+CLIP 7.41 7.78 +0 .37 
+
+Table 21: Retrieval-channel decomposition (R@5). Paraphrasing the true state (content fixed, phrasing var-ied) isolates the canonicalization channel; the achievable free-form ceiling is ∼30 , so the genuine forecasting gap is ∼14 pp. The cross-model single-frame probe is con-founded (see text). 
+
+Retrieval query for the true state R@5 Canonical GT string (semantic oracle) 53.0 LLM paraphrase of GT (content fixed) 29.7 Non-Gemini VLM single-frame description † 3.2 
+
+Best LFTR (learned predictor) 18.6 V Qualitative Retrieval — Full Ranked List 
+
+This section collects the qualitative retrieval ex-amples referenced above: for real queries, the ac-tual future segments each method retrieves, with a green border when the retrieved state matches the gold future and red otherwise. We show the top-1 retrieval across methods (Fig. 14), far-horizon fail-ures (Fig. 15), the full top-5 ranked lists (Fig. 16), and per-question-type and per-method breakdowns (Figs. 18–25). Fig. 16 extends the top-1 comparison (Fig. 14) to the top-5 ranked list of each method. Cross-space fusion places the most correct instances (green) in its top-5, while the naive and MLLM baselines return mostly hard-negative states (red) — the fine-grained-discrimination failure that hard-negative training targets (App. H). Absolute counts are mod-est (R@5 is ≤17 even for fusion), reflecting the intrinsic difficulty of the task. Fig. 15 isolates the 
+
+far-horizon (h≥3) failures: the multi-modal fu-ture drives even fusion to a plausible-but-wrong adjacent state, making the prediction bottleneck concrete. 
+
+V.1 Per-question-type retrieval examples 
+
+Figures 18–21 give one top-5 retrieval example 
+
+per question type (Q1–Q4), in the same format as Fig. 16: the observed prefix (blue, ordered in time) on top and, per method, the top-5 retrieved future segments (green correct, red wrong). Across types, cross-space fusion places more correct futures near the top of the list than the semantic-only, visual-only, and zero-shot 32B MLLM (M3) baselines. Figure 17 first summarizes the aggregate R@5 of each method on each type. 
+
+V.2 Per-method retrieval across question types 
+
+The complementary view: Figures 22–25 give one figure per method , each with one row per ques-tion type (Q1–Q4), showing that method’s top-5 retrievals and how many are correct. Cross-space fusion (Fig. 22) is consistently strongest; the zero-shot 32B MLLM (Fig. 25) is weakest across every type. query (prefix → gold) correct future LFTR-Fusion (ours) LFTR →DINOv2 LFTR →BGE M3 (32B) 
+
+> being mashed
+> roll dough
+> cutting mushrooms
+> falling
+
+Figure 14: Top-1 retrieved future state per method , one query per row (observed prefix and its gold future on the left; each cell the single top-ranked retrieval, green if its state matches the gold future, red otherwise). The zero-shot 32B MLLM (M3) never places the correct future at rank 1; the learned cross-space retrievers recover it on several queries. Top-1 is a strict view — the full top-5 ranking (where fusion leads) is in Fig. 16. Q3 (far horizon, h=4 ) — What will the person look like after 8 seconds? future state: lying on ground       
+
+> Query video
+> (prefix)
+> time
+> correct future
+> (reference) the ground-truth “lying on ground”
+> #1 #2 #3 #4 #5 LFTR-Fusion
+> (ours), 0/5
+
+Figure 15: Far-horizon failure. A long-horizon ( h=4 ) query where fusion is wrong on all five retrievals: the correct future (green reference, lying on ground ) versus LFTR-fusion’s top-5 (red, 0/5). At far horizons the future is genuinely multi-modal, so even fusion returns plausible-but-wrong states — the prediction bottleneck, made concrete. Q4: Before the bicycle reaches “lying on ground”, what state does it pass through? future state: falling     
+
+> time
+> Query video
+> (prefix)
+> retrieved rank:
+> #1 #2 #3 #4 #5 LFTR-Fusion
+> (ours)
+> LFTR →DINOv2
+> LFTR →BGE
+> M3 (32B)
+> (zero-shot)
+
+Figure 16: Top-5 retrievals per method for one query (Q4; future state falling ). The observed prefix (blue, ordered left-to-right in time) is shown on top; below, each method’s top-5 retrieved future segments carry a green border when the retrieved state matches the ground-truth future and a red one otherwise. Cross-space fusion (ours) places the most correct futures in its top-5 ( 3/5), degrading through LFTR →DINOv2 ( 2/5) and LFTR →BGE ( 1/5) to the zero-shot 32B MLLM (M3, 0/5). Q1 
+
+next 
+
+Q2 
+
+end 
+
+Q3 
+
+after-k
+
+Q4 
+
+inter.   
+
+> 0
+> 10
+> 20
+> 30
+> 40
+> 50
+> 60
+> R@5 (\%)
+> 15.0
+> 7.2
+> 11.2 13.0 11.9
+> 5.9
+> 13.0 10.9
+> 13.8
+> 7.6
+> 16.3
+> 13.1
+> 17.8
+> 9.9
+> 20.0
+> 16.2
+> Oracle ceiling
+
+Retrieval R@5 by method, per question type      
+
+> M3 (32B MLLM) LFTR BGE LFTR DINOv2 LFTR-Fusion (ours)
+
+Figure 17: Retrieval R@5 by method, per question type (aggregate over the test set). Cross-space fusion (ours) leads on every question type; the dashed line is the Oracle-BGE ceiling, far above all methods — the prediction headroom the benchmark exposes. Q2 (end state) is hardest for every method. Q1 (next): What will the sauce look like next? future state: being mixed with pasta 
+
+time 
+
+Query video 
+
+(prefix) 
+
+retrieved rank: 
+
+#1 #2 #3 #4 #5 LFTR-Fusion 
+
+(ours) 
+
+LFTR →DINOv2 
+
+LFTR →BGE 
+
+M3 (32B) 
+
+(zero-shot) Figure 18: Q1 (next state) — top-5 retrievals per method. Q2 (end state): What is the final state of the potatoes at the end of the video? future state: being mashed     
+
+> time
+> Query video
+> (prefix)
+> retrieved rank:
+> #1 #2 #3 #4 #5 LFTR-Fusion
+> (ours)
+> LFTR →DINOv2
+> LFTR →BGE
+> M3 (32B)
+> (zero-shot)
+
+Figure 19: Q2 (end state) — top-5 retrievals per method. Q3 (after ks): What will the person look like after 3 seconds? future state: falling into water     
+
+> time
+> Query video
+> (prefix)
+> retrieved rank:
+> #1 #2 #3 #4 #5 LFTR-Fusion
+> (ours)
+> LFTR →DINOv2
+> LFTR →BGE
+> M3 (32B)
+> (zero-shot)
+
+Figure 20: Q3 (state after k seconds) — top-5 retrievals per method. Q4 (intermediate): Before the surfer reaches the state of being engulfed by wave, wha future state: falling off board     
+
+> time
+> Query video
+> (prefix)
+> retrieved rank:
+> #1 #2 #3 #4 #5 LFTR-Fusion
+> (ours)
+> LFTR →DINOv2
+> LFTR →BGE
+> M3 (32B)
+> (zero-shot)
+
+Figure 21: Q4 (intermediate state) — top-5 retrievals per method. Method: LFTR-Fusion (ours) top-5 retrievals per question type (green correct, red wrong) 
+
+question type → query #1 #2 #3 #4 #5 Q1 next 
+
+being mixed with pas 
+
+2/5 correct 
+
+Q2 end 
+
+being mashed 
+
+3/5 correct 
+
+Q3 after-k
+
+falling into water 
+
+2/5 correct 
+
+Q4 inter. 
+
+falling off board 
+
+2/5 correct Figure 22: LFTR-Fusion (ours) — top-5 retrievals across question types. Method: LFTR →DINOv2 top-5 retrievals per question type (green correct, red wrong) 
+
+question type → query #1 #2 #3 #4 #5 Q1 next 
+
+being mixed with pas 
+
+2/5 correct 
+
+Q2 end 
+
+being mashed 
+
+3/5 correct 
+
+Q3 after-k
+
+falling into water 
+
+0/5 correct 
+
+Q4 inter. 
+
+falling off board 
+
+3/5 correct Figure 23: LFTR →DINOv2 — top-5 retrievals across question types. Method: LFTR →BGE top-5 retrievals per question type (green correct, red wrong) 
+
+question type → query #1 #2 #3 #4 #5 Q1 next 
+
+being mixed with pas 
+
+2/5 correct 
+
+Q2 end 
+
+being mashed 
+
+0/5 correct 
+
+Q3 after-k
+
+falling into water 
+
+2/5 correct 
+
+Q4 inter. 
+
+falling off board 
+
+1/5 correct Figure 24: LFTR →BGE — top-5 retrievals across question types. Method: M3 (32B, zero-shot) top-5 retrievals per question type (green correct, red wrong) 
+
+question type → query #1 #2 #3 #4 #5 Q1 next 
+
+being mixed with pas 
+
+0/5 correct 
+
+Q2 end 
+
+being mashed 
+
+0/5 correct 
+
+Q3 after-k
+
+falling into water 
+
+0/5 correct 
+
+Q4 inter. 
+
+falling off board 
+
+0/5 correct Figure 25: M3 (zero-shot 32B MLLM) — top-5 retrievals across question types.

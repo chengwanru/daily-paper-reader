@@ -44,14 +44,14 @@
       <span class="dpr-home-dashboard-kicker">2026-08-07</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 11 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 20 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
-    <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>6</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>5</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>2 次</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>12</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>8</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-08-07 02:13:32 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-08-07 21:01:14 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -62,7 +62,9 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>今日11篇论文聚焦世界模型与具身智能，精读6篇中2篇满分。最值得关注：MobileWAM将世界行动模型用于移动操作，DreamWAM突破RGB预测瓶颈。建议普通读者从“Quo Vadis, World Modeling?”综述入手，再探索物理推理与驾驶合成应用。</p>
+<p>今日聚焦世界动作模型（WAM），精读两篇满分论文《MobileWAM》与《DreamWAM》，分别实现链式前瞻的移动操作与超越RGB的未来预测。</p>
+<p>最值得关注的是WAM如何统一预测与行动，且速读中《DynaPix》《PhysMind》等揭示视觉语言模型在物理推理与精确未来识别上的短板与突破。</p>
+<p>下一步建议：若你关注具身智能，可深入精读两篇WAM；若想了解多模态局限，可先从速读《DynaPix》入手。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -71,12 +73,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">6 篇</strong>
+    <strong class="dpr-home-dashboard-count">12 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="MobileWAM: Bridging World Action Models to Mobile Manipulation with Chain-of-Foresight">MobileWAM: Bridging World Action Models to Mobile Manipulation with Chain-of-Foresight</span></li><li><span class="dpr-home-dashboard-paper-title" title="DreamWAM: Beyond RGB Future Prediction for World Action Models">DreamWAM: Beyond RGB Future Prediction for World Action Models</span></li><li><span class="dpr-home-dashboard-paper-title" title="Faster-WAM: Efficient Inference-Time Future Conditioning for Robust World Action Models">Faster-WAM: Efficient Inference-Time Future Conditioning for Robust World Action Models</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="MobileWAM: Bridging World Action Models to Mobile Manipulation with Chain-of-Foresight">MobileWAM: Bridging World Action Models to Mobile Manipulation with Chain-of-Foresight</span></li><li><span class="dpr-home-dashboard-paper-title" title="DreamWAM: Beyond RGB Future Prediction for World Action Models">DreamWAM: Beyond RGB Future Prediction for World Action Models</span></li><li><span class="dpr-home-dashboard-paper-title" title="MobileWAM: Bridging World Action Models to Mobile Manipulation with Chain-of-Foresight">MobileWAM: Bridging World Action Models to Mobile Manipulation with Chain-of-Foresight</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">video-wam <strong>6</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">video-wam <strong>12</strong></span></div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
@@ -84,12 +86,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">速读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">5 篇</strong>
+    <strong class="dpr-home-dashboard-count">8 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="muSync-GS: Physics-Synchronized Driving Video Synthesis for Weather and Geometric Road Hazards">muSync-GS: Physics-Synchronized Driving Video Synthesis for Weather and Geometric Road Hazards</span></li><li><span class="dpr-home-dashboard-paper-title" title="PhysMind: From Video to Executable Worlds for Training-Free Physical Reasoning">PhysMind: From Video to Executable Worlds for Training-Free Physical Reasoning</span></li><li><span class="dpr-home-dashboard-paper-title" title="Quo Vadis, World Modeling?">Quo Vadis, World Modeling?</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="DynaPix: Can Vision-Language Models Identify the Exact Future?">DynaPix: Can Vision-Language Models Identify the Exact Future?</span></li><li><span class="dpr-home-dashboard-paper-title" title="muSync-GS: Physics-Synchronized Driving Video Synthesis for Weather and Geometric Road Hazards">muSync-GS: Physics-Synchronized Driving Video Synthesis for Weather and Geometric Road Hazards</span></li><li><span class="dpr-home-dashboard-paper-title" title="PhysMind: From Video to Executable Worlds for Training-Free Physical Reasoning">PhysMind: From Video to Executable Worlds for Training-Free Physical Reasoning</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">video-wam <strong>5</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">video-wam <strong>8</strong></span></div>
 </section>
 </div>
 

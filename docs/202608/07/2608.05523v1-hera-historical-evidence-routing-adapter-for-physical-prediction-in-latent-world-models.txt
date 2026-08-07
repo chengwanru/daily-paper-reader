@@ -1,0 +1,431 @@
+Title: HERA: Historical Evidence Routing Adapter for Physical Prediction in Latent World Models
+
+URL Source: https://arxiv.org/pdf/2608.05523v1
+
+Published Time: Fri, 07 Aug 2026 00:22:22 GMT
+
+Number of Pages: 9
+
+Markdown Content:
+# HERA: Historical Evidence Routing Adapter for Physical Prediction in Latent World Models 
+
+## Yuanruyi 1,4 , Yue Cao 2,3,4 , Haojia Gao 4,5 , Guanqiu Guo 2,4,5 , Ziyuezhang 2, Shangqin Lin 4, Junbo Tan 2, Bokui Chen 5, Zhuo Zou 3, Xueqian Wang 5
+
+> 1
+
+Chongqing University, 2Research Institute of Tsinghua University in Shenzhen, 3Fudan University, 4Everwise-Tech Co., Ltd., 
+
+> 5
+
+Tsinghua Shenzhen International Graduate School Yuan Ruyi@stu.cqu.edu.cn 
+
+Abstract 
+
+Predictive video models have emerged as promising world models by learning latent visual dynamics from large-scale video. Yet these models remain challenged by physical events under occlusion, where later predictions may depend on ob-ject evidence that is no longer available in the current view. Addressing this challenge requires historical evidence not only to be preserved but also to remain accessible when it becomes relevant to a subsequent prediction. Existing ap-proaches mainly enlarge the temporal context, cache generic video features, or impose explicit object-centric states, thereby improving the capacity or structure of retained history. How-ever, they do not directly address how relevant historical evidence can be selectively retrieved and integrated into a pretrained predictor without interfering with its native la-tent workspace. Accordingly, we introduce HERA (Histori-cal Evidence Routing Adapter), a framework for routing re-tained historical evidence into a frozen latent predictor, and instantiate it with Register-Routed Patch Memory (RRPM), a lightweight adapter comprising a Structured Memory Bank, Memory Registers, and Workspace Registers. On the IntPhys2 Main split, HERA with RRPM improves the pairwise Avg-Surprise accuracy of V-JEPA 2-G from 52.57% to 54.35%. Subgroup analysis shows particularly strong improvements on fixed-camera continuity, from 46.15% to 57.69%, and fixed-camera immutability, from 46.15% to 63.46%. These results support historical evidence routing as a practical adaptation strategy for physical prediction in latent world models. 
+
+## Introduction 
+
+An ideal world model should not only follow the next vis-ible frame, but also anticipate the consequences of events from observations that are incomplete, transient, and often occluded. It must keep commitments when the evidence is no longer on screen. A ball should continue behind an occluder, a block should keep its color after it disappears, and a later collision should still be constrained by objects hidden ear-lier. We refer to this capacity as physical memory: the ability to preserve and recover evidence about existence, attributes, motion, and interaction that persists through time. Predictive video representation learning provides a natu-ral framework for this capability. Masked video autoencoders and JEPA-style objectives learn by anticipating missing or fu-ture visual content (He et al. 2022; Tong et al. 2022; Feicht-enhofer et al. 2022; Assran et al. 2023). V-JEPA 2 provides a particularly instructive example because it predicts future latent representations rather than pixels, and supports under-standing, prediction, and planning in physically grounded settings (Bardes et al. 2024, 2025). Such results show that predictive video models can encode useful physical regu-larities. These findings do not, however, establish that the model maintains a persistent representation of physical state. A predictor may exploit recent motion, local appearance, or scene-level correlations without reliably preserving object identity, attributes, or existence through occlusion. Common strategies for extending temporal reasoning do not resolve this distinction automatically. A longer input win-dow retains more observations, but sparse early evidence must compete with an increasingly large set of recent tokens. A generic feature cache preserves history, but does not deter-mine which part of that history should influence a particular future prediction. Object-centric memory offers a stronger state abstraction, yet depends on stable object discovery, identity binding, and temporal matching, properties that a frozen video representation is not guaranteed to expose. The unresolved bottleneck is therefore not only whether historical evidence is retained, but whether the relevant evidence can be routed into prediction when it is needed without disrupting the pretrained predictor’s native latent workspace. In this work, we study this mechanism using Int-Phys2 (Bordes et al. 2025). The benchmark pairs possible and impossible videos that share scene content but differ in physical validity. For a predictive model, an impossible continuation should produce a larger future-latent prediction error, and therefore higher surprise, than its matched possible continuation. This setting allows us to examine whether V-JEPA 2 can recover earlier visual evidence when prediction depends on trajectory or appearance cues that are no longer directly observable. To make retained historical evidence broadly accessible when it becomes relevant to prediction, we introduce HERA, a framework for routing historical ev-idence into a frozen latent predictor. We instantiate HERA with Register-Routed Patch Memory (RRPM), which stores structured patch history, retrieves it through dedicated Mem-ory Registers, and uses a separate set of trainable Workspace Registers to integrate the retrieved evidence through the frozen predictor’s native self-attention pathway. Our main contributions are summarized as follows. 
+
+• We formulate pairwise AvgSurprise as a behavioral probe arXiv:2608.05523v1 [cs.CV] 6 Aug 2026 of physical memory and identify evaluation settings in which prediction depends on historical evidence that is no longer directly observable. 
+
+• We introduce HERA with RRPM, a parameter-efficient adapter that separates Memory Registers from Workspace Registers while keeping the V-JEPA 2 blocks frozen. With only 3.00M trainable parameters, it improves V-JEPA 2-G pairwise AvgSurprise accuracy from 52.57% to 54.35% on the IntPhys2 Main split. 
+
+• Comparisons with five alternative memory mechanisms and diagnostic register removals provide evidence that selective routing offers benefits beyond historical storage alone. Subgroup analysis further shows gains of 11.54% and 17.31% on fixed-camera continuity and immutability, respectively. Together, these results support selective evidence routing as a tractable component of physical memory, distinct from persistent object-state maintenance. 
+
+## Related Work 
+
+Predictive Video World Models 
+
+Self-supervised video learning extends masked image mod-eling to video, while JEPA-style objectives predict represen-tations rather than pixels (Bao, Dong, and Wei 2022; He et al. 2022; Tong et al. 2022; Feichtenhofer et al. 2022; As-sran et al. 2023; Bardes et al. 2024). V-JEPA and V-JEPA 2 predict future latent representations, providing natural test cases for predictive video world models (Bardes et al. 2024, 2025). Recent studies examine the robustness of latent pre-diction and the emergence of physical variables in large-scale video encoders (Alrasheed et al. 2026; Joseph et al. 2026). Latent world models have long supported imagined roll-outs and decision making in reinforcement learning and robotics (Ha and Schmidhuber 2018; Hafner et al. 2019, 2020, 2023; Schrittwieser et al. 2020; Hansen, Su, and Wang 2022). More recent video foundation models scale this premise toward physical simulation, embodied prediction, and interactive environments (Bruce et al. 2024; Agarwal et al. 2025). However, prediction quality or task success does not establish whether historical physical evidence remains available after it disappears from view. Violation-of-expectation benchmarks directly probe this distinction through paired possible and impossible events (Baillargeon, Spelke, and Wasserman 1985; Riochet et al. 2018; Piloto et al. 2018; Bordes et al. 2025). We use IntPhys2 to test whether V-JEPA 2’s predictive pathway pre-serves and uses the evidence required for physical memory. 
+
+Long-Horizon Memory for Video Prediction 
+
+Long-sequence transformers preserve distant information through recurrence, sparse attention, compression, retrieval, or explicit memory tokens (Dai et al. 2019; Beltagy, Peters, and Cohan 2020; Rae et al. 2020; Borgeaud et al. 2022; Wu et al. 2022; Bulatov, Kuratov, and Burtsev 2022). Video trans-formers additionally rely on space-time or factorized atten-tion to manage large spatiotemporal token grids (Bertasius, Wang, and Torresani 2021; Arnab et al. 2021). Register to-kens offer a compact internal workspace, but retaining more context alone does not determine which historical evidence should affect a future prediction (Darcet et al. 2024). Recent video world models support long-horizon con-sistency through spatial memory, compressed historical la-tents, adaptive frame compression, and learned context queries (Wu et al. 2025; Hong et al. 2025; Oshima et al. 2025; Yu et al. 2026). These methods mainly target genera-tive rollouts; RRPM instead separates Workspace Registers from Memory Registers to route historical patch evidence into a frozen latent predictor. Object-centric representations provide explicit state abstractions but require stable object decomposition and temporal association, which frozen video features do not guarantee (Locatello et al. 2020; Kipf et al. 2022; Elsayed et al. 2022). 
+
+## Method 
+
+Given a matched possible–impossible video pair, we use future-latent prediction surprise to diagnose persistent physical-memory failures. We then extend a pretrained V-JEPA 2 predictor with HERA without object annotations or changes to its prediction objective. HERA separates histor-ical retention, selective retrieval, and evidence integration through three RRPM modules: the Structured Memory Bank stores temporally specialized context tokens, the Memory Registers retrieve them through gated cross-attention, and the Workspace Registers integrate retrieved evidence through the predictor’s native pathway. Figure 1 summarizes the mem-ory construction and routed retrieval process of HERA with RRPM. 
+
+Mechanism Analysis 
+
+Problem Formulation Given a video v, V-JEPA 2 ob-serves a context prefix and predicts latent representations of future masked tubelets. Let Eϕ denote the frozen context encoder, E ¯ϕ the frozen target encoder, and Gψ the frozen predictor. For a sliding window w with context frames vw, 1: c
+
+and future target frames vw,c +1: c+h, the context encoder pro-duces patch tokens 
+
+Xw,c = Eϕ(vw, 1: c) ∈ RTc×P ×De , (1) where Tc is the number of context tubelets, P is the num-ber of spatial patches per tubelet, and De is the encoder dimension. Let Π : RDe → RD denote the predictor input projection, with Π equal to the identity map when De = D,and write Xp,w,c = Π( Xw,c ). The frozen target encoder is applied to the same window and the future mask selects nor-malized target latents ¯Zw,c . The predictor receives Xp,w,c 
+
+and future mask tokens Ymask , and outputs predicted target latents ˆZw,c = Gψ (Xp,w,c , Y mask ).The physical-memory question is whether the model pre-serves information about objects that are no longer visible but still physically relevant. We use matched possible/impossible video pairs from IntPhys2 (Bordes et al. 2025). For scene s
+
+and pair index k, let vpos  
+
+> s,k
+
+be the physically possible video and vimp  
+
+> s,k
+
+be the physically impossible video. The two videos share most scene-level factors. A prediction-based physical model should assign a larger future surprise to vimp  
+
+> s,k
+
+.Context 
+
+> Frames
+> t_0
+> t_1
+> t_2
+> t_c
+
+⋮    
+
+> Encoder
+> Predictor
+> Blocks 0–3
+> Mem Read
+> Blocks 4–7
+> Mem Read
+> Blocks 8–11
+> Memory Registers
+> ...
+> Context Tokens
+> ... ...
+> Mem Read
+> Memory Registers Memory Tokens
+> ... ...
+> QK,V
+> Cross-Attention
+
+σ Gate 
+
+> Updated Memory Registers
+
+Rₘₑₘ ← Rₘₑₘ + σ(g) · CrossAttn (Rₘₑₘ, M, M)   
+
+> Projected
+> Context Tokens
+> ...
+> Structured Patch Memory Bank
+> Anchor
+> ...
+> Middle
+> ...
+> Recent
+> ...
+> Global
+> ...
+> Mask Tokens Workspace Registers
+
++
+
+> ...
+
+Frozen Figure 1: Architecture of HERA with RRPM. A frozen V-JEPA 2 context encoder produces tokens that are organized into temporally structured memory. Memory Registers retrieve this evidence through gated cross-attention, while Workspace Registers support its integration through the frozen predictor’s self-attention pathway. This formulation separates diagnosis from augmentation. The diagnostic output is a pairwise surprise margin that tests whether V-JEPA 2 is more surprised by the impossible con-tinuation. The augmented model changes only the prediction pathway, while the evaluation protocol remains unchanged. The memory module is trained with the same future-latent objective as V-JEPA 2. Its physical value is judged only by whether it changes pairwise violation sensitivity. The official prediction-model scorer first reduces each slid-ing window to a per-window future-latent prediction loss. Let 
+
+ˆzv,w,c,t,d denote feature dimension d of predicted target to-ken t, and let ¯zv,w,c,t,d denote the corresponding normalized target feature. The per-window surprise is the mean L1 error over target tokens and feature dimensions, 
+
+ℓv,w,c = 1
+
+|T v,w,c |Dz
+
+X
+
+> t∈T v,w,c
+> Dz
+
+X
+
+> d=1
+
+|ˆzv,w,c,t,d − ¯zv,w,c,t,d | ,
+
+(2) where Tv,w,c is the set of predicted future target tokens and 
+
+Dz is the target latent dimension. The official video-level score for a fixed context length is therefore the mean over valid, non-padded windows, 
+
+AvgSurprise( v, c ) = 1
+
+|W (v, c )|
+
+X
+
+> w∈W (v,c )
+
+ℓv,w,c , (3) where W(v, c ) is the set of valid windows. Zero-padded windows are excluded from W(v, c ), and context settings are evaluated independently. Thus the protocol uses AvgSurprise over all valid sliding windows for a given context length; it does not select a single window and it does not use a max-surprise reduction. For a matched pair, the pairwise surprise margin is 
+
+ms,k,c = AvgSurprise( vimp  
+
+> s,k
+
+, c ) − AvgSurprise( vpos  
+
+> s,k
+
+, c ).
+
+(4) The pair is counted as correct only when ms,k,c > 0; ties are not credited. The context-wise pairwise accuracy is 
+
+Acc( c) = 1
+
+|P c|
+
+X
+
+> (s,k )∈P c
+
+1[ms,k,c > 0] , (5) where Pc is the set of valid pairs for context length c. For a predefined context set C, the best-context summary is 
+
+Acc best (C) = max  
+
+> c∈C
+
+Acc( c). (6) For overall accuracy, the context is selected once at the aggre-gate method level and is shared by all pairs. For a subgroup g,we analogously restrict the valid pair set to Pc,g and compute 
+
+Acc g, best (C) = max  
+
+> c∈C
+
+Acc g (c). (7) A single context length is shared by all pairs within each method–subgroup evaluation. This score is a relative physical-consistency measure rather than an absolute pre-diction loss. The possible and impossible videos are scored independently and compared only through the final margin. No physical labels are used by the memory module during training, and no learned classifier is added at evaluation time. The probe remains tied to the prediction pathway. A method succeeds only when the impossible continuation becomes harder for the predictive model to explain than the matched possible continuation. Diagnostic Target: Persistent Physical Memory At the behavior level, informative failures depend on early evidence that later becomes hidden. Solidity requires visible balls or blocks to remain active through occlusion and contact. Im-mutability requires static properties to stay bound to object identity, while permanence and continuity require maintain-ing existence and motion without sufficient recent evidence. At the representation level, these behaviors suggest a gap between patch-level evidence and object-level state. Frozen V-JEPA 2 latents may preserve local visual traces, but those traces are not necessarily organized as persistent object state. This motivates temporal-forgetting, attribute-retention, and object-identity probes that separate missing representation information from failures to route existing evidence. At the predictor level, the failure cases suggest over-reliance on recent context. The predictor can use local con-tinuity and recent patches, but early evidence can be diluted before it affects future latent prediction. A memory interven-tion should preserve early evidence, keep the pretrained V-JEPA 2 pathway mostly intact, and provide a selective route from stored evidence into future latent prediction. These con-straints make two simple alternatives unattractive. Append-ing all historical tokens directly to the predictor increases context length without deciding which evidence should per-sist. Replacing patch tokens with object slots would match the physical target more directly, but it depends on reliable object decomposition from frozen latents. These observa-tions motivate an intervention that preserves useful historical evidence, retains the pretrained prediction pathway, and se-lectively routes stored evidence into future latent predictions. 
+
+HERA with RRPM 
+
+We extend a pretrained V-JEPA 2 predictor without object annotations or changes to the original latent prediction objec-tive. HERA separates what historical information should be retained, what should be retrieved for the current prediction, and how retrieved evidence should be integrated. Its RRPM instantiation contains three modules: the Structured Memory Bank, Memory Registers, and Workspace Registers. For clarity, we omit the window and context indices be-low and write Xp ≡ Xp,w,c ∈ RTc×P ×D for the context tokens after projection into the predictor hidden dimension 
+
+D. The original V-JEPA 2 predictor consumes Xp together with future mask tokens Ymask and predicts target latents. We keep the context encoder, target encoder, and pretrained predictor blocks frozen. Only the Structured Memory Bank, cross-attention readers and gates, Workspace Registers, and Memory Registers are trainable. The memory-augmented predictor therefore has the form 
+
+ˆZ = Gmem  
+
+> ψ
+
+(Xp, Y mask , M, R w, R mem ), (8) where M denotes the Structured Memory Bank, Rw denotes the Workspace Registers, and Rmem denotes the Memory Registers. The Structured Memory Bank stores selected or com-pressed patch evidence from different temporal regions of the context. Workspace Registers support the predictor’s in-ternal computation, while Memory Registers retrieve explicit memory and carry it through later self-attention layers. This separation keeps the intervention small while making early evidence available in a stable form before the frozen predictor is asked to use it. 
+
+Structured Memory Bank Physical prediction often de-pends on evidence distributed across the context, with recent observations supporting short-term motion and earlier con-ditions revealing later physical violations. Retaining all con-text patches is redundant and expensive, while object-centric memory requires reliable decomposition and temporal as-sociation from frozen features. We therefore organize patch memory by temporal role to preserve complementary histor-ical information within a compact memory. The Structured Memory Bank converts the full context sequence into a com-pact set of memory tokens for subsequent retrieval. Let 
+
+U = TubeletView( Xp, Mc) (9) denote the temporally ordered view of valid projected context tokens under context mask Mc, with Uτ ∈ RP ×D containing the patch tokens at context tubelet τ . We divide the context into temporal index sets Ianchor , Imiddle , and Irecent . The anchor set covers the earliest context tubelets, the recent set covers the last visible tubelets before prediction, and the mid-dle set covers intermediate history. When U provides a valid and temporally regular tubelet layout, the bank constructs four memory groups: 
+
+M = [ Manchor ; Mmiddle ; Mrecent ; Mglobal ]. (10) Anchor memory stores the earliest context evidence, such as initial object identity, color, and position. Middle mem-ory compresses intermediate motion and interaction history. Recent memory preserves the state immediately before pre-diction. Global memory summarizes the full context at a coarse level. Algorithm 1 specifies the construction of the four memory groups and their concatenation into M . The op-erators ρanchor , ρmiddle , ρrecent , and ρglobal are lightweight token selection, projection, or compression operators that output a fixed number of memory tokens. The learned role embeddings eanchor , emiddle , erecent , and eglobal identify the temporal function of each memory group and are broadcast across the corresponding tokens. In our implementation, an-chor and recent memory are selected from temporally desig-nated tubelets, middle memory is compressed from grouped intermediate tubelets, and global memory is generated from the concatenated memory tokens. All memory tokens live in the predictor hidden dimension, so they can be read without changing the pretrained encoder or target encoder. If the context mask cannot be converted into a valid, tem-porally regular tubelet view, temporal partitioning is not re-liable. In this case, the bank uses a global-only fallback, 
+
+M = ρglobal (Xp) + eglobal , (11) where the global summarizer is applied directly to the pro-jected valid context tokens. This fallback preserves a well-defined memory interface without assigning potentially in-correct anchor, middle, or recent roles. The temporal organization is asymmetric by design. An-chor memory protects early evidence from being overwritten by later visual context. Recent memory preserves the imme-diate pre-prediction state, which is useful for short-term mo-tion continuity. Middle memory gives the predictor access to interaction history without storing every patch token. Global memory provides a coarse fallback when the exact temporal source of relevant evidence is ambiguous. The bank stores patch-level evidence in a structured form without assuming that each memory token is a stable object. 
+
+Memory Registers and Workspace Registers The pre-dictor needs a stable memory interface. Directly modify-ing context tokens can disturb the pretrained prediction path. A single shared register set can also mix two dif-ferent roles: internal workspace and explicit memory car-rier. We split the register tokens into Workspace Registers 
+
+Rw and Memory Registers Rmem . Let Rw ∈ RNw ×D and 
+
+Rmem ∈ RNmem ×D , where Nw and Nmem are the numbers of Workspace Registers and Memory Registers, respectively. The predictor input is 
+
+H0 = [ Xp; Ymask ; Rw; Rmem ], (12) where Ymask denotes the future-mask tokens. Workspace Registers participate only in predictor self-attention. Mem-ory Registers additionally read the Structured Memory Bank. At read layers Lread , Memory Registers attend to M
+
+through gated cross-attention: 
+
+∆R(ℓ)mem = σ(gℓ) CrossAttn( R(ℓ)mem , M, M ),R(ℓ)+ mem = R(ℓ)mem + ∆ R(ℓ)mem , ℓ ∈ L read . (13) Only the Memory Registers are directly updated by this read operation. The context tokens and future mask tokens re-ceive memory information later through frozen predictor self-attention. This delayed propagation lets memory enter through a small set of trainable carriers instead of rewriting the full context representation. The gate gℓ is initialized conservatively so that training begins near the frozen predictor behavior. In all reported RRPM experiments, Lread = {3, 7} under the zero-based block indexing used in Algorithm 1; the reads therefore occur after the fourth and eighth predictor blocks. This placement leaves several subsequent frozen predictor blocks in which retrieved evidence can be integrated. The split-register de-sign controls both where memory is read and which tokens carry it. After the final predictor block, only the predicted future target tokens are used to compute the latent predic-tion loss and surprise score, while the register tokens are discarded. Let Norm out and Wout denote the frozen final normalization and output projection of the pretrained pre-dictor, respectively. Here, TargetSlice selects the positions corresponding to future-mask tokens. 
+
+Training and Inference Training follows the base model’s future-latent prediction objective. For each clip, the frozen context encoder produces context tokens, the Structured Memory Bank stores historical evidence, the memory-augmented predictor outputs future target latents, and the frozen target encoder provides normalized targets. The opti-mization objective is 
+
+Lpred = 1
+
+|T | Dz
+
+X
+
+> t∈T
+
+∥ˆzt − ¯zt∥1 . (14) Algorithm 1: HERA with Register-Routed Patch Memory 
+
+Require: Inputs Xp, Ymask , and context mask Mc
+
+Require: Frozen predictor blocks B0: L−1
+
+Require: Trainable registers Rw, R mem , memory operators 
+
+ρ, role embeddings e, and gates g
+
+Require: Temporal partitions I and zero-based read indices 
+
+Lread  
+
+> 1:
+
+U ← TubeletView( Xp, Mc) 
+
+> 2:
+
+if U is invalid or temporally irregular then  
+
+> 3:
+
+M ← ρglobal (Xp) + eglobal  
+
+> 4:
+
+else  
+
+> 5:
+
+Manchor ← ρanchor ({Uτ : τ ∈ I anchor }) + eanchor  
+
+> 6:
+
+Mmiddle ← ρmiddle ({Uτ : τ ∈ I middle }) + emiddle  
+
+> 7:
+
+Mrecent ← ρrecent ({Uτ : τ ∈ I recent }) + erecent  
+
+> 8:
+
+Mglobal ← ρglobal ([ Manchor ; Mmiddle ; Mrecent ]) + 
+
+eglobal  
+
+> 9:
+
+M ← [Manchor ; Mmiddle ; Mrecent ; Mglobal ] 
+
+> 10:
+
+end if  
+
+> 11:
+
+H ← [Xp; Ymask ; Rw; Rmem ] 
+
+> 12:
+
+for ℓ = 0 to L − 1 do  
+
+> 13:
+
+H ← Bℓ(H) 
+
+> 14:
+
+if ℓ ∈ L read then  
+
+> 15:
+
+Extract Rmem from H 
+
+> 16:
+
+∆Rmem ← σ(gℓ) CrossAttn( Rmem , M, M ) 
+
+> 17:
+
+Rmem ← Rmem + ∆ Rmem  
+
+> 18:
+
+Replace the slice of H corresponding to Rmem  
+
+> 19:
+
+end if  
+
+> 20:
+
+end for  
+
+> 21:
+
+ˆZ ← Wout 
+
+ TargetSlice(Norm out (H))  
+
+> 22:
+
+return ˆZ
+
+Only the Structured Memory Bank, cross-attention read-ers and gates, Workspace Registers, and Memory Registers are updated. The V-JEPA 2 encoders and main predictor blocks remain fixed. Freezing the encoders and main pre-dictor blocks limits the source of improvement. If the entire predictor were fine-tuned, gains could come from general adaptation rather than from the memory interface. At inference, the same procedure is applied independently to each video window. The model constructs M , injects mem-ory through Rmem at the read layers, predicts future target latents, and averages the resulting window losses to obtain the video-level AvgSurprise score. The pairwise margin and ac-curacy are then computed exactly as in the physical violation probe. No IntPhys2-specific classifier, threshold, or pairwise calibration is introduced. The comparison tests whether the memory mechanism changes physical violation sensitivity, rather than whether a new scorer is better calibrated. 
+
+## Experiments 
+
+Experimental Setup 
+
+Datasets and evaluation protocol. We train HERA with Register-Routed Patch Memory (RRPM) on the 14,000-video Physion training split (Xiang et al. 2021) and eval-uate it on the IntPhys2 Main split (Bordes et al. 2025), which contains 1,012 videos organized into 506 matched Context tubelets Xₚ (ordered in time) 
+
+Temporal grouping  
+
+> Anchor (early)
+> ...
+> Early identity / appearance
+> Selection
+> keep early tubelets
+
+𝑴𝑴 𝒂𝒂𝒂𝒂𝒂𝒂𝒂𝒂𝒂𝒂𝒂𝒂 
+
+> ...
+> Middle (intermediate)
+> ...
+> Motion / interaction history
+> Compression
+> group & compress
+> ...
+
+e 
+
+> Recent (latest)
+> ...
+> Pre -prediction state
+> Selection
+> keep recent tubelets
+> ...
+> Global (summary)
+> ...
+> Coarse context summary
+> Global summarizer
+> from anchor | middle | recent
+> ...
+
+Concatenate    
+
+> ... ... ... ...
+
+Structured patch memory for the predictor 
+
+> Anchor memory (early identity)
+> Middle memory (motion / interactions)
+> Recent memory (pre -prediction state)
+> Global memory (context summary)
+
+𝑴𝑴 middle  𝑴𝑴 recent  𝑴𝑴 global 
+
+[𝑴𝑴 𝒂𝒂𝒂𝒂𝒂𝒂𝒂𝒂𝒂𝒂𝒂𝒂 ; 𝑴𝑴 middle ; 𝑴𝑴 recent ; 𝑴𝑴 global ]Memory bank M = Figure 2: Structured Memory Bank in RRPM. The Structured Memory Bank preserves historical patch evidence according to temporal role. Anchor memory stores early object evidence, middle memory summarizes motion and interaction history, recent memory stores the state immediately before prediction, and global memory provides a coarse context summary. The bank gives the predictor access to physically relevant history without requiring object supervision. possible–impossible pairs. No IntPhys2 videos, pair iden-tities, physical-validity labels, or condition annotations are used during training. Following the AvgSurprise protocol defined in the Prob-lem Formulation subsection, all methods use the same pre-defined evaluation settings and scoring pipeline. All reported results use context lengths selected from the same predefined set under the same protocol. Each evaluation uses 48-frame clips at 384 × 384 resolu-tion, a temporal sampling step of 10, a sliding-window stride of 2, a batch size of 1, and bfloat16 inference. AvgSurprise averages future-latent prediction losses over all valid sliding windows, and pairwise accuracy is computed using the of-ficial IntPhys2 scorer. Zero-padded windows are excluded, and no ties occur in the reported evaluations. 
+
+Implementation details. We use V-JEPA 2-G as the frozen backbone. Its context encoder, target encoder, and predictor blocks remain fixed, leaving 3.00M trainable parameters in the Structured Memory Bank, gated cross-attention readers, Memory Registers, and Workspace Registers. RRPM con-tains 12 Memory Registers and eight Workspace Registers. The former retrieve evidence from the Structured Memory Bank after the fourth and eighth predictor blocks, while the latter support its subsequent integration through predictor self-attention. The Structured Memory Bank contains 96 an-chor tokens, 28 middle tokens, 64 recent tokens, and eight global tokens, giving 196 memory tokens in total. All methods are trained across multiple random seeds and use the same data split, scoring pipeline, software en-vironment, and hardware allocation. Experiments are im-plemented in PyTorch and conducted on a four-GPU node equipped with NVIDIA H100 GPUs. Direct-to-Target Mem-ory follows the same data and training schedule but tunes 5.96M parameters because it additionally unfreezes the final two predictor blocks and predictor normalization. 
+
+Experimental Results 
+
+Comparison with alternative memory mechanisms. Ta-ble 1 compares HERA with alternative memory designs cov-ering clip-local storage, cross-window propagation, hierar-chical temporal selection, shared-register routing, and direct memory injection. Each row reports pairwise accuracy under the same evaluation protocol. HERA with RRPM achieves the highest overall accuracy, improving V-JEPA 2-G from 52.57% to 54.35%, an absolute gain of 1.78 percentage points. It also outperforms Direct-to-Target Memory, the strongest competing routing design, by 0.79 points. Notably, Direct-to-Target Memory tunes 5.96M parameters by adapting the final predictor blocks, whereas HERA trains only 3.00M parameters and preserves the pre-trained prediction pathway. Clip-local, prefix, and hierarchical patch memories pro-Method Accuracy (%) V-JEPA 2-G 52.57 Clip-Local Patch Memory 52.77 Prefix Cross-Window Memory 52.77 Hierarchical Patch Memory 52.96 Shared-Register Memory 52.96 Direct-to-Target Memory 53.56     
+
+> HERA with RRPM 54.35
+> HERA + low-LR continuation 53.95 RRPM w/o Memory Regs. 53.56 RRPM w/o Workspace Regs. 53.56
+
+Table 1: Pairwise AvgSurprise accuracy (%) on the IntPhys2 Main split under the same evaluation protocol. The highest accuracy is bold.                   
+
+> Subgroup V-JEPA 2-G HERA Gain Hard 48.81 57.74 +8.93% Fixed camera 48.56 56.73 +8.17% Continuity / Fixed 46.15 57.69 +11.54% Immutability / Fixed 46.15 63.46 +17.31% Solidity 47.26 55.48 +8.22%
+
+Table 2: Pairwise AvgSurprise accuracy (%) on IntPhys2 sub-groups spanning difficulty, camera, and physical-principle categories under the same protocol. vide smaller gains, indicating that increasing the amount, temporal range, or organization of stored history is insuffi-cient without an effective retrieval and integration pathway. Shared-Register Memory also remains below HERA, sug-gesting that using a single token set for both memory access and predictor-side computation may introduce interference between the two functions. 
+
+Register-role ablation. The register-removal variants are evaluated from the same checkpoint. Removing either regis-ter group reduces the accuracy from 53.95% to 53.56%, cor-responding to a 0.39-point decrease. Memory Registers pro-vide the explicit route for querying the Structured Memory Bank, while Workspace Registers integrate the retrieved in-formation through the frozen predictor’s native self-attention pathway. The consistent reduction from either removal sup-ports the complementary roles of the two register groups within the trained RRPM model. 
+
+Subgroup analysis. Table 2 reports an IntPhys2 subgroup analysis spanning difficulty, camera, and physical-principle categories in which prediction particularly depends on ear-lier appearance, trajectory, or interaction evidence. These subgroups place stronger demands on recovering earlier ap-pearance, trajectory, or interaction evidence. HERA produces particularly strong improvements when physically relevant evidence appears earlier in the video and must later be recovered for prediction. Accuracy increases by 8.93 points on Hard examples and 8.17 points under fixed cameras. Larger gains are observed on fixed-camera continu-ity and immutability, where HERA improves the backbone by 11.54 and 17.31 points, respectively. Solidity also improves by 8.22 points, a pattern consistent with improved access to historical spatial and interaction evidence through RRPM. Overall, HERA provides the strongest result across five alternative memory mechanisms. The register-removal diag-nostics further support the central design of HERA: tempo-rally structured memory preserves historical evidence, Mem-ory Registers selectively retrieve it, and Workspace Regis-ters integrate the retrieved information without modifying the pretrained predictor blocks. 
+
+## Discussion 
+
+Our results show that physical prediction benefits from rout-ing retained evidence into the predictor when needed. HERA improves performance across the evaluated memory mech-anisms, with clear gains on Hard, fixed-camera, continuity, immutability, and solidity cases that depend on earlier evi-dence. The architectural controls support separate Memory Registers for retrieval and Workspace Registers for integra-tion through the frozen predictor. HERA requires no object supervision, and extending it to richer structured states and broader physical settings is promising. 
+
+## Conclusion 
+
+We introduced HERA, a historical-evidence routing frame-work, and instantiated it with RRPM, a lightweight adapter that routes structured historical patch evidence into a frozen latent video predictor through dedicated Memory Registers and Workspace Registers. On the IntPhys2 Main split, un-der the same evaluation protocol, HERA with RRPM im-proves the pairwise AvgSurprise accuracy of V-JEPA 2-G from 52.57% to 54.35%. Comparisons with five alternative memory mechanisms and register-role ablations support the importance of selec-tive retrieval and separate predictor-side integration. These results show that making historical evidence accessible at the appropriate stage of prediction is a practical way to improve physical reasoning in pretrained latent world models. 
+
+## References 
+
+Agarwal, N.; Ali, A.; Bala, M.; Balaji, Y.; Barker, E.; Cai, T.; Chattopadhyay, P.; et al. 2025. Cosmos World Foundation Model Platform for Physical AI. arXiv:2501.03575. Alrasheed, A. J.; Parast, A. Y.; Azam, B.; Bailey, J.; and Akhtar, N. 2026. Latent Video Prediction Learns Better World Models. arXiv:2605.15618. Arnab, A.; Dehghani, M.; Heigold, G.; Sun, C.; Lučić, M.; and Schmid, C. 2021. ViViT: A Video Vision Transformer. In Proceedings of the IEEE/CVF International Conference on Computer Vision , 6836–6846. Assran, M.; Duval, Q.; Misra, I.; Bojanowski, P.; Vincent, P.; Rabbat, M.; LeCun, Y.; and Ballas, N. 2023. Self-Supervised Learning from Images with a Joint-Embedding Predictive Architecture. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , 15619–15629. Baillargeon, R.; Spelke, E. S.; and Wasserman, S. 1985. Object Permanence in Five-Month-Old Infants. Cognition ,20(3): 191–208. Bao, H.; Dong, L.; and Wei, F. 2022. BEiT: BERT Pre-Training of Image Transformers. In International Conference on Learning Representations .Bardes, A.; Garrido, Q.; Ponce, J.; Chen, X.; Rabbat, M.; LeCun, Y.; Assran, M.; and Ballas, N. 2024. V-JEPA: La-tent Video Prediction for Visual Representation Learning. arXiv:2404.08471. Bardes, A.; et al. 2025. V-JEPA 2: Self-Supervised Video Models Enable Understanding, Prediction and Planning. arXiv:2506.09985. Beltagy, I.; Peters, M. E.; and Cohan, A. 2020. Longformer: The Long-Document Transformer. arXiv:2004.05150. Bertasius, G.; Wang, H.; and Torresani, L. 2021. Is Space-Time Attention All You Need for Video Understanding? In 
+
+Proceedings of the International Conference on Machine Learning .Bordes, F.; et al. 2025. IntPhys 2: Benchmarking Intuitive Physics Understanding in Video Models. arXiv:2503.20883. Borgeaud, S.; Mensch, A.; Hoffmann, J.; Cai, T.; Rutherford, E.; Millican, K.; van den Driessche, G. B.; Lespiau, J.-B.; Damoc, B.; Clark, A.; de Las Casas, D.; Guy, A.; Menick, J.; Ring, R.; Hennigan, T.; Huang, S.; Maggiore, L.; Jones, C.; Cassirer, A.; Brock, A.; Paganini, M.; Irving, G.; Vinyals, O.; Osindero, S.; Simonyan, K.; Rae, J.; Elsen, E.; and Sifre, L. 2022. Improving Language Models by Retrieving from Trillions of Tokens. In Proceedings of the 39th International Conference on Machine Learning .Bruce, J.; Dennis, M.; Edwards, A.; Parker-Holder, J.; Shi, Y.; Hughes, E.; Lai, M.; Mavalankar, A.; Steigerwald, R.; Apps, C.; Aytar, Y.; Bechtle, S.; Behbahani, F.; Chan, S. C. Y.; Heess, N.; Gonzalez, L. C.; Osindero, S.; Ozair, S.; Reed, S.; Zhang, J.; Zolna, K.; Clune, J.; Freitas, N. d.; Singh, S.; and Rocktäschel, T. 2024. Genie: Generative Interactive Environments. arXiv:2402.15391. Bulatov, A.; Kuratov, Y.; and Burtsev, M. 2022. Recurrent Memory Transformer. arXiv:2207.06881. Dai, Z.; Yang, Z.; Yang, Y.; Carbonell, J.; Le, Q. V.; and Salakhutdinov, R. 2019. Transformer-XL: Attentive Lan-guage Models Beyond a Fixed-Length Context. In Proceed-ings of the 57th Annual Meeting of the Association for Com-putational Linguistics , 2978–2988. Darcet, T.; Oquab, M.; Mairal, J.; and Bojanowski, P. 2024. Vision Transformers Need Registers. In International Con-ference on Learning Representations .Elsayed, G. F.; Mahendran, A.; van Steenkiste, S.; Greff, K.; Mozer, M. C.; and Kipf, T. 2022. SAVi++: Towards End-to-End Object-Centric Learning from Real-World Videos. arXiv:2206.07764. Feichtenhofer, C.; Fan, H.; Li, Y.; and He, K. 2022. Masked Autoencoders as Spatiotemporal Learners. In Advances in Neural Information Processing Systems .Ha, D.; and Schmidhuber, J. 2018. World Models. arXiv:1803.10122. Hafner, D.; Lillicrap, T.; Ba, J.; and Norouzi, M. 2020. Dream to Control: Learning Behaviors by Latent Imagination. In 
+
+International Conference on Learning Representations .Hafner, D.; Lillicrap, T.; Fischer, I.; Villegas, R.; Ha, D.; Lee, H.; and Davidson, J. 2019. Learning Latent Dynamics for Planning from Pixels. In Proceedings of the 36th Interna-tional Conference on Machine Learning , 2555–2565. Hafner, D.; Pasukonis, J.; Ba, J.; and Lillicrap, T. 2023. Mastering Diverse Domains through World Models. arXiv:2301.04104. Hansen, N.; Su, H.; and Wang, X. 2022. Temporal Difference Learning for Model Predictive Control. In Proceedings of the 39th International Conference on Machine Learning .He, K.; Chen, X.; Xie, S.; Li, Y.; Dollár, P.; and Girshick, R. 2022. Masked Autoencoders Are Scalable Vision Learners. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , 16000–16009. Hong, Y.; Mei, Y.; Ge, C.; Xu, Y.; Zhou, Y.; Bi, S.; Hold-Geoffroy, Y.; Roberts, M.; Fisher, M.; Shechtman, E.; Sunkavalli, K.; Liu, F.; Li, Z.; and Tan, H. 2025. RELIC: In-teractive Video World Model with Long-Horizon Memory. arXiv:2512.04040. Joseph, S.; Garrido, Q.; Balestriero, R.; Kowal, M.; Fel, T.; Bakhtiari, S.; Richards, B.; and Rabbat, M. 2026. Interpret-ing Physics in Video World Models. arXiv:2602.07050. Kipf, T.; Elsayed, G. F.; Mahendran, A.; Stone, A.; Sabour, S.; Heigold, G.; Jonschkowski, R.; Dosovitskiy, A.; and Greff, K. 2022. Conditional Object-Centric Learning from Video. In International Conference on Learning Representations .Locatello, F.; Weissenborn, D.; Unterthiner, T.; Mahendran, A.; Heigold, G.; Uszkoreit, J.; Dosovitskiy, A.; and Kipf, T. 2020. Object-Centric Learning with Slot Attention. In 
+
+Advances in Neural Information Processing Systems .Oshima, Y.; Iwasawa, Y.; Suzuki, M.; Matsuo, Y.; and Fu-ruta, H. 2025. WorldPack: Dynamic Frame Compression for Long-context Video World Modeling. arXiv:2512.02473. Piloto, L. S.; Weinstein, A.; Battaglia, P.; and Botvinick, M. 2018. Probing Physics Knowledge Using Tools from Developmental Psychology. In Proceedings of the Annual Meeting of the Cognitive Science Society .Rae, J. W.; Potapenko, A.; Jayakumar, S. M.; Hillier, C.; and Lillicrap, T. P. 2020. Compressive Transformers for Long-Range Sequence Modelling. In International Conference on Learning Representations .Riochet, R.; Castro, M.; Bernard, M.; Lerer, A.; Fergus, R.; Izard, V.; and Dupoux, E. 2018. IntPhys: A Framework and Benchmark for Visual Intuitive Physics Reasoning. In 
+
+Advances in Neural Information Processing Systems .Schrittwieser, J.; Antonoglou, I.; Hubert, T.; Simonyan, K.; Sifre, L.; Schmitt, S.; Guez, A.; Lockhart, E.; Hassabis, D.; Graepel, T.; Lillicrap, T.; and Silver, D. 2020. Mastering Atari, Go, Chess and Shogi by Planning with a Learned Model. Nature , 588: 604–609. Tong, Z.; Song, Y.; Wang, J.; and Wang, L. 2022. Video-MAE: Masked Autoencoders Are Data-Efficient Learners for Self-Supervised Video Pre-Training. In Advances in Neural Information Processing Systems .Wu, T.; Yang, S.; Po, R.; Xu, Y.; Liu, Z.; Lin, D.; and Wet-zstein, G. 2025. Video World Models with Long-term Spatial Memory. arXiv:2506.05284. Wu, Y.; Rabe, M. N.; Hutchins, D.; and Szegedy, C. 2022. Memorizing Transformers. arXiv:2203.08913. Xiang, F.; et al. 2021. Physion: Evaluating Physical Predic-tion from Vision in Humans and Machines. In Advances in Neural Information Processing Systems .Yu, J.; Gao, J.; Bai, J.; Qin, Y.; Huang, K.; Liu, Q.; Wang, X.; Wan, P.; Gai, K.; and Liu, X. 2026. MemLearner: Learn-ing to Query Context Memory for Video World Models. arXiv:2606.31734.

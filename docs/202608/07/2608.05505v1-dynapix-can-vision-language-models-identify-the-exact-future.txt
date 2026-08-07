@@ -1,0 +1,429 @@
+Title: DynaPix: Can Vision-Language Models Identify the Exact Future?
+
+URL Source: https://arxiv.org/pdf/2608.05505v1
+
+Published Time: Fri, 07 Aug 2026 00:21:06 GMT
+
+Number of Pages: 17
+
+Markdown Content:
+# DynaPix: Can Vision-Language Models Identify the Exact Future? 
+
+Thong Nguyen † Vinh-Hien Do Quynh Vo Cong-Duy Nguyen See-Kiong Ng 
+
+Centre for AI Research, VinUniversity National University of Singapore Email: thong.nguyen@u.nus.edu 
+
+Abstract 
+
+Acting in a physical scene requires knowing its real later state, not a plausible one. Current evaluations often accept words or a realistic-looking image, so the predicted state is never checked against the true one. We introduce DynaPix ( Dyna mic Pix els), a benchmark that makes prediction checkable. Given a video clip that stops before a key event and a ques-tion about a later moment, a model must pick the true future image from close candidates or a large gallery. The scenes come from a physics simulator, so the correct image and its time are known exactly and the wrong options are deliberately similar. Models often succeed when a visible event marks the target moment, but are near chance when only elapsed time marks it. Gallery search is harder still, as the true image rarely ranks first. People handle the elapsed-time items well, so the difficulty lies with the models, not the questions. Train-ing on scene accounts drawn from the simu-lator’s true record, not a teacher’s guess, re-pairs much of this but not the longer elapsed-time case. DynaPix thus exposes a temporal-anchoring gap: models attach a prediction to an event far better than to time itself. 
+
+1 Introduction 
+
+Concrete physical anticipation is a reliability re-quirement for vision-language models (VLMs) used as the perception-and-reasoning core of em-bodied agents. An agent facing an unstable stack cannot act on “the stack may collapse” : it needs to know which objects move and where they come to rest, since a vague forecast can turn a safe route into a collision. We therefore target predictions that commit to the specific resulting state of the observed scene, not a plausible description of what might happen. 
+
+> †Corresponding author.
+
+Existing evaluations of physical future predic-tion do not check this commitment. Language-answer evaluations score a textual continuation, a one-word answer, or a free-text forecast (Lei et al., 2020; Yi et al., 2019; Patel et al., 2022; Chang et al., 2026), but answers such as “they will col-lide” underdetermine where each object comes to rest and may reflect what typically happens rather than what happens in this scene. Generated-frame evaluations instead reward visual fidelity rather than whether the depicted state is the correct fu-ture (Li et al., 2026b). What is missing is a veri-fiable test that scores a committed, specific future against ground truth. We introduce DynaPix (Dyna mic Pix els), a benchmark for verifiable future-state prediction. Given a video prefix that stops before a key event and a future-oriented query, a model must iden-tify the specific resulting scene, either in selec-tion , where the target is chosen from plausible candidates, or in retrieval , where it is found in a large image database. Since both settings need a known-correct target and controlled distractors, we build DynaPix on simulated scenes rather than recorded video. Simulation gives the exact result-ing state and lets us construct hard negatives that preserve appearance while changing the dynam-ics, the same scene at the wrong moment and look-alike scenes from other videos (Figure 1), making surface matching and language priors less reliable. We span multiple simulated domains (Greff et al., 2022; Bear et al., 2021) to reduce dependence on any one simulator’s artifacts. Across DynaPix, the open models and multi-modal retrievers we evaluate do not predict the specific future reliably. When the query asks for the exact state at a specified later moment, they perform near chance: Qwen3-VL (Bai et al., 2025) reaches only about 27%, against the 25% that random choice among the candidates would give. They do better when a collision marks the 1arXiv:2608.05505v1 [cs.CV] 6 Aug 2026 INPUT  
+
+> Video prefix Query
+
++ ? Which image best matches            
+
+> the next scene state?
+> (One exact future frame is correct.)
+> Future-frame prediction under two ways.
+> 1Selection
+> ABCD
+> nearby wrong
+> moment
+> correct future
+> (queried state)
+> later moment later moment
+> Visually similar but temporally distinct —
+> only motion reveals the true future.
+> 2Retrieval
+> ~10k candidate
+> frames
+> Rank 1 Rank 2 Rank 3 Rank 51
+> look-alike
+> wrong moment
+> the true future
+> ranks far down
+> •••
+> Static look-alikes outrank the true future —
+> causing appearance-based retrieval to fail.
+
+Figure 1: A DynaPix example from a real benchmark instance. Selection: observed prefix plus future-oriented query, choose the correct future frame (green) among four same-scene candidates. Retrieval: rank the correct future in the 10,000-frame standard database. Scenes are simulated with the Bullet physics engine. 
+
+target moment, about 65%, still far from reli-able. This time-anchored weakness appears in ev-ery model we test, across generative and embed-ding families, though matched-anchor controls are needed to separate temporal anchoring from con-struction factors. In a human validity probe, anno-tators identify the exact later state on 83.3% of the elapsed-time items of a balanced subsample while models stay near chance, so those items leave real headroom despite the study’s modest size. Re-trieval tests the same commitment in an open-set setting, and the strongest retriever we test, Qwen3-VL-Emb-8B (Li et al., 2026a), ranks the correct future first only 13.3% of the time, so the correct frame is in the database yet rarely surfaced. We also study physics-grounded chain-of-thought distillation, which supervises a student with simulator-derived accounts of how each scene unfolds rather than a teacher’s unsupported rationales. It substantially improves event- and window-anchored selection and lifts the one-second time case, and contrastive finetuning of the retriever raises its Recall@1 from 13 to 49%. The hardest cases remain: selecting the state at a longer elapsed horizon and ranking the exact future first, which leave DynaPix with remaining headroom. We summarize our contributions as follows: • We introduce DynaPix, a benchmark that makes predictive understanding verifiable by asking a model to identify the specific future state of a physical scene, by selection among controlled candidates or retrieval from a large database. • We propose physics-grounded chain-of-thought distillation, which supervises astudent with reasoning grounded in a simu-lator’s true dynamics rather than a teacher’s generated rationales, substantially improving selection over answer-only training. • We analyze current open generative models and multimodal retrievers and find them far from solving DynaPix. They are near chance on the state at a specified later time, a fail-ure distillation lifts only at the shortest hori-zon, and they are weak at zero-shot open-set retrieval, where targeted finetuning closes much but not all of the gap. A human study supports the validity of the time-anchored gap. 
+
+2 Related Work 
+
+Future prediction in language space. Many predictive evaluations ask for an answer in words. 2VLEP scores which of two textual continuations is more likely (Lei et al., 2020), synthetic physics suites pose predictive questions whose answers are words or labels (Yi et al., 2019; Patel et al., 2022), and open-ended event forecasting asks a model to write what happens next (Chang et al., 2026; Yu et al., 2025; Li et al., 2025). Such targets un-derdetermine the resulting state: a fluent contin-uation can name the event yet omit where each object ends up, rewarding typical outcomes over this scene’s outcome. DynaPix keeps the query in language but moves the answer into pixels, so a response is scored against the frame the simulator actually produced. 
+
+World models and predictive probes. Recent probes report that vision-language models de-scribe observed scenes far better than they predict continuations (Qiu et al., 2026; Li et al., 2026c; Qian et al., 2026), and related diagnostics isolate causal and object-state reasoning as distinct weak-nesses (Komanduri et al., 2025; Nguyen et al., 2024). Simulation is a standard reference for phys-ical prediction, in cognitive accounts (Battaglia et al., 2013; Smith et al., 2019) and rigid-body benchmarks (Greff et al., 2022; Bear et al., 2021). Generated-frame evaluations score the fidelity of a synthesized image (Li et al., 2026b). We score identity against the true frame, separating fami-lies where a salient event marks the target moment from the family where only elapsed time does. 
+
+Multimodal retrieval. Our retrieval track uses methods from composed and interleaved multi-modal retrieval, where a query combines modal-ities and evaluation must resolve fine-grained dis-tinctions (Song et al., 2026; Tang et al., 2025), and from multimodal embedders trained for that set-ting (Zhang et al., 2025b; Feng et al., 2026). Late-interaction and hybrid retrievers preserve token-level correspondences that single-vector encoders discard (Santhanam et al., 2022; Kim et al., 2026), which fits frames that differ only in object posi-tion. We leave them to future work, so our claims do not depend on them. 
+
+Chain-of-thought distillation. Distilling ratio-nales from a teacher improves small students across reasoning tasks (Hsieh et al., 2023; Wang et al., 2023; Zhang et al., 2025a; Goncharov et al., 2026). These recipes assume something that fails for physical prediction: the rationale is sampled from a black-box teacher, so a fluent but wrong explanation supervises the student as strongly as a correct one. We keep the format but change the source: our rationales are derived from the simula-tor’s record, converted into qualitative predicates, and checked for numeric leakage, so the teacher narrates a true account rather than inventing one. 
+
+3 The DynaPix Benchmark 
+
+3.1 Task formulation 
+
+DynaPix evaluates whether a model can identify a 
+
+specific future state of a physical scene given an observed video prefix and a future-oriented query. Each instance contains a prefix video V≤t, a query 
+
+q, and an image answer I⋆ depicting the queried future state. The image answer is verified directly against simulator frames. Two protocols test this at two scales. In the selection track the model chooses the correct image from four candidates (chance 25% ), and in the retrieval track it ranks the correct frame from a large database. Selection is a controlled closed-set diagnostic. Retrieval is an open-set test among many visually similar fu-ture frames. 
+
+3.2 Construction from simulator oracles 
+
+The core DynaPix scenes use the Bullet physics engine (Coumans and Bai, 2016–2021) and follow the collision-scene design of CLEVRER (Yi et al., 2019). We generate 10,000 collision scenes with oracle annotations of object trajectories and col-lision events, controlling object placement, event timing, and the exact future trajectory of every scene. Ground truth is a real simulation frame, not a human or MLLM-generated label, making each instance verifiable by frame identity and times-tamp. The prefix boundary is set from oracle event timestamps: for event-based items, the prefix ends a default 10 frames before the target event, pre-venting event leakage and forcing prediction from prior dynamics. Selection items resist appearance shortcuts with same-scene wrong-time frames as the main distractor. These share object identities, colors, shapes, viewpoint, and background with the correct frame but come from another moment. Because all candidates are real simulator frames, no option is singled out by rendering artifacts or physical impossibility. The templates specify the temporal anchor and horizon but never name the answer image or encode the target as a text label. 33.3 Selection track 
+
+The selection track has three question families, defined by how time anchors the target future state. Appendix C gives worked examples and construction variants, and Appendix A gives sub-type counts. 
+
+Event-anchored. The prefix stops just before a collision, and the model selects the frame that shows the scene right after that collision . The anchor is event-relative, so the task requires pre-dicting the outcome of the interaction rather than choosing any plausible later frame. 
+
+Time-anchored. The model observes a short prefix and must identify the state at a precise later time , 1 or 2 seconds ahead. No event need oc-cur at that instant, so the family probes tempo-ral precision rather than event recognition. Can-didates a few frames apart can conflate forward prediction with sub-second timestamp discrimina-tion, and Section 4.3 checks this. 
+
+Window-anchored. The model observes a brief activity window and must identify the state ashort horizon into the future . Every window item uses one shared query, so items differ in the phys-ical situation rather than the wording. The future window may contain no event, one collision, an object entering or leaving view, or several events. Distractor sources follow the temporal anchor. Time-anchored and window-anchored items use same-scene wrong-time distractors, while event-anchored items also include a cross-scene distrac-tor variant that tests whether the model tracks the correct scene rather than only the correct mo-ment. We release a fixed split of 9,368 train-ing and 2,208 test questions over 387 distinct test scenes. Each item has four candidates and ex-actly one correct image. Table 1 summarizes the split, retrieval pools, and transfer suites. Window-anchored items make up 72% of the test split, so we report per-family accuracy throughout and treat any aggregate over the three families as a ref-erence number only. 
+
+3.4 Retrieval track 
+
+The retrieval track replaces closed-set choice with open-set ranking. Given the same prefix and query, the model ranks the correct future frame in a database, so the answer must be found among thousands of look-alikes rather than a small candi-date set (Figure 3). The two query families (Ta-ble 1) are future-state , which varies the obser-                             
+
+> Subset Count Frames
+> Selection (train / test, four candidates) Event-anchored 1,151 / 249 –Time-anchored 1,619 / 374 –Window-anchored 6,598 / 1,585 –Total 9,368 / 2,208 –
+> Retrieval (queries / database frames) Future-state pool 22,500 30,000 Counterfactual pool 18,225 26,995 Standard test 2,002 10,000
+> Transfer, zero-shot (test items) MoVi-A (event / time) 327 / 1,198 –MoVi-A total 1,525 –Physion (event / time) 583 / 1,612 –Physion total 2,195 –
+> Table 1: DynaPix statistics. Selection uses four can-didates per item, a frozen split, and 387 distinct test scenes. Retrieval lists the standard test set and its source pools.
+
+vation length and prediction horizon, and coun-terfactual , which adds an intervention by asking where an object would be if another were absent. The standard evaluation uses 2,002 queries over 10,000 frames, and Appendix D gives further de-tail. 
+
+3.5 Transfer suites 
+
+To measure out-of-simulator transfer, we build zero-shot suites with the same oracle recipe on MoVi-A, a Kubric rigid-body setting, and Phys-ion (Greff et al., 2022; Bear et al., 2021). Both suites contribute event- and time-anchored items, with the Physion items drawn from three regimes: A1 contact, A2 motion and A3 landing. Counts are in Table 1 and construction details are in Ap-pendix E. 
+
+4 How Far Are VLMs from Predictive Understanding? 
+
+We use DynaPix to test whether current models can identify a specific future state and whether per-formance depends on target anchoring: a salient physical event, elapsed time alone, or a short fu-ture window. We report the selection track in Sec-tion 4.2 and the open-set retrieval track in Sec-tion 4.4. All model numbers are zero-shot before DynaPix training. Section 5 tests whether physics-grounded supervision closes the gap. 
+
+4.1 Models and metrics 
+
+A selection item admits two solver types. A
+
+generative model reads the prefix, query, and 4Event   
+
+> anchored
+> future state at a
+> physical event
+> (here, a collision)
+> “Which image is
+> closest to the correct future state?” correct future same scene, wrong moment
+> (differs only in object position)
+
+Window   
+
+> anchored
+> the next scene state
+> a short window
+> ahead of the cut
+> “Which image best matches the next scene state?” correct future same scene, wrong moment
+> (differs only in object position)
+
+Time   
+
+> anchored
+> the state a fixed
+> time (1 s) after
+> the observation ends
+> “Which best shows
+> the scene 1s after the observation ends?” correct future distractors
+> (same-scene wrong moments or hard negatives)
+
+Figure 2: The three selection anchors, shown on real benchmark instances. Given an observed prefix cut before the target, choose one exact future frame t⋆ (green) among four candidates. Event-anchored : frame right after the next collision. Window-anchored : state a short horizon ahead. Time-anchored : state a fixed time after the cut. Distractors are wrong moments from the same scene or hard negatives from a different scene. 
+
+four candidates and writes a choice. A similar-ity scorer embeds the query and candidates and picks the nearest candidate without generating a future state. The comparison separates predic-tion from appearance matching. As generative models, we use Qwen3-VL-2B and Qwen3-VL-8B in instruct mode, Qwen3-VL-8B in thinking mode (Bai et al., 2025), and the larger open mod-els Qwen3.5-27B and Qwen3.6-27B, which test whether scale alone supplies the missing ability. As similarity scorers, we use CLIP (Radford et al., 2021), SigLIP 2 (Tschannen et al., 2025), Lan-guageBind (Zhu et al., 2024), VLM2Vec (Jiang et al., 2025), and Qwen3-VL-Embedding at 2B and 8B (Li et al., 2026a), each a dual encoder applied to both the selection and retrieval tracks. For thinking models, unparseable outputs count as wrong, and we report parseability because a model that cannot commit has not answered (Ap-pendix H). For retrieval, each method ranks every database frame against the query. Direct embedders com-pare the query and each frame in one step. Two-stage pipelines instead generate a textual future prediction and match it to the database through a frozen text-image encoder. Our strongest such pipeline generates a chain of thought with Qwen3-VL-8B-Instruct, while two weaker predict variants generate a short outcome description with Qwen3-VL-2B and match it to generated frame captions or the frames themselves. Since the encoder is identical across two-stage rows, only the genera-tive stage differs. We report Recall@ k, mean re-ciprocal rank (MRR), and the median rank of the true future among 10,000 frames. 
+
+4.2 Selection: event-anchored items are solved, time-anchored ones are not 
+
+Table 2 reports per-family accuracy. We treat these as primary and the mean as reference, because the test set is 72% window-anchored. A pooled score would be dominated by window and hide failure on the time family. Accuracy separates sharply by family. With a salient collision marking the target moment, the best generative model reaches 65.1%, and VLM2Vec reaches 71.1%, both well above the 25% chance rate. With elapsed time alone, ev-ery model is near chance, with a best of 27.3%. The contrast holds within Qwen3-VL-8B instruct: 5Future-state     
+
+> "Which image best
+> shows the scene after
+> the observation?"
+> observation video
+> rank in
+> ~10k DB
+> true future same scene, before the collapse different scene
+> Counterfactual
+> "If the blue cube were
+> absent, where does the red sphere end up?"
+> observation video
+> rank in
+> ~10k DB
+> counterfactual future outcome without counterfactual factor different scene
+
+Figure 3: The retrieval track of DynaPix (illustrative). From the observation video, a method ranks the true future frame (green) among a database of about 10,000 frames. Future-state queries ask for the scene after the observation: the true future is the outcome the dynamics force, here the toppling stack settled flat, while distractors show the scene before the collapse or a different scene. Counterfactual queries remove a named object and ask for the resulting motion: without the blue cube the red sphere rolls on, whereas the factual outcome keeps the cube and the sphere stops against it.                                                        
+
+> Event Time Window Mean Chance 25.0 25.0 25.0 25.0 Human ‡58.3 83.3 73.9 71.8
+> Similarity scorers
+> CLIP 44.6 27.0 40.7 37.4 LanguageBind 18.9 21.7 24.1 21.5 SigLIP 2 65.9 20.6 52.7 46.4 VLM2Vec 71.1 24.1 55.6 50.2
+> Qwen3-VL-Emb-2B 63.1 21.4 44.7 43.1 Qwen3-VL-Emb-8B 57.0 22.7 52.7 44.1
+> Open generative VLMs
+> Qwen3-VL-2B (instruct) 28.5 24.6 35.3 29.5 Qwen3-VL-8B (instruct) 64.7 27.3 42.0 44.7 Qwen3-VL-8B (thinking) †65.1 18.7 39.3 41.0 Qwen3.5-27B 25.8 21.6 26.6 24.7 Qwen3.6-27B 26.1 20.3 27.1 24.5
+
+Table 2: Zero-shot selection accuracy (%) on the Dy-naPix test set. Columns are the three per-family scores Event, Time, Window, and their unweighted Mean. Test mix: 72% window-anchored, so the per-family scores are primary. Chance is 25%. Bold marks the best model result per family. †Unparsed outputs are counted as wrong throughout. Parse rates in reason-ing mode are 66.4% for the thinking base, 89.9% for Qwen3.5-27B and 81.1% for Qwen3.6-27B, so the 27B rows also mix errors with non-answers. ‡Human is the three-annotator majority vote on a balanced cross-simulator subsample (Section 4.3), read as a validity probe, so its per-family scores are comparable but its item mix differs from the test set. 
+
+64.7% on event and 27.3% on time, so the pat-tern is not a quirk of one architecture. Whether it reflects temporal anchoring itself or other dif-ferences between the families is taken up in Sec-tion 4.3. Neither scale nor explicit reasoning removes the gap. Thinking mode raises event from 64.7% to 65.1% but lowers time from 27.3% to 18.7%. The larger open models are the clearest scale test: Qwen3.5-27B and Qwen3.6-27B sit within a few points of chance on every family, so scale alone does not confer the missing ability. The similarity scorers extend the pattern. VLM2Vec never gen-erates a future state, yet posts the highest mean at 50.2%, driven by event and window items where appearance is partly informative, while it too falls to 24.1% on time. The unweighted mean can thus be led by appearance matching. The per-family view exposes the time-anchored failure DynaPix is designed to surface: every evaluated similarity scorer is within a few points of chance on time, so appearance matching does not recover a moment specified only by elapsed time. 
+
+4.3 Human performance and temporal validity 
+
+Near-chance accuracy on time-anchored items has two readings: models lack the capability, or the items are ill posed for anyone. We use a human study as a validity probe. Three annotators judged a balanced cross-simulator subsample with ran-domized candidate order and balanced answer po-sition, so chance is 25%. Of 59 unique items, 10 were seen by one annotator, 30 by two, and 19 by all three, for 127 judgments. Because depth varies, the majority vote aggregates the available judgments rather than a uniform three-way vote. The time family supports validity. Human ma-jority accuracy is 83.3% versus 27.3% for the best model, with annotators at 83.3%, 100.0%, and 83.3%. Thus near-chance model performance on elapsed-time queries is not due to unanswer-able time items or indistinguishable adjacent fu-ture states, and shows headroom for selecting a 6Method R@1 R@10 R@50 MRR Med. rank                                                     
+
+> Direct embedders
+> CLIP 1.9 8.0 20.4 0.041 404 LanguageBind 1.0 6.9 19.4 0.031 388 SigLIP 2 7.3 39.4 60.6 0.171 23 VLM2Vec-V2 12.7 62.0 81.1 0.272 6
+> Qwen3-VL-Emb-2B 10.6 49.1 71.5 0.224 11 Qwen3-VL-Emb-8B 13.3 64.2 81.3 0.283 6
+> Two-stage predict-then-match (matching encoder frozen) Qwen3-VL-8B CoT →text 2.1 11.4 26.6 0.055 252 Qwen3-VL-2B predict →caption 1.0 6.7 18.0 0.031 477 Qwen3-VL-2B predict →image 0.2 2.4 7.6 0.012 985
+
+Table 3: Zero-shot retrieval, standard test set: 2,002 queries, 10,000-frame database. Recall@ k and MRR are higher-is-better. Median rank is lower-is-better. Chance R@1 is 0.01%. Bold marks the best result per column. 
+
+later state specified only by elapsed time. On event-anchored items humans are not above models. The majority vote is 58.3% versus 71.1% for VLM2Vec and 65.1% for the best Qwen3-VL-8B setting, and annotators at 58.3%, 40.0%, and 63.6%. Event is slowest for humans, median 39.9s versus 15.8s for time and 20.3s for window. Thus humans find time easiest and event hardest, the re-verse of models, which are near chance on time and much stronger on event. This reversal argues against event items being simply easier for any observer due to obvious static post-collision targets: then humans should find event easy, but they do not. Still, this is not a controlled test of the construction-confound con-cern: the families differ beyond the anchor in pos-sible horizon, distractor, and target-state proper-ties, and it does not rule out model-specific static cues, candidate-only artifacts, or post-collision ap-pearance strategies that ignore the prefix. Agreement is fair. Fleiss’ κ is 0.366 on the 19 items seen by all three annotators. We treat it as a validity probe, not a human ceiling or causal isolation of temporal anchoring. The strongest conclusion is that elapsed-time items are human-answerable while all evaluated models re-main near chance. A matched-anchor experiment with identical prefix, target, horizon, and candi-dates, differing only in event versus elapsed-time anchors, plus candidate-only and shuffled-prefix controls, would settle it. 
+
+4.4 Retrieval: the true future is rarely ranked first 
+
+Retrieval is stricter: the correct future sits in a database of about 10k look-alikes and must out-rank them. Even the strongest embedder, Qwen3-VL-Emb-8B, places the true future first only 13.3% of the time, at an MRR of 0.283 and a median rank of 6. The correct frame is usually near the top rather than first, so a system that acts on one retrieved image is right 13.3% of the time. The two-stage predict-then-match pipelines are weaker, because generating a future descrip-tion and matching it to pixels can lose the fine spatial detail that separates one moment from the next. Across zero-shot methods here, open-set lo-calization of the exact future remains unsolved, and Section 5 asks how far supervised adaptation closes it. 
+
+5 Physics-Grounded CoT Distillation 
+
+Section 4 leaves one supervision question: can training rationales tied to the true future state im-prove a model? Standard chain-of-thought distil-lation trains the student on a teacher’s own ratio-nales (Hsieh et al., 2023; Wang et al., 2023). For physical prediction, those rationales can be scene-mismatched guesses. We ground each rationale in the simulator record, so the supervision is physi-cally correct by construction. 
+
+5.1 Method 
+
+The pipeline grounds each training scene in three steps. Oracle to predicates: we read the simu-lator’s exact trajectories and collision events and convert them into qualitative predicates: direction and relative speed of each object, which pairs are on a collision course, and each object’s region at the target moment. A validator strips all raw co-ordinates, timestamps, and numeric values, so ra-tionales use only test-time terms. Teacher nar-ration: a Qwen3-32B teacher phrases the predi-cates into a chain of thought that parses the scene, analyzes motion, predicts the configuration, and compares it against the candidates (Appendix K). 
+
+Student training: we fine-tune Qwen3-VL at 8B and 2B with LoRA on pairs mapping the pre-fix and question to the rationale and answer (Ap-pendix G). At inference the student sees only pix-els and the question, so the oracle is unavailable. 
+
+Retrieval adaptation. We adapt both retrieval families. In the two-stage pipeline, we replace the generative stage, Qwen3-VL-8B-Instruct, with the distilled 8B student and freeze the matching en-coder, isolating grounded reasoning. For the di-rect family, we contrastively fine-tune Qwen3-VL-Emb-8B, the strongest zero-shot retriever, with LoRA on the retrieval pool of 22,500 queries, us-7(a) Selection, per family (Qwen3-VL-8B)                                              
+
+> Event Time Window Macro Micro Zero-shot (base) 64.7 27.3 42.0 44.7 42.1 Answer-only SFT 73.9 36.6 61.1 57.2 58.4 Physics-grounded CoT 92.4 45.4 96.7 78.2 87.5
+> (b) Retrieval
+> R@1 R@10 R@50 MRR Med. Two-stage (Qwen3-VL-8B →text) 2.1 11.4 26.6 0.055 252 + CoT-distilled student 16.0 61.3 78.0 0.305 6Direct (Qwen3-VL-Emb-8B) 13.3 64.2 81.3 0.283 6+ contrastive finetune 48.8 92.0 96.8 0.652 2
+
+Table 4: Physics-grounded CoT distillation. (a) 
+
+CLEVRER selection accuracy per family. (b) Retrieval on 2,002 queries over 10,000 frames. The distilled stu-dent replaces the two-stage pipeline’s generative stage, and the contrastive row finetunes the direct embedder. Bold marks the best result in each column of each panel. 
+
+ing in-batch and same-scene hard negatives. Both train on the training pool only and are evaluated on the standard test set. 
+
+5.2 In-domain results 
+
+Table 4 shows uneven CLEVRER selection gains for Qwen3-VL-8B. Distillation nearly solves win-dow, from 42.0 to 96.7, and strongly lifts event, from 64.7 to 92.4, because both families re-ward collision-outcome reasoning supplied by the grounded rationale. Answer-only training reaches only 61.1 on window and 73.9 on event, so most of the gain comes from rationale content rather than answer supervision alone (Appendix J). Time-anchored accuracy is the weakest family under every regime. Distillation lifts it from 27.3 to 45.4, above answer-only fine-tuning at 36.6, but the gain comes from the near horizon: the 1-second case rises to 64.0 while the 2-second case reaches only 37.6, from base rates of 28.8 and 26.6. A qualitative rationale supports the one-second case, but performance decays as the hori-zon lengthens and the target drifts from observed landmarks. The 2-second case remains close to the failure pattern in Section 4. Distillation helps most when a landmark or short reach anchors the moment. Longer-horizon anchoring remains open. 
+
+5.3 Transfer to unseen simulators 
+
+Transfer to MoVi-A and Physion is partial (Sec-tion 3). Applied zero-shot, the CLEVRER-trained student improves overall selection accuracy (an-swer mode) from 39.3 to 48.1 on MoVi-A and from 17.5 to 48.4 on Physion. Both gains are be-low the in-domain rise from 42.1 to 86.7 measured in the same answer mode. The same family split persists: on MoVi-A the improvement is concen-trated in event-anchored items, from 72.8 to 89.3, while time-anchored items barely move, from 30.2 to 36.8. Transfer again fails on the elapsed-time case. 
+
+5.4 Retrieval with distilled reasoning 
+
+With the matching encoder frozen, swapping the distilled 8B student into the generative stage of the two-stage pipeline raises MRR from 0.055 to 0.305 and cuts the median rank of the true future from 252 to 6 (Table 4). Because only the gener-ative stage changes, the gain reflects the grounded rationale rather than a stronger matcher, and ex-ceeds the zero-shot direct embedder it trailed, 0.305 against 0.283 MRR. Two-stage adaptation leaves the stronger direct-retrieval family untrained, so we also contrastively fine-tune Qwen3-VL-Emb-8B (Section 5.1), re-ported in Table 4(b). This finetune is our strongest retriever: Recall@1 rises from 13.3 to 48.8, MRR from 0.283 to 0.652, Recall@50 from 81.3 to 96.8, and the median rank from 6 to 2. These gains show representation headroom, though even the fine-tuned embedder ranks the exact future first fewer than half the time. 
+
+6 Conclusion 
+
+We introduce DynaPix, a benchmark that tests whether vision-language models identify the ex-act future frame of a physical scene. With simu-lator oracles, DynaPix has verifiable targets and appearance-matched distractors. We also pro-pose physics-grounded chain-of-thought distilla-tion, where the teacher narrates the simulator record rather than inventing it. This supervi-sion nearly solves the event- and short-horizon families, and a contrastively finetuned embedder closes much of, but not all, the open-set retrieval gap. Temporal precision remains the main fail-ure mode: models stay near chance when elapsed time alone fixes the target moment, and distil-lation helps only at the shortest horizon. The human study places annotators far above mod-els on elapsed-time items, leaving headroom for future work on prediction with temporal preci-sion. The event-anchored comparison needs con-trolled follow-up, and a matched-anchor design with candidate-only controls is the natural next experiment, holding every factor but the anchor fixed. 8Limitations 
+
+DynaPix gives simulator-verifiable, frame-exact targets for future-state prediction. This verifiabil-ity restricts scope. • The families differ in more than their an-chor. This is the limitation that most con-strains our interpretation. Event-anchored and time-anchored items differ not only in what fixes the target moment but also in pre-diction horizon, distractor sourcing, and how visually distinctive the target state is, since a post-collision configuration is salient in a way that an arbitrary point on a trajectory is not. We therefore report a family-level difference and cannot attribute it to tempo-ral anchoring alone. Two observations argue against the simplest competing account, that event items are easier for any observer: anno-tators are at or below models on event items while far above them on time items, and they take longest on event. Neither is a controlled manipulation. Settling this needs matched pairs that share a prefix, target frame, horizon and candidate set while varying only whether the query names an event or an elapsed time, together with candidate-only and shuffled-prefix controls that test how far the target can be identified without the observed dynamics. We did not run those experiments and do not claim the mechanism. • Synthetic scope. The data are synthetic. This makes frame-identity ground truth auditable, but leaves real-world transfer untested. Fu-ture work should rebuild the oracle from tracks, robot logs, or instrumented video and test whether the temporal-anchoring gap sur-vives clutter, camera motion, and imperfect perception. • Temporal resolution. Frame-exact selection could mix prediction with sub-second times-tamp discrimination. The human study tests this directly: annotators reach 83% on time-anchored items, so nearby futures are distin-guishable at this resolution and model failure is not an artifact of impossible timing. The balanced subsample is modest, so it validates the family but does not fix the granularity at which the distinction becomes hard. A larger calibrated study should map that boundary. • Time-anchored failure. The time-anchored regime remains the hardest family after scal-ing, explicit reasoning, and oracle-grounded distillation. The 1s and 2s split shows that failure grows with elapsed time: distillation lifts the 1s case to 64.0 but the 2s case to only 37.6. We characterize this horizon de-pendence but do not identify its cause. Fu-ture work should separate error accumulation in predicted dynamics from failure to convert elapsed time into displacement. • Design coverage. The oracle uses a designer-chosen predicate vocabulary. If that vocab-ulary drives the distillation gain, measure-ments may reflect phrasing rather than true-record grounding. Our conclusions there-fore concern predicate-grounded diagnostics, not unrestricted physical inference. The re-trieval database is single-domain, and fine-tuning is limited to Qwen-family students. Future work should vary these factors sepa-rately. • Retrieval coverage. We adapt both retrieval families to the domain, the generative two-stage pipeline and the direct embedder, but only within single-vector architectures. Late-interaction and multi-vector retrievers pre-serve token-level correspondences discarded by a single-vector encoder (Santhanam et al., 2022; Kim et al., 2026). They remain untested for cases where the target differs from its distractors in a small frame region. We report the model set we could run com-pletely rather than a broader panel of partial results. 
+
+References                   
+
+> Shuai Bai, Yuxuan Cai, Ruizhe Chen, Keqin Chen, Xionghui Chen, Zesen Cheng, Lianghao Deng, Wei Ding, Chang Gao, Chunjiang Ge, et al. 2025. Qwen3-vl technical report. arXiv preprint arXiv:2511.21631 .Peter W Battaglia, Jessica B Hamrick, and Joshua B Tenenbaum. 2013. Simulation as an engine of phys-ical scene understanding. Proceedings of the na-tional academy of sciences , 110(45):18327–18332. Anna Bavaresco, Raffaella Bernardi, Leonardo Berto-lazzi, Desmond Elliott, Raquel Fernández, Albert Gatt, Esam Ghaleb, Mario Giulianelli, Michael
+
+9Hanna, Alexander Koller, et al. 2025. Llms in-stead of human judges? a large scale empirical study across 20 nlp evaluation tasks. In Proceedings of the 63rd Annual Meeting of the Association for Compu-tational Linguistics (Volume 2: Short Papers) , pages 238–255. Daniel M Bear, Elias Wang, Damian Mrowca, Felix J Binder, Hsiao-Yu Fish Tung, RT Pramod, Cameron Holdaway, Sirui Tao, Kevin Smith, Fan-Yun Sun, et al. 2021. Physion: Evaluating physical prediction from vision in humans and machines. arXiv preprint arXiv:2106.08261 .Nitay Calderon, Roi Reichart, and Rotem Dror. 2025. The alternative annotator test for llm-as-a-judge: How to statistically justify replacing human anno-tators with llms. In Proceedings of the 63rd An-nual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers) , pages 16051– 16081. He Chang, Zhulin Tao, Lifang Yang, Xianglin Huang, and Yunshan Ma. 2026. Scattered hypothesis gen-eration for open-ended event forecasting. In Find-ings of the Association for Computational Linguis-tics: ACL 2026 , pages 17288–17304. Erwin Coumans and Yunfei Bai. 2016–2021. Pybullet, a python module for physics simulation for games, robotics and machine learning. http://pybullet. org .Hengyi Feng, Zeang Sheng, Meiyi Qiang, Yang Li, and Wentao Zhang. 2026. Generative giants, re-trieval weaklings: Why do multimodal large lan-guage models fail at multimodal retrieval? In Find-ings of the Association for Computational Linguis-tics: ACL 2026 , pages 15917–15933. Andrey Goncharov, Daniil Vyazhev, Petr Sychev, Edvard Khalafyan, and Alexey Zaytsev. 2026. Complexity-aware fine-tuning. In Findings of the Association for Computational Linguistics: EACL 2026 , pages 682–696. Google DeepMind. 2025. EmbeddingGemma: Pow-erful and lightweight text representations. arXiv preprint .Klaus Greff, Francois Belletti, Lucas Beyer, Carl Do-ersch, Yilun Du, Daniel Duckworth, David J Fleet, Dan Gnanapragasam, Florian Golemo, Charles Her-rmann, et al. 2022. Kubric: A scalable dataset gen-erator. In Proceedings of the IEEE/CVF conference on computer vision and pattern recognition , pages 3749–3761. Cheng-Yu Hsieh, Chun-Liang Li, Chih-Kuan Yeh, Hootan Nakhost, Yasuhisa Fujii, Alex Ratner, Ran-jay Krishna, Chen-Yu Lee, and Tomas Pfister. 2023. Distilling step-by-step! outperforming larger lan-guage models with less training data and smaller model sizes. In Findings of the Association for Computational Linguistics: ACL 2023 , pages 8003– 8017. Ziyan Jiang, Rui Meng, Xinyi Yang, Semih Yavuz, Yingbo Zhou, and Wenhu Chen. 2025. VLM2Vec: Training vision-language models for massive mul-timodal embedding tasks. In International Confer-ence on Learning Representations (ICLR) .Juyeon Kim, Geon Lee, Dongwon Choi, Taeuk Kim, and Kijung Shin. 2026. Hybrid-vector retrieval for visually rich documents: Combining single-vector efficiency and multi-vector accuracy. In Findings of the Association for Computational Linguistics: ACL 2026 , pages 1073–1089. Aneesh Komanduri, Karuna Bhaila, and Xintao Wu. 2025. Causalvlbench: Benchmarking visual causal reasoning in large vision-language models. In Pro-ceedings of the 2025 Conference on Empirical Meth-ods in Natural Language Processing , pages 30648– 30668. Jie Lei, Licheng Yu, Tamara Berg, and Mohit Bansal. 2020. What is more likely to happen next? video-and-language future event prediction. In Proceed-ings of the 2020 conference on empirical meth-ods in natural language processing (EMNLP) , pages 8769–8784. Haobo Li, Zhaowei Wang, Jiachen Wang, YueYa Wang, Alexis Kai Hon Lau, and Huamin Qu. 2025. Cllmate: A multimodal benchmark for weather and climate events forecasting. In Proceedings of the 2025 Conference on Empirical Methods in Natural Language Processing , pages 17547–17573. Mingxin Li, Yanzhao Zhang, Dingkun Long, Keqin Chen, Sibo Song, Shuai Bai, Zhibo Yang, Pengjun Xie, An Yang, Dayiheng Liu, et al. 2026a. Qwen3-vl-embedding and qwen3-vl-reranker: A unified framework for state-of-the-art multimodal retrieval and ranking. arXiv preprint arXiv:2601.04720 .Yifan Li, YuKai Gu, Yingqian Min, Zikang Liu, Yi-fan Du, Kun Zhou, Min Yang, Wayne Xin Zhao, and Minghui Qiu. 2026b. Beyond the last frame: Process-aware evaluation for generative video rea-soning. In Proceedings of the 64th Annual Meet-ing of the Association for Computational Linguistics (Volume 1: Long Papers) , pages 20393–20409. Yixia Li, Hongru Wang, Jiahao Qiu, Zhenfei Yin, Dongdong Zhang, Cheng Qian, Zeping Li, Xiaoteng Ma, Guanhua Chen, and Heng Ji. 2026c. From word to world: Can large language models be implicit text-based world models? In Proceedings of the 64th Annual Meeting of the Association for Compu-tational Linguistics (Volume 1: Long Papers) , pages 8084–8111. Nguyen Nguyen, Jing Bi, Ali Vosoughi, Yapeng Tian, Pooyan Fazli, and Chenliang Xu. 2024. Oscar: Ob-ject state captioning and state change representation. In Findings of the Association for Computational Linguistics: NAACL 2024 , pages 3565–3576. 
+
+10 Maitreya Patel, Tejas Gokhale, Chitta Baral, and Yezhou Yang. 2022. Cripp-vqa: Counterfactual rea-soning about implicit physical properties via video question answering. In Proceedings of the 2022 Conference on Empirical Methods in Natural Lan-guage Processing , pages 9856–9870. Cheng Qian, Emre Can Acikgoz, Bingxuan Li, Xiusi Chen, Yuji Zhang, Bingxiang He, Qinyu Luo, Gokhan Tur, Dilek Hakkani-Tur, Yunzhu Li, et al. 2026. Current agents fail to leverage world model as tool for foresight. In Proceedings of the 64th An-nual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers) , pages 13686– 13723. Yifu Qiu, Yftah Ziser, Anna Korhonen, Shay B Co-hen, and Edoardo Maria Ponti. 2026. Can vlms predict future states? bootstrapping world models from inverse dynamics. In Findings of the Asso-ciation for Computational Linguistics: ACL 2026 ,pages 35579–35600. Alec Radford, Jong Wook Kim, Chris Hallacy, Aditya Ramesh, Gabriel Goh, Sandhini Agarwal, Girish Sastry, Amanda Askell, Pamela Mishkin, Jack Clark, et al. 2021. Learning transferable visual mod-els from natural language supervision. In Interna-tional conference on machine learning , pages 8748– 8763. PmLR. Keshav Santhanam, Omar Khattab, Jon Saad-Falcon, Christopher Potts, and Matei Zaharia. 2022. Colbertv2: Effective and efficient retrieval via lightweight late interaction. In Proceedings of the 2022 Conference of the North American Chapter of the Association for Computational Linguistics: Hu-man Language Technologies , pages 3715–3734. Kevin Smith, Lingjie Mei, Shunyu Yao, Jiajun Wu, Elizabeth Spelke, Josh Tenenbaum, and Tomer Ull-man. 2019. Modeling expectation violation in intu-itive physics with coarse probabilistic object repre-sentations. Advances in neural information process-ing systems , 32. Tingyu Song, Yanzhao Zhang, Mingxin Li, Zhuoning Guo, Dingkun Long, Pengjun Xie, Siyue Zhang, Yilun Zhao, and Shu Wu. 2026. Rethinking com-posed image retrieval evaluation: A fine-grained benchmark from image editing. arXiv preprint arXiv:2601.16125 .Haomiao Tang, Jinpeng Wang, Yuang Peng, Guang-Hao Meng, Ruisheng Luo, Bin Chen, Long Chen, Yaowei Wang, and Shu-Tao Xia. 2025. Modeling uncertainty in composed image retrieval via proba-bilistic embeddings. In Proceedings of the 63rd An-nual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers) , pages 1210– 1222. Michael Tschannen, Alexey Gritsenko, Xiao Wang, Muhammad Ferjad Naeem, Ibrahim Alabdul-mohsin, Nikhil Parthasarathy, Talfan Evans, Lucas Beyer, Ye Xia, Basil Mustafa, et al. 2025. Siglip 2: Multilingual vision-language encoders with im-proved semantic understanding, localization, and dense features. arXiv preprint arXiv:2502.14786 .Peifeng Wang, Zhengyang Wang, Zheng Li, Yifan Gao, Bing Yin, and Xiang Ren. 2023. Scott: Self-consistent chain-of-thought distillation. In Proceed-ings of the 61st Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Pa-pers) , pages 5546–5558. Kexin Yi, Chuang Gan, Yunzhu Li, Pushmeet Kohli, Jiajun Wu, Antonio Torralba, and Joshua B Tenen-baum. 2019. Clevrer: Collision events for video representation and reasoning. arXiv preprint arXiv:1910.01442 .Zi Yu, Shaoxiang Wang, Guozheng Li, Yu Zhang, and Chi Harold Liu. 2025. Forestcast: Open-ended event forecasting with semantic news forest. In 
+
+Findings of the Association for Computational Lin-guistics: EMNLP 2025 , pages 12667–12681. Ruohong Zhang, Bowen Zhang, Yanghao Li, Haotian Zhang, Zhiqing Sun, Zhe Gan, Yinfei Yang, Ruom-ing Pang, and Yiming Yang. 2025a. Improve vision language model chain-of-thought reasoning. In Pro-ceedings of the 63rd Annual Meeting of the Associa-tion for Computational Linguistics (Volume 1: Long Papers) , pages 1631–1662. Xin Zhang, Ziqi Dai, Yongqi Li, Yanzhao Zhang, Dingkun Long, Pengjun Xie, Meishan Zhang, Jun Yu, Wenjie Li, and Min Zhang. 2025b. Towards text-image interleaved retrieval. In Proceedings of the 63rd Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Pa-pers) , pages 4254–4269. Bin Zhu, Bin Lin, Munan Ning, Yang Yan, Jiaxi Cui, Hongfa Wang, Yatian Pang, Wenhao Jiang, Junwu Zhang, Zongwei Li, et al. 2024. LanguageBind: Extending video-language pretraining to n-modality by language-based semantic alignment. In Inter-national Conference on Learning Representations (ICLR) .
+
+11 Framing Distractors Gap Train Test Future cross-scene 10 165 35 Future same, offset 10 163 35 Future same, obj-match 10 165 35 Future same, obj-match 5 162 38 Contact cross-scene 10 165 35 Contact same, offset 10 166 36 Contact same, obj-match 10 165 35 Total 1,151 249 
+
+Table 5: The seven event-anchored subtypes and their counts. 
+
+A Selection Subtypes 
+
+This appendix defines the selection subtypes. Each family uses one fixed question, stated below with a worked example. The subtypes within a family share that question and differ only in how the item is constructed. Each table therefore lists the construction axes and the verified train and test counts. Every axis is explained in the text above its table. Frame ranges are inclusive and each video has 128 frames. 
+
+A.1 Event-anchored 
+
+The question is “Which image is closest to the cor-rect future state of the whole scene?” As a worked example, the model observes frames 10–30, where a gray and a yellow cylinder are on a collision course, then selects the frame just after they col-lide, frame 40. The distractors are the same scene at other moments. Three axes generate the seven subtypes of Ta-ble 5. Framing is whether the collision falls af-ter the observation ( future , the prefix ends 10 or 5 frames before it) or exactly at the observation end (contact , the target is 10 frames later). Distrac-tors is the source of the three wrong options: an-other scene (cross-scene), the same scene at offset frames, or the same scene selected by an object-match score. Gap is the number of frames be-tween the prefix end and the collision. 
+
+A.2 Time-anchored 
+
+The question is “Watch the 1-second observation video. Which image best shows what the scene will look like k seconds after the observation ends?” ,with k either one or two. As a worked example, the model observes a one-second clip, frames 0– 25, then selects the frame two seconds later, frame 78. The distractors are the same scene at other times. The only axis is Horizon , the offset k that         
+
+> Horizon Train Test 1 second 555 111 2 seconds 1,064 263 Total 1,619 374
+
+Table 6: The two time-anchored subtypes and their counts.                 
+
+> Group Future-event structure Train Test G1 no future event 1,967 412 G2 one future collision 2,300 680 G3 occlusion change in obser-vation 1,578 324 G4 multiple future events 753 169 Total 6,598 1,585
+
+Table 7: The four window-anchored groups and their counts. 
+
+the question asks about. Table 6 gives both sub-types. 
+
+A.3 Window-anchored 
+
+The question is “Which image best matches the next scene state?” As a worked example, the model observes frames 90–109, then selects frame 125, by which point one collision has occurred. The distractors are the same scene at other times. Four axes generate the subtypes. Group is the future-event structure. G1 has no future event. G2 has one future collision. G3 has an occlu-sion change during the observation. G4 has multi-ple future events. Horizon is 8, 16, or 24 frames ahead. Difficulty is easy or hard, where hard keeps the distractors closest in appearance to the target. 
+
+Family sets how the target and the distractors are chosen and does not change the question. Family A uses the whole scene. Family B uses a collision and appears only when a collision exists. Family C uses a single object and is excluded from G4. The 47 subtypes are the valid, populated combina-tions of these axes. Table 7 defines the groups and Table 8 gives the counts by group and family. 
+
+B Example Gallery 
+
+Figure 4 shows six items, two from each core se-lection family and one from each Physion regime, chosen so that no instance repeats those in Fig-ures 1 and 2. The gallery makes three things vis-ible that the main paper states but cannot show compactly. First, the same oracle recipe produces items in three simulators with entirely different 12 A B C Total G1 178 – 234 412 G2 269 266 145 680 G3 173 – 151 324 G4 84 85 – 169 Total 704 351 530 1,585 
+
+> Table 8: Window-anchored test counts by group and family. A dash marks an invalid family for that group. Each populated cell is split further over three horizons (8, 16, 24 frames) and two difficulty levels, giving 47 subtypes in all.
+
+renderers and object inventories, from CLEVRER primitives to TDW rooms containing furniture and animals. Second, the distractor design is visi-ble per family: the CLEVRER and Physion rows draw every distractor from the same scene at a wrong moment, whereas the MoVi-A row mixes one same-scene wrong moment with two cross-scene hard negatives. Third, and most importantly, within every row the candidates are appearance-matched, so nothing in the pixels except object po-sition separates the correct future from the distrac-tors. 
+
+C Worked Examples of the Selection Families 
+
+Section 3 defines the three selection families com-pactly. We give the worked examples and con-struction variants here. 
+
+Event-anchored. The model is given a video prefix that stops just before a collision and must select, from four candidates, the single frame showing the scene state right after that collision .The hard distractors show the same scene at other moments, which prevents appearance-only match-ing and forces the model to predict the outcome of the collision. For example, after observing a gray and a yellow metal cylinder on a collision course over frames 10 to 30, the model must identify the state right after they collide at frame 40. The query names the anchor, “Which image is closest to the correct future state of the whole scene?” , thereby pinning down the target moment rather than leav-ing any plausible later state correct. Construction variants tune difficulty and guard against shortcuts by altering the cut point, the source of the distrac-tors, and the length of the prefix gap. 
+
+Time-anchored. The model is given a short ob-servation and must identify the exact scene state at a precise later time . This family probes tem-poral precision rather than event recognition, be-cause no event needs to happen at that instant. For example, after watching a one-second observation over frames 0 to 25, the model must select the frame showing the scene 2 seconds later, at frame 78. The query is “Watch the 1-second observation video. Which image best shows what the scene will look like 2 seconds after the observation ends?” 
+
+The only variation is the prediction horizon, 1 sec-ond or 2 seconds. 
+
+Window-anchored. The model observes a brief window of activity and must identify the scene state a short horizon into the future . Be-cause every window item uses the same query, the items differ in the physical situation rather than the wording. The future window may contain no event, a single collision, an object entering or leav-ing view, or several events. For example, after observing frames 90 to 109, the model must se-lect the frame at 125, by which point one colli-sion has occurred. The query names the anchor, 
+
+“Which image best matches the next scene state?” ,with the horizon fixed per item. Construction also varies the horizon and the distractor difficulty. 
+
+D The Retrieval Track 
+
+The retrieval track (Figure 3) uses the same prefix and query as selection, but replaces the four can-didates with the full database, so a method can-not exploit the fact that exactly one of a small set is correct. Distractors are not constructed per item here. They are whatever else the database holds, which for a scene-dense database means many frames that differ from the target only in the position of one or two objects. The standard evaluation uses 2,002 queries over 10,000 frames. Recall@ k and MRR are computed against the single correct frame, so chance Re-call@1 is 0.01%, and we report the median rank of that frame because the mean is dominated by a small number of very poorly ranked queries. 
+
+Query constructions. The retrieval pool is gen-erated by six builders that differ in what fixes the target moment and where the observation is cut, as summarized in Table 9. Two builders are time-anchored, with the target set by a clock offset rather than by an event. Builder 1 asks for the final state of the clip and varies difficulty only through the observation length, so a longer observation leaves less to predict. Builder 2 fixes a two-second observation and sweeps the horizon. The remain-13 T = correct future  M = same scene, wrong moment  S = different scene 
+
+CLEVRER 
+
+> event-anchored
+> Which image is closest to
+> the correct future state
+> of the whole scene?
+
+CLEVRER 
+
+> window-anchored
+> Which image best matches the
+> next scene state?
+
+MoVi-A 
+
+> time-anchored
+> Watch the 1-second observation
+> video. Which image best shows
+> what the scene will look like 1
+> second after the observation ends?
+
+Physion A1 
+
+> first contact
+> Which image best shows
+> the next scene state after
+> the input video ends?
+
+Physion A2 
+
+> motion onset
+> same query as above
+
+Physion A3                  
+
+> landing
+> same query as above
+> TMMM
+> TMMM
+> TMSS
+> TMMM
+> TMM
+> TMMM
+> S
+
+Figure 4: Six DynaPix items, one per row. CLEVRER event-anchored and window-anchored, MoVi-A time-anchored, and the three Physion regimes, first contact (A1), motion onset (A2), and landing (A3). The correct future is outlined in green. Distractors are the same scene at a wrong moment, except in the MoVi-A row where two are drawn from different scenes. 
+
+ing four are event-anchored and differ in where the observation sits relative to the collision. Builders 3 and 5 ask for the event frame itself, from an obser-vation that ends shortly before the event or a full second before it. Builder 4 cuts the observation exactly at the collision and asks for the state one second later. Builder 6 places the collision half a second after the observation ends, so the event to be predicted is never seen. For query-specific hard negatives, every builder samples same-video wrong-time frames, falls back to a denser offset grid when the first choices collide with the target or with each other, and uses a fixed seed. Each builder caps its source database at 30,000 frames, from which the 10,000-frame database of the stan-dard test set is drawn, so the pool sizes in Table 1 are sources rather than the evaluated database. The retrieval builders use 25 fps for time-to-frame con-version. 
+
+E Transfer Suite Construction 
+
+To measure transfer beyond our own simulator, we build zero-shot suites with the same oracle recipe on MoVi-A and Physion (Greff et al., 2022; Bear et al., 2021). In these suites, simulator metadata or trial frames identify event times and target frames. MoVi-A is a Kubric rigid-body setting, and its multiple-choice suite contains 327 event-anchored and 1,198 time-anchored questions, for 1,525 in total. The Physion suite is built from raw HDF5 trials and contains 583 event-anchored and 1,612 time-14 Observation Target Anchor 1 0 to 2, 3 or 4 s clip end (5 s) time 2 0 to 2 s obs end +1, 2, 3 s time 3 0 to 5 frames pre-event the event frame event 4 1 s, ends at event event +1 s event 5 1 s, ends 1 s pre-event the event frame event 6 1 s, event 0.5 s later obs end +1 s event 
+
+> Table 9: The six future-state retrieval builders. Time-anchored builders fix the target with a clock off-set, event-anchored builders fix it with a collision. Builder 3 allows up to three events per video, builders 4 to 6 one.
+
+anchored questions, for 2,195 in total. Its event items come from three regimes: A1 contact, A2 motion and A3 landing. A1 targets first contact, A2 targets motion onset, and A3 targets landing on the ground. The prefix ends 10 frames before the event. Each item has four candidates: the cor-rect frame, two same-video frames strictly after the correct one and one cross-video frame from the same scenario. 
+
+F Design Properties 
+
+DynaPix is designed as a physics-grounded and auditable benchmark for future-state prediction, with reduced reliance on surface appearance, and three construction choices support this goal. First, oracle frames provide exact labels through frame identity and timestamp. Second, same-scene wrong-time distractors reduce the usefulness of static matching in the time-anchored and window-anchored selection families. Third, multiple tem-poral regimes separate temporal precision from coarse event recognition. The benchmark also in-cludes selection and retrieval tracks, counterfac-tual retrieval queries, and cross-simulator transfer suites. Synthetic scenes are a deliberate tradeoff for exact, controllable ground truth, as they allow prefix boundaries, event times, interventions and distractors to be specified with precision that is not available in ordinary web video. 
+
+G Implementation Details 
+
+Table 10 lists the main implementation set-tings used for the reported experiments. The reproduction-critical defaults not repeated here live in the released configuration files. 
+
+Benchmark construction. Every builder uses a fixed seed and an 80/20 train and test division of scenes, which yields the 9,368 and 2,208 counts of Table 1. Time-anchored and window-anchored items take all three distractors from the same video, while the event builder additionally offers a cross-scene variant, the source of the cross-scene subtypes in Table 5. The event builder observes a 20-frame clip by default and stops 10 frames be-fore the collision, requires at least 10 frames be-tween the answer frame and the end of the clip, and draws same-video distractors at 16, 32 and 48 frames on either side of the target. The window builder observes 16 frames and looks 8 frames ahead by default. Observation length is config-urable per subtype, so the worked examples in Appendices A and C show items whose spans differ from these defaults. The selection time builder treats 26 frames as one second, matching CLEVRER’s 128 frames over roughly five sec-onds, while the retrieval builders convert at 25 fps, a difference that moves a one-second target by at most one frame. 
+
+Rationale construction. The oracle-to-predicate stage calls an object stationary when its speed falls below 0.05 in simulator units, cuts the prefix 12 frames before the first collision, discards scenes whose prefix would be shorter than 5 frames, and inspects the 5 frames before the cut to decide which pairs are on a collision course. Time-to-event is bucketed rather than stated numerically, as imminent within 15 frames and soon within 40. The teacher is served locally and sampled at temperature 0.7, and a rationale is rejected and resampled unless it falls between 80 and 250 words. This filter is intended to reduce answer restatement and unsupported detail. 
+
+Training. Students are trained with LoRA adapters over a 4-bit NF4-quantized base, with the vision encoder frozen and adapters on the atten-tion and feed-forward projections of the language tower. The contrastive retriever finetune keeps the same training infrastructure and replaces the gen-erative objective with a contrastive ranking one. It uses a cached multiple-negatives ranking ob-jective wrapped in a Matryoshka loss over seven nested embedding widths from 4,096 down to 64, so one finetune yields a family of truncatable em-beddings. The cached formulation permits more negatives than the micro-batch size alone would provide. 15 Setting Value                            
+
+> Student training
+> Base models Qwen3-VL 8B, 2B LoRA rank / alpha 16 / 32 Base quantization 4-bit NF4 Learning rate 2×10 −5
+> Epochs 3Micro batch / accumulation 1 / 16 Max sequence length 3,072 Precision bf16
+> Visual input
+> Frames per prefix 12 Frame resolution 336 ×336
+> Teacher
+> Model Qwen3-32B Temperature 0.7 Rationale length 80 to 250 words
+> Contrastive retriever
+> Base model Qwen3-VL-Emb-8B Loss Matryoshka over cached MNRL Embedding widths 4,096 to 64, seven levels Negatives in-batch and same-scene
+> Inference
+> Instruct decoding greedy Thinking decoding T=0 .6, top-p0.95, top-k20 Max new tokens 512 instruct, 8,192 thinking
+
+Table 10: Main implementation settings for the re-ported experiments. Frames per prefix is the number of frames sampled from the observation as model in-put, not the length of the observation itself. 
+
+H Evaluation Protocol 
+
+Generative models receive the prefix as a video, the query as text, and the four candidates as four separately labelled images in a randomized order, and are asked to return a structured record rather than a bare letter. The requested record contains the forced choice, a self-reported confidence, a distribution over the four options, a second choice, an ambiguity tag, one short rationale per option, and a final justification. We score only the forced choice. The remaining fields exist so that a refusal, a hedge, or a tie is visible in the output rather than hidden inside a scalar, and so that an unparseable answer can be distinguished from a wrong one. We nonetheless count unparseable outputs as wrong. A model that emits no extractable choice has not identified a future state, and discarding those cases would flatter exactly the models that fail to commit. This matters for one row of Ta-ble 2, where the thinking base returns a parseable record for only 66.4% of items, so its reported accuracy mixes genuine errors with non-answers. We report the parse rate alongside the accuracy so the two can be separated. Thinking models are al-lowed 8,192 new tokens against 512 for instruct                
+
+> Annotator Event Time Window A1 58.3 83.3 60.9 A2 40.0 100.0 81.8 A3 63.6 83.3 81.2 Majority vote 58.3 83.3 73.9
+
+Table 11: Per-annotator human accuracy (%) by family, with the majority vote used in Table 2. Median decision times are 39.9 s (event), 15.8 s (time), and 20.3 s (win-dow). 
+
+models, a budget sixteen times larger, which re-duces but does not by itself eliminate truncation as an explanation for a missing answer. Similarity scorers bypass this protocol because they emit a score for each candidate and rank by construction. 
+
+I Human Study Details 
+
+Section 4.3 reports the three-annotator majority vote used as a validity probe for the time-anchored family. Here we give the per-annotator break-down, agreement, and timing behind that sum-mary. The three annotators collectively judged a balanced subsample of 59 items drawn across CLEVRER, MoVi-A, and Physion, seeing the pre-fix, query, and four candidates in randomized or-der with the correct answer balanced across posi-tions, for 127 judgments in total. No annotator saw any answer key, and the interface exposed only the media the released form serves. Table 11 gives per-annotator accuracy by fam-ily. Every annotator is far above the 25% chance rate on time-anchored items and far above the best zero-shot model there (83.3% against 27.3%), which is the comparison the validity probe rests on. On event-anchored items annotators are at or below the models, at 58.3%, 40.0% and 63.6%, and they are also slowest there, with a median de-cision time of 39.9 s against 15.8 s on time. Agree-ment over the items all three saw is fair (Fleiss’ 
+
+κ = 0.37 , 19 overlapping items). Annotation depth is uneven: of the 59 items, 10 were seen by one annotator, 30 by two and 19 by all three, so the majority vote reduces to a single judgment on the first group and can be a tie on the second. We therefore read the per-annotator columns as the primary human evidence and the vote as a sum-mary. 16 CLEVRER MoVi-A Physion Full student 87.5 39.9 64.6         
+
+> −candidate analysis 88.0 35.9 69.0
+> −match layout 86.8 40.3 68.9
+> Table 12: Component ablation of the distilled student, overall accuracy (%) in reasoning mode. The student writes a rationale before answering. Each row removes one component from the full model.
+
+J What the Rationale Contributes 
+
+Two packaging choices could explain the gain in-stead of grounding, so we remove each. One drops the explicit candidate-analysis step from the ratio-nale and is retrained, and the other removes the match-style answer layout and is tested with the baseline layout. Table 12 reports overall accuracy in domain and on the two transfer suites, with the student in reasoning mode. These transfer figures are not comparable to the answer-mode numbers above. In domain, neither component is worth one point, so the in-domain gain comes from the grounded rationale rather than either formatting choice. On transfer, effects are small and mixed: removing candidate analysis lowers MoVi-A but raises Physion, so neither component is uniformly responsible for transfer. Together with the answer-only row of Table 4, this places the gain in the con-tent of the supervision rather than in its presenta-tion. 
+
+K Qualitative Examples of Grounded Rationales 
+
+Section 5.1 describes how a rationale is built from the simulator’s record rather than sampled from a teacher’s guess. Because that distinction is the core of the method, we give a complete rationale here so it can be inspected directly. The example is an event-anchored item from CLEVRER video 86, where the prefix is cut before a collision and the target is frame 63. Every statement below is a narration of oracle predicates, and the validator has removed all raw coordinates, timestamps, and numeric values, so the student is supervised only in terms it can recover from pixels at test time. 
+
+Query. “Which image is closest to the correct fu-ture state of the whole scene?” 
+
+Scene parse. At the end of the observation, the yellow rubber sphere is near the right side of the scene, moving slowly toward the southwest. The blue metal cube is near the top-right, mov-ing quickly toward the south. The yellow metal cylinder is near the top and stationary, and the gray metal sphere is also near the top. The yellow rub-ber sphere and the blue metal cube are on a colli-sion course. 
+
+Motion analysis. The yellow rubber sphere is moving slowly toward the southwest, so given its speed and direction it will shift only slightly down-ward and to the left, and because the collision is imminent near the top-right it will not have moved far by the target moment. The stationary objects remain where they are unless struck. 
+
+Prediction. At the collision moment, the yel-low rubber sphere and the blue metal cube will be very close near the top-right, while the yellow metal cylinder remains near the top, the gray metal sphere remains near the top, and the brown metal cube remains near the top-left. 
+
+Outcome. The yellow rubber sphere and the blue metal cube are very close near the top-right, while the yellow metal cylinder is near the top and the gray metal sphere is near the top. Two properties of this rationale are worth not-ing. First, it is stated entirely in qualitative terms, such as near the top-right and moving slowly to-ward the southwest , so nothing in it could be re-cited from a coordinate the student cannot observe. Second, the candidate it selects is fixed by the sim-ulator’s record rather than by plausibility, so a flu-ent but physically wrong narration cannot be pro-duced by construction. This is what separates the supervision from ordinary chain-of-thought distil-lation, in which the rationale records only what the teacher guessed. 17
