@@ -1,0 +1,695 @@
+Title: PhyLatent: Learning Dynamics-Relevant Representations for JEPA World Models
+
+URL Source: https://arxiv.org/pdf/2608.05720v1
+
+Published Time: Fri, 07 Aug 2026 00:39:08 GMT
+
+Number of Pages: 16
+
+Markdown Content:
+Published as a conference paper at ICLR 2025 
+
+# PhyLatent: Learning Dynamics-Relevant Represen-tations for JEPA World Models 
+
+Xi Zeng 1,3 Haojie Ren 1,3 Ziying Song 1,2,* 
+
+> 1
+
+School of Mechanical and Aerospace Engineering, Nanyang Technological University, Singapore  
+
+> 2
+
+School of Artificial Intelligence (School of Software), Yanshan University, Qinhuangdao, China 
+
+> 3
+
+The University of Sheffield, Sheffield, United Kingdom 
+
+> *
+
+Corresponding author 
+
+xzeng991108@gmail.com, rhj130063@gmail.com, songziying@ysu.edu.cn 
+
+## Abstract 
+
+We propose PhyLatent, a dynamics-relevant training objective for Joint-Embedding Predictive Architecture (JEPA) world models. Our key observation is that preventing global latent collapse does not ensure that a representation pre-serves physical states and action consequences. We identify three failure modes in JEPA world models: physical invariance collapse, physical identifiability col-lapse, and counterfactual dynamics collapse. PhyLatent addresses them through three training pathways: physical invariance, physical identifiability, and counter-factual dynamics, implemented with physical state grounding, future representa-tion alignment, static visual invariance, counterfactual branch separation, and la-tent denoising. On OGBench-Cube, PhyLatent reduces the three failure rates from 
+
+15.60% , 6.71% , and 8.41% to 7.53% , 0.95% , and 4.62% , respectively, and im-proves model predictive control (MPC) success from 70.0% to 78.1% . With the same architecture and planner, it further improves success from 81.0% to 98.0% 
+
+on TwoRooms and remains competitive on Reacher and PushT. These results show that global non-collapse alone is insufficient for learning a reliable JEPA world-model state space. 
+
+## 1 Introduction 
+
+Joint-Embedding Predictive Architectures (JEPAs) learn compact representations for future predic-tion without reconstructing pixel-level details (LeCun, 2022). Recent work extends this idea to action-conditioned world models, where predicted latents support control and planning (Assran et al., 2025; Maes et al., 2026a). LeWorldModel (LeWM), for example, combines latent prediction with isotropic Gaussian regularization and performs MPC directly in the learned representation space (Balestriero & LeCun, 2025; Maes et al., 2026a). We observe a hidden limitation: a globally non-collapsed latent space is not necessarily a reliable state space for world modeling. Its overall distribution may remain non-degenerate while local ge-ometry is dominated by irrelevant appearance changes, physically distinct states are confused, or futures produced by different actions are compressed. This raises a direct question: does global non-collapse preserve the structure required for prediction and planning? 
+
+We examine this question on LeWorldModel and identify three forms of dynamics-relevant collapse. 
+
+Physical invariance collapse occurs when appearance-only changes induce large latent shifts despite an unchanged physical state. Physical identifiability collapse occurs when physically distinct states occupy nearby latent regions. Counterfactual dynamics collapse occurs when different actions pro-duce distinct real futures but insufficiently separated predicted futures. Figure 1 summarizes these failures and the desired latent geometry. To address these failures, we propose PhyLatent , a dynamics-relevant representation learning method for JEPA world models. PhyLatent organizes its training constraints into three complemen-tary pathways. It grounds encoded and predicted latents with task-relevant physical states, aligns pre-dicted and observed future representations, suppresses appearance-induced shifts, separates counter-1arXiv:2608.05720v1 [cs.CV] 6 Aug 2026 Published as a conference paper at ICLR 2025 (a) Physical invariance collapse  (b) Physical identifiability collapse  (c) Counterfactual dynamics collapse 
+
+> large latent shift
+> too close
+> future latents too close
+
+Figure 1: Motivation for PhyLatent. A globally non-collapsed JEPA latent can still violate the local structure required by a world model. (a) Physical invariance collapse: an appearance-only transformation changes the image but not the simulator state, yet produces a large latent displace-ment. (b) Physical identifiability collapse: two physically distinct robot–object configurations are mapped to nearby latent representations. (c) Counterfactual dynamics collapse: two actions lead to separated real futures, while their predicted latent branches remain close. PhyLatent adds training-time constraints at these three failure points; the encoder, predictor, and MPC planner are unchanged at inference. factual action branches, and regularizes local future structure through latent denoising. All additional heads are used only during training. On OGBench-Cube, PhyLatent reduces physical invariance collapse from 15.60% to 7.53% , physi-cal identifiability collapse from 6.71% to 0.95% , and counterfactual dynamics collapse from 8.41% 
+
+to 4.62% . Planning success improves from 70.0% to 78.1% . With the same architecture and plan-ner, PhyLatent also improves TwoRooms and remains competitive on Reacher and PushT. These results suggest that global non-collapse is only a starting point: a useful world-model latent must preserve dynamics-relevant physical structure. 
+
+## 2 Related Work 
+
+JEPA world models. JEPAs predict target representations rather than reconstructing pixels, shift-ing predictive learning toward abstract and semantically stable features (LeCun, 2022). I-JEPA ap-plies this principle to masked image regions (Assran et al., 2023; He et al., 2022; Bao et al., 2022), while V-JEPA extends it to spatiotemporal prediction in video (Bardes et al., 2024; Assran et al., 2023). V-JEPA 2 and LeWorldModel further show that action-conditioned JEPA representations can support embodied prediction and planning (Assran et al., 2025; Maes et al., 2026a). SD-JEPA further decomposes the latent space into progression and content subspaces to explicitly represent task progression (Thil et al., 2026). These methods avoid explicit future-image generation, but their success still depends on whether the learned latent geometry preserves the state variables and action consequences required by control. 
+
+Representation collapse. Joint-embedding models require mechanisms that prevent trivial or low-rank solutions (Grill et al., 2020; Chen & He, 2021; Zbontar et al., 2021; Bardes et al., 2022; Balestriero & LeCun, 2025). Existing approaches use contrastive objectives, asymmetric prediction, momentum targets, self-distillation, redundancy reduction, and variance–covariance regularization (van den Oord et al., 2018; Chen et al., 2020; He et al., 2020; Caron et al., 2020; Grill et al., 2020; Chen & He, 2021; Caron et al., 2021; Zbontar et al., 2021; Bardes et al., 2022). I-JEPA and V-JEPA additionally rely on masked prediction, stop-gradient, and target representations (Assran et al., 2023; Bardes et al., 2024). LeJEPA introduces Sketched Isotropic Gaussian Regularization (SIGReg) to maintain a globally non-degenerate embedding distribution, and LeWorldModel applies this regu-larization to action-conditioned latent prediction (Balestriero & LeCun, 2025; Maes et al., 2026a). Sub-JEPA relaxes the full-space Gaussian constraint by applying Gaussian regularization over mul-tiple random subspaces (Zhao et al., 2026). These mechanisms prevent global collapse, but they do not directly specify which samples should be invariant, which physical states should be separated, or how different action-conditioned futures should be organized. 
+
+Dynamics-aware representations. Latent world models and control-oriented representation learning study planning, temporal continuity, controllability, transition prediction, bisimulation, and 2Published as a conference paper at ICLR 2025 Table 1: Quantitative diagnostics of dynamics-relevant collapse in LeWorldModel. Results are averaged over three random seeds.                 
+
+> Failure mode Collapse criterion Evaluation scale Failure rate ↓
+> Physical invariance dnuis > d state 1,000 states 15.60%
+> Physical identifiability Cid 200,000 state pairs 6.71%
+> Counterfactual dynamics rcf <0.51,000 action pairs 8.41%
+
+inverse dynamics (Hafner et al., 2019; 2020; Jonschkowski & Brock, 2015; Sermanet et al., 2018; Gelada et al., 2019; Zhang et al., 2021; Wang et al., 2022; Pathak et al., 2017). Sensorimotor World Models use inverse dynamics regularization to learn action-aligned latent representations (Ivashkov et al., 2026). These works establish that useful state representations should retain task-relevant dy-namics while suppressing irrelevant visual details. PhyLatent focuses on a complementary gap in JEPA world models: a latent distribution may be globally well spread yet still lose local physical and counterfactual structure. 
+
+## 3 Why Does LeWorldModel Still Exhibit Dynamics-Relevant Collapse? 
+
+Architecture. LeWorldModel extends JEPA to action-conditioned latent prediction (Maes et al., 2026a). Given the current observation ot, the next observation ot+1 , and action at, the encoder E,projector P , and action-conditioned predictor Fθ compute 
+
+zt = P (E(ot)) ,zt+1 = P (E(ot+1 )) ,
+
+ˆzt+1 = Fθ (zt, a t).
+
+(1) The predictor is trained to match the stop-gradient future latent: 
+
+Lpred = ∥ˆzt+1 − sg( zt+1 )∥22 . (2) LeWorldModel further applies Sketched Isotropic Gaussian Regularization (SIGReg) to maintain a globally non-degenerate latent distribution (Balestriero & LeCun, 2025). This design effectively prevents trivial global collapse and enables MPC directly in the learned latent space. 
+
+Key observation. SIGReg regularizes the global latent distribution, while Lpred minimizes the pre-diction error of individual transitions. Neither objective constrains the relational structure required by a world model: observations of the same physical state should remain stable, different physical states should remain identifiable, and different actions should produce separated future branches. We find that all three properties can fail even when the latent distribution remains globally non-collapsed. Our diagnostics directly test these properties. Each detected sample is a counterexample to one required structure: an appearance-only change dominates a real state transition, physically distant states collide in a local latent neighborhood, or separated action outcomes become compressed after prediction. Figure 2 visualizes these failures, and Table 1 reports their prevalence. 
+
+3.1 Physical Invariance Collapse 
+
+Observations with the same physical state should remain close in latent space. However, SIGReg constrains only the aggregated latent distribution and does not enforce consistency within the same physical equivalence class. We apply appearance-only perturbations to brightness, color, texture, and image noise while keeping the simulator state and action unchanged: 
+
+oaug  
+
+> t
+
+= A(ot), zaug  
+
+> t
+
+= P (E(oaug  
+
+> t
+
+)) . (3) We then compare the latent displacement caused by the nuisance perturbation with that caused by a real state transition: 
+
+dnuis = ∥zt − zaug  
+
+> t
+
+∥2 , dstate = ∥zt − zt+∆ ∥2 ,rinv = log 10 
+
+( dnuis + ϵdstate + ϵ
+
+)
+
+, Cinv : dnuis > d state . (4) 3Published as a conference paper at ICLR 2025 0612 18        
+
+> state shift 0612 18
+> nuisance shift
+> −1.6 −0.8 0.0
+> log ratio
+> (a) Physical Invariance Collapse
+> Ordinary Collapse Boundary
+> 0246
+> physical distance
+> 0612 18
+> latent distance
+> 0.0 0.4 0.8 1.2
+> normalized ratio
+> (b) Physical Identifiability Collapse
+> Ordinary Collapse Boundary
+> 0612 18
+> true branch distance
+> 0510 15
+> predicted distance
+> 0.0 0.6 1.2 1.8
+> pred/true ratio
+> (c) Counterfactual Dynamics Collapse
+> Ordinary Collapse Boundary
+
+Figure 2: Three-dimensional diagnostics of dynamics-relevant collapse in LeWorldModel on Cube. Blue, green, and yellow points are ordinary samples; red points satisfy the corresponding collapse criterion. Translucent planes mark the decision boundaries. (a) Physical invariance col-lapse. The horizontal axes are dnuis = ∥zt − zaug  
+
+> t
+
+∥2 and dstate = ∥zt − zt+∆ ∥2; the vertical axis is rinv = log 10 (( dnuis + ϵ)/(dstate + ϵ)) . Red points satisfy dnuis > d state , equivalently 
+
+rinv > 0. (b) Physical identifiability collapse. The horizontal axes are dphys = ∥¯si − ¯sj ∥2 and 
+
+dlat = ∥zi − zj ∥2; the vertical axis is rid = [ dphys /(τphys + ϵ)] /[dlat /(τlat + ϵ) + ϵ]. The two boundary planes are dphys = τphys and dlat = τlat ; red points satisfy both dphys > τ phys and 
+
+dlat < τ lat . (c) Counterfactual dynamics collapse. The horizontal axes are dtrue = ∥z(i) 
+
+> t+k
+
+−z(j)
+
+> t+k
+
+∥2
+
+and dpred = ∥ˆz(i) 
+
+> t+k
+
+−ˆz(j)
+
+> t+k
+
+∥2; the vertical axis is rcf = dpred /(dtrue +ϵ). Red points satisfy rcf < 0.5,with the translucent plane marking the 0.5 threshold. The criterion Cinv identifies an inversion of the desired latent ordering: a non-physical appearance change produces a larger displacement than a real physical transition. Equivalently, the criterion holds when rinv > 0. Among 1,000 evaluated states, 15.60% satisfy this condition, providing direct evidence that global non-collapse does not ensure physical invariance. 
+
+3.2 Physical Identifiability Collapse 
+
+A reliable state representation should keep physically distinct configurations identifiable. Global dispersion alone cannot ensure this property because a globally non-degenerate latent manifold may still fold distant physical states into the same local neighborhood. For two samples i and j, we measure their standardized physical-state distance and latent distance: 
+
+dphys = ∥¯si − ¯sj ∥2 , dlat = ∥zi − zj ∥2 ,τphys = Q75 (dphys ), τlat = Q10 (dlat ),
+
+Cid : dphys > τ phys ∧ dlat < τ lat .
+
+(5) Here, ¯s denotes the standardized simulator-state vector and Qp denotes the p-th percentile. The criterion selects pairs that are physically distant but unusually close in latent space, directly exposing local folding of the latent manifold. For visualization, we additionally define 
+
+rid = dphys /(τphys + ϵ)
+
+dlat /(τlat + ϵ) + ϵ . (6) The ratio rid visualizes the severity of each collision; the failure rate is computed directly from Cid .Among 200,000 sampled state pairs, 6.71% satisfy the collapse criterion. Thus, a globally dispersed latent space can still confuse physically distinct robot–object configurations. 
+
+3.3 Counterfactual Dynamics Collapse 
+
+MPC ranks candidate actions by comparing their predicted futures. A useful predictive representation must therefore preserve the relative separation between alternative action outcomes. Pointwise latent regression aligns each transition with its own target but does not constrain the geometry between different action branches. 4Published as a conference paper at ICLR 2025 Starting from the same state, we execute two action branches i and j and compare their observed and predicted future separations: 
+
+dtrue =
+
+∥∥∥z(i) 
+
+> t+k
+
+− z(j)
+
+> t+k
+
+∥∥∥2 , dpred =
+
+∥∥∥ˆz(i) 
+
+> t+k
+
+− ˆz(j)
+
+> t+k
+
+∥∥∥2 ,rcf = dpred 
+
+dtrue + ϵ , Ccf : rcf < 0.5.
+
+(7) The ratio rcf measures how much of the observed branch separation is preserved after prediction. When rcf < 0.5, the model loses more than half of the observed separation, providing a direct coun-terexample to counterfactual action preservation. This occurs in 8.41% of 1,000 evaluated action pairs. Hence, a low pointwise prediction error can coexist with a latent geometry that is insufficient for reliable action comparison. 
+
+## 4 PhyLatent 
+
+Overview. PhyLatent introduces three complementary training pathways for structuring the latent space of a JEPA world model: physical invariance, physical identifiability, and counterfactual dy-namics. The physical-invariance pathway uses a Static Visual Invariance Constraint (SVIC). The physical-identifiability pathway combines Physical State Grounding (PSG) with Future Represen-tation Alignment (FRA). The counterfactual-dynamics pathway combines a Counterfactual Action Separation Constraint (CASC) with Latent Denoising (LD). These five training components oper-ate on the same JEPA prediction graph and are used only during training. Figure 3 summarizes the shared backbone and the three pathways. 
+
+Shared sequence-level training graph. The upper panel of Fig. 3 illustrates one transition for clarity, whereas training operates on latent sequences. Let O = [ o1, . . . , o T ] and A = [ a1, . . . , a T ]
+
+denote an observation sequence and its associated raw actions. The visual encoder E, projection head P , and action encoder Ga produce 
+
+Z = P (E(O)) , Ca = Ga(A),Zctx = Z1: H , Ca 
+
+> ctx
+
+= Ca 
+
+> 1: H
+
+,Z+ = ZK+1: T , ˆZ = Fθ (Zctx , C a
+
+> ctx
+
+) ,
+
+(8) where H is the context length and K is the target offset used by the training window. The predicted sequence ˆZ and encoded target sequence Z+ have matching temporal dimensions. For two tensors with the same shape, we define the normalized mean-squared distance 
+
+dN(X, Y ) = mean 
+
+[
+
+(norm −1(X) − norm −1(Y )) 2]
+
+, (9) where norm −1 denotes ℓ2 normalization independently along the final feature dimension. The base-line sequence prediction loss is 
+
+Lpred = MSE 
+
+( ˆZ, sg( Z+)
+
+)
+
+. (10) PhyLatent attaches three pathways to this shared graph. Physical invariance compares the origi-nal encoded sequence with an appearance-perturbed counterpart. Physical identifiability constrains encoded and predicted sequences using physical-state targets and future-representation consistency. Counterfactual dynamics compares alternative action-conditioned predictions and regularizes the neighborhood around future latents. 
+
+4.1 Physical Invariance 
+
+Static visual invariance constraint (SVIC). Physical invariance requires observations with the same physical state to remain close despite changes in image appearance. We construct an augmented observation sequence by applying additive brightness and per-channel color perturbations: 
+
+Oaug = A(O),Zaug = P (E(Oaug )) . (11) 5Published as a conference paper at ICLR 2025 Physical Identifiability  Counterfactual Dynamics   
+
+> shared E, P
+> Physical Invariance
+> . . . Encoder Encoder Action-
+> conditioned
+> Predictor
+> (JEPA)
+> . . . . . .
+
+Figure 3: Overview of the PhyLatent framework. The upper panel shows the shared action-conditioned JEPA backbone for one transition. The current observation ot is encoded into zt and combined with action at by the predictor Fθ to produce ˆzt+1 . The next observation ot+1 is pro-cessed by the same visual encoder to provide the stop-gradient target sg( zt+1 ). In the figure, E
+
+denotes the complete visual encoding pipeline, including the projection head P retained explicitly in the equations. The lower panel presents the three PhyLatent training pathways. Physical invari-ance suppresses appearance-induced latent changes; physical identifiability preserves task-relevant physical structure in encoded and predicted representations; and counterfactual dynamics separates futures produced by different actions while regularizing local future geometry. All three pathways are removed after training, leaving the inference-time JEPA world model and MPC planner unchanged. The perturbation changes image appearance without modifying the corresponding simulator state or action. The original and augmented observations are processed by the same encoder and projection head. SVIC aligns the augmented sequence with a stop-gradient copy of the original encoded sequence: 
+
+Linv = dN (Zaug , sg( Z)) . (12) Gradients from this objective update the augmented branch, while the original sequence provides a stable target. This suppresses appearance-induced variation in the representation used by the dynam-ics predictor. 
+
+4.2 Physical Identifiability 
+
+Physical identifiability requires the representation to retain physical variables that distinguish task states and determine their future evolution. We enforce this property through physical state grounding and future representation alignment. 
+
+Physical state grounding (PSG). Let ¯S = [¯ s1, . . . , ¯sT ] denote the task-specific physical targets after per-dimension z-score normalization. A shared state head Hs is applied to both the encoded trajectory and its predicted continuation: 
+
+Lstate = MSE (Hs(Z), ¯S)
+
++ MSE 
+
+(
+
+Hs( ˆZ), ¯SK+1: T
+
+)
+
+. (13) Sharing Hs across the encoded and predicted branches gives both representations a common physical interpretation. The physical targets supervise representation learning only during training and are not required by the planner. 6Published as a conference paper at ICLR 2025 
+
+Future representation alignment (FRA). Physical state grounding preserves the selected low-dimensional physical variables, but it does not fully constrain the remaining structure of the predicted future. FRA therefore aligns ˆZ and Z+ through two complementary views. The first branch uses a shared projection head ϕ:
+
+Lproj = dN
+
+(
+
+ϕ( ˆZ), sg (ϕ(Z+)))
+
+. (14) The stop-gradient is applied after the target sequence has passed through the shared projection head, so this target branch does not update either the target representation or ϕ.The second branch summarizes the future sequence relative to its action context. Let 
+
+¯ca = 1
+
+H
+
+> H
+
+∑ 
+
+> τ=1
+
+caτ (15) be the mean context-action embedding. The action-query module is 
+
+Ψ( X, C a
+
+> ctx
+
+) = LN [MHA ( Wq ¯ca, W kX, W v X)] , (16) where the action representation forms a single query and the latent sequence provides the keys and values. The action-conditioned alignment loss is 
+
+Lact = dN
+
+(
+
+Ψ( ˆZ, C a
+
+> ctx
+
+), sg (Ψ( Z+, C a
+
+> ctx
+
+)))
+
+. (17) FRA combines the two branches: 
+
+Lalign = Lproj + Lact . (18) The projection branch aligns general future content, while the action-query branch aligns the se-quence structure selected by the executed action context. 
+
+4.3 Counterfactual Dynamics 
+
+Counterfactual dynamics requires the predictive representation to distinguish futures induced by meaningfully different actions. We enforce this property through counterfactual action separation and latent denoising. 
+
+Counterfactual action separation constraint (CASC). For each sample b in a mini-batch, we con-struct one counterfactual context action sequence by permuting actions across the batch and adding Gaussian noise: 
+
+acf  
+
+> b,τ
+
+= aπ(b),τ + σaξb,τ , ξb,τ ∼ N (0 , I ), (19) where π is a random mini-batch permutation. The counterfactual actions are passed through the same action encoder and predictor: 
+
+Ca, cf ctx = Ga(Acf ctx ),
+
+ˆZcf = Fθ
+
+(
+
+Zctx , C a, cf ctx 
+
+)
+
+. (20) For batch index b and temporal index τ , the normalized action difference and predicted branch sep-aration are 
+
+δab,τ =
+
+∥∥∥acf  
+
+> b,τ
+
+− ab,τ 
+
+∥∥∥2
+
+√da
+
+,δzb,τ =
+
+∥∥∥ˆzcf  
+
+> b,τ
+
+− sg (ˆ zb,τ )
+
+∥∥∥2
+
+√dz
+
+,
+
+(21) where da and dz are the action and latent dimensions. The factual prediction is treated as a stop-gradient reference, so this loss separates the counterfactual branch without moving the factual branch. The desired separation margin is proportional to the action difference and bounded by a maximum gap: 
+
+mb,τ = min (γδ ab,τ , m max 
+
+) . (22) 7Published as a conference paper at ICLR 2025 To avoid enforcing separation for nearly identical actions, we retain only positions whose action differences exceed the median over the mini-batch and temporal dimensions: 
+
+Ω = {(b, τ ) ∣∣ δab,τ > median b′,τ ′
+
+(δab′,τ ′
+
+)} . (23) The separation objective is 
+
+Lsep = 1
+
+|Ω|
+
+∑ 
+
+> (b,τ )∈Ω
+
+[mb,τ − δzb,τ 
+
+] 
+
+> +
+
+, (24) where [x]+ = max( x, 0) . This creates action-dependent future separation while bounding the ex-pansion of the latent space. 
+
+Latent denoising (LD). CASC separates alternative action branches, while LD regularizes the local structure around observed future latents. We sample an independent noise vector and noise scale for each future latent: ϵb,τ ∼ N (0 , I ),σb,τ ∼ U (σmin , σ max ) ,
+
+˜z+ 
+
+> b,τ
+
+= sg 
+
+(
+
+z+
+
+> b,τ
+
+)
+
++ σb,τ ϵb,τ .
+
+(25) Let Ca 
+
+> den
+
+denote the portion of the context-action embedding sequence aligned with the predicted future sequence. The denoising head receives the noisy target future, predicted future, action-conditioning representation, and noise scale: 
+
+ˆϵ = Dω
+
+( ˜Z+, ˆZ, C a
+
+> den
+
+, σ 
+
+)
+
+,
+
+Ldenoise = MSE (ˆ ϵ, ϵ ) .
+
+(26) The observed future is detached before noise is added, whereas gradients are propagated through the predicted future and the denoising module. The objective therefore regularizes the predicted future geometry without requiring pixel reconstruction. 
+
+4.4 Training Objective 
+
+The complete PhyLatent objective is 
+
+LPhyLatent = Lpred + 0 .09 LSIGReg + λinv Linv 
+
++ λstate Lstate + λalign (Lproj + Lact )+ λsep Lsep + λdenoise Ldenoise .
+
+(27) The first line contains the JEPA baseline and physical-invariance objective, the second line contains the physical-identifiability objectives, and the third line contains the counterfactual-dynamics objec-tives. All objectives jointly optimize the shared visual encoder, projector, action encoder, and action-conditioned predictor. The state head, alignment heads, action-query module, and latent denoiser are used only during training and are excluded from the exported inference model. Task-specific physical targets, auxiliary-module architectures, augmentation ranges, and loss hyperparameters are provided in the appendix. 
+
+## 5 Experiments 
+
+We evaluate PhyLatent on dynamics-relevant latent structure and downstream planning. The latent diagnostics are evaluated on Cube, while MPC performance is reported across four visual control tasks. 
+
+5.1 Datasets and Metrics 
+
+Tasks. We use the standardized datasets and environment interfaces provided by stable-worldmodel (Maes et al., 2026b). The evaluation includes OGBench-Cube (Park et al., 2025), PushT (Chi et al., 2023), Reacher from the DeepMind Control Suite (Tunyasuvunakool et al., 2020), and the TwoRooms visual navigation task (Maes et al., 2026b). 8Published as a conference paper at ICLR 2025 Cube requires a robotic manipulator to move a cube to a target position. Reacher requires the robot joints to reach a target configuration. PushT requires a planar agent to push a T-shaped object to a target pose. TwoRooms requires an agent to navigate across two connected rooms and reach a target position. Table 2: Dataset statistics. The fourth column reports the average number of stored steps per episode.                     
+
+> Task Transitions Episodes Avg. steps / episode Size (GiB) Cube 2,010,000 10,000 201.00 94.94 TwoRooms 920,809 10,000 92.08 11.90 Reacher 2,010,000 10,000 201.00 92.11 PushT 2,336,736 18,685 125.06 43.12
+
+For training, each dataset is randomly divided into 90% training and 10% validation data using a fixed random seed. 
+
+Evaluation protocol. Planning performance is measured by task success. Each evaluation rollout is initialized from a sampled dataset state, and its goal is set to the state 25 steps later in the same trajectory. The model is allowed at most 50 environment interaction steps to reach the goal. We evaluate 100 episodes for each of three random seeds ( 0, 1, and 2) and report the mean and standard deviation. Success is determined by the environment termination condition. For Cube, the cube must be within 
+
+0.04 m of its target position. For PushT, the object position error must be below 20 pixels and its angular error below π/ 9. For Reacher, every joint-position error must be below 0.05 radians. For TwoRooms, the agent must be within 16 pixels of the target position. On Cube, we additionally report the three collapse rates defined in Sec. 3. The physical invariance and counterfactual diagnostics each use 1,000 instances, while the physical identifiability diagnostic uses 200,000 state pairs. All diagnostic results are averaged over three random seeds. Lower collapse rates and higher success indicate better performance. 
+
+5.2 Implementation Details 
+
+Model configuration. Input observations are resized to 224 × 224 . We use a ViT-Tiny encoder with patch size 14, trained from scratch. The latent dimension is 192 and the observation history size is 3. The action-conditioned predictor contains 6 transformer blocks, 16 attention heads, and an MLP dimension of 2048. The complete PhyLatent training graph has approximately 19.6 million trainable parameters, including the JEPA world model and the training-time auxiliary heads. 
+
+Optimization. All tasks are trained for 10 epochs with a batch size of 32. We use AdamW with a learning rate of 5 × 10 −5, weight decay of 10 −3, and bfloat16 precision on a single NVIDIA RTX 5080 GPU. For Reacher, PushT, and TwoRooms, each epoch is limited to 10,000 training steps. The total training time is approximately 14 h 35 min for Cube, 3 h 32 min for TwoRooms, 19 h 02 min for Reacher, and 32 h 43 min for PushT. 
+
+Objective weights. We use unit weight for Lpred and set the SIGReg weight to 0.09 . Table 3 reports the task-specific weights of physical state grounding (PSG), future representation alignment (FRA), static visual invariance constraint (SVIC), counterfactual action separation constraint (CASC), and latent denoising (LD). For latent denoising, we sample ϵ ∼ N (0 , I ) and σ ∼ U (σmin , σ max ). We use (σmin , σ max ) = (0 .03 , 0.35) for Cube, (0 .05 , 0.35) for TwoRooms, and (0 .05 , 0.10) for Reacher and PushT. 
+
+MPC configuration. The planner uses a prediction horizon of 5, a receding horizon of 5, and an action block size of 5. At each planning step, it samples 100 candidate action sequences and retains the top 10 elite candidates. The evaluation budget of 50 denotes the maximum number of environment interaction steps in each evaluation episode. 9Published as a conference paper at ICLR 2025 Table 3: PhyLatent auxiliary loss weights. The columns correspond to λstate , λalign , λinv , λsep ,and λdenoise , respectively. 
+
+Task PSG FRA SVIC CASC LD Cube 0.25 0.10 0.05 0.02 0.01 TwoRooms 0.20 0.08 0.03 0.02 0.01 Reacher 0.045 0.025 0.030 0.015 0.005 PushT 0.090 0.035 0.060 0.010 0.005 
+
+5.3 Main Results 
+
+Dynamics-relevant latent structure. PhyLatent reduces all three failure rates while increasing Cube planning success from 70 .00% to 78 .10% . Physical invariance collapse decreases from 15 .60% 
+
+to 7.53% , physical identifiability collapse from 6.71% to 0.95% , and counterfactual dynamics col-lapse from 8.41% to 4.62% . The exact values are reported in Table 10 in Appendix C.1. The si-multaneous improvement in latent structure and planning shows that dynamics-relevant geometry produces a more reliable state space for action selection. LeWM PhyLatent     
+
+> 0612 18 15.60% 7.53%
+> (a) Physical Invariance Collapse
+> 51.7% lower
+> Nuisance Failure Rate (%) LeWM PhyLatent
+> 0369
+> 6.71% 0.95%
+> (b) Physical Identifiability Collapse
+> 85.8% lower
+> Collision Rate (%) LeWM PhyLatent
+> 04812
+> 8.41% 4.62%
+> (c) Counterfactual Dynamics Collapse
+> 45.1% lower
+> Under-Separation Rate (%) LeWorldModel PhyLatent
+
+Figure 4: Reduction of dynamics-relevant collapse on Cube. Each panel compares JEPA + SI-GReg and PhyLatent on the same diagnostic set. (a) Physical invariance collapse. (b) Physical identifiability collapse. (c) Counterfactual dynamics collapse. Lower values indicate fewer collapse cases. 
+
+Planning across tasks. Table 4 reports MPC success on all four tasks. PhyLatent improves three of the four environments, with gains of 8.1 percentage points on Cube and 17.0 points on TwoRooms. Table 4: Planning success across tasks. Results are percentages reported as mean ± standard deviation over three random seeds. 
+
+Task JEPA + SIGReg PhyLatent Cube 70 .00 ± 4.00 78 .10 ± 2.80 
+
+TwoRooms 81 .00 ± 6.24 98 .00 ± 1.00 
+
+Reacher 78 .33 ± 2.08 79 .33 ± 3.51 
+
+PushT 77 .67 ± 0.58 75 .33 ± 2.08 
+
+The gains on Cube and TwoRooms show that the same representation principles benefit both manip-ulation and navigation. PhyLatent remains comparable on Reacher and PushT. 
+
+5.4 Ablation Study 
+
+We ablate the three structural pathways on Cube. The identifiability ablation removes PSG and FRA, the invariance ablation removes SVIC, and the counterfactual ablation removes CASC and LD. Removing SVIC increases physical invariance failure from 7.53% to 9.93% . Removing PSG and FRA increases counterfactual failure to 6.84% and lowers success to 74 .00% . Removing CASC and LD produces the largest planning drop, reducing success to 73 .33% . The complete objective achieves the highest planning success while maintaining low failure rates across all three diagnostics. 10 Published as a conference paper at ICLR 2025 Table 5: Grouped ablation on Cube. Diagnostic columns are failure rates in percent. Bold marks the highest planning success.                                       
+
+> Method Inv. Fail. ↓Id. Fail. ↓CF Fail. ↓Success ↑
+> JEPA + SIGReg 15.60 6.71 8.41 70 .00 ±4.00
+> PhyLatent 7.53 0.95 4.62 78 .10 ±2.80
+> w/o PSG + FRA 7.17 1.03 6.84 74 .00 ±1.00
+> w/o SVIC 9.93 0.84 4.26 77 .00 ±1.00
+> w/o CASC + LD 12.77 0.78 4.74 73 .33 ±3.51
+
+5.5 Visualization 
+
+Figure 5 compares representative MPC rollouts on Cube. In the JEPA + SIGReg rollout, the gripper initially approaches and contacts the cube, but the interaction is not maintained as execution proceeds. The cube is consequently left behind rather than transported along the planned trajectory. PhyLatent maintains a consistent robot–object interaction across the same sequence and continues moving the cube toward the target. This qualitative difference is consistent with the higher Cube planning success reported in Sec. 5.3. LeWorldModel  PhyLatent 
+
+Figure 5: Qualitative comparison of MPC execution on Cube. Each row shows five snapshots from t0 to t4. The upper row is JEPA + SIGReg and the lower row is PhyLatent. Both models establish an initial interaction, but JEPA + SIGReg loses contact and leaves the cube behind after 
+
+t1. PhyLatent maintains the robot–object interaction and transports the cube with the end-effector through the later time steps. 
+
+## 6 Conclusion 
+
+We showed that global JEPA non-collapse does not guarantee a dynamics-relevant state space. Phy-Latent explicitly preserves physical invariance, state identifiability, and counterfactual future sepa-ration through three coordinated training pathways composed of five auxiliary objectives. On Cube, it reduces all three diagnosed failure rates and improves planning success, while the same represen-tation framework transfers across additional visual control tasks. These results establish dynamics-relevant latent structure as a central learning principle for JEPA world models. 
+
+Limitations and Future Work. PhyLatent uses task-specific physical targets as auxiliary supervi-sion during training. Future work will investigate more broadly available supervision signals while preserving dynamics-relevant latent structure across diverse visual control tasks. 
+
+## References 
+
+Mahmoud Assran, Quentin Duval, Ishan Misra, Piotr Bojanowski, Pascal Vincent, Michael Rabbat, Yann LeCun, and Nicolas Ballas. Self-supervised learning from images with a joint-embedding predictive architecture. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pp. 15619–15629, 2023. 11 Published as a conference paper at ICLR 2025 Mido Assran, Adrien Bardes, David Fan, et al. V-JEPA 2: Self-supervised video models enable understanding, prediction and planning. arXiv preprint arXiv:2506.09985 , 2025. Randall Balestriero and Yann LeCun. LeJEPA: Provable and scalable self-supervised learning with-out the heuristics. arXiv preprint arXiv:2511.08544 , 2025. Hangbo Bao, Li Dong, Songhao Piao, and Furu Wei. BEiT: BERT pre-training of image transformers. In International Conference on Learning Representations , 2022. Adrien Bardes, Jean Ponce, and Yann LeCun. VICReg: Variance-invariance-covariance regular-ization for self-supervised learning. In International Conference on Learning Representations ,2022. Adrien Bardes, Quentin Garrido, Jean Ponce, Xinlei Chen, Michael Rabbat, Yann LeCun, Mido Assran, and Nicolas Ballas. Revisiting feature prediction for learning visual representations from video. arXiv preprint arXiv:2404.08471 , 2024. Mathilde Caron, Ishan Misra, Julien Mairal, Priya Goyal, Piotr Bojanowski, and Armand Joulin. Unsupervised learning of visual features by contrasting cluster assignments. In Advances in Neural Information Processing Systems , volume 33, pp. 9912–9924, 2020. Mathilde Caron, Hugo Touvron, Ishan Misra, Hervé Jégou, Julien Mairal, Piotr Bojanowski, and Armand Joulin. Emerging properties in self-supervised vision transformers. In Proceedings of the IEEE/CVF International Conference on Computer Vision , pp. 9650–9660, 2021. Ting Chen, Simon Kornblith, Mohammad Norouzi, and Geoffrey Hinton. A simple framework for contrastive learning of visual representations. In International Conference on Machine Learning ,pp. 1597–1607. PMLR, 2020. Xinlei Chen and Kaiming He. Exploring simple siamese representation learning. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , 2021. Cheng Chi, Siyuan Feng, Yilun Du, Zhenjia Xu, Eric Cousineau, Benjamin C. M. Burchfiel, and Shuran Song. Diffusion policy: Visuomotor policy learning via action diffusion. In Proceedings of Robotics: Science and Systems , Daegu, Republic of Korea, July 2023. doi: 10.15607/RSS. 2023.XIX.026. Carles Gelada, Saurabh Kumar, Jacob Buckman, Ofir Nachum, and Marc G. Bellemare. DeepMDP: Learning continuous latent space models for representation learning. In International Conference on Machine Learning , 2019. Jean-Bastien Grill et al. Bootstrap your own latent: A new approach to self-supervised learning. In 
+
+Advances in Neural Information Processing Systems , 2020. Danijar Hafner, Timothy Lillicrap, Ian Fischer, Ruben Villegas, David Ha, Honglak Lee, and James Davidson. Learning latent dynamics for planning from pixels. In Proceedings of the 36th Inter-national Conference on Machine Learning , pp. 2555–2565, 2019. Danijar Hafner, Timothy Lillicrap, Jimmy Ba, and Mohammad Norouzi. Dream to control: Learning behaviors by latent imagination. In International Conference on Learning Representations , 2020. Kaiming He, Haoqi Fan, Yuxin Wu, Saining Xie, and Ross Girshick. Momentum contrast for unsu-pervised visual representation learning. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pp. 9729–9738, 2020. Kaiming He, Xinlei Chen, Saining Xie, Yanghao Li, Piotr Dollár, and Ross Girshick. Masked au-toencoders are scalable vision learners. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pp. 16000–16009, 2022. Petr Ivashkov, Randall Balestriero, and Bernhard Schölkopf. Sensorimotor world models: Perception for action via inverse dynamics. arXiv preprint arXiv:2606.20104 , 2026. Rico Jonschkowski and Oliver Brock. Learning state representations with robotic priors. Autonomous Robots , 39(3):407–428, 2015. doi: 10.1007/s10514-015-9459-7. 12 Published as a conference paper at ICLR 2025 Yann LeCun. A path towards autonomous machine intelligence. OpenReview , 2022. Lucas Maes, Quentin Le Lidec, Damien Scieur, Yann LeCun, and Randall Balestriero. LeWorld-Model: Stable end-to-end joint-embedding predictive architecture from pixels. arXiv preprint arXiv:2603.19312 , 2026a. Lucas Maes, Quentin Le Lidec, Luiz Facury, Nassim Massaudi, Ayush Chaurasia, Francesco Ca-puano, Richard Gao, Taj Gillin, Dan Haramati, Damien Scieur, Yann LeCun, and Randall Balestriero. stable-worldmodel: A platform for reproducible world modeling research and evalu-ation, 2026b. Seohong Park, Kevin Frans, Benjamin Eysenbach, and Sergey Levine. Ogbench: Benchmarking offline goal-conditioned rl. In International Conference on Learning Representations , 2025. Deepak Pathak, Pulkit Agrawal, Alexei A. Efros, and Trevor Darrell. Curiosity-driven exploration by self-supervised prediction. In International Conference on Machine Learning , 2017. Pierre Sermanet, Corey Lynch, Yevgen Chebotar, Jasmine Hsu, Eric Jang, Stefan Schaal, and Sergey Levine. Time-contrastive networks: Self-supervised learning from video. In IEEE International Conference on Robotics and Automation , 2018. Lucas Thil, Jesse Read, Rim Kaddah, and Guillaume Doquet. Subspace-decomposed JEPAs: Disen-tangling progression and content in latent world models. arXiv preprint arXiv:2605.31111 , 2026. Saran Tunyasuvunakool, Alistair Muldal, Yotam Doron, Siqi Liu, Steven Bohez, Josh Merel, Tom Erez, Timothy Lillicrap, Nicolas Heess, and Yuval Tassa. dm_control: Software and tasks for continuous control. Software Impacts , 6:100022, 2020. doi: 10.1016/j.simpa.2020.100022. Aaron van den Oord, Yazhe Li, and Oriol Vinyals. Representation learning with contrastive predictive coding. arXiv preprint arXiv:1807.03748 , 2018. Tongzhou Wang, Simon S. Du, Antonio Torralba, Phillip Isola, Amy Zhang, and Yuandong Tian. Denoised MDPs: Learning world models better than the world itself. In International Conference on Machine Learning , 2022. Jure Zbontar, Li Jing, Ishan Misra, Yann LeCun, and Stéphane Deny. Barlow twins: Self-supervised learning via redundancy reduction. In International Conference on Machine Learning , 2021. Amy Zhang, Rowan McAllister, Roberto Calandra, Yarin Gal, and Sergey Levine. Learning invariant representations for reinforcement learning without reconstruction. In International Conference on Learning Representations , 2021. Kai Zhao, Dongliang Nie, Yuchen Lin, Zhehan Luo, Yixiao Gu, Deng-Ping Fan, and Dan Zeng. Sub-JEPA: Subspace gaussian regularization for stable end-to-end world models. arXiv preprint arXiv:2605.09241 , 2026. 13 Published as a conference paper at ICLR 2025 
+
+## A Notation 
+
+Table 6 summarizes the notation used in the analysis and method sections. Table 6: Notation used in PhyLatent. 
+
+Symbol Meaning 
+
+O = [ o1, . . . , o T ] Input observation sequence. 
+
+A = [ a1, . . . , a T ] Raw action sequence. 
+
+E, P Shared JEPA encoder and projector. 
+
+Ga Shared action encoder. 
+
+Z = P (E(O)) Encoded latent sequence. 
+
+Ca = Ga(A) Action-embedding sequence. 
+
+Zctx , C a 
+
+> ctx
+
+Context latent and action-embedding sequences. 
+
+Z+ Encoded target-future sequence. 
+
+ˆZ Predicted future latent sequence. 
+
+Fθ Action-conditioned latent predictor. 
+
+sg( ·) Stop-gradient operation. 
+
+dN(·, ·) Mean-squared distance after ℓ2 normalization along the final feature di-mension. 
+
+S, ¯S Physical target sequence and its per-dimension z-score normalization. 
+
+Hs Shared physical state grounding head. 
+
+ϕ Future-alignment projection head. 
+
+Ψ Action-query alignment module. 
+
+Oaug , Z aug Appearance-perturbed observation sequence and its encoded latents. 
+
+Acf Counterfactual action sequence. 
+
+ˆZcf Predicted future sequence under counterfactual actions. 
+
+δa, δ z Normalized action difference and predicted branch separation. 
+
+γ, m max Counterfactual margin scale and maximum gap. 
+
+Ω Active set selected by the mini-batch median action difference. 
+
+Dω Latent denoising head. 
+
+ϵ, σ Gaussian noise and sampled noise scale. 
+
+˜Z+ Noise-perturbed target-future latent sequence. 
+
+λ· Weight of an auxiliary objective. 
+
+## B Additional Implementation Details 
+
+B.1 Task-Specific Physical Targets 
+
+Physical state grounding uses simulator-derived targets only during training. Each target dimension is normalized independently using its dataset mean and standard deviation after samples containing NaNs are removed. Table 7 lists the exact target construction used for each task. Table 7: Task-specific physical targets used by PSG. No future state, success label, or terminal indicator is included.              
+
+> Task Dim. Ordered target components Cube 28 Indices 0–5: arm joint positions; 6–11: arm joint velocities; 12–14: scaled end-effector position; 15–16: cosine and sine of end-effector yaw; 17: scaled gripper opening; 18: gripper contact; 19–21: scaled cube position; 22–25: cube quaternion; 26–27: cosine and sine of cube yaw. Reacher 6Indices 0–1: joint position features; 2–3: target-relative displacement ( to_target ); 4–5: joint velocity features from the standard DMControl Reacher observation. PushT 7Indices 0–1: agent position; 2–3: block position; 4: block angle modulo 2π; 5–6: agent velocity. TwoRooms 2Agent position (x, y )only. Target and door states are not used by PSG.
+
+B.2 Auxiliary Module Architectures 
+
+All auxiliary modules operate on a latent dimension of 192 and are used only during training. Their architectures are summarized in Table 8. 14 Published as a conference paper at ICLR 2025 Table 8: Architectures of the training-time auxiliary modules. ds denotes the task-specific physical-target dimension.                                          
+
+> Module Architecture Output dim. Parameters
+> HsLN(192) →Linear(192 ,512) →GELU →Linear(512 , d s)dsTask-dependent
+> ϕLN(192) →Linear(192 ,128) →GELU →Linear(128 ,128) 128 41,600
+> ΨLinear query, key, and value maps in 192 dimensions, followed by four-head multi-head attention and LN(192)
+> 192 259,776
+> DωLN(577) →Linear(577 ,768) →GELU →Linear(768 ,768) →
+> GELU →Linear(768 ,192)
+> 192 1,183,298
+
+The state-head parameter counts are 113,564 for Cube, 102,278 for Reacher, 102,791 for PushT, and 100,226 for TwoRooms. The action-query module forms a single query from the temporal mean of the context action embeddings and uses the latent sequence as keys and values. 
+
+B.3 Visual Augmentation and Auxiliary Hyperparameters 
+
+SVIC is applied whenever its loss weight is nonzero. For each sample and time step, the augmented image is obtained by adding a global brightness offset and an independent per-channel offset. No texture replacement, masking, cropping, or background substitution is used during training. Table 9 reports the augmentation ranges and the additional CASC and LD hyperparameters. Table 9: Training-time augmentation, counterfactual separation, and latent denoising settings. 
+
+Brightness and channel entries denote symmetric ranges [−b, b ] and [−c, c ].                                   
+
+> Task bcσaγmmax σmin σmax
+> Cube 0.040 0.030 0.100 0.080 1.00 0.03 0.35 TwoRooms 0.030 0.020 0.100 0.080 1.00 0.05 0.35 Reacher 0.012 0.008 0.025 0.025 0.35 0.05 0.10 PushT 0.012 0.008 0.015 0.018 0.25 0.05 0.10
+
+For CASC, the counterfactual action sequence is formed by permuting actions across the mini-batch and adding Gaussian noise with standard deviation σa. The target branch separation is 
+
+min( γδ a, m max ). For LD, the noise level is sampled independently from U(σmin , σ max ) for each future latent. 
+
+## C Additional Experimental Results 
+
+C.1 Exact Cube Results 
+
+Table 10 reports the exact values shown in Fig. 4, together with Cube planning success. Table 10: Latent diagnostics and planning performance on Cube. Inv. Fail., Id. Fail., and CF Fail. denote physical invariance, physical identifiability, and counterfactual dynamics failure rates. All values are percentages. 
+
+Method Inv. Fail. ↓ Id. Fail. ↓ CF Fail. ↓ Success ↑
+
+JEPA + SIGReg 15.60 6.71 8.41 70 .00 ± 4.00 
+
+PhyLatent 7.53 0.95 4.62 78 .10 ± 2.80 
+
+PhyLatent reduces all three dynamics-relevant failure rates and improves Cube planning success under the same architecture and MPC configuration. 
+
+C.2 Robustness to Physical Identifiability Thresholds 
+
+The physical identifiability diagnostic uses a physical-distance quantile Qphys and a latent-neighborhood quantile Qlat . The main paper uses (Qphys , Q lat ) = (75 , 10) . We evaluate additional threshold combinations to determine whether the measured improvement depends on this particular choice. 15 Published as a conference paper at ICLR 2025 Table 11: Threshold sensitivity of physical identifiability collapse on Cube. Entries report far-physical/near-latent collision rates in percent. The bold row denotes the default thresholds used in the main paper. Lower values are better.                                 
+
+> Qphys Qlat JEPA + SIGReg ↓PhyLatent ↓
+> 70 51.49 0.05
+> 70 10 6.76 1.07
+> 70 15 13.13 5.22
+> 75 51.44 0.04 75 10 6.71 0.95
+> 75 15 13.17 5.02
+> 80 51.34 0.03
+> 80 10 6.51 0.78
+> 80 15 12.94 4.79
+
+PhyLatent produces a lower collision rate under all nine threshold settings. At the default setting, the collision rate decreases from 6.71% to 0.95% , matching the result reported in the main paper. The improvement therefore does not depend on a single physical-distance or latent-neighborhood threshold. 
+
+C.3 Additional Analysis on PushT 
+
+PushT provides a boundary case for the relationship between latent structure and downstream plan-ning. Table 12 reports the three dynamics-relevant diagnostics on this task. Table 12: Dynamics-relevant latent diagnostics on PushT. Entries are failure rates in percent. Lower values are better.             
+
+> Method Inv. Fail. ↓Id. Fail. ↓CF Fail. ↓
+> JEPA + SIGReg 1.33 1.15 4.25 PhyLatent 0.20 0.52 2.38
+
+PhyLatent reduces all three measured failure rates on PushT. However, Table 4 shows that this im-provement does not translate into higher MPC success under the shared planning configuration. This result indicates that the proposed diagnostics capture important representation properties, while contact-rich pushing additionally depends on precise local contact transitions and the geometry of the planning objective. 16

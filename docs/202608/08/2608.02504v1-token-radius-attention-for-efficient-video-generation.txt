@@ -1,0 +1,1045 @@
+Title: Token Radius Attention for Efficient Video Generation
+
+URL Source: https://arxiv.org/pdf/2608.02504v1
+
+Published Time: Tue, 04 Aug 2026 02:47:49 GMT
+
+Number of Pages: 15
+
+Markdown Content:
+# Token Radius Attention for Efficient Video Generation 
+
+Jiayu Chen 1∗, Zhikun Jiang 2∗, Maoliang Li 1, Jiayi Luo 4,5 , Jiawei Yang 1,Zihao Zheng 1, Hengyi Zhang 1, Guojie Luo 1,3 , Xiang Chen 1†
+
+> 1
+
+School of Computer Science, Peking University 
+
+> 2
+
+School of Electronics Engineering and Computer Science, Peking University 
+
+> 3
+
+State Key Laboratory of Multimedia Information Processing, Peking University 
+
+> 4
+
+School of Computer Science and Engineering, Beihang University 
+
+> 5
+
+Zhongguancun Academy jiayu.chen.25@stu.pku.edu.cn, 2400013188@stu.pku.edu.cn, xiang.chen@pku.edu.cn 
+
+Abstract 
+
+Video Diffusion Transformers (VDiTs) enable high-fidelity generation but incur quadratic cost from dense 3D self-attention. Existing head- and block-level sparse methods share computation budgets across queries, overlooking token-specific attention demand. We observe that retained density varies across queries yet correlates log-linearly with atten-tion entropy, while dominant interactions form query-centered neighborhoods with token-dependent radii. Based on these findings, we propose Token Radius Attention (TRA) , a training-free framework that maps query entropy to an an-alytic token budget and converts it into a temporally decayed radius without explicit key ranking. Fused entropy extraction, warm-up reuse, and block-sparse mask construction further reduce overhead. Across seven Wan2.1, Wan2.2, and Hun-yuanVideo T2V/I2V configurations, TRA retains only 9–19% of attention interactions and achieves 1.56 ×–2.05 × speedup with competitive generation quality. Code is available at https://github.com/IF-LAB-PKU/Token-Radius-Attention. 
+
+1 Introduction 
+
+Video Diffusion Transformers (VDiTs) (Peebles and Xie 2023) have become a dominant architecture for high-fidelity video generation (Wan et al. 2025; Kong et al. 2024; Yang et al. 2024), enabling applications such as audiovisual content creation and world modeling (Seedance et al. 2026; Brooks et al. 2024). Their success relies on dense 3D self-attention to capture spatial and temporal dependencies. Given N video tokens, however, dense attention computes O(N 2) pairwise interactions, causing its cost to grow rapidly with video dura-tion and resolution. Attention has therefore become a major inference bottleneck for scaling and deployment. Recent studies (Zhang et al. 2026) reduce this cost by ex-ploiting the intrinsic sparsity of attention and computing only potentially important interactions. Based on the granularity of sparse decisions, existing methods can be broadly catego-rized into two groups. Head-level methods assign structured spatial or temporal patterns to individual attention heads (Xi et al. 2025; Chen et al. 2026b; Li et al. 2026), whereas block-level methods select important query–key block pairs (Yang 
+
+> ∗
+
+These authors contributed equally. 
+
+> †
+
+Corresponding author. (a) Head Level Method - SVG (b) Block Level Method – SVG2 (c) Our Method – Token Radius Attention Spatial Head Temporal Head Online Select Block Select Original Attention Query Q𝑞 !  
+
+> ×Key K"
+> Token Attention Pattern Radius Pattern Block Sparse Original Attention Radius Attention Mask Fine-grained
+> More Sparse
+> Fidelity-preserving
+
+Figure 1: Comparison of sparse attention paradigms: TRA performs token-level radius masking for higher sparsity while preserving fidelity, unlike head-and block-level methods. et al. 2026; Zhang et al. 2025; Luo et al. 2026). Despite their effectiveness, both paradigms typically share a single com-putation allocation across all query tokens within a head or query block, implicitly assuming uniform attention demand within each group. This shared-allocation assumption conflicts with the query token-specific computation of self-attention (Vaswani et al. 2017). Since softmax is normalized independently for each query, the number of keys required to preserve a target at-tention mass is inherently a token-specific attention de-mand . Even within the same head or query block, concen-trated queries require a small token budget , whereas dif-fuse queries require a much larger one. Consequently, shared head- or block-level allocation can waste computation on concentrated queries and miss critical keys for diffuse ones, degrading generation quality. 
+
+Token-level sparse allocation can address this mismatch by aligning sparse decisions with the atomic unit of attention, but replacing shared allocation with token-specific decisions introduces an adaptivity–efficiency tension. First, estimat-ing and assigning an individual token budget to every query may itself incur substantial identification and decision over-head, calling for a low-cost model of token-specific attention arXiv:2608.02504v1 [cs.CV] 3 Aug 2026 Token Radius Attention SVG Radial         
+
+> 0.2 0.3 0.4 0.5 0.6 22 23 24 25 Attention Density PSNR (dB) 0.2 0.3 0.4 0.5 0.6 0.5 0.6 0.7 0.8 Attention Density Attention Recall
+
+Figure 2: PSNR and attention recall versus attention den-sity. Token Radius Attention achieves a favorable quality-efficiency trade-off compared with baselines. demand. Second, a budget specifies only how much compu-tation to allocate, but not where to allocate it. To address this challenge, we analyze token-specific at-tention sparsity and its spatial support geometry. For each query, we define retained density as the minimum fraction of top-ranked keys required to preserve a target attention mass. Our analysis shows that retained density varies by or-ders of magnitude across queries within the same layer and head, while its logarithm grows approximately linearly with attention entropy, revealing token-specific attention sparsity (Insight I ). Accordingly, attention entropy provides a com-pact signal for assigning query-specific token budgets with-out requiring per-query key ranking. We further observe that high-attention keys form query-centered circular neighbor-hoods and normalized attention probability decays approxi-mately exponentially with two-dimensional spatial distance, establishing the token radius attention pattern ( Insight II ). Consequently, each budget can be converted into a structured spatial support through a token radius. With the temporal distance-decay rule (Li et al. 2026), these radii form regular spatiotemporal supports across video frames. Based on these insights, we propose Token Radius Atten-tion (TRA) , a training-free framework that realizes token-specific structured sparsity through an entropy-to-budget-to-radius pipeline. Based on Insight I , TRA uses an analytic entropy-based approximation to estimate a query-specific to-ken budget, determining how much computation each query receives without per-query key ranking. During early dense warm-up, TRA computes attention entropy and reuses its budgets, radii, and masks throughout subsequent sparse steps. Based on Insight II , TRA converts each predicted budget into a query-specific base radius and applies tempo-ral distance decay to construct regular two-dimensional sup-ports across video frames, determining where the computa-tion is allocated. Finally, a tile-major token layout and fused CUDA kernel perform distance computation, radius com-parison, block pruning, and token voting, converting logical token-radius masks into regular block masks for FlashIn-fer (Ye et al. 2025) execution. These components combine token-level adaptivity with efficient structured computation. Our contributions are threefold: (1) We uncover token-specific attention sparsity in VDiTs: retained density varies dramatically across queries yet follows a log-linear re-lationship with attention entropy, while interactions ex-hibit a query-centered token radius attention pattern. (2) We introduce Token Radius Attention (TRA) , a training-free entropy-to-budget-to-radius framework that transforms query-specific computation demand into regular spatiotem-poral supports under temporal distance decay without explicit key ranking. (3) We co-design a radius-mask kernel and a fused entropy kernel, and comprehensively validate TRA across seven Wan2.1, Wan2.2, and HunyuanVideo variants spanning text-to-video and image-to-video generation, where it demonstrates a favorable quality–efficiency trade-off. 
+
+2 Token Radius Attention 
+
+2.1 Preliminary and Challenge 
+
+Video Diffusion Transformers (VDiTs) represent a latent video using N = F HW tokens, where F , H, and W de-note the temporal length and spatial grid dimensions, re-spectively. Each video token is associated with a spatiotem-poral coordinate (f, x, y ). For a single self-attention head, let Q, K, V ∈ RN ×d denote the query, key, and value matri-ces, where d is the head dimension. Dense 3D self-attention computes all query–key interactions as 
+
+sij = q⊤ 
+
+> i
+
+kj
+
+√d , pij = exp( sij )
+
+PNn=1 exp( sin ) , o i =
+
+> N
+
+X
+
+> j=1
+
+pij vj .
+
+(1) Although dense attention captures unrestricted spatial and temporal dependencies, it incurs O(N 2) interactions. Sparse attention reduces this cost by retaining a subset of keys. 
+
+Challenge: reconciling token-specific attention demand with structured sparse execution. Existing head- or block-level methods share one retained density, radius schedule, or key-block set across multiple queries. However, this shared al-location conflicts with the row-wise nature of self-attention: because pi = ( pi1, . . . , p iN ) is normalized independently for each query i, different queries need not require the same amount or extent of attention. Consequently, a large shared mask wastes computation on queries with concentrated sup-port, whereas a small one may remove important interactions for queries with broader support. Addressing this challenge requires token-specific structured sparsity , with allocation adapting to each query while preserving a regular mask. 
+
+2.2 Insight I: Token-Specific Attention Sparsity 
+
+We first determine how much computation each query re-quires. For a target attention mass τ , let Kτi be the minimum number of top-ranked keys whose cumulative probability reaches τ , and define the retained density as Bτi = Kτi /N .Because obtaining Kτi requires the complete attention row, it serves only as an oracle measure of query-specific attention demand. We therefore seek a compact statistic that exposes this demand without treating all queries uniformly. To characterize the dispersion of query i’s attention distri-bution, we introduce its attention entropy: 
+
+Hi = −
+
+> N
+
+X
+
+> j=1
+
+pij log pij , 0 ≤ H i ≤ log N. (2) Figure 3: Relationship between token-specific retained density and attention entropy on Wan2.2-A14B. Their strong log-linear relationship ( R2 = 0 .940 –0.966 ) supports attention entropy as a query-specific budget signal. A low entropy indicates that most attention mass is concen-trated on a few keys, whereas a high entropy indicates that the mass is distributed over a broader support. Entropy therefore describes not merely whether attention is sparse, but how many interactions a particular query is likely to need. Figure 3 reveals two complementary properties. First, the retained density varies by orders of magnitude among to-kens from the same layer and head, directly contradicting the shared-budget assumption. Second, log Bτi grows approxi-mately linearly with Hi, with R2 = 0 .940 –0.966 across the four profiled layer–head groups. This log-linear trend is con-sistent with the effective-support interpretation of entropy: when attention spreads over more keys, its entropy increases logarithmically, while the number of keys needed to preserve the same mass grows exponentially. Thus, attention entropy serves as a compact signal for assigning query-specific token budgets without requiring a separately trained predictor. 
+
+2.3 Insight II: Token Radius Attention Pattern 
+
+A token budget specifies how many keys to retain, but it does not determine where those keys should be placed. Select-ing arbitrary top-ranked keys would require dense attention scores and an expensive per-query search. We therefore ex-amine whether the dominant interactions of each video token follow a coordinate-defined pattern that can translate a scalar budget into structured support. For query i = ( fi, x i, y i) and key j = ( fj , x j , y j ), we define 
+
+ds(i, j ) = 
+
+q
+
+(xi − xj )2 + ( yi − yj )2, dt(i, j ) = |fi−fj |.
+
+(3) As shown in Figure 4(a), high-attention keys form approx-imately circular neighborhoods around the query’s spatial position. Crucially, these neighborhoods are not identical: their radii vary substantially across queries, heads, and lay-ers, mirroring the token-specific budgets identified above. Figure 4(b) explains why a radius is an effective support parameter. The normalized attention probability decays ap-proximately exponentially with two-dimensional spatial dis-tance ( R2 = 0 .791 ); hence, enlarging a query-centered disk (b) Token-level Attention Score Distribution 
+
+> Head 22 Token 5388 Layer39 Head 22 Token 5474 Head 25 Token 7085 Layer39 Layer39 Layer1 Layer38
+> (a) Token-level Attention Pattern
+> Layer 35 Head 33 Token 3944 Head 12 Token 3224 Head 15 Token 2011
+> High Score
+> Attention exhibits token-specific circles of varying radii ！
+> Low
+> Temporal Spatial
+
+Figure 4: Token-specific attention patterns on Wan2.2-A14B. Dominant interactions form query-centered neigh-borhoods with token-dependent radii, while attention decays exponentially with two-dimensional spatial distance. progressively incorporates lower-probability keys, whereas shrinking it removes distant interactions first. The radius therefore provides a monotonic, structured way to convert each predicted budget into a spatial support without ranking arbitrary key tokens. The pattern also reflects the structure of video generation rather than sequence proximity. Within each frame, a video token attends most strongly to spatially nearby visual content; across frames, the query-centered layout provides a common coordinate system for aggregating locally aligned appearance and motion context. Because the useful extent varies with both the token and temporal offset, the spatial geometry can share an established temporal distance-decay rule (Li et al. 2026), while its base radius remains query specific. 
+
+3 Efficient Video Generation with TRA 
+
+In this section, we introduce Token Radius Attention (TRA) , a training-free sparse attention framework that allo-cates computation at query-token granularity while retaining a regular execution structure for VDiTs. As illustrated in Fig-ure 5, TRA follows an entropy-to-budget-to-radius pipeline. First, entropy-guided token budgeting estimates a query-specific effective token budget under a common attention-mass target (Section 3.1). Second, a budget-preserving radius construction converts this scalar budget into a query-specific spatiotemporal mask without explicitly ranking individual keys (Section 3.2). Additionally, fused entropy extraction, cross-step reuse, and a customized block-sparse kernel amor-tize the decision overhead and translate token-level sparsity into practical execution (Section 3.3). 
+
+3.1 Entropy-to-Budget Mapping 
+
+Token-Specific Budget Formulation. Following In-sight I , a low-entropy query concentrates its attention mass on a small number of key tokens, whereas a high-entropy query distributes its mass over a broader support. Conse-quently, different queries require different numbers of keys to preserve the same target attention mass. This heterogene-(a) Entropy-to-Budget Mapping (b) Budget-to-Radius Mask Construction (c) Efficient Radius Masking and Entropy Query 𝑡𝑜𝑘𝑒𝑛𝑠 𝑁                
+
+> Token Budget )𝐵 !"=" #$% ℋ !
+> '
+> Entropy ℋ!
+> Token Radius -𝑟 !=' ( )!"
+> * ∑ #$% &,'-./ !
+> Frame i Frame j+1 Video Diffusion Transformer Warm up Token prob. High Entropy Low Entropy Target Mass 𝜏
+> Frame j+2
+> ×Key K0
+> Token Radius Attention Pattern Merge across Queries Query-Key Pair Irregular Mask Distance Computation Radius Comparison Block Pruning Token Voting
+> Cuda Kernel of Radius Mask Construction
+> Partition Rearrange Regular Block Mask FlashInfer
+
+Figure 5: Overview of Token Radius Attention (TRA). (a) Query-wise entropy predicts a token budget. (b) The budget is converted into temporally decayed spatial radii. (c) A fused CUDA kernel constructs efficient block masks for execution. ity motivates an entropy-based estimate of the effective token budget for each query. Specifically, consider the attention distribution pi =(pi1, . . . , p iN ) ∈ RN of query i, where N is the number of key tokens. Let πi denote the permutation that sorts its probabilities in descending order. Given a target attention mass τ ∈ (0 , 1) , we define the oracle support size as 
+
+Kτi = min 
+
+(
+
+k :
+
+> k
+
+X
+
+> n=1
+
+pi,π i(n) ≥ τ
+
+)
+
+. (4) The corresponding effective token budget , expressed as the fraction of retained keys, is Bτi = Kτi /N . Although Bτi
+
+directly characterizes query-specific attention demand, com-puting it requires the complete attention distribution and an explicit per-query top-k search. It therefore serves as an ora-cle diagnostic rather than an efficient inference-time policy. 
+
+Entropy-Equivalent Support Approximation. To moti-vate a tractable entropy-to-budget relationship, we introduce an idealized effective-support approximation. For query i,consider an entropy-equivalent distribution p′ 
+
+> i
+
+that assigns uniform probability to a set Si of mi effective key tokens and zero probability elsewhere: 
+
+p′ 
+
+> ij
+
+=
+
+( 1 
+
+> mi
+
+, j ∈ S i,
+
+0, j / ∈ S i, |S i| = mi. (5) Requiring p′ 
+
+> i
+
+to have the same entropy Hi as the original distribution gives 
+
+H(p′
+
+> i
+
+) = −
+
+> N
+
+X
+
+> j=1
+
+p′ 
+
+> ij
+
+log p′ 
+
+> ij
+
+= − X
+
+> j∈S i
+
+1
+
+mi
+
+log 1
+
+mi
+
+= log mi.
+
+Hence, mi = exp( Hi), which represents an entropy-equivalent effective support size rather than the exact Top-τ
+
+support of the original distribution. 
+
+Entropy-Based Budget Approximation. From the entropy-equivalent distribution in Equation 5, we define 
+
+meff  
+
+> i
+
+= exp( Hi) as the continuous effective support size of query i, rather than the exact number of nonzero attention probabilities. Under the uniform-support approximation, the attention mass associated with k retained effective keys is approximated by 
+
+fMi(k) = min 
+
+ kmeff 
+
+> i
+
+, 1
+
+
+
+, k ∈ { 0, . . . , N }. (6) Consequently, the estimated number of keys required to reach a target attention mass τ is 
+
+bKτi = min 
+
+n
+
+k : fMi(k) ≥ τ
+
+o
+
+= ⌈τ exp( Hi)⌉ . (7) The corresponding effective token budget is therefore 
+
+bBτi = bKτi
+
+N = ⌈τ exp( Hi)⌉
+
+N ≈ τ exp( Hi)
+
+N . (8) Equation 8 provides an analytic and monotonic ap-proximation of the query-specific token budget under the effective-support assumption, assigning smaller budgets to low-entropy queries and larger budgets to high-entropy ones. It does not imply that entropy uniquely determines the exact Top-τ support of the original attention distribution. Nev-ertheless, its exponential dependence is consistent with the empirical log-linear trend in Figure 3. Appendix further eval-uates this approximation using measured attention distribu-tions and provides the corresponding derivation. 
+
+3.2 Budget-to-Radius Mask Construction 
+
+Temporally Decayed Radius Model. The entropy-based budget approximation determines how many keys a query should retain, but not where those keys should be placed. Ex-plicitly selecting the top- bKτi keys would still require dense attention scores and a per-query ranking operation. Fol-lowing Insight II , TRA instead converts each budget into query-centered 2D disks, producing a coordinate-defined spatiotemporal support without arbitrary key selection. Let query i be located at (fi, x i, y i), and let key j be located at (fj , x j , y j ). We use the spatial and temporal distances defined in Equation 3. Following the established temporal-locality prior (Li et al. 2026), we model the contraction of spatial support using 
+
+ϕ(δ) = exp( −γδ ), γ ≥ 0, δ = |fj − fi|. (9) Here, γ is a fixed decay rate shared by all queries; query-level adaptivity is introduced only through the base radius ri. The radius assigned to target frame t is ri,t = riϕ(|t − fi|). Thus, the predicted token budget controls the overall support scale, whereas temporal distance determines how this support is distributed across video frames. 
+
+Budget-Matched Radius Construction. The predicted density bBτi corresponds to a target key count bKτi = N bBτi .We determine a base radius whose frame-dependent disks contain approximately this number of video keys. Assuming latent-grid coordinates and temporarily ignoring discretiza-tion and spatial boundaries, the retained-key count is approx-imated by the sum of disk areas: 
+
+Ccont  
+
+> i
+
+(r) = 
+
+> F
+
+X
+
+> t=1
+
+πr 2ϕ2(|t − fi|). (10) Equating Ccont  
+
+> i
+
+(r) with bKτi yields the analytic initialization 
+
+eri =
+
+vuut bKτi
+
+π PFt=1 ϕ2(|t − fi|) . (11) This formulation completes the entropy-to-budget-to-radius chain: entropy estimates a query-specific key count, while the temporal decay distributes spatial support across frames. However, eri is only a continuous approximation and does not account for finite grid boundaries or lattice effects. To obtain a boundary-aware radius, we count the retained keys exactly for each candidate r:
+
+Cgrid  
+
+> i
+
+(r) = 
+
+> F
+
+X
+
+> t=1
+
+|{ j : fj = t, d s(i, j ) ≤ rϕ (|t − fi|)}| .
+
+(12) TRA selects the smallest candidate radius whose discrete support reaches the target key count: 
+
+ri = min 
+
+n
+
+r ∈ R : Cgrid  
+
+> i
+
+(r) ≥ bKτi
+
+o
+
+, (13) where R includes all candidate radii on the latent grid and a full-support radius. Because the count changes discretely, the selected support may slightly exceed bKτi ; the construction therefore matches the predicted budget conservatively rather than exactly. For fixed grid dimensions and γ, the boundary-aware counts depend only on the query coordinate, query frame, and candidate radius, allowing them to be stored in a lookup table. 
+
+Token-Radius Mask Definition. The resulting logical video-token mask is 
+
+Mij = I [ds(i, j ) ≤ riϕ(|fj − fi|)] . (14) The mask is query specific because ri depends on the entropy-derived budget bKτi , yet structurally regular because its support is a union of nested two-dimensional disks. Con-ceptually, TRA applies the mask as 
+
+TRA( Q, K, V ) = Softmax 
+
+ QK ⊤
+
+√d + B(M )
+
+
+
+V, (15) where Bij (M ) = 0 when Mij = 1 , and Bij (M ) = −∞ oth-erwise. Equation 15 is a mathematical definition; the sparse kernel evaluates only retained query–key blocks rather than materializing dense QK ⊤. For joint text–video attention, all text keys remain visible and M is applied only to the video-key submatrix; architectures with separate cross-attention retain their original text-attention path. 
+
+3.3 Efficient Radius Masking and Entropy 
+
+Flash Radius Mask Kernel. Fixed-block sparse-attention kernels cannot represent Token-Radius masks because ir-regular regions do not align with fixed block boundaries. Under the original token order, tokens retained for one query may span multiple disjoint blocks, producing a fragmented sparse mask. TRA resolves this mismatch by partitioning each H × W frame into bh × bw tiles and rearranging video tokens in tile-major order. This layout makes neighboring to-kens contiguous in the one-dimensional sequence, grouping retained interactions into fewer, denser blocks for efficient block-sparse computation. Before attention, Q, K, and V are consistently reordered; afterward, outputs are restored to the original token order. Given this layout, TRA converts the query-specific token-level mask M into a hardware-compatible block-sparse mask. We fuse distance computation, radius comparison, block pruning, and token-level voting into one CUDA kernel. A three-dimensional grid covers all query blocks, key blocks, and attention heads, generating head-specific masks in one launch. For each query–key block pair, the kernel uses pre-computed spatial bounding boxes to discard pairs that cannot contain valid token interactions. It then evaluates remain-ing candidates at token granularity and votes to determine whether each block is retained. Finally, all head masks are packed into one block-sparse attention invocation, avoiding per-head planning and dispatch overhead. 
+
+Fused Attention Entropy Kernel. Computing query-wise attention entropy at every denoising step would offset the benefit of sparse attention. TRA therefore extracts entropy only during selected early dense warm-up steps and reuses the resulting budgets, radii, and masks throughout the sub-sequent sparse steps. Specifically, letting sij = q⊤ 
+
+> i
+
+kj /√d,
+
+Zi = P 
+
+> j
+
+exp( sij ), and pij = exp( sij )/Z i, the entropy can be rewritten as Hi = log Zi − PNj=1 pij sij . This formula-tion allows entropy to be accumulated during online softmax without materializing the complete attention matrix. Follow-ing prior observations of cross-step entropy stability (Chen et al. 2026a), TRA directly reuses the entropy estimates from the final dense warm-up step to construct radius maps for subsequent sparse steps, reducing entropy estimation and mask-construction overhead. 
+
+4 Experiments 
+
+4.1 Experimental settings 
+
+Models and tasks. We evaluate TRA on seven T2V and I2V configurations based on Wan2.1, Wan2.2, and Hunyuan-Video, covering model sizes from 1.3B to 14B. Unless other-wise specified, videos are generated at 720 ×1280 resolution. Model/Method VBench (%) Efficiency Overall ↑ Subject ↑ Flicker ↑ Back. ↑ Aesthetic ↑ Motion ↑ Image ↑ Density ↓ FLOPs ↓ Latency ↓ Speedup ↑
+
+Wan2.1-1.3B-T2V 87.67 97.56 99.55 97.93 65.46 98.52 67.01 1.00 105.34 417 1.000 ×
+
+SVG1 84.44 94.27 98.75 91.16 61.14 98.05 63.26 0.30 48.41 266 1.568 ×
+
+SVG2 85.30 95.88 98.75 96.47 60.15 98.71 61.83 0.20 40.22 241 1.730 ×
+
+Radial 86.30 96.56 99.05 97.07 62.76 98.72 63.67 0.39 55.31 257 1.623 ×
+
+TRA 86.53 96.89 99.11 97.17 63.25 98.78 64.01 0.12 33.63 230 1.813 ×
+
+Wan2.1-14B-T2V 87.41 97.52 99.46 97.70 61.27 99.08 69.43 1.00 374.56 1982 1.000 ×
+
+SVG1 86.45 97.09 98.49 97.12 58.95 99.26 67.80 0.30 183.13 1239 1.600 ×
+
+SVG2 86.52 97.24 98.29 97.07 59.06 99.18 68.29 0.32 188.58 1261 1.572 ×
+
+Radial 86.83 97.55 98.16 97.49 60.83 99.28 67.66 0.36 261.99 1297 1.528 ×
+
+TRA 87.39 97.43 99.10 97.61 60.24 99.27 71.86 0.15 141.93 1131 1.752 ×
+
+Wan2.2-14B-T2V 88.63 97.29 99.22 97.39 67.22 98.94 71.75 1.00 374.56 1608 1.000 ×
+
+SVG1 87.63 96.16 97.16 96.67 65.13 98.83 71.84 0.30 183.02 1049 1.533 ×
+
+SVG2 86.93 96.22 96.83 96.45 62.17 98.41 71.51 0.34 192.91 1061 1.516 ×
+
+Radial 87.29 95.78 97.01 96.22 64.76 98.48 71.47 0.36 261.99 1164 1.381 ×
+
+TRA 87.91 96.18 99.05 96.46 65.27 99.55 71.96 0.15 142.99 1020 1.576 ×
+
+HunyuanVideo-13B-T2V 86.52 97.67 99.43 97.76 57.28 99.45 67.56 1.00 416.22 1783 1.000 ×
+
+SVG1 85.55 96.47 98.43 96.51 55.56 99.27 67.04 0.27 193.55 897 1.988 ×
+
+SVG2 85.57 96.78 98.65 96.49 55.31 99.31 66.90 0.26 187.68 909 1.961 ×
+
+Radial 85.87 97.04 99.03 96.72 56.74 99.35 66.33 0.28 183.41 916 1.947 ×
+
+TRA 85.95 97.10 99.60 96.58 56.36 99.38 67.05 0.09 136.30 870 2.049 ×
+
+Wan2.1-14B-I2V 86.56 94.48 97.24 95.37 61.86 98.91 71.52 1.00 374.56 1658 1.000 ×
+
+SVG1 85.97 94.42 96.68 94.51 61.02 98.28 70.93 0.30 183.13 1047 1.584 ×
+
+SVG2 86.36 95.72 96.98 94.93 61.45 98.33 70.76 0.29 179.71 998 1.661 ×
+
+Radial 86.30 94.52 96.95 95.36 61.62 98.44 70.91 0.36 261.99 1046 1.585 ×
+
+TRA 86.41 95.55 97.15 95.42 61.59 98.74 71.09 0.19 151.96 971 1.708 ×
+
+Wan2.2-14B-I2V 88.60 97.55 97.54 97.24 66.23 98.67 74.36 1.00 374.56 1605 1.000 ×
+
+SVG1 87.40 97.17 97.01 97.08 62.05 98.23 72.88 0.30 183.03 1034 1.552 ×
+
+SVG2 87.16 96.79 97.04 96.65 62.36 98.84 71.28 0.28 176.48 1057 1.518 ×
+
+Radial 87.10 95.91 97.48 96.49 63.73 97.80 71.19 0.36 261.99 1157 1.387 ×
+
+TRA 87.87 97.10 97.36 97.11 64.50 98.70 72.45 0.15 143.00 1028 1.561 ×
+
+HunyuanVideo-13B-I2V 87.30 96.55 98.91 96.54 62.06 99.45 70.30 1.00 416.22 1761 1.000 ×
+
+SVG1 85.31 96.51 98.15 95.47 55.57 99.11 67.04 0.27 193.55 887 1.985 ×
+
+SVG2 86.14 95.61 98.28 95.68 59.75 99.06 68.45 0.27 192.07 889 1.981 ×
+
+Radial 86.48 95.30 97.58 95.62 61.66 99.21 69.52 0.28 183.41 912 1.931 ×
+
+TRA 86.63 96.17 98.41 96.01 60.73 99.38 69.41 0.09 136.30 874 2.015 ×
+
+Table 1: Quality and efficiency comparisons of TRA and training-free sparse-attention baselines on T2V and I2V tasks. VBench scores are reported in percentage, FLOPs in P, and latency in seconds. Speedup is measured against the corresponding dense model. Best and second-best sparse results are bolded and underlined, respectively. 
+
+Datasets. For T2V evaluation, we use the prompt-enhanced Penguin benchmark provided by the VBench team (Huang et al. 2024). For I2V evaluation, we use the 16:9 prompt–image pairs from VBench++ (Zheng et al. 2025). 
+
+Evaluation metrics and baselines. Generation quality is evaluated using VBench Overall and six dimensions: Subject Consistency, Temporal Flickering, Background Consistency, Aesthetic Quality, Motion Smoothness, and Imaging Quality. We report attention density, FLOPs, end-to-end latency, and speedup for efficiency evaluation. We measure fidelity to Dense Attention using PSNR, SSIM (Wang et al. 2004), and LPIPS (Zhang et al. 2018). We compare TRA with three training-free sparse attention methods: SVG (Xi et al. 2025), SVG2 (Yang et al. 2026), and Radial (Li et al. 2026). 
+
+Implementation details. All experiments are conducted on an NVIDIA H200 GPU. At the default resolution, Wan2.1-1.3B, Wan2.1-14B, and Wan2.2-14B generate 81 frames, whereas HunyuanVideo-13B generates 129 frames. For TRA, SVG, and SVG2, the first transformer layer remains dense, and dense attention is applied during the first 25% of the denoising process as warm-up. Method-specific sparse attention is used in the remaining layers and denoising steps. TRA uses a temporal decay factor of 0.6 for all Wan models and 0.95 for HunyuanVideo. SVG adopts its calibrated target block density, while SVG2 uses Kq = 300 and Kk = 1000 ;both follow the same layer-wise and denoising-step warm-up protocol as TRA. For Radial Attention, due to constraints imposed by its acceleration strategy, we use a resolution of Dense SVG SVG2 TRA    
+
+> Wan2.1-14B “Cinematic shot of Van Goghs selfie, Van Gogh style……”
+> Dense SVG SVG2 TRA
+> HunyuanVideo “A focus on the tabby cat siCng contently in the center…… ”
+
+Figure 6: Qualitative comparison of various methods on Wan2.1 and HunyuanVideo.                         
+
+> Method PSNR ↑SSIM ↑LPIPS ↓
+> Wan2.1-14B –––SVG 21.2930 0.7980 0.2100 Radial 20.4520 0.7020 0.2700 TRA 23.3772 0.8275 0.1742
+> w/o Budget Mapping 22.2070 0.5648 0.4403 w/o Radius Masking 13.1320 0.2724 0.7011
+
+Table 2: Ablation study on the key components of TRA.                
+
+> Operation / Time (s) Per Layer Total Speedup
+> Naive Token Radius Mask 15.78 615.30 1.00 ×
+> Flash Radius Mask 1.52 59.46 10.35 ×
+> Naive Attention Entropy 4.77 190.91 1.00 ×
+> Fused Attention Entropy 0.39 15.47 12.34 ×
+
+Table 3: Efficiency evaluation for customized kernels. 
+
+768 × 1280 and generate 69, 77, and 117 frames for Wan2.1, Wan2.2, and HunyuanVideo, respectively. 
+
+4.2 Main Results 
+
+Quantitative Comparison on VBench. We evaluate TRA on seven T2V and I2V configurations in Table 1. TRA achieves the best VBench Overall score among sparse meth-ods in all seven configurations. Notably, it nearly matches dense attention on Wan2.1-14B T2V while achieving a 1.75 ×
+
+speedup, showing a favorable quality–efficiency trade-off. 
+
+Efficiency Analysis. TRA achieves the highest speedup across all configurations, ranging from 1.56 × to 2.05 ×,while TRA retains only 9%–19% of attention interactions. On Hunyuan-13B, it reaches 2.05 × and 2.02 × speedups for T2V and I2V, respectively. TRA also consistently reduces FLOPs compared with SVG and Radial Attention, confirm-ing the effectiveness of token-level adaptive sparsity. 
+
+Qualitative Visualizations of Different Methods. Fig-ure 6 compares TRA with dense attention and existing sparse methods. TRA better preserves subject identity, structural in-tegrity, fine-grained details, and temporal consistency, while reducing artifacts such as distortion, flickering, and motion discontinuity. Its outputs remain visually close to dense at-tention despite substantial acceleration. 
+
+4.3 Ablation Studies 
+
+Impact of Key Components. As shown in Table 2, replacing entropy-guided allocation with a uniform budget degrades generation quality. Replacing the budget-preserving radius with a 1D radial distance causes a more severe degradation, including a PSNR drop of over 10 dB. These results con-firm that the two components jointly enable TRA to allocate computation adaptively while preserving informative tokens. 
+
+Computational Cost Analysis. As shown in Table 3, Flash Radius Mask and Fused Attention Entropy achieve 10 .35 ×
+
+and 12 .34 × speedups over their naive implementations, re-spectively. This demonstrates that the customized kernels substantially reduce the auxiliary cost of TRA, enabling its efficient practical deployment. 
+
+Additional ablations are provided in the Appendix. 
+
+5 Related Work 
+
+Efficient Video Generation. Existing methods accelerate video diffusion by caching computation across denoising steps (Liu et al. 2025a,b; Ma et al. 2026), reducing sam-pling steps through distillation (Salimans and Ho 2022; Yin et al. 2024), or lowering per-evaluation cost through quanti-zation (Shang et al. 2023; He et al. 2023; Feng et al. 2025), and parallelism. These techniques optimize repeated evalua-tions or numerical cost, whereas TRA reduces the quadratic query–key interactions within executed attention layers and is therefore complementary. 
+
+Sparse Attention for Video Generation. Training-free sparse attention methods for video DiTs can be categorized by their allocation granularity. Head-level methods, includ-ing SVG (Xi et al. 2025), Radial Attention (Li et al. 2026), and Sparse-vDiT (Chen et al. 2026b), assign structured spa-tial or temporal patterns to entire heads. Block-level meth-ods, such as SpargeAttn (Zhang et al. 2025), SVG2 (Yang et al. 2026), and SVOO (Luo et al. 2026), select important query–key block pairs. Both paradigms typically share one sparse allocation across queries, overlooking query-specific attention demand. TRA instead maps each query’s entropy to its own token budget and spatiotemporal radius, combining token-level allocation with regular block-sparse execution. 
+
+6 Conclusion 
+
+We presented Token Radius Attention (TRA), a training-free framework that maps attention entropy to query-specific to-ken budgets and temporally decayed radii. Across seven 720P T2V and I2V settings, TRA retains only 9% –19% attention density, achieves 1.56 ×–2.05 × speedup, and delivers the competitive VBench score in seven settings. References 
+
+Brooks, T.; Peebles, B.; Holmes, C.; DePue, W.; Guo, Y.; Jing, L.; Schnurr, D.; Taylor, J.; Luhman, T.; Luhman, E.; et al. 2024. Video generation models as world simulators. 
+
+OpenAI Blog , 1(8): 1. Chen, J.; Zhang, H.; Li, M.; Li, M.; Zheng, Z.; Liu, X.; Luo, G.; and Chen, X. 2026a. EcoVideo: Entropy-Orchestrated Video Generation Paradigm in Cloud-Edge Dy-namics. ECCV .Chen, P.; Zeng, X.; Zhao, M.; Shen, M.; Cheng, W.; Yu, G.; and Chen, T. 2026b. Sparse-vdit: Unleashing the power of sparse attention to accelerate video diffusion transformers. In AAAI , volume 40, 2957–2965. Feng, W.; Qin, H.; Yang, C.; Li, X.; Yang, H.; Li, Y.; An, Z.; Huang, L.; Magno, M.; and Xu, Y. 2025. S2Q-VDiT: Accurate Quantized Video Diffusion Transformer with Salient Data and Sparse Token Distillation. arXiv preprint arXiv:2508.04016 .He, Y.; Liu, L.; Liu, J.; Wu, W.; Zhou, H.; and Zhuang, B. 2023. Ptqd: Accurate post-training quantization for diffusion models. NeurIPS , 36: 13237–13249. Huang, Z.; He, Y.; Yu, J.; Zhang, F.; Si, C.; Jiang, Y.; Zhang, Y.; Wu, T.; Jin, Q.; Chanpaisit, N.; et al. 2024. Vbench: Com-prehensive benchmark suite for video generative models. In 
+
+CVPR , 21807–21818. Kong, W.; Tian, Q.; Zhang, Z.; Min, R.; Dai, Z.; Zhou, J.; Xiong, J.; Li, X.; Wu, B.; Zhang, J.; et al. 2024. Hunyuan-video: A systematic framework for large video generative models. arXiv preprint arXiv:2412.03603 .Li, X.; Li, M.; Cai, T.; Xi, H.; Yang, S.; Lin, Y.; Zhang, L.; Yang, S.; Hu, J.; Peng, K.; et al. 2026. Radial Attention: 
+
+O(nlogn ) Sparse Attention with Energy Decay for Long Video Generation. NeurIPS , 38: 16822–16852. Liu, F.; Zhang, S.; Wang, X.; Wei, Y.; Qiu, H.; Zhao, Y.; Zhang, Y.; Ye, Q.; and Wan, F. 2025a. Timestep Embedding Tells: It’s Time to Cache for Video Diffusion Model. In 
+
+CVPR , 7353–7363. Liu, J.; Zou, C.; Lyu, Y.; Chen, J.; and Zhang, L. 2025b. From reusing to forecasting: Accelerating diffusion models with taylorseers. In ICCV , 15853–15863. Luo, J.; Chen, J.; Wang, J.; Wang, C.; Zhu, H.; Sun, Q.; Gao, C.; Chen, Z.; and Li, J. 2026. Attention Sparsity is Input-Stable: Training-Free Sparse Attention for Video Generation via Offline Sparsity Profiling and Online QK Co-Clustering. 
+
+ICML .Ma, Z.; Wei, L.; Wang, F.; Zhang, S.; and Tian, Q. 2026. Mag-cache: Fast video generation with magnitude-aware cache. 
+
+NeurIPS , 38: 34348–34380. Peebles, W.; and Xie, S. 2023. Scalable diffusion models with transformers. In ICCV , 4195–4205. Salimans, T.; and Ho, J. 2022. Progressive distillation for fast sampling of diffusion models. arXiv preprint arXiv:2202.00512 .Seedance, T.; Chen, D.; Chen, L.; Chen, X.; Chen, Y.; Chen, Z.; Chen, Z.; Cheng, F.; Cheng, T.; Cheng, Y.; et al. 2026. Seedance 2.0: Advancing video generation for world com-plexity. arXiv preprint arXiv:2604.14148 .Shang, Y.; Yuan, Z.; Xie, B.; Wu, B.; and Yan, Y. 2023. Post-training quantization on diffusion models. In CVPR ,1972–1981. Vaswani, A.; Shazeer, N.; Parmar, N.; Uszkoreit, J.; Jones, L.; Gomez, A. N.; Kaiser, Ł.; and Polosukhin, I. 2017. Attention is all you need. NeurIPS , 30. Wan, T.; Wang, A.; Ai, B.; Wen, B.; Mao, C.; Xie, C.-W.; Chen, D.; Yu, F.; Zhao, H.; Yang, J.; et al. 2025. Wan: Open and advanced large-scale video generative models. arXiv preprint arXiv:2503.20314 .Wang, Z.; Bovik, A. C.; Sheikh, H. R.; and Simoncelli, E. P. 2004. Image quality assessment: from error visibility to structural similarity. IEEE transactions on image processing ,13(4): 600–612. Xi, H.; Yang, S.; Zhao, Y.; Xu, C.; Li, M.; Li, X.; Lin, Y.; Cai, H.; Zhang, J.; Li, D.; et al. 2025. Sparse videogen: Ac-celerating video diffusion transformers with spatial-temporal sparsity. ICML .Yang, S.; Xi, H.; Zhao, Y.; Li, M.; Zhang, J.; Cai, H.; Lin, Y.; Li, X.; Xu, C.; Peng, K.; et al. 2026. Sparse videogen2: Ac-celerate video generation with sparse attention via semantic-aware permutation. NeurIPS , 38: 96965–96991. Yang, Z.; Teng, J.; Zheng, W.; Ding, M.; Huang, S.; Xu, J.; Yang, Y.; Hong, W.; Zhang, X.; Feng, G.; et al. 2024. Cogvideox: Text-to-video diffusion models with an expert transformer. arXiv preprint arXiv:2408.06072 .Ye, Z.; Chen, L.; Lai, R.; Lin, W.; Zhang, Y.; Wang, S.; Chen, T.; Kasikci, B.; Grover, V.; Krishnamurthy, A.; and Ceze, L. 2025. FlashInfer: Efficient and Customizable At-tention Engine for LLM Inference Serving. arXiv preprint arXiv:2501.01005 .Yin, T.; Gharbi, M.; Zhang, R.; Shechtman, E.; Durand, F.; Freeman, W. T.; and Park, T. 2024. One-step diffusion with distribution matching distillation. In Proceedings of the IEEE/CVF conference on computer vision and pattern recognition , 6613–6623. Zhang, J.; Xiang, C.; Huang, H.; Wei, J.; Xi, H.; Zhu, J.; and Chen, J. 2025. Spargeattention: Accurate and training-free sparse attention accelerating any model inference. ICML .Zhang, P.; Chen, Y.; Huang, H.; Lin, W.; Liu, Z.; Stoica, I.; Xing, E.; and Zhang, H. 2026. Faster video diffusion with trainable sparse attention. NeurIPS , 38: 152509–152534. Zhang, R.; Isola, P.; Efros, A. A.; Shechtman, E.; and Wang, O. 2018. The unreasonable effectiveness of deep features as a perceptual metric. In CVPR , 586–595. Zheng, D.; Huang, Z.; Liu, H.; Zou, K.; He, Y.; Zhang, F.; Gu, L.; Zhang, Y.; He, J.; Zheng, W.-S.; et al. 2025. Vbench-2.0: Advancing video generation benchmark suite for intrinsic faithfulness. arXiv preprint arXiv:2503.21755 .A Supplementary Analyses 
+
+A.1 Cross-Model Validation on HunyuanVideo 
+
+Analysis setup. TRA is motivated by two empirical prop-erties of video self-attention: query-specific retained density is strongly correlated with attention entropy, and dominant query–key interactions follow a query-centered Token Ra-dius Attention pattern. To verify that these properties are not specific to the Wan architecture, we repeat the analyses on HunyuanVideo-13B (Kong et al. 2024). 
+
+Entropy–budget relation. For each query, we compute its attention entropy Hi and oracle retained density Bτi , defined as the minimum fraction of top-ranked keys required to pre-serve the target attention mass τ . Figure 7 presents represen-tative fitting results across different denoising steps, trans-former layers, and attention heads. Across all sampled con-figurations, the logarithm of the retained density remains ap-proximately linear in attention entropy, with R2 values rang-ing from 0.978 to 0.993 . The fitted slopes also remain con-sistent across the denoising trajectory. These results demon-strate that entropy provides a stable query-specific budget signal across both network components and denoising stages on HunyuanVideo. 
+
+Token Radius Attention pattern. Figure 8(a) aggregates normalized attention probabilities according to the two-dimensional spatial distance between query and key to-kens. Within the fitted range 10 ≤ ds ≤ 75 , the loga-rithm of the normalized attention probability follows log y =
+
+−0.067 ds + 6 .081 , with R2 = 0 .994 . The corresponding attention heatmaps in Figure 8(b) further show that domi-nant interactions form query-centered spatial neighborhoods whose extent varies across queries. Together, these results show that both token-specific attention sparsity and the To-ken Radius Attention pattern generalize beyond Wan-based models. 
+
+A.2 Distributional Analysis of the Entropy-to-Budget Mapping 
+
+Effective-support approximation. The entropy-to-budget mapping used in the main paper is derived from an entropy-equivalent uniform-support approximation . Importantly, this approximation does not assume that the original attention probabilities are uniformly distributed. Instead, it replaces each query distribution with a surrogate that uniformly dis-tributes its probability mass over exp( H) effective keys while preserving the same entropy. For a target attention mass τ ,this gives the parameter-free mapping 
+
+bBτ
+
+> Uni
+
+(H) = τ exp( H)
+
+N . (16) Although idealized, this approximation provides a simple monotonic relation between query entropy and computation demand. We next examine whether this relation remains valid under more realistic parametric models of attention distribu-tions and quantify the approximation error introduced by the uniform-support surrogate. 
+
+General distributional formulation. Let X1, . . . , X N be positive unnormalized attention weights drawn from a para-metric distribution Fθ , and define 
+
+pj = Xj
+
+PNℓ=1 Xℓ
+
+. (17) Let μθ = Eθ [X]. For sufficiently large N , the entropy of the normalized attention distribution can be approximated by 
+
+H(θ) = log N + log μθ − Eθ [X log X]
+
+μθ
+
+. (18) For a retained key fraction q, let xq = F −1 
+
+> θ
+
+(1 − q). The expected attention mass retained by the largest qN weights is 
+
+Lθ (q) = Eθ [X1{X ≥ xq }]
+
+μθ
+
+. (19) The corresponding retained density required to preserve tar-get attention mass τ is 
+
+Bτ 
+
+> θ
+
+= inf {q : Lθ (q) ≥ τ } . (20) Therefore, an entropy-to-budget mapping can be obtained by identifying the distribution parameters from entropy and substituting them into Equation (20). 
+
+Parametric models of attention distributions. We fit 
+
+44 ,400 query-wise attention distributions collected from Wan2.2-14B T2V under the 40 -step denoising setting. The observed attention distributions can be approximated by several positive parametric families, including Lognormal, Gamma, Weibull, Burr XII, and Johnson SU. However, the best-fitting family varies across queries and entropy ranges, rather than remaining fixed globally. For one-shape scale families such as Lognormal, Gamma, and Weibull, normalization eliminates the scale parameter and leaves one effective shape parameter. This parameter can be identified from entropy through either a closed-form expression or one-dimensional numerical inversion, yield-ing an entropy-only budget mapping. More flexible families such as Burr XII and Johnson SU retain multiple scale-free shape parameters. For these families, entropy provides one constraint, while the remaining degrees of freedom must be estimated from offline distribution statistics. 
+
+Entropy-identified Lognormal mapping. Consider X ∼
+
+Lognormal( μ, σ 2). Its relevant moments satisfy 
+
+E[X] = exp 
+
+
+
+μ + σ2
+
+2
+
+
+
+, E[X log X]
+
+E[X] = μ + σ2.
+
+(21) Substituting them into Equation (18) gives 
+
+H = log N − σ2
+
+2 . (22) The scale parameter μ disappears after normalization, and the remaining parameter is uniquely determined by entropy: 
+
+σ(H) = p2(log N − H ). (23) Let ¯Φ( z) = 1 − Φ( z). The expected mass retained by the largest fraction q of Lognormal samples is 
+
+LLN (q) = ¯Φ  Φ−1(1 − q) − σ . (24) 8.5 9.0 9.5 10.0 10.5 11.0 10 −1                                            
+
+> Top-k ratio
+> log(y) = 0.77x -9.01 R²(log) = 0.989 (e) Step 5 / Layer 0 / Head 5 8.5 9.0 9.5 10.0 10.5 11.0 10 −1
+> log(y) = 0.80x -9.26 R²(log) = 0.988 (f) Step 10 / Layer 0 / Head 5 8.0 8.5 9.0 9.5 10.0 10.5 11.0 Attention Entropy 10 −1
+> Top-k ratio
+> log(y) = 0.81x -9.40 R²(log) = 0.987 (g) Step 15 / Layer 0 / Head 5 8.0 8.5 9.0 9.5 10.0 10.5 11.0 Attention Entropy 10 −1
+> log(y) = 0.83x -9.55 R²(log) = 0.986 (h) Step 20 / Layer 0 / Head 5 9.0 9.5 10.0 10.5 11.0 11.5 Top-k ratio
+> log(y) = 0.72x -8.46 R²(log) = 0.993 (a) Step 0 / Layer 0 / Head 5 6.0 6.5 7.0 7.5 8.0 8.5 9.0 9.5 10 −1
+> log(y) = 0.80x -9.31 R²(log) = 0.990 (b) Step 45 / Layer 0 / Head 3 7.5 8.0 8.5 9.0 9.5 10.0 10.5 11.0 Attention Entropy 10 −1
+> Top-k ratio
+> log(y) = 0.80x -9.40 R²(log) = 0.981 (c) Step 0 / Layer 30 / Head 0 345678910 Attention Entropy 10 −3
+> 10 −2
+> 10 −1
+> log(y) = 0.85x -9.79 R²(log) = 0.978 (d) Step 45 / Layer 39 / Head 8
+
+Figure 7: Query-wise entropy–retained-density relation on HunyuanVideo-13B across different denoising steps, transformer layers, and attention heads. Each plot shows attention entropy against oracle retained density on a logarithmic vertical scale. Across all sampled configurations, the logarithm of retained density remains approximately linear in attention entropy, with 
+
+R2 = 0 .978 –0.993 . The consistently strong fits confirm that attention entropy provides a stable query-specific budget signal across model depths, attention heads, and denoising stages. 0 20 40 60 80 Spatial Distance 10 −2 
+
+10 0
+
+10 2
+
+10 4
+
+> Normalized Attention Score
+
+log(y) = -0.067x +6.081 R²(log) = 0.994 
+
+fit range: 10 <= d <= 75 
+
+(a) Spatial-distance decay (a) Step 45 | Layer 10 | Head 20 | Query 91 (b) Step 40 | Layer 10 | Head 20 | Query 14    
+
+> (c) Step 45 | Layer 39 | Head 22 | Query 98 (d) Step 35 | Layer 10 | Head 20 | Query 6
+> (e) Step 35 | Layer 10 | Head 20 | Query 78 (f) Step 45 | Layer 10 | Head 20 | Query 94
+
+(b) Query-wise attention heatmaps 
+
+Figure 8: Token Radius Attention pattern on HunyuanVideo-13B. (a) The normalized attention probability decays approximately exponentially with two-dimensional spatial distance, achieving R2 = 0 .994 in log space over the fitted interval. (b) Representative query-wise heatmaps exhibit localized, query-centered supports with token-dependent spatial extents. These observations validate the query-centered spatial prior underlying Token Radius Attention beyond Wan-based models. 
+
+Mapping Parameter source MAE ↓ Median AE ↓ P90 AE ↓ Mean error 
+
+Uniform Entropy only; closed form 0.0460 0.0282 0.1125 -0.0415 Lognormal Entropy only; analytic 0.0299 0.0205 0.0683 +0.0164 Gamma Entropy only; analytic 0.0420 0.0270 0.1024 -0.0406 Weibull Entropy only; analytic 0.0320 0.0196 0.0787 -0.0243 Entropy-bin Oracle † Best mapping per entropy bin 0.0246 0.0122 0.0651 -0.0064 Per-query Oracle ‡ Best mapping per query 0.0127 0.0065 0.0296 -0.0061 Conditional Johnson SU § Entropy + offline statistics 0.0881 0.0277 0.2303 +0.0261 
+
+Table 4: Budget-prediction errors at τ = 0 .9. Mean error is defined as E[ bB0.90 − B0.90 ], where positive values indicate over-estimation. † and ‡ are oracle references among the four entropy-only mappings and are not available during inference. §
+
+Conditional Johnson SU uses fitted offline statistics and is evaluated on all 44,400 queries as a post-hoc reference. Solving LLN (q) = τ yields 
+
+Bτ
+
+LN (H) = ¯Φ
+
+p 2(log N − H ) − Φ−1(τ )
+
+
+
+. (25) Thus, the Lognormal assumption also produces an analytic entropy-to-budget mapping without requiring a learned bud-get predictor. Gamma and Weibull similarly yield entropy-only mappings through one-dimensional parameter inver-sion. 0 2 4 6 8           
+
+> Attention entropy H(nats)
+> 0.0 0.2 0.4 0.6 0.8
+> Minimum support ratio  B0.90
+> (a)
+> Real queries Empirical 10--90% Empirical 25--75% Empirical median Uniform Lognormal Gamma Weibull Conditional Johnson SU §
+> 3456789
+> Entropy-bin median H
+> 0.00 0.02 0.04 0.06 0.08
+> Median absolute error of  B0.90
+> (b)
+> Uniform Lognormal Gamma Weibull Entropy-bin oracle †
+> Per-query oracle ‡
+> Conditional Johnson SU §
+
+Figure 9: Distributional validation of the entropy-to-budget mapping at τ = 0 .9. (a) Oracle retained densities from real attention queries, empirical conditional intervals, and mappings derived under different distributional assumptions. Uniform, Lognormal, Gamma, and Weibull recover a consistent monotonic relation between entropy and the required retained density. Conditional Johnson SU uses offline statistics fitted on the complete query set. (b) Median absolute budget-prediction error within each entropy bin. The entropy-bin and per-query oracles select the best entropy-only mapping using ground-truth budgets and are included only as reference lower bounds. 
+
+Empirical comparison. Figure 9(a) shows that oracle re-tained density increases monotonically with attention en-tropy (Spearman ρ = 0 .9884 ). Uniform-support, Lognor-mal, Gamma, and Weibull models recover the same domi-nant trend despite different tail assumptions, confirming that entropy is the primary signal for query-specific attention de-mand. Table 4 shows that the uniform-support approxima-tion has an MAE of 0.0460 , only 0.0161 higher than the best individual entropy-only mapping. More flexible oracle or conditional models either require ground-truth budgets or offline fitted statistics and are not available in TRA’s inference pipeline. We therefore retain the uniform-support mapping because it is closed form, parameter free, and consistent with the empirical entropy–budget relation. 
+
+A.3 Cross-Step Stability of Attention Entropy 
+
+Entropy stability across denoising steps. TRA estimates query-wise attention entropy during the dense warm-up stage and reuses the resulting token budgets and radius maps in subsequent sparse denoising steps, following prior observa-tions of cross-step entropy stability (Chen et al. 2026a). To validate this design, for each transformer block and atten-tion head, we flatten the entropy values of all queries at each denoising step into an entropy vector and compute pairwise cosine similarities between different steps. As shown in Figure 10, the query-wise entropy patterns remain highly consistent across denoising steps for represen-tative network depths and attention heads. The cosine simi-larities are consistently close to 1, and even the least similar step pair achieves a similarity of 0.945 . These results indicate that, although the absolute entropy values may evolve during denoising, their relative distribution across queries remains largely stable. Since TRA adopts a monotonic entropy-to-budget mapping, this stability supports reusing the token budgets and attention radii estimated during dense warm-up. 
+
+B Supplementary Experiments 
+
+B.1 Hyperparameter Sensitivity 
+
+Experimental settings. We conduct all hyperparameter ablations on Wan2.2-14B for T2V generation with 40 de-noising steps at 720 × 1280 resolution. Unless otherwise specified, TRA uses 10 dense warm-up steps, one prefix dense transformer layer, a block size of 90 , and no peri-odic entropy refresh. PSNR, SSIM, and LPIPS are measured against the corresponding Dense Attention outputs. 
+
+Hyperparameter sensitivity. As shown in Table 5, in-creasing the dense warm-up length consistently improves reconstruction fidelity at the cost of moderately increased runtime. In particular, increasing the warm-up length from 
+
+10 to 20 steps improves PSNR from 23 .452 to 29 .214 , while increasing runtime from 1015 s to 1234 s. Increasing the number of dense layers or distributing them uniformly across the network provides no consistent quality improvement, sup-porting the use of a single prefix dense layer. Increasing the block size generally reduces runtime, whereas an excessively large block size of 120 noticeably degrades reconstruction fidelity. A block size of 90 therefore provides a favorable quality–efficiency trade-off. Together with the cross-step stability in Section A.3, these results sup-port reusing the entropy estimated during dense warm-up without periodic refresh. Figure 10: Cross-step stability of query-wise attention entropy. Each matrix reports the pairwise cosine similarity between entropy vectors at different denoising steps for a representative transformer block and attention head. The similarities remain close to 1, with a minimum value of 0.945 .
+
+Setting Time PSNR SSIM LPIPS 
+
+Dense Warm-up Steps 
+
+10 1015 23.4520 0.8020 0.1615 11 1043 24.2380 0.8163 0.1504 12 1075 24.8880 0.8287 0.1346 13 1104 25.7220 0.8411 0.1214 14 1105 26.5170 0.8562 0.1053 15 1128 27.2420 0.8674 0.0958 16 1146 27.5740 0.8714 0.0927 17 1167 27.7680 0.8749 0.0896 18 1195 28.3360 0.8831 0.0814 19 1228 28.8090 0.8895 0.0763 20 1234 29.2140 0.8946 0.0716 
+
+Entropy and Mask Refresh 
+
+Never 1018 21.6030 0.7589 0.2035 Every 10 Steps 1112 21.6030 0.7589 0.2035 Every 5 Steps 1198 21.6030 0.7589 0.2035 Every 2 Steps 1481 21.6030 0.7589 0.2035 
+
+Setting Time PSNR SSIM LPIPS 
+
+Number and Placement of Dense Layers 
+
+1, Prefix 1036 23.4520 0.8020 0.1615 1, Uniform 1016 23.4520 0.8020 0.1615 2, Prefix 1030 23.5820 0.8053 0.1490 2, Uniform 1036 23.4690 0.8001 0.1622 3, Prefix 1067 23.2840 0.8044 0.1488 3, Uniform 1043 23.3890 0.7962 0.1658 4, Prefix 1057 23.2200 0.8033 0.1534 4, Uniform 1060 23.4270 0.7993 0.1626 
+
+Block Size 
+
+40 1295 23.3930 0.7957 0.1690 48 1211 23.3710 0.7923 0.1734 72 1068 23.6530 0.7957 0.1686 
+
+90 1019 23.4520 0.8020 0.1615 120 952 22.2880 0.7742 0.1767 
+
+Table 5: Additional hyperparameter ablations on Wan2.2-14B T2V with 40 denoising steps at 720 × 1280 resolution. Time is reported in seconds. Unless otherwise specified, TRA uses 10 dense warm-up steps, one prefix dense layer, block size 90 , and no periodic entropy refresh. Reconstruction metrics are measured against Dense Attention outputs. 
+
+B.2 Additional Qualitative Results 
+
+Figure 11 presents additional frame-level visualizations gen-erated with TRA. Each row contains temporally ordered frames sampled from one video. TRA preserves subject ap-pearance, scene structure, fine-grained details, and temporal consistency while using query-specific sparse attention. Wan 2.1 
+
+> A red fox resting quietly in a snowy pine for...
+> Dense
+> t=0 t=20 t=40 t=60
+> TRA
+> t=80
+> A moss-covered waterfall in a shaded green fo...
+> Dense
+> t=0 t=20 t=40 t=60
+> TRA
+> t=80
+
+HunyuanVideo   
+
+> A giant panda sitting peacefully among bamboo...
+> Dense TRA
+> A sea turtle gliding slowly above a quiet cor...
+> Dense TRA
+
+Wan 2.2   
+
+> A small owl perched motionless on an old oak...
+> Dense TRA
+> A tranquil alpine lake reflecting snow-covere...
+> Dense TRA
+
+Figure 11: Additional qualitative results generated with TRA. Each row shows temporally ordered frames sampled from one video. TRA preserves coherent appearance, scene structure, and motion throughout the generated sequence. 
+
+C Implementation Details 
+
+Let F be the number of latent video frames, P = HW the number of spatial tokens per frame, and N = F P the number of video tokens. Let S denote the total sequence length, including optional text tokens. The sequence is partitioned into 
+
+B =
+
+ Sb
+
+
+
+blocks of b tokens. The mask-construction kernel outputs a Boolean block mask, where an entry of one denotes a retained query–key block pair. We use Ha to denote the number of attention heads. 
+
+C.1 Flash Radius Mask Construction 
+
+Entropy-to-budget-to-radius lookup. For attention head 
+
+h and query token q, the fused entropy kernel produces the query-wise attention entropy Hh,q . Following the main method, TRA first estimates the target key count and then ob-tains the smallest boundary-aware base radius whose discrete support reaches that count: 
+
+bKτh,q = ⌈τ exp( Hh,q )⌉ , rh,q = L
+
+
+
+fq , x q , y q , bKτh,q 
+
+
+
+,
+
+(26) where τ is the target attention mass and L implements the boundary-aware radius selection defined by the discrete sup-port count in the main method. For fixed latent-grid dimen-sions and temporal decay, the discrete counts are precom-puted; inference therefore requires only the analytic budget evaluation and a lookup, without per-query key ranking or iterative radius search. 
+
+Temporal radius decay. The implementation uses the same exponential temporal decay as the main method (Li et al. 2026), ϕ(δ) = exp( −γδ ). Thus, for a query–key pair 
+
+(q, k ), the spatial threshold is 
+
+ρh,q,k = rh,q ϕ(|fq − fk|). (27) 
+
+Token-pair distance. Let xq = ( xq , y q ) denote the two-dimensional spatial coordinate of token q. Consistent with Insight II and the mask definition in the main paper, the kernel evaluates 
+
+ds(q, k ) = ∥xq − xk∥2 . (28) For the sequence-distance ablation, the spatial term is re-placed by |q − k|. To match the area of a two-dimensional disk using a symmetric one-dimensional interval, the corre-sponding radius is initialized as 
+
+ρ1D = π
+
+2 ρ22D . (29) 
+
+Kernel execution. Before mask construction, each H ×W
+
+frame is partitioned into spatial tiles, and its video tokens are rearranged in tile-major order. Spatially neighboring to-kens therefore become contiguous in the one-dimensional sequence, allowing token-radius supports to be represented by fewer and denser query–key blocks. The same permuta-tion is applied to Q, K, and V , and the attention outputs are restored to the original token order after sparse attention. The CUDA grid assigns one thread block to each (h, u, v )
+
+tuple. A bounding-box test first rejects block pairs that cannot contain any valid token interactions. For the remaining pairs, one thread is assigned to each query lane, while warp ballots and population counts compute the number of valid query tokens for every key column. A single final write produces 
+
+Mh,u,v .The resulting block mask remains head and query specific. For joint text–video attention, blocks containing text keys remain dense, matching the text-key handling defined in the main method. Algorithm 1: CUDA block-mask construction. 
+
+Require: attention entropy H ∈ RHa×N ; target attention mass τ ; boundary-aware radius lookup L; block size b;number of video blocks Bv = ⌈N/b ⌉
+
+Ensure: block mask M ∈ { 0, 1}Ha×B×B 
+
+> 1:
+
+bK ← ⌈ τ exp( H)⌉, R ← L ( bK) ▷ query-specific budgets and radii  
+
+> 2:
+
+for all attention heads h, query blocks u, and key blocks 
+
+v in parallel do  
+
+> 3:
+
+if u ≥ Bv or v ≥ Bv then  
+
+> 4:
+
+Mh,u,v ← 1 
+
+> 5:
+
+continue ▷ text or non-video blocks remain dense  
+
+> 6:
+
+end if  
+
+> 7:
+
+if BoundingBoxReject (h, u, v, R ) then  
+
+> 8:
+
+Mh,u,v ← 0 
+
+> 9:
+
+continue ▷ no token pair can satisfy the radius constraint  
+
+> 10:
+
+end if  
+
+> 11:
+
+for all key columns j = 0 , . . . , b − 1 in parallel do  
+
+> 12:
+
+cj ← 0 
+
+> 13:
+
+for all query lanes i = 0 , . . . , b − 1 in parallel do  
+
+> 14:
+
+q ← ub + i, k ← vb + j 
+
+> 15:
+
+if q < N and k < N then  
+
+> 16:
+
+ρ ← Rh,q ϕ(|fq − fk|) 
+
+> 17:
+
+zi,j ← [ds(q, k ) ≤ ρ] 
+
+> 18:
+
+cj ← cj + zi,j ▷ warp ballot and population count  
+
+> 19:
+
+end if  
+
+> 20:
+
+end for  
+
+> 21:
+
+end for  
+
+> 22:
+
+C ← { j : cj > 0} ▷ nonempty key columns  
+
+> 23:
+
+Chi ← { j : cj > b/ 3} ▷ high-coverage columns  
+
+> 24:
+
+Mh,u,v ← [|C| > 0] ∧ [10 |C hi | > 6|C| ]
+
+▷ retain if > 60% of nonempty columns have high coverage  
+
+> 25:
+
+end for 
+
+C.2 Fused Attention Entropy Kernel 
+
+For query row i, let 
+
+sij = q⊤ 
+
+> i
+
+kj
+
+√d , pij = exp( sij )
+
+P 
+
+> ℓ
+
+exp( siℓ ) . (30) The Shannon entropy in nats can be rewritten as 
+
+Hi = − X
+
+> j
+
+pij log pij = log 
+
+X
+
+> j
+
+esij 
+
+ − X
+
+> j
+
+pij sij .
+
+(31) This identity allows entropy to be accumulated together with the online softmax state without materializing the complete attention matrix. 
+
+Computational cost. The entropy accumulator reuses the same score tiles and online-softmax states as the dense at-tention forward pass. It introduces only scalar per-row ac-cumulators and one entropy writeback, rather than a second Algorithm 2: Fused online softmax and entropy extraction. 
+
+Require: Query tile Q; key/value tiles {(K(r), V (r))}Rr=1 ;softmax scale α = 1 /√d
+
+Ensure: Attention output O; per-query attention entropy H 
+
+> 1:
+
+for all query rows i in the tile in parallel do  
+
+> 2:
+
+m ← −∞ , ℓ ← 0, a ← 0, o ← 0 
+
+> 3:
+
+for r = 1 to R do  
+
+> 4:
+
+s ← αqi(K(r))⊤ 
+
+> 5:
+
+mr ← max j sj 
+
+> 6:
+
+w ← exp( s − mr ) 
+
+> 7:
+
+ℓr ← P 
+
+> j
+
+wj 
+
+> 8:
+
+ar ← P 
+
+> j
+
+wj sj 
+
+> 9:
+
+or ← P 
+
+> j
+
+wj vj 
+
+> 10:
+
+m′ ← max( m, m r ) 
+
+> 11:
+
+u ← exp( m − m′), v ← exp( mr − m′) 
+
+> 12:
+
+ℓ ← uℓ + vℓ r 
+
+> 13:
+
+a ← ua + va r 
+
+> 14:
+
+o ← uo + vor 
+
+> 15:
+
+m ← m′ 
+
+> 16:
+
+end for  
+
+> 17:
+
+Oi ← o/ℓ  
+
+> 18:
+
+Hi ← log ℓ + m − a/ℓ ▷ equivalent to Equation (31)  
+
+> 19:
+
+end for 
+
+attention pass or explicit softmax materialization. Conse-quently, entropy extraction does not change the asymptotic complexity of dense attention and requires only O(HaN )
+
+additional storage. Let Bv be the number of video-token blocks. The worst-case logical complexity of mask construction is 
+
+O HaB2v b2 . (32) In practice, the bounding-box test rejects spatially incompati-ble block pairs before token-level evaluation, while tile-major ordering concentrates valid interactions into a small number of neighboring blocks. The final mask requires O(HaB2)
+
+Boolean storage and is consumed directly by the FlashInfer block-sparse attention backend (Ye et al. 2025). 
+
+D Limitations and Future Work 
+
+Restricted and static sparsity patterns. TRA uses a spa-tiotemporal distance prior to convert query-specific token budgets into structured sparse supports. Although the radius is adapted to the entropy of each query, the resulting support is still constrained to a predefined, distance-based pattern with a fixed temporal-decay rule. Such a pattern may not fully capture content-dependent interactions, including long-range object correspondence, nonlocal motion, or scene-dependent attention structures. Future work could explore online token selection or richer adaptive patterns that jointly account for semantic content, motion, and spatial structure. 
+
+Lack of a dedicated token-level sparse-attention kernel. 
+
+TRA currently executes query-specific token-level sparsity through an existing block-sparse attention backend. Tile-major token reordering and block-mask construction reduce blockification overhead but retain redundant computation within selected blocks. A dedicated kernel that fuses mask construction, token gathering, and sparse attention could fur-ther improve the practical efficiency of TRA.

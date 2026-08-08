@@ -1,0 +1,267 @@
+{
+  "mode": "standard",
+  "generated_at": "2026-08-08T20:16:30.896865+00:00",
+  "stats": {
+    "mode": "standard",
+    "tag_count": 1,
+    "deep_divecandidates": 4,
+    "deep_cap": 6,
+    "deep_selected": 4,
+    "quick_candidates": 2,
+    "quick_skim_target": 11,
+    "quick_selected": 2
+  },
+  "deep_dive": [
+    {
+      "id": "2608.06008v1",
+      "source": "arxiv",
+      "title": "Adaptive-WAM: Quality-Guided Early-Exit Planning from Intermediate Video-Diffusion Features",
+      "abstract": "Large video diffusion models provide rich spatiotemporal priors for autonomous driving, but existing world-action models often inherit the cost of iterative future-video generation even though deployment only requires an ego trajectory. We ask a more basic question: how much of a video diffusion model must be executed to make a reliable driving decision? Through a controlled study of video denoising timesteps and Diffusion Transformer (DiT) depth, we find that planning performance is largely insensitive to the tested video-noise levels, whereas strong trajectories can already be decoded from intermediate layers. Based on this observation, we introduce Adaptive-WAM, a quality-aware multi-exit planner built on a Wan2.2-5B backbone. Trajectory diffusion heads are attached to selected DiT blocks, and a lightweight trajectory-quality scorer terminates inference once the best trajectory decoded so far satisfies a quality threshold; otherwise, computation continues from the cached hidden state to a deeper exit. The deployed planner therefore avoids the iterative classifier-free denoising loop and VAE decoding required for future-video synthesis, while dynamically allocating backbone depth according to trajectory quality. On NAVSIM, the adaptive single-trajectory planner achieves 90.8 PDMS; a separate fixed-exit variant reaches 92.6 PDMS with 64 proposals. It further obtains 89.9 EPDMS on NAVSIM v2, yielding the best reported results among the compared front-view video world-model planners. Without target-domain fine-tuning, Adaptive-WAM transfers to nuScenes with 0.88 m average L2 error and a 0.08\\% collision rate. On an A100, adaptive routing improves PDMS from 90.62 to 90.79 while averaging 170 ms end-to-end planning latency, approximately 10\\% below the 190 ms fixed block-15 planner and 47\\% below the 320 ms fixed full-depth planner. Code will be released.",
+      "authors": [
+        "Sining Ang",
+        "Yuguang Yang",
+        "Yan Wang"
+      ],
+      "primary_category": "cs.RO",
+      "categories": [
+        "cs.RO"
+      ],
+      "published": "2026-08-06T13:13:07+00:00",
+      "link": "https://arxiv.org/pdf/2608.06008v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 10.0,
+      "llm_evidence_en": "World-Action Model with quality-guided early-exit planning from video diffusion features",
+      "llm_evidence_cn": "基于视频扩散中间特征进行质量引导早退规划的世界行动模型",
+      "llm_evidence": "基于视频扩散中间特征进行质量引导早退规划的世界行动模型",
+      "canonical_evidence": "基于视频扩散中间特征进行质量引导早退规划的世界行动模型",
+      "llm_tldr_en": "Adaptive-WAM is a quality-guided multi-exit planner built on a Wan2.2-5B backbone, showing that reliable driving decisions can be decoded from intermediate video-diffusion layers, greatly reducing inference cost.",
+      "llm_tldr_cn": "视频扩散模型为自动驾驶提供时空先验，但世界行动模型常承受迭代未来视频生成的高成本，而部署只需求自车轨迹。该论文通过控制去噪时间步和DiT深度发现：规划性能对视频噪声水平不敏感，轨迹可从中间层解码。据此提出基于Wan2.2-5B骨干的质量感知多出口规划器，在保持可靠驾驶决策的同时显著减少计算开销。",
+      "llm_tldr": "视频扩散模型为自动驾驶提供时空先验，但世界行动模型常承受迭代未来视频生成的高成本，而部署只需求自车轨迹。该论文通过控制去噪时间步和DiT深度发现：规划性能对视频噪声水平不敏感，轨迹可从中间层解码。据此提出基于Wan2.2-5B骨干的质量感知多出口规划器，在保持可靠驾驶决策的同时显著减少计算开销。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "world action model",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2608.04404v1",
+      "source": "arxiv",
+      "title": "Faster-WAM: Efficient Inference-Time Future Conditioning for Robust World Action Models",
+      "abstract": "World Action Models (WAMs) improve robot manipulation by learning how the environment evolves beyond the current observation. However, existing approaches face a fundamental dilemma: Joint-WAMs preserve future-aware representations during inference but incur prohibitive computation costs, while efficient alternatives remove future modeling at inference time and may lose the robustness benefits of temporal reasoning. In this work, we revisit the role of future representations in WAMs and show that inference-time future conditioning is critical for generalization under distribution shifts. This observation motivates Faster-WAM, an efficient future-conditioning WAM that preserves future representations while avoiding expensive video-action interaction. Faster-WAM introduces a sparse future-conditioning framework that computes future representations once and selectively reuses them throughout action denoising. Specifically, we propose SparseMoT to replace ubiquitous layer-wise fusion with selective video-action interaction at a compact subset of network stages, and Interval KV-Fusion to aggregate multi-depth future representations without increasing attention complexity. Experiments demonstrate that Faster-WAM achieves a substantially better performance-efficiency trade-off than existing WAMs. On the out-of-distribution LIBERO-Plus benchmark, Faster-WAM improves success rate from 49.14% to 73.57% compared with Fast-WAM, while running 2.21$\\times$ faster than Joint-WAM. It further achieves state-of-the-art performance on LIBERO and RoboTwin 2.0, while demonstrating strong robustness in real-world manipulation.",
+      "authors": [
+        "Weiheng Zhao",
+        "Haoyi Jiang",
+        "Xin Shi",
+        "Liu Liu",
+        "Fan Huang",
+        "Zhizhong Su",
+        "Wei Sui",
+        "Xinggang Wang"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV"
+      ],
+      "published": "2026-08-05T03:18:58+00:00",
+      "link": "https://arxiv.org/pdf/2608.04404v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 9.0,
+      "llm_evidence_en": "Efficient inference-time future conditioning for robust World Action Models",
+      "llm_evidence_cn": "面向鲁棒世界动作模型的高效推理时未来条件化",
+      "llm_evidence": "面向鲁棒世界动作模型的高效推理时未来条件化",
+      "canonical_evidence": "面向鲁棒世界动作模型的高效推理时未来条件化",
+      "llm_tldr_en": "Faster-WAM shows that inference-time future conditioning is critical for WAM generalization under distribution shifts and introduces an efficient architecture that keeps future-aware representations while avoiding costly video-action processing.",
+      "llm_tldr_cn": "现有世界动作模型面临两难：联合模型推理开销大而高效变体损失未来建模。作者重新审视未来表示的作用，证明推理时未来条件化对分布偏移下的泛化至关重要，并提出Faster-WAM，在保留未来感知表示的同时避免昂贵的视频-动作联合计算。实验显示该方法在机器人操作任务上兼顾效率与鲁棒性。",
+      "llm_tldr": "现有世界动作模型面临两难：联合模型推理开销大而高效变体损失未来建模。作者重新审视未来表示的作用，证明推理时未来条件化对分布偏移下的泛化至关重要，并提出Faster-WAM，在保留未来感知表示的同时避免昂贵的视频-动作联合计算。实验显示该方法在机器人操作任务上兼顾效率与鲁棒性。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "world action model",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2608.05720v1",
+      "source": "arxiv",
+      "title": "PhyLatent: Learning Dynamics-Relevant Representations for JEPA World Models",
+      "abstract": "We propose PhyLatent, a dynamics-relevant training objective for JointEmbedding Predictive Architecture (JEPA) world models. Our key observation is that preventing global latent collapse does not ensure that a representation preserves physical states and action consequences. We identify three failure modes in JEPA world models: physical invariance collapse, physical identifiability collapse, and counterfactual dynamics collapse. PhyLatent addresses them through three training pathways: physical invariance, physical identifiability, and counterfactual dynamics, implemented with physical state grounding, future representation alignment, static visual invariance, counterfactual branch separation, and latent denoising. On OGBench-Cube, PhyLatent reduces the three failure rates from 15.60%, 6.71%, and 8.41% to 7.53%, 0.95%, and 4.62%, respectively, and improves model predictive control (MPC) success from 70.0% to 78.1%. With the same architecture and planner, it further improves success from 81.0% to 98.0% on TwoRooms and remains competitive on Reacher and PushT. These results show that global non-collapse alone is insufficient for learning a reliable JEPA worldmodel state space.",
+      "authors": [
+        "Xi Zeng",
+        "Haojie Ren",
+        "Ziying Song"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV"
+      ],
+      "published": "2026-08-06T08:02:15+00:00",
+      "link": "https://arxiv.org/pdf/2608.05720v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 9.0,
+      "llm_evidence_en": "Proposes dynamics-relevant representation learning objective for JEPA world models, addressing physical state and action consequences.",
+      "llm_evidence_cn": "面向JEPA世界模型提出动力学相关表示学习目标，关注物理状态与动作后果。",
+      "llm_evidence": "面向JEPA世界模型提出动力学相关表示学习目标，关注物理状态与动作后果。",
+      "canonical_evidence": "面向JEPA世界模型提出动力学相关表示学习目标，关注物理状态与动作后果。",
+      "llm_tldr_en": "PhyLatent adds dynamics-relevant objectives to JEPA world models, preventing physical invariance, identifiability, and counterfactual dynamics collapse, improving representation of states and action effects.",
+      "llm_tldr_cn": "JEPA世界模型容易在全局潜在空间不坍塌的同时丢失物理状态和动作后果信息。本文提出PhyLatent，通过物理状态锚定、未来表示对齐、静态视觉不变性、反事实分支分离和潜在去噪三条训练路径，分别解决物理不变性坍塌、物理可辨识性坍塌和反事实动力学坍塌。在OGBench-Cube上的实验显示该目标显著提升了世界模型对状态与动作后果的表征质量。这表明世界模型的学习目标应直接面向物理状态与动作后果，为生成式世界模型提供了更有效的表示学习信号。",
+      "llm_tldr": "JEPA世界模型容易在全局潜在空间不坍塌的同时丢失物理状态和动作后果信息。本文提出PhyLatent，通过物理状态锚定、未来表示对齐、静态视觉不变性、反事实分支分离和潜在去噪三条训练路径，分别解决物理不变性坍塌、物理可辨识性坍塌和反事实动力学坍塌。在OGBench-Cube上的实验显示该目标显著提升了世界模型对状态与动作后果的表征质量。这表明世界模型的学习目标应直接面向物理状态与动作后果，为生成式世界模型提供了更有效的表示学习信号。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "world model",
+      "matched_requirement_id": "req-2",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2608.02713v1",
+      "source": "arxiv",
+      "title": "Quo Vadis, World Modeling?",
+      "abstract": "Continually improving agents require dynamic interaction feedback beyond static supervision, yet direct real-environment interaction is costly, slow, unsafe, and hard to parallelize. World modeling offers a natural intermediate proxy that allows agents to query lower-cost, more controllable feedback before committing to real actions. Classical world models instantiate this proxy primarily through future physical-state prediction, a formulation useful yet narrow for agents that require actionable feedback beyond raw state transitions. In this work, we conceptualize Agent-Centric Interactive World Proxies, shifting the fundamental paradigm from physical state transitions to agent-usable information transitions, such as execution outcomes, retrieved experiences or skills, and verification signals, broadening the scope of world modeling to provide versatile feedback for continually improving agents. To systematically map this design space, we organize world proxies into six functional forms based on their feedback modalities: dynamics, spatial, execution, memory/experience, skill, and reward/verification proxies, which together characterize the primary ways world modeling serves agent improvement. We further analyze how these proxies empower agents across three progressive levels: L.1 Inference-Time Guidance, where proxy outputs enrich in-context information for superior decisions; L.2 Training-Time Optimization, where proxy outputs yield rewards, critiques, or synthetic rollouts for policy learning; and L.3 Agent-Proxy Co-Evolution, where real-environment evidence continuously updates both the proxy and the agent for co-evolution. Ultimately, this work recasts world modeling into an agent-centric paradigm, establishing a roadmap for building world proxies that empower agents to plan better, learn faster, and evolve continually.",
+      "authors": [
+        "Yu Yang",
+        "Xuemeng Yang",
+        "Licheng Wen",
+        "Lingdong Kong",
+        "Xiaobin Hu",
+        "Dongyue Lu",
+        "Wei Chow",
+        "Xiyan Huang",
+        "Yuxiang Feng",
+        "Yue Liao",
+        "Jianbiao Mei",
+        "Daocheng Fu",
+        "Rong Wu",
+        "Pinlong Cai",
+        "Ran Yi",
+        "Ying Tai",
+        "Jiangning Zhang",
+        "Botian Shi",
+        "Yong Liu",
+        "Shuicheng Yan"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV",
+        "cs.AI",
+        "cs.RO"
+      ],
+      "published": "2026-08-03T17:59:58+00:00",
+      "link": "https://arxiv.org/pdf/2608.02713v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 8.0,
+      "llm_evidence_en": "Conceptualizes agent-centric world modeling beyond physical state prediction",
+      "llm_evidence_cn": "提出面向智能体的世界代理概念，超越物理状态预测",
+      "llm_evidence": "提出面向智能体的世界代理概念，超越物理状态预测",
+      "canonical_evidence": "提出面向智能体的世界代理概念，超越物理状态预测",
+      "llm_tldr_en": "This position paper argues that world models should shift from predicting physical states to simulating agent-usable information transitions, such as outcomes, experiences, and verification signals, to support continual learning.",
+      "llm_tldr_cn": "传统世界模型将代理局限于未来物理状态预测，难以支撑智能体所需的可操作反馈。该文提出Agent-Centric Interactive World Proxies，将世界建模从物理状态转移转向执行结果、检索经验、验证信号等对智能体可用的信息转移。这一视角转变有望让世界模型在低成本、可控前提下为持续学习智能体提供更直接的交互反馈，推动世界模型设计的新方向。",
+      "llm_tldr": "传统世界模型将代理局限于未来物理状态预测，难以支撑智能体所需的可操作反馈。该文提出Agent-Centric Interactive World Proxies，将世界建模从物理状态转移转向执行结果、检索经验、验证信号等对智能体可用的信息转移。这一视角转变有望让世界模型在低成本、可控前提下为持续学习智能体提供更直接的交互反馈，推动世界模型设计的新方向。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "world model",
+      "matched_requirement_id": "req-2",
+      "selection_source": "fresh_fetch"
+    }
+  ],
+  "quick_skim": [
+    {
+      "id": "2608.02504v1",
+      "source": "arxiv",
+      "title": "Token Radius Attention for Efficient Video Generation",
+      "abstract": "Video Diffusion Transformers (VDiTs) enable high-fidelity generation but incur quadratic cost from dense 3D self-attention. Existing head- and block-level sparse methods share computation budgets across queries, overlooking token-specific attention demand. We observe that retained density varies across queries yet correlates log-linearly with attention entropy, while dominant interactions form query-centered neighborhoods with token-dependent radii. Based on these findings, we propose Token Radius Attention (TRA), a training-free framework that maps query entropy to an analytic token budget and converts it into a temporally decayed radius without explicit key ranking. Fused entropy extraction, warm-up reuse, and block-sparse mask construction further reduce overhead. Across seven Wan2.1, Wan2.2, and HunyuanVideo T2V/I2V configurations, TRA retains only 9-19% of attention interactions and achieves 1.56x-2.05x speedup with competitive generation quality. Code is available at https://github.com/IF-LAB-PKU/Token-Radius-Attention.",
+      "authors": [
+        "Jiayu Chen",
+        "Zhikun Jiang",
+        "Maoliang Li",
+        "Jiayi Luo",
+        "Jiawei Yang",
+        "Zihao Zheng",
+        "Hengyi Zhang",
+        "Guojie Luo",
+        "Xiang Chen"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV"
+      ],
+      "published": "2026-08-03T17:05:15+00:00",
+      "link": "https://arxiv.org/pdf/2608.02504v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 7.0,
+      "llm_evidence_en": "Provides an efficient video generation attention method, directly useful for video-generation-based world models",
+      "llm_evidence_cn": "提出高效视频生成注意力方法，可直接服务于基于视频生成的世界模型",
+      "llm_evidence": "提出高效视频生成注意力方法，可直接服务于基于视频生成的世界模型",
+      "canonical_evidence": "提出高效视频生成注意力方法，可直接服务于基于视频生成的世界模型",
+      "llm_tldr_en": "Token Radius Attention is a training-free framework for efficient video generation, mapping query entropy to analytic token budgets and temporally decayed radii to reduce attention cost while preserving generation quality.",
+      "llm_tldr_cn": "针对视频扩散Transformer自注意力计算随令牌数二次增长的问题，本文提出Token Radius Attention免训练优化框架。它观察到查询注意力密度与熵呈对数线性相关，且主要交互集中在查询中心的可变半径邻域。方法将查询熵映射为分析式令牌预算，并转换为时间衰减半径，结合融合熵提取与块稀疏掩码降低开销。实验表明该方法在几乎不影响生成质量的前提下显著加速视频生成，为视频生成模型提供高效可扩展的注意力方案。",
+      "llm_tldr": "针对视频扩散Transformer自注意力计算随令牌数二次增长的问题，本文提出Token Radius Attention免训练优化框架。它观察到查询注意力密度与熵呈对数线性相关，且主要交互集中在查询中心的可变半径邻域。方法将查询熵映射为分析式令牌预算，并转换为时间衰减半径，结合融合熵提取与块稀疏掩码降低开销。实验表明该方法在几乎不影响生成质量的前提下显著加速视频生成，为视频生成模型提供高效可扩展的注意力方案。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "research on video generation for world models",
+      "matched_requirement_id": "req-8",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "7"
+    },
+    {
+      "id": "2608.05976v1",
+      "source": "arxiv",
+      "title": "Diff-VF: Training-free High-quality Long Video Generation via Diffusion Model",
+      "abstract": "Recently, diffusion models have made great progress in video generation. However, most existing video diffusion models are trained with short videos, and degrade when extrapolated to long videos, struggling to maintain long-range temporal coherence while retaining diverse motions. To generate consistent, high-quality and dynamic long videos, we propose Diff-VF, a training-free, plug-and-play and model-agnostic framework that converts existing short-video diffusion backbones into long-video generators without modifying or fine-tuning the base model. Diff-VF couples three complementary strategies: Hybrid Noise Initialization (HNI) to constrain global semantics, Weighted Window Sampling (WWS) to remove inter-window discontinuities, and Temporal Extended Sampling (TES) to establish long-range dependencies with a timestep-varying fusion. We further extend Diff-VF to long-video enhancement via Skip Residual Guidance that balances fidelity and realism through timestep-dependent guidance. VBench-Long evaluation results show that Diff-VF achieves a more favorable balance between temporal coherence and motion diversity than base models and recent training-free long video generation baselines, including FreeNoise, FreeLong, and RIFLEx, while maintaining competitive frame-wise quality. Experiments on two base models demonstrate the applicability to video diffusion models with different spatial-temporal modeling strategies. Extensive ablations validate the contribution of each component and hyperparameters.",
+      "authors": [
+        "Haoning Yang",
+        "Xinyuan Chen",
+        "Yaohui Wang",
+        "Guo Lu"
+      ],
+      "primary_category": "cs.CV",
+      "categories": [
+        "cs.CV"
+      ],
+      "published": "2026-08-06T12:53:46+00:00",
+      "link": "https://arxiv.org/pdf/2608.05976v1",
+      "tags": [
+        "keyword:video-wam",
+        "query:video-wam"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "Training-free long video generation method; supports temporal coherence needed for video world model rollouts.",
+      "llm_evidence_cn": "提出无需训练的长视频生成方法，为视频世界模型的长时间推演提供时序一致性支持。",
+      "llm_evidence": "提出无需训练的长视频生成方法，为视频世界模型的长时间推演提供时序一致性支持。",
+      "canonical_evidence": "提出无需训练的长视频生成方法，为视频世界模型的长时间推演提供时序一致性支持。",
+      "llm_tldr_en": "Training-free model-agnostic framework converting short-video diffusion backbones into long-video generators using hybrid noise initialization, weighted window sampling, and temporal extension for coherent diverse long videos.",
+      "llm_tldr_cn": "长视频生成是视频世界模型的重要基础，但现有扩散模型在超长时序下会损失一致性。本文提出Diff-VF，一个无需训练、即插即用且与模型无关的框架，通过混合噪声初始化、加权窗口采样和时序扩展三种互补策略，将短视频扩散骨干转换为长视频生成器。实验表明该方法能在保持多样运动的同时维持长期时间一致性，为视频世界模型的长时程预测提供了可直接复用的技术方案。它不需要修改或微调基础模型，因此可快速套用到现有视频扩散模型上。",
+      "llm_tldr": "长视频生成是视频世界模型的重要基础，但现有扩散模型在超长时序下会损失一致性。本文提出Diff-VF，一个无需训练、即插即用且与模型无关的框架，通过混合噪声初始化、加权窗口采样和时序扩展三种互补策略，将短视频扩散骨干转换为长视频生成器。实验表明该方法能在保持多样运动的同时维持长期时间一致性，为视频世界模型的长时程预测提供了可直接复用的技术方案。它不需要修改或微调基础模型，因此可快速套用到现有视频扩散模型上。",
+      "llm_tags": [
+        "query:video-wam"
+      ],
+      "matched_query_tag": "query:video-wam",
+      "matched_query_text": "research on video generation for world models",
+      "matched_requirement_id": "req-8",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    }
+  ]
+}

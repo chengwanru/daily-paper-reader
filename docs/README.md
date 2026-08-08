@@ -41,17 +41,17 @@
 <section class="dpr-home-dashboard-card dpr-home-report-card">
   <div class="dpr-home-dashboard-header">
     <div>
-      <span class="dpr-home-dashboard-kicker">2026-08-07</span>
+      <span class="dpr-home-dashboard-kicker">2026-08-08</span>
       <h3 class="dpr-home-dashboard-title">今日汇总</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">共 20 篇</strong>
+    <strong class="dpr-home-dashboard-count">共 6 篇</strong>
   </div>
   <dl class="dpr-home-dashboard-stats">
-    <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>2 次</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>12</dd></div>
-    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>8</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>累计更新</dt><dd>1 次</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>精读</dt><dd>4</dd></div>
+    <div class="dpr-home-dashboard-stat"><dt>速读</dt><dd>2</dd></div>
   </dl>
-  <p class="dpr-home-dashboard-body">最近更新：2026-08-07 21:01:14 UTC<br>状态：成功</p>
+  <p class="dpr-home-dashboard-body">最近更新：2026-08-08 20:20:01 UTC<br>状态：成功</p>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-brief-card">
   <div class="dpr-home-dashboard-header">
@@ -62,9 +62,9 @@
     <strong class="dpr-home-dashboard-count">AI</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<p>今日聚焦世界动作模型（WAM），精读两篇满分论文《MobileWAM》与《DreamWAM》，分别实现链式前瞻的移动操作与超越RGB的未来预测。</p>
-<p>最值得关注的是WAM如何统一预测与行动，且速读中《DynaPix》《PhysMind》等揭示视觉语言模型在物理推理与精确未来识别上的短板与突破。</p>
-<p>下一步建议：若你关注具身智能，可深入精读两篇WAM；若想了解多模态局限，可先从速读《DynaPix》入手。</p>
+<p>今日聚焦视频生成与世界模型的推理效率优化，共处理6篇论文，其中2篇精读获高分。</p>
+<p>最值得关注的是Adaptive-WAM（10.0）与Faster-WAM（9.0），分别通过质量引导早退和未来条件化加速视频扩散模型。</p>
+<p>建议读者优先深入这两篇精读论文，速读可留意Token Radius Attention等轻量化注意力机制方向。</p>
   </div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-deep-card">
@@ -73,12 +73,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">精读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">12 篇</strong>
+    <strong class="dpr-home-dashboard-count">4 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="MobileWAM: Bridging World Action Models to Mobile Manipulation with Chain-of-Foresight">MobileWAM: Bridging World Action Models to Mobile Manipulation with Chain-of-Foresight</span></li><li><span class="dpr-home-dashboard-paper-title" title="DreamWAM: Beyond RGB Future Prediction for World Action Models">DreamWAM: Beyond RGB Future Prediction for World Action Models</span></li><li><span class="dpr-home-dashboard-paper-title" title="MobileWAM: Bridging World Action Models to Mobile Manipulation with Chain-of-Foresight">MobileWAM: Bridging World Action Models to Mobile Manipulation with Chain-of-Foresight</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Adaptive-WAM: Quality-Guided Early-Exit Planning from Intermediate Video-Diffusion Features">Adaptive-WAM: Quality-Guided Early-Exit Planning from Intermediate Video-Diffusion Features</span></li><li><span class="dpr-home-dashboard-paper-title" title="Faster-WAM: Efficient Inference-Time Future Conditioning for Robust World Action Models">Faster-WAM: Efficient Inference-Time Future Conditioning for Robust World Action Models</span></li><li><span class="dpr-home-dashboard-paper-title" title="PhyLatent: Learning Dynamics-Relevant Representations for JEPA World Models">PhyLatent: Learning Dynamics-Relevant Representations for JEPA World Models</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">video-wam <strong>12</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">video-wam <strong>4</strong></span></div>
 </section>
 <section class="dpr-home-dashboard-card dpr-home-skim-card">
   <div class="dpr-home-dashboard-header">
@@ -86,12 +86,12 @@
       <span class="dpr-home-dashboard-kicker">今日累计</span>
       <h3 class="dpr-home-dashboard-title">速读推荐</h3>
     </div>
-    <strong class="dpr-home-dashboard-count">8 篇</strong>
+    <strong class="dpr-home-dashboard-count">2 篇</strong>
   </div>
   <div class="dpr-home-dashboard-body">
-<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="DynaPix: Can Vision-Language Models Identify the Exact Future?">DynaPix: Can Vision-Language Models Identify the Exact Future?</span></li><li><span class="dpr-home-dashboard-paper-title" title="muSync-GS: Physics-Synchronized Driving Video Synthesis for Weather and Geometric Road Hazards">muSync-GS: Physics-Synchronized Driving Video Synthesis for Weather and Geometric Road Hazards</span></li><li><span class="dpr-home-dashboard-paper-title" title="PhysMind: From Video to Executable Worlds for Training-Free Physical Reasoning">PhysMind: From Video to Executable Worlds for Training-Free Physical Reasoning</span></li></ul>
+<ul class="dpr-home-dashboard-paper-list"><li><span class="dpr-home-dashboard-paper-title" title="Token Radius Attention for Efficient Video Generation">Token Radius Attention for Efficient Video Generation</span></li><li><span class="dpr-home-dashboard-paper-title" title="Diff-VF: Training-free High-quality Long Video Generation via Diffusion Model">Diff-VF: Training-free High-quality Long Video Generation via Diffusion Model</span></li></ul>
   </div>
-  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">video-wam <strong>8</strong></span></div>
+  <div class="dpr-home-dashboard-tags"><span class="dpr-home-dashboard-tag">video-wam <strong>2</strong></span></div>
 </section>
 </div>
 
