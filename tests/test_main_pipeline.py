@@ -74,6 +74,28 @@ class MainPipelineTest(unittest.TestCase):
         self.assertEqual(env["LLM_PRIMARY_BASE_URL"], "https://summary.example.com/v1")
         self.assertEqual(env["DEEPSEEK_MODEL"], "deepseek-v4-flash")
 
+    def test_resolve_summary_step_env_prefers_primary_base_url(self):
+        with patch.dict(
+            os.environ,
+            {
+                "DEEPSEEK_API_KEY": "k",
+                "DEEPSEEK_BASE_URL": "https://api.deepseek.com",
+                "SUMMARY_BASE_URL": "https://summary.example.com/v1",
+                "LLM_PRIMARY_BASE_URL": "https://ws-demo.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+                "DEEPSEEK_MODEL": "deepseek-r1",
+            },
+            clear=True,
+        ):
+            env = self.mod.resolve_summary_step_env()
+
+        self.assertEqual(
+            env["DEEPSEEK_BASE_URL"],
+            "https://ws-demo.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+        )
+        self.assertEqual(
+            env["SUMMARY_BASE_URL"],
+            "https://ws-demo.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+        )
     def test_main_runs_local_rerank_without_remote_rerank_base(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)

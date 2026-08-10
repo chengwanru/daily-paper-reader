@@ -282,7 +282,11 @@ def prepare_rerank_fallback(input_path: str, output_path: str) -> bool:
 def resolve_summary_step_env() -> dict[str, str]:
     env = os.environ.copy()
     summary_api_key = _read_env_text("SUMMARY_API_KEY", "DEEPSEEK_API_KEY")
-    summary_base_url = _read_env_text("SUMMARY_BASE_URL", "DEEPSEEK_BASE_URL")
+    summary_base_url = _read_env_text(
+        "LLM_PRIMARY_BASE_URL",
+        "SUMMARY_BASE_URL",
+        "DEEPSEEK_BASE_URL",
+    )
     summary_model = _read_env_text("SUMMARY_MODEL", "DEEPSEEK_MODEL")
 
     if summary_api_key:

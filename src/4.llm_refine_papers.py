@@ -10,7 +10,14 @@ import time
 from datetime import datetime, timezone
 from typing import Any, Callable, Dict, List
 
-from llm import DeepSeekClient, resolve_max_output_tokens
+from llm import (
+    DeepSeekClient,
+    describe_llm_endpoint,
+    resolve_llm_api_key,
+    resolve_llm_base_url,
+    resolve_llm_model,
+    resolve_max_output_tokens,
+)
 from subscription_plan import build_pipeline_inputs
 
 SCRIPT_DIR = os.path.dirname(__file__)
@@ -22,11 +29,9 @@ CONFIG_FILE = os.getenv("DPR_CONFIG_FILE") or os.path.join(ROOT_DIR, "config.yam
 
 DEFAULT_FILTER_MODEL = (
     os.getenv("DEEPSEEK_FILTER_MODEL")
-    or os.getenv("SUMMARY_MODEL")
-    or os.getenv("DEEPSEEK_MODEL")
-    or "deepseek-v4-flash"
+    or resolve_llm_model("deepseek-v4-flash")
 )
-DEFAULT_DEEPSEEK_BASE_URL = os.getenv("DEEPSEEK_BASE_URL") or os.getenv("SUMMARY_BASE_URL") or "https://api.deepseek.com"
+DEFAULT_DEEPSEEK_BASE_URL = resolve_llm_base_url()
 DEFAULT_FILTER_CONCURRENCY = 4
 MAX_FILTER_RETRIES = 3
 
@@ -793,7 +798,7 @@ def process_file(
         return
     paper_map = build_paper_map(papers)
 
-    api_key = os.getenv("DEEPSEEK_API_KEY") or os.getenv("SUMMARY_API_KEY")
+    api_key = resolve_llm_api_key()
     if not api_key:
         raise RuntimeError("missing DEEPSEEK_API_KEY or SUMMARY_API_KEY")
 
@@ -801,7 +806,8 @@ def process_file(
     log(
         f"[INFO] start filter: queries={len(queries)}, papers={len(papers)}, "
         f"min_star={min_star}, batch_size={batch_size}, max_chars={max_chars}, "
-        f"concurrency={filter_concurrency}"
+        f"concurrency={filter_concurrency}, endpoint={describe_llm_endpoint(DEFAULT_DEEPSEEK_BASE_URL)}, "
+        f"model={filter_model}"
     )
 
     candidate_ids: List[str] = []

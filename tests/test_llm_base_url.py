@@ -2,12 +2,19 @@ import sys
 import unittest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
+import os
 
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from llm import LLMClient
+from llm import (
+    LLMClient,
+    describe_llm_endpoint,
+    resolve_llm_api_key,
+    resolve_llm_base_url,
+    resolve_llm_model,
+)
 
 
 class LlmBaseUrlTest(unittest.TestCase):
@@ -29,6 +36,24 @@ class LlmBaseUrlTest(unittest.TestCase):
             },
         }
         return resp
+
+    def test_resolve_llm_base_url_prefers_primary(self):
+        with patch.dict(
+            os.environ,
+            {
+                "LLM_PRIMARY_BASE_URL": "https://ws-demo.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+                "SUMMARY_BASE_URL": "https://summary.example.com/v1",
+                "DEEPSEEK_BASE_URL": "https://api.deepseek.com",
+            },
+            clear=True,
+        ):
+            self.assertEqual(
+                resolve_llm_base_url(),
+                "https://ws-demo.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+            )
+            self.assertIn("maas.aliyuncs.com", describe_llm_endpoint())
+            self.assertEqual(resolve_llm_api_key(), "")
+            self.assertEqual(resolve_llm_model("fallback"), "fallback")
 
     @patch("llm.requests.post")
     def test_chat_auth_error_fails_without_retrying_other_bases(self, mock_post):

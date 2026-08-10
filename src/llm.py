@@ -39,6 +39,59 @@ GLOBAL_TIME_SECONDS: float = 0.0
 DEFAULT_DEEPSEEK_BASE_URL = "https://api.deepseek.com"
 
 
+def _first_nonempty_env(*names: str) -> str:
+    for name in names:
+        value = str(os.getenv(name) or "").strip()
+        if value:
+            return value
+    return ""
+
+
+def resolve_llm_api_key() -> str:
+    """优先读取密钥配置写入的 SUMMARY_/DEEPSEEK_ 变量。"""
+    return _first_nonempty_env("SUMMARY_API_KEY", "DEEPSEEK_API_KEY", "LLM_API_KEY")
+
+
+def resolve_llm_base_url(default: str = DEFAULT_DEEPSEEK_BASE_URL) -> str:
+    """
+    统一解析 LLM Base URL。
+
+    密钥向导保存 OpenAI 兼容（阿里云 MaaS）配置时，会同时写入：
+    LLM_PRIMARY_BASE_URL / SUMMARY_BASE_URL / DEEPSEEK_BASE_URL。
+    这里按同一优先级读取，避免任一变量缺失时静默回落到官方 DeepSeek。
+    """
+    return _first_nonempty_env(
+        "LLM_PRIMARY_BASE_URL",
+        "SUMMARY_BASE_URL",
+        "DEEPSEEK_BASE_URL",
+        "LLM_BASE_URL",
+    ) or default
+
+
+def resolve_llm_model(default: str = "deepseek-v4-flash") -> str:
+    return _first_nonempty_env(
+        "SUMMARY_MODEL",
+        "DEEPSEEK_MODEL",
+        "DEEPSEEK_FILTER_MODEL",
+        "LLM_MODEL",
+    ) or default
+
+
+def describe_llm_endpoint(base_url: str = "") -> str:
+    text = str(base_url or resolve_llm_base_url() or "").strip().rstrip("/")
+    if not text:
+        return "(empty)"
+    try:
+        from urllib.parse import urlparse
+
+        parsed = urlparse(text if "://" in text else f"https://{text}")
+        host = parsed.netloc or parsed.path.split("/")[0] or text
+        path = parsed.path.rstrip("/") if parsed.netloc else ""
+        return f"{host}{path}" if path else host
+    except Exception:
+        return text
+
+
 def reset_global_tokens():
     """重置本次实验的全局 token 统计。"""
     GLOBAL_TOKENS['prompt'] = 0
@@ -774,8 +827,9 @@ class LLMClient:
 
 
 class DeepSeekClient(LLMClient):
-    def __init__(self, api_key: str, model: str, base_url: str = DEFAULT_DEEPSEEK_BASE_URL):
-        super().__init__(api_key=api_key, model=model, base_url=base_url)
+    def __init__(self, api_key: str, model: str, base_url: str = ""):
+        resolved_base = str(base_url or "").strip() or resolve_llm_base_url()
+        super().__init__(api_key=api_key, model=model, base_url=resolved_base)
 
 
 def parse_provider_model(model_str: str) -> Tuple[str, str]:
@@ -802,19 +856,18 @@ class ClientFactory:
         - LLM_MODEL：形如 'provider/model'。
         选填：
         - LLM_API_KEY：通用 API key（优先级高于各 provider 专用 key）
-        - LLM_BASE_URL：通用 base_url（优先级高于默认 base_url）
+        - LLM_BASE_URL / LLM_PRIMARY_BASE_URL / SUMMARY_BASE_URL / DEEPSEEK_BASE_URL
         """
         model_env = (os.getenv('LLM_MODEL') or '').strip()
         if not model_env:
             raise ValueError("缺少必要环境变量: LLM_MODEL（格式为 'deepseek/model'）")
 
         provider, model = parse_provider_model(model_env)
-        api_key = (os.getenv('LLM_API_KEY') or '').strip() or None
-        base_url = (os.getenv('LLM_BASE_URL') or '').strip() or None
+        api_key = resolve_llm_api_key()
+        base_url = resolve_llm_base_url()
 
         if provider == 'deepseek':
-            base_url = base_url or DEFAULT_DEEPSEEK_BASE_URL
-            return DeepSeekClient(api_key=api_key or os.getenv('DEEPSEEK_API_KEY', ''), model=model, base_url=base_url)
+            return DeepSeekClient(api_key=api_key, model=model, base_url=base_url)
         raise ValueError(f"当前仅支持 DeepSeek API，请使用 'deepseek/模型名'，当前 provider={provider}")
 
     @staticmethod

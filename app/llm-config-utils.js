@@ -97,23 +97,33 @@
     const chatList = Array.isArray(safeSecret.chatLLMs) ? safeSecret.chatLLMs : [];
     const models = [];
     const seen = new Set();
-    chatList.forEach((item) => {
-      if (!item || typeof item !== 'object') return;
-      const baseUrl = normalizeBaseUrlForStorage(item.baseUrl || '');
-      const apiKey = normalizeText(item.apiKey || '');
-      const modelNames = sanitizeModelList(item.models || [], 99);
-      if (!baseUrl || !apiKey || !modelNames.length) return;
-      modelNames.forEach((name) => {
-        const dedupeKey = `${name.toLowerCase()}\u0000${baseUrl}\u0000${apiKey}`;
+    const pushEntry = (apiKey, baseUrl, modelNames) => {
+      const normalizedBaseUrl = normalizeBaseUrlForStorage(baseUrl || '');
+      const normalizedApiKey = normalizeText(apiKey || '');
+      const names = sanitizeModelList(modelNames || [], 99);
+      if (!normalizedBaseUrl || !normalizedApiKey || !names.length) return;
+      names.forEach((name) => {
+        const dedupeKey = `${name.toLowerCase()}\u0000${normalizedBaseUrl}\u0000${normalizedApiKey}`;
         if (seen.has(dedupeKey)) return;
         seen.add(dedupeKey);
         models.push({
           name,
-          apiKey,
-          baseUrl,
+          apiKey: normalizedApiKey,
+          baseUrl: normalizedBaseUrl,
         });
       });
+    };
+
+    chatList.forEach((item) => {
+      if (!item || typeof item !== 'object') return;
+      pushEntry(item.apiKey, item.baseUrl, item.models || []);
     });
+
+    // 若 chatLLMs 缺失，回退到 summarizedLLM，保证读论文对话与流水线同源。
+    if (!models.length) {
+      const summarized = safeSecret.summarizedLLM || {};
+      pushEntry(summarized.apiKey, summarized.baseUrl, [summarized.model]);
+    }
     return models;
   };
 

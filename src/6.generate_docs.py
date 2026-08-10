@@ -18,7 +18,13 @@ from typing import Any, Dict, List, Set, Tuple
 
 import fitz  # PyMuPDF
 import requests
-from llm import DeepSeekClient
+from llm import (
+    DeepSeekClient,
+    describe_llm_endpoint,
+    resolve_llm_api_key,
+    resolve_llm_base_url,
+    resolve_llm_model,
+)
 
 SCRIPT_DIR = os.path.dirname(__file__)
 ROOT_DIR = os.path.abspath(os.path.join(SCRIPT_DIR, ".."))
@@ -44,10 +50,10 @@ HOME_TEMPLATE_DIR = os.path.join(ROOT_DIR, "docs_init")
 TODAY_STR = str(os.getenv("DPR_RUN_DATE") or "").strip() or datetime.now(timezone.utc).strftime("%Y%m%d")
 RANGE_DATE_RE = re.compile(r"^(\d{8})-(\d{8})$")
 
-# LLM 配置（使用 llm.py 内的 DeepSeek 客户端）
-DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY") or os.getenv("SUMMARY_API_KEY")
-DEEPSEEK_BASE_URL = os.getenv("DEEPSEEK_BASE_URL") or os.getenv("SUMMARY_BASE_URL") or "https://api.deepseek.com"
-DEEPSEEK_MODEL = os.getenv("SUMMARY_MODEL") or os.getenv("DEEPSEEK_MODEL") or "deepseek-v4-flash"
+# LLM 配置（使用 llm.py 内的 OpenAI 兼容客户端；密钥向导写入的自定义 Base URL 优先）
+DEEPSEEK_API_KEY = resolve_llm_api_key()
+DEEPSEEK_BASE_URL = resolve_llm_base_url()
+DEEPSEEK_MODEL = resolve_llm_model("deepseek-v4-flash")
 STEP6_STRUCTURED_MAX_TOKENS = 16 * 1024
 
 
@@ -62,6 +68,11 @@ def create_llm_client() -> DeepSeekClient | None:
 
 
 LLM_CLIENT = create_llm_client()
+if LLM_CLIENT:
+    print(
+        f"[INFO] Step6 LLM endpoint: {describe_llm_endpoint(DEEPSEEK_BASE_URL)} | model={DEEPSEEK_MODEL}",
+        flush=True,
+    )
 
 DEFAULT_DOCS_CONCURRENCY = 4
 

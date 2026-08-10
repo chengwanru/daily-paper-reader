@@ -68,6 +68,15 @@ window.PrivateDiscussionChat = (function () {
         });
       });
     });
+    if (!models.length) {
+      const summarized = secret.summarizedLLM || {};
+      const baseUrl = (summarized.baseUrl || '').trim();
+      const apiKey = (summarized.apiKey || '').trim();
+      const name = (summarized.model || '').trim();
+      if (name && apiKey && baseUrl) {
+        models.push({ name, apiKey, baseUrl });
+      }
+    }
     return models;
   };
   const inferChatApiProfile = (baseUrl, model) => {
@@ -1117,7 +1126,12 @@ window.PrivateDiscussionChat = (function () {
     savePreferredModelName(model);
 
     if (statusEl) {
-      statusEl.textContent = `正在调用 Chat 模型 ${model}...`;
+      try {
+        const host = new URL(endpoint).host;
+        statusEl.textContent = `正在调用 ${model}（${host}）...`;
+      } catch {
+        statusEl.textContent = `正在调用 Chat 模型 ${model}...`;
+      }
       statusEl.style.color = '#666';
     }
 

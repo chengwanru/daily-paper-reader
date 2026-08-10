@@ -10,18 +10,16 @@ from typing import Any, Dict, List
 
 import yaml  # type: ignore
 
-from llm import DeepSeekClient
+from llm import DeepSeekClient, resolve_llm_api_key, resolve_llm_base_url, resolve_llm_model, describe_llm_endpoint
 
 SCRIPT_DIR = os.path.dirname(__file__)
 CONFIG_FILE = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "config.yaml"))
 
 MODEL_NAME = (
   os.getenv("DEEPSEEK_REWRITE_MODEL")
-  or os.getenv("SUMMARY_MODEL")
-  or os.getenv("DEEPSEEK_MODEL")
-  or "deepseek-v4-flash"
+  or resolve_llm_model("deepseek-v4-flash")
 )
-BASE_URL = os.getenv("DEEPSEEK_BASE_URL") or os.getenv("SUMMARY_BASE_URL") or "https://api.deepseek.com"
+BASE_URL = resolve_llm_base_url()
 
 def log(message: str) -> None:
   ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
@@ -146,9 +144,9 @@ def main() -> None:
     if not os.path.exists(CONFIG_FILE):
         raise FileNotFoundError(f"找不到 config.yaml：{CONFIG_FILE}")
 
-    api_key = os.getenv("DEEPSEEK_API_KEY") or os.getenv("SUMMARY_API_KEY")
+    api_key = resolve_llm_api_key()
     if not api_key:
-        raise RuntimeError("缺少 DEEPSEEK_API_KEY 或 SUMMARY_API_KEY 环境变量，无法调用 DeepSeek。")
+        raise RuntimeError("缺少 DEEPSEEK_API_KEY 或 SUMMARY_API_KEY 环境变量，无法调用 LLM。")
 
     group_start("Step 0.0 - load config")
     with open(CONFIG_FILE, "r", encoding="utf-8") as f:
@@ -159,6 +157,7 @@ def main() -> None:
     keywords = subs.get("keywords") or []
     llm_queries = subs.get("llm_queries") or []
 
+    log(f"LLM endpoint: {describe_llm_endpoint(BASE_URL)} | model={MODEL_NAME}")
     client = DeepSeekClient(api_key=api_key, model=MODEL_NAME, base_url=BASE_URL)
 
     related_schema = {

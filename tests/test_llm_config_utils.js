@@ -80,6 +80,20 @@ function testResolveChatModelsAndSummary() {
   const summary = resolveSummaryLLM(secret);
   assert.equal(summary.model, 'gpt-4.1-mini');
   assert.equal(summary.baseUrl, 'https://api.example.com/v1');
+
+  const fromSummaryOnly = resolveChatModels({
+    summarizedLLM: {
+      apiKey: 'sk-summary-only',
+      baseUrl: 'https://ws-demo.cn-beijing.maas.aliyuncs.com/compatible-mode/v1',
+      model: 'deepseek-r1',
+    },
+  });
+  assert.equal(fromSummaryOnly.length, 1);
+  assert.equal(fromSummaryOnly[0].name, 'deepseek-r1');
+  assert.equal(
+    fromSummaryOnly[0].baseUrl,
+    'https://ws-demo.cn-beijing.maas.aliyuncs.com/compatible-mode/v1',
+  );
 }
 
 function testInferProviderType() {
