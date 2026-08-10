@@ -10,10 +10,6 @@
 - 论文页 AI 问答（可停止 / 编辑重问）
 - GitHub Actions + Pages，无需自建服务器
 
-## 网站
-
-https://chengwanru.github.io/daily-paper-reader
-
 ## 致谢
 
 上游项目：[Daily Paper Reader](https://github.com/ziwenhahaha/daily-paper-reader)
