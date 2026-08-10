@@ -645,9 +645,12 @@ function testQuickLinksCenterTextAndDetachIcon() {
   const headerHtml = tools.renderSidebarHeader('#/', '#/tutorial/README', '首页', '使用教程');
   const homeIndex = headerHtml.indexOf('dpr-sidebar-quick-home');
   const tutorialIndex = headerHtml.indexOf('dpr-sidebar-quick-tutorial');
+  const favoritesIndex = headerHtml.indexOf('dpr-sidebar-favorites-btn');
   const feedbackIndex = headerHtml.indexOf('dpr-sidebar-feedback-btn');
-  assert.ok(homeIndex >= 0 && tutorialIndex > homeIndex && feedbackIndex > tutorialIndex);
+  assert.ok(homeIndex >= 0 && tutorialIndex > homeIndex && favoritesIndex > tutorialIndex && feedbackIndex > favoritesIndex);
   assert.ok(headerHtml.includes('aria-hidden="true">📖</span>教程</span>'));
+  assert.ok(headerHtml.includes('aria-hidden="true">⭐</span>收藏</span>'));
+  assert.ok(headerHtml.includes('data-sidebar-favorites'));
 
   const sidebarTemplate = fs.readFileSync('docs_init/_sidebar.md', 'utf8').split('\n').slice(0, 3).join('\n');
   assert.ok(sidebarTemplate.includes('data-dpr-hash="#/tutorial/README">教程</a>'));
@@ -656,7 +659,7 @@ function testQuickLinksCenterTextAndDetachIcon() {
   const css = fs.readFileSync('app/app.css', 'utf8');
   const headerRule = cssRule(css, '.dpr-sidebar-header');
   assert.ok(/display:\s*grid/i.test(headerRule));
-  assert.ok(/grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\)/i.test(headerRule));
+  assert.ok(/grid-template-columns:\s*repeat\(4,\s*minmax\(0,\s*1fr\)\)/i.test(headerRule));
 
   const quickRule = cssRule(css, '.dpr-sidebar-quick');
   assert.ok(/position:\s*relative/i.test(quickRule));
@@ -750,9 +753,8 @@ function testSidebarFooterControlsReplaceRefresh() {
   assert.ok(html.includes('data-sidebar-collapse'));
   assert.ok(html.includes('aria-label="收起侧边栏"'));
   assert.ok(html.includes('class="dpr-sidebar-footer-actions"'));
-  assert.ok(html.includes('class="dpr-sidebar-footer-btn dpr-sidebar-favorites-btn"'));
-  assert.ok(html.includes('data-sidebar-favorites'));
-  assert.ok(html.includes('aria-label="打开收藏夹"'));
+  assert.ok(!html.includes('dpr-sidebar-favorites-btn'));
+  assert.ok(!html.includes('data-sidebar-favorites'));
   assert.ok(html.includes('class="dpr-sidebar-footer-btn dpr-sidebar-settings-btn"'));
   assert.ok(html.includes('data-sidebar-settings'));
   assert.ok(html.includes('aria-label="打开设置"'));
@@ -762,7 +764,7 @@ function testSidebarFooterControlsReplaceRefresh() {
   const collapsedHtml = tools.renderSidebarFooterControls(true);
   assert.ok(collapsedHtml.includes('aria-label="展开侧边栏"'));
   assert.ok(collapsedHtml.includes('title="展开侧边栏"'));
-  assert.ok(collapsedHtml.includes('data-sidebar-favorites'));
+  assert.ok(!collapsedHtml.includes('data-sidebar-favorites'));
 
   const css = fs.readFileSync('app/app.css', 'utf8');
   const bodyRule = cssRule(css, 'body.dpr-sidebar-v2');
@@ -783,8 +785,10 @@ function testSidebarFooterControlsReplaceRefresh() {
   const footerActionsRule = cssRule(css, '.dpr-sidebar-footer-actions');
   assert.ok(/margin-left:\s*auto/i.test(footerActionsRule));
   assert.ok(/display:\s*inline-flex/i.test(footerActionsRule));
-  assert.ok(css.includes('.dpr-favorites-overlay'));
-  assert.ok(css.includes('.dpr-favorites-modal'));
+  assert.ok(css.includes('.dpr-sidebar-favorites-view'));
+  assert.ok(css.includes('.dpr-sidebar-favorites-list'));
+  assert.ok(!css.includes('.dpr-favorites-overlay'));
+  assert.ok(!css.includes('.dpr-favorites-modal'));
 
   const collapsedRootRule = cssRule(css, '#dpr-sidebar-v2.is-collapsed');
   assert.ok(/width:\s*var\(--dpr-sidebar-collapsed-width\)/i.test(collapsedRootRule));
@@ -1698,5 +1702,41 @@ testAxisControlClicksKeepSidebarScrollInPlace();
 testAxisToggleCollapsesOnlyItsOwnPanel();
 testExpandedAxisSectionSetSerializesCorrectly();
 testReadStatusNormalization();
+testFavoritesSidebarBodyUsesPaperRows();
 
 console.log('dpr sidebar v2 tests passed');
+
+function testFavoritesSidebarBodyUsesPaperRows() {
+  const sidebar = loadSidebarForTest('#/');
+  const store = new Map();
+  window.localStorage = {
+    getItem(key) {
+      return store.has(key) ? store.get(key) : null;
+    },
+    setItem(key, value) {
+      store.set(String(key), String(value));
+    },
+    removeItem(key) {
+      store.delete(String(key));
+    },
+  };
+  delete require.cache[require.resolve('../app/favorites.js')];
+  window.DPRFavorites = require('../app/favorites.js');
+  window.DPRFavorites.addFavorite('20260301/demo-paper', {
+    title: 'Demo Paper',
+    titleZh: '示例论文',
+  });
+
+  const html = sidebar.__test.renderFavoritesBodyHtml({
+    search: '',
+    filter: 'all',
+    readMap: {},
+    currentPaperHref: '#/20260301/demo-paper',
+  });
+  assert.ok(html.includes('dpr-sidebar-favorites-view'));
+  assert.ok(html.includes('class="dpr-sidebar-paper'));
+  assert.ok(html.includes('href="#/20260301/demo-paper"'));
+  assert.ok(html.includes('Demo Paper'));
+  assert.ok(html.includes('data-remove-favorite="20260301/demo-paper"'));
+  assert.ok(html.includes('is-active'));
+}

@@ -1374,6 +1374,7 @@
     sidebarWidth: DEFAULT_SIDEBAR_WIDTH,
     sidebarCollapsed: false,
     titleOverflowFrame: 0,
+    contentMode: 'browse', // 'browse' | 'favorites'
   };
 
   function loadPersistedFilter() {
@@ -1487,11 +1488,25 @@
     );
   }
 
-  function renderSidebarHeader(homeHref, tutorialHref, homeLabel, tutorialLabel) {
+  function renderFavoritesQuickButton(active) {
+    var isActive = !!active;
+    return (
+      '<button type="button" class="dpr-sidebar-quick dpr-sidebar-favorites-btn' +
+      (isActive ? ' is-active' : '') +
+      '" data-sidebar-favorites aria-label="打开收藏夹" title="收藏夹" aria-pressed="' +
+      (isActive ? 'true' : 'false') +
+      '">' +
+      '<span class="dpr-sidebar-quick-label"><span class="dpr-sidebar-quick-icon" aria-hidden="true">⭐</span>收藏</span>' +
+      '</button>'
+    );
+  }
+
+  function renderSidebarHeader(homeHref, tutorialHref, homeLabel, tutorialLabel, favoritesActive) {
     return (
       '<header class="dpr-sidebar-header">' +
       renderQuickLink('dpr-sidebar-quick-home', homeHref, '🏠', homeLabel) +
       renderQuickLink('dpr-sidebar-quick-tutorial', tutorialHref, '📖', normalizeTutorialLabel(tutorialLabel)) +
+      renderFavoritesQuickButton(favoritesActive) +
       renderFeedbackQuickButton() +
       '</header>'
     );
@@ -1504,7 +1519,6 @@
       '  <button type="button" class="dpr-sidebar-footer-btn dpr-sidebar-collapse-btn" data-sidebar-collapse aria-label="' +
       safeAttr(collapseLabel) + '" title="' + safeAttr(collapseLabel) + '">☰</button>' +
       '  <div class="dpr-sidebar-footer-actions">' +
-      '    <button type="button" class="dpr-sidebar-footer-btn dpr-sidebar-favorites-btn" data-sidebar-favorites aria-label="打开收藏夹" title="打开收藏夹">⭐</button>' +
       '    <button type="button" class="dpr-sidebar-footer-btn dpr-sidebar-settings-btn" data-sidebar-settings aria-label="打开设置" title="打开设置">⚙️</button>' +
       '  </div>' +
       '</div>'
@@ -1540,14 +1554,37 @@
     }, 100);
   }
 
+  function syncFavoritesModeChrome() {
+    if (!state.rootEl) return;
+    var active = state.contentMode === 'favorites';
+    state.rootEl.classList.toggle('is-favorites-mode', active);
+    var btn = $('.dpr-sidebar-favorites-btn', state.rootEl);
+    if (btn) {
+      btn.classList.toggle('is-active', active);
+      btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+    }
+  }
+
+  function setContentMode(mode, options) {
+    var next = mode === 'favorites' ? 'favorites' : 'browse';
+    var changed = state.contentMode !== next;
+    state.contentMode = next;
+    syncFavoritesModeChrome();
+    if (changed || (options && options.forceRerender)) {
+      rerenderSidebarBody(options && options.rerenderOptions ? options.rerenderOptions : { syncActive: true, center: false });
+    }
+    return state.contentMode;
+  }
+
   function openFavoritesPanel() {
-    try {
-      if (window.DPRFavorites && typeof window.DPRFavorites.openFavoritesPanel === 'function') {
-        window.DPRFavorites.openFavoritesPanel();
-        return true;
-      }
-    } catch (e) {}
-    return false;
+    setContentMode(state.contentMode === 'favorites' ? 'browse' : 'favorites');
+    return true;
+  }
+
+  function closeFavoritesPanel() {
+    if (state.contentMode !== 'favorites') return false;
+    setContentMode('browse');
+    return true;
   }
 
   function openFeedbackPanel() {
@@ -1571,7 +1608,7 @@
     root.innerHTML =
       '<button type="button" class="dpr-sidebar-mobile-toggle" aria-label="切换侧边栏">' +
       '<span></span><span></span><span></span></button>' +
-      renderSidebarHeader(homeHref, tutorialHref, homeLabel, tutorialLabel) +
+      renderSidebarHeader(homeHref, tutorialHref, homeLabel, tutorialLabel, state.contentMode === 'favorites') +
       '<div class="dpr-sidebar-toolbar">' +
       '  <div class="dpr-sidebar-search-wrap">' +
       '    <span class="dpr-sidebar-search-icon" aria-hidden="true">🔍</span>' +
@@ -1589,6 +1626,7 @@
     state.searchInput = $('.dpr-sidebar-search', root);
     state.unreadCountEl = $('.dpr-sidebar-unread-count', root);
     if (state.searchInput) state.searchInput.value = state.search || '';
+    syncFavoritesModeChrome();
     // 渲染后立刻剥离 docsify 注入的 .app-nav / .no-badge（防下拉菜单定位）
     stripAppNav(state.bodyEl);
   }
@@ -1640,7 +1678,114 @@
     return buildDailyCalendarTagView(viewModel, vs.activeDailyDate, vs.activeDailyTag, map, vs.activeDailyMonth);
   }
 
+  function findPaperByIdInModel(model, paperId) {
+    var target = String(paperId || '');
+    if (!target) return null;
+    var found = null;
+    function visit(paper) {
+      if (found || !paper) return;
+      if (paperIdentity(paper) === target || paperIdFromHref(paper.href) === target) {
+        found = paper;
+      }
+    }
+    (model && model.daily || []).forEach(function (day) {
+      (day.papers || []).forEach(visit);
+    });
+    (model && model.conferences || []).forEach(function (conf) {
+      (conf.topics || []).forEach(function (topic) {
+        (topic.papers || []).forEach(visit);
+      });
+    });
+    return found;
+  }
+
+  function favoriteRecordToPaper(item, model) {
+    var id = String((item && item.id) || '');
+    var fromModel = findPaperByIdInModel(model, id);
+    if (fromModel) {
+      return {
+        id: paperIdentity(fromModel) || id,
+        href: normalizeRouteHref(fromModel.href || (item && item.href) || id),
+        title: fromModel.title || (item && item.title) || id,
+        evidence: fromModel.evidence || (item && item.titleZh) || '',
+        tags: fromModel.tags || [],
+        score: fromModel.score,
+        section: fromModel.section || '',
+      };
+    }
+    return {
+      id: id,
+      href: normalizeRouteHref((item && item.href) || id),
+      title: (item && item.title) || id,
+      evidence: (item && item.titleZh) || '',
+      tags: [],
+      score: null,
+      section: '',
+    };
+  }
+
+  function renderFavoritePaper(p, readMap, currentPaperId) {
+    var html = renderPaper(p, readMap, currentPaperId);
+    var removeBtn =
+      '<button type="button" class="dpr-sidebar-favorite-remove-btn" data-remove-favorite="' +
+      safeAttr(paperIdentity(p)) +
+      '" title="取消收藏" aria-label="取消收藏">★</button>';
+    return html.replace(
+      '<div class="dpr-sidebar-paper-actions" aria-label="论文标记">',
+      '<div class="dpr-sidebar-paper-actions" aria-label="论文标记">' + removeBtn
+    );
+  }
+
+  function renderFavoritesBodyHtml(viewState) {
+    var vs = resolveViewState(viewState);
+    var items = [];
+    var favApi = null;
+    try {
+      favApi = (typeof window !== 'undefined' && window.DPRFavorites) ||
+        (typeof globalThis !== 'undefined' && globalThis.DPRFavorites) ||
+        null;
+    } catch (e) {
+      favApi = null;
+    }
+    try {
+      if (favApi && typeof favApi.listFavorites === 'function') {
+        items = favApi.listFavorites() || [];
+      }
+    } catch (e) {
+      items = [];
+    }
+    var keyword = String(vs.search || '').trim().toLowerCase();
+    var currentPaperId = vs.currentPaperHref ? paperIdFromHref(vs.currentPaperHref) : '';
+    var papers = items
+      .map(function (item) { return favoriteRecordToPaper(item, state.model); })
+      .filter(function (paper) {
+        if (keyword && paperSearchText(paper).indexOf(keyword) < 0) return false;
+        if (vs.filter === 'unread' && paperReadStatus(paper, vs.readMap)) return false;
+        return true;
+      });
+    var html = [];
+    html.push('<section class="dpr-sidebar-favorites-view">');
+    html.push('<div class="dpr-sidebar-favorites-head">');
+    html.push('<div class="dpr-sidebar-favorites-title">收藏夹 <span class="dpr-sidebar-favorites-count">' + papers.length + '</span></div>');
+    html.push('<div class="dpr-sidebar-favorites-note">连续按三下空格可收藏当前论文</div>');
+    html.push('</div>');
+    if (!papers.length) {
+      html.push('<div class="dpr-sidebar-empty">暂无收藏</div>');
+    } else {
+      html.push('<ul class="dpr-sidebar-favorites-list">');
+      papers.forEach(function (paper) {
+        html.push(renderFavoritePaper(paper, vs.readMap, currentPaperId));
+      });
+      html.push('</ul>');
+    }
+    html.push('</section>');
+    return html.join('');
+  }
+
   function renderBodyHtml(model, viewState) {
+    if ((viewState && viewState.contentMode) === 'favorites' || state.contentMode === 'favorites') {
+      return renderFavoritesBodyHtml(viewState);
+    }
     var html = [];
     var vs = resolveViewState(viewState);
     var unreadOnly = vs.filter === 'unread';
@@ -1717,6 +1862,7 @@
   function renderBody() {
     var readMap = ReadState.getAll();
     var viewState = {
+      contentMode: state.contentMode,
       expandedGroups: state.expandedGroups,
       dailyViewMode: state.dailyViewMode,
       dailyCalendarPlacement: state.dailyCalendarPlacement,
@@ -1731,6 +1877,11 @@
       readMap: readMap,
       unreadResultPaperIds: state.filter === 'unread' ? ensureUnreadSessionPaperIds(state.model, readMap) : state.unreadResultPaperIds,
       expandedAxisSections: state.expandedAxisSections,
+      currentPaperHref: state.contentMode === 'favorites'
+        ? normalizeRouteHref(state.pendingPaperHref || currentRouteHref())
+        : resolveCurrentPaperHrefForRender(state.model, {
+            currentPaperHref: state.pendingPaperHref || currentRouteHref(),
+          }),
     };
     state.bodyEl.innerHTML = renderBodyHtml(state.model, viewState);
     schedulePaperTitleOverflowMarks(state.bodyEl);
@@ -2121,7 +2272,7 @@
     var li = state.bodyEl.querySelector(
       '.dpr-sidebar-paper[data-href="' + cssEscape(href) + '"]'
     );
-    if (!li && syncAxisStateToHref(href)) {
+    if (!li && state.contentMode !== 'favorites' && syncAxisStateToHref(href)) {
       renderBody();
       updateReadStateMarks();
       applyFilterAndSearch();
@@ -2318,7 +2469,29 @@
         e.preventDefault();
         openFavoritesPanel();
         if (isOverlaySidebarViewport()) {
-          toggleMobile(false);
+          // 收藏夹在侧栏内，移动端保持侧栏打开便于点论文
+        }
+        return;
+      }
+      var homeOrTutorial = e.target.closest('.dpr-sidebar-quick-home, .dpr-sidebar-quick-tutorial');
+      if (homeOrTutorial && state.contentMode === 'favorites') {
+        closeFavoritesPanel();
+      }
+      var removeFavoriteBtn = e.target.closest('[data-remove-favorite]');
+      if (removeFavoriteBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        var removeId = removeFavoriteBtn.getAttribute('data-remove-favorite') || '';
+        try {
+          if (window.DPRFavorites && typeof window.DPRFavorites.removeFavorite === 'function') {
+            window.DPRFavorites.removeFavorite(removeId);
+            if (window.DPRFavorites.showToast) {
+              window.DPRFavorites.showToast('已取消收藏');
+            }
+          }
+        } catch (err) {}
+        if (state.contentMode === 'favorites') {
+          rerenderSidebarBody({ syncActive: false });
         }
         return;
       }
@@ -2577,6 +2750,14 @@
     state.rootEl = ensureRoot();
     applySidebarWidth(loadPersistedSidebarWidth());
     state.rootEl.innerHTML = '<div class="dpr-sidebar-loading">加载中…</div>';
+    document.addEventListener('dpr-favorites-changed', function () {
+      if (state.contentMode === 'favorites') {
+        rerenderSidebarBody({ syncActive: false });
+      }
+    });
+    document.addEventListener('dpr-open-favorites', function () {
+      setContentMode('favorites');
+    });
     loadAndRender();
   }
 
@@ -2597,6 +2778,8 @@
     setCollapsed: function (collapsed) { return applySidebarCollapsed(collapsed); },
     syncResponsiveSidebarMode: syncResponsiveSidebarMode,
     openSettingsPanel: openSettingsPanel,
+    openFavoritesPanel: openFavoritesPanel,
+    closeFavoritesPanel: closeFavoritesPanel,
   };
 
   // 让正文页（评分按钮）和 docsify 插件能消费侧栏状态。
@@ -2643,14 +2826,18 @@
         updatePaperTitleOverflowMarks: updatePaperTitleOverflowMarks,
         renderQuickLink: renderQuickLink,
         renderFeedbackQuickButton: renderFeedbackQuickButton,
+        renderFavoritesQuickButton: renderFavoritesQuickButton,
         renderSidebarHeader: renderSidebarHeader,
         renderSidebarFooterControls: renderSidebarFooterControls,
+        renderFavoritesBodyHtml: renderFavoritesBodyHtml,
         applySidebarCollapsed: applySidebarCollapsed,
         toggleSidebarCollapsed: toggleSidebarCollapsed,
         syncResponsiveSidebarMode: syncResponsiveSidebarMode,
         openSettingsPanel: openSettingsPanel,
         openFavoritesPanel: openFavoritesPanel,
+        closeFavoritesPanel: closeFavoritesPanel,
         openFeedbackPanel: openFeedbackPanel,
+        setContentMode: setContentMode,
       },
     };
   }

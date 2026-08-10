@@ -7718,9 +7718,9 @@ body.dpr-sidebar-resizing {
 /* header */
 .dpr-sidebar-header {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   align-items: stretch;
-  gap: 8px;
+  gap: 6px;
   padding: 12px 14px 8px;
   border-bottom: 1px solid #f1f5f9;
   flex-shrink: 0;
@@ -7779,6 +7779,18 @@ body.dpr-sidebar-resizing {
   background: #dcfce7;
   border-color: #4ade80;
   color: #14532d;
+  outline: none;
+}
+.dpr-sidebar-favorites-btn.is-active {
+  color: #92400e;
+  background: #fffbeb;
+  border-color: #fcd34d;
+  box-shadow: inset 0 0 0 1px rgba(245, 158, 11, 0.12);
+}
+.dpr-sidebar-favorites-btn.is-active:hover,
+.dpr-sidebar-favorites-btn.is-active:focus-visible {
+  background: #fef3c7;
+  border-color: #fbbf24;
   outline: none;
 }
 @media (max-width: 420px) {
@@ -8711,138 +8723,62 @@ body.dpr-sidebar-resizing {
   align-items: center;
   gap: 8px;
 }
-.dpr-sidebar-settings-btn,
-.dpr-sidebar-favorites-btn {
+.dpr-sidebar-settings-btn {
   margin-left: 0;
 }
 
-/* 收藏夹面板 */
-.dpr-favorites-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 10050;
-  display: none;
-  align-items: center;
-  justify-content: center;
-  padding: 24px 16px;
-  background: rgba(15, 23, 42, 0.42);
-  opacity: 0;
-  transition: opacity .18s ease;
+/* 收藏夹：侧栏内列表（与普通论文行同构） */
+.dpr-sidebar-favorites-view {
+  padding: 8px 0 16px;
 }
-.dpr-favorites-overlay.show {
-  opacity: 1;
+.dpr-sidebar-favorites-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding: 8px 14px 10px;
+  background: var(--dpr-sidebar-surface, #fff);
+  border-bottom: 1px solid #f1f5f9;
 }
-.dpr-favorites-modal {
-  width: min(560px, 94vw);
-  max-height: min(78vh, 720px);
-  display: flex;
-  flex-direction: column;
-  background: #fff;
-  border-radius: 12px;
-  box-shadow: 0 18px 48px rgba(15, 23, 42, 0.22);
-  overflow: hidden;
-}
-.dpr-favorites-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 14px 16px;
-  border-bottom: 1px solid #eef2f7;
-}
-.dpr-favorites-title {
-  font-size: 16px;
-  font-weight: 650;
+.dpr-sidebar-favorites-title {
+  font-size: 14px;
+  font-weight: 600;
   color: #0f172a;
 }
-.dpr-favorites-close {
-  border: 1px solid #e2e8f0;
-  background: #fff;
-  color: #475569;
-  border-radius: 6px;
-  padding: 4px 10px;
-  font-size: 13px;
-  cursor: pointer;
-}
-.dpr-favorites-close:hover {
-  background: #f8fafc;
-}
-.dpr-favorites-note {
-  margin: 0;
-  padding: 10px 16px 0;
-  font-size: 12px;
-  line-height: 1.5;
+.dpr-sidebar-favorites-count {
+  margin-left: 4px;
+  font-weight: 500;
   color: #64748b;
+  font-size: 12px;
 }
-.dpr-favorites-note kbd {
-  display: inline-block;
-  padding: 0 5px;
-  border: 1px solid #cbd5e1;
-  border-bottom-width: 2px;
-  border-radius: 4px;
-  background: #f8fafc;
-  font-size: 11px;
+.dpr-sidebar-favorites-note {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #94a3b8;
+  line-height: 1.4;
 }
-.dpr-favorites-list {
+.dpr-sidebar-favorites-list {
   list-style: none;
   margin: 0;
-  padding: 10px 12px 14px;
-  overflow: auto;
+  padding: 4px 0 0;
 }
-.dpr-favorites-empty {
-  padding: 28px 12px;
-  text-align: center;
-  color: #94a3b8;
-  font-size: 13px;
-  line-height: 1.6;
-}
-.dpr-favorites-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 10px 10px;
-  border: 1px solid #eef2f7;
-  border-radius: 8px;
-  background: #fff;
-  margin-bottom: 8px;
-}
-.dpr-favorites-item:last-child {
-  margin-bottom: 0;
-}
-.dpr-favorites-item-link {
-  flex: 1;
-  min-width: 0;
-  text-decoration: none;
-  color: inherit;
-}
-.dpr-favorites-item-title {
-  font-size: 13px;
-  line-height: 1.45;
-  color: #0f172a;
-  font-weight: 560;
-}
-.dpr-favorites-item-zh {
-  margin-top: 3px;
-  font-size: 12px;
-  line-height: 1.4;
-  color: #64748b;
-}
-.dpr-favorites-remove {
-  width: 28px;
-  height: 28px;
-  flex-shrink: 0;
+.dpr-sidebar-favorite-remove-btn {
   border: 0;
-  border-radius: 6px;
   background: transparent;
-  color: #94a3b8;
-  font-size: 18px;
+  color: #f59e0b;
+  font-size: 12px;
   line-height: 1;
+  padding: 2px 4px;
+  border-radius: 4px;
   cursor: pointer;
+  opacity: 0.85;
 }
-.dpr-favorites-remove:hover {
-  background: #fef2f2;
-  color: #dc2626;
+.dpr-sidebar-favorite-remove-btn:hover,
+.dpr-sidebar-favorite-remove-btn:focus-visible {
+  background: #fffbeb;
+  color: #b45309;
+  outline: none;
 }
+
 .dpr-favorites-toast {
   position: fixed;
   left: 50%;
@@ -8866,31 +8802,15 @@ body.dpr-sidebar-resizing {
 .dpr-favorites-toast.is-error {
   background: rgba(185, 28, 28, 0.94);
 }
-body.dpr-dark .dpr-favorites-modal {
-  background: #0f172a;
-  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.45);
-}
-body.dpr-dark .dpr-favorites-header {
+body.dpr-dark .dpr-sidebar-favorites-head {
+  background: var(--dpr-sidebar-surface, #0f172a);
   border-bottom-color: #1e293b;
 }
-body.dpr-dark .dpr-favorites-title {
+body.dpr-dark .dpr-sidebar-favorites-title {
   color: #e2e8f0;
 }
-body.dpr-dark .dpr-favorites-close {
-  background: #111827;
-  border-color: #334155;
-  color: #cbd5e1;
-}
-body.dpr-dark .dpr-favorites-item {
-  background: #111827;
-  border-color: #1e293b;
-}
-body.dpr-dark .dpr-favorites-item-title {
-  color: #e2e8f0;
-}
-body.dpr-dark .dpr-favorites-item-zh,
-body.dpr-dark .dpr-favorites-note,
-body.dpr-dark .dpr-favorites-empty {
+body.dpr-dark .dpr-sidebar-favorites-note,
+body.dpr-dark .dpr-sidebar-favorites-count {
   color: #94a3b8;
 }
 

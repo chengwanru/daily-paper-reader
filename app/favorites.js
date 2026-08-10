@@ -18,14 +18,6 @@
     return id ? `#/${id}` : '';
   };
 
-  const escapeHtml = (value) =>
-    String(value || '')
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
-
   const loadAll = () => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
@@ -181,86 +173,32 @@
     return result;
   };
 
-  const closeFavoritesPanel = () => {
-    const overlay = document.getElementById('dpr-favorites-overlay');
-    if (!overlay) return;
-    overlay.classList.remove('show');
-    window.setTimeout(() => {
-      if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
-    }, 180);
-  };
-
-  const renderFavoritesPanel = () => {
-    const items = listFavorites();
-    const listHtml = items.length
-      ? items
-          .map((item) => {
-            const subtitle = item.titleZh && item.titleZh !== item.title
-              ? `<div class="dpr-favorites-item-zh">${escapeHtml(item.titleZh)}</div>`
-              : '';
-            return (
-              `<li class="dpr-favorites-item" data-favorite-id="${escapeHtml(item.id)}">` +
-              `<a class="dpr-favorites-item-link" href="${escapeHtml(item.href)}">` +
-              `<div class="dpr-favorites-item-title">${escapeHtml(item.title)}</div>` +
-              subtitle +
-              `</a>` +
-              `<button type="button" class="dpr-favorites-remove" data-remove-favorite="${escapeHtml(item.id)}" aria-label="取消收藏" title="取消收藏">×</button>` +
-              `</li>`
-            );
-          })
-          .join('')
-      : '<li class="dpr-favorites-empty">暂无收藏。打开论文后连续按三下空格即可加入。</li>';
-
-    return (
-      `<div class="dpr-favorites-modal" role="dialog" aria-modal="true" aria-label="收藏夹">` +
-      `<div class="dpr-favorites-header">` +
-      `<div class="dpr-favorites-title">收藏夹</div>` +
-      `<button type="button" class="dpr-favorites-close" aria-label="关闭">关闭</button>` +
-      `</div>` +
-      `<p class="dpr-favorites-note">读论文时连续按三下 <kbd>Space</kbd> 可加入收藏。</p>` +
-      `<ul class="dpr-favorites-list">${listHtml}</ul>` +
-      `</div>`
-    );
-  };
-
+  // 收藏夹改在侧栏内展示；这里只负责切换侧栏视图。
   const openFavoritesPanel = () => {
-    let overlay = document.getElementById('dpr-favorites-overlay');
-    if (!overlay) {
-      overlay = document.createElement('div');
-      overlay.id = 'dpr-favorites-overlay';
-      overlay.className = 'dpr-favorites-overlay';
-      document.body.appendChild(overlay);
+    try {
+      if (window.DPRSidebar && typeof window.DPRSidebar.openFavoritesPanel === 'function') {
+        return !!window.DPRSidebar.openFavoritesPanel();
+      }
+    } catch {
+      // ignore
     }
-    overlay.innerHTML = renderFavoritesPanel();
-    overlay.style.display = 'flex';
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => overlay.classList.add('show'));
-    });
+    try {
+      document.dispatchEvent(new CustomEvent('dpr-open-favorites'));
+      return true;
+    } catch {
+      return false;
+    }
+  };
 
-    const onClick = (e) => {
-      if (e.target === overlay) {
-        closeFavoritesPanel();
-        return;
+  const closeFavoritesPanel = () => {
+    try {
+      if (window.DPRSidebar && typeof window.DPRSidebar.closeFavoritesPanel === 'function') {
+        return !!window.DPRSidebar.closeFavoritesPanel();
       }
-      if (e.target.closest('.dpr-favorites-close')) {
-        e.preventDefault();
-        closeFavoritesPanel();
-        return;
-      }
-      const removeBtn = e.target.closest('[data-remove-favorite]');
-      if (removeBtn) {
-        e.preventDefault();
-        e.stopPropagation();
-        removeFavorite(removeBtn.getAttribute('data-remove-favorite'));
-        overlay.innerHTML = renderFavoritesPanel();
-        return;
-      }
-      const link = e.target.closest('.dpr-favorites-item-link');
-      if (link) {
-        closeFavoritesPanel();
-      }
-    };
-    overlay.onclick = onClick;
+    } catch {
+      // ignore
+    }
+    return false;
   };
 
   // 连续三击空格检测（单次/双次仍交给调用方执行原空格行为）
