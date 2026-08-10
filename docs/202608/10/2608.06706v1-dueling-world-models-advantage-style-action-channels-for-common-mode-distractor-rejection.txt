@@ -1,0 +1,736 @@
+Title: Dueling World Models: Advantage-Style Action Channels for Common-Mode Distractor Rejection
+
+URL Source: https://arxiv.org/pdf/2608.06706v1
+
+Published Time: Mon, 10 Aug 2026 00:20:18 GMT
+
+Number of Pages: 17
+
+Markdown Content:
+# Dueling World Models: Advantage-Style Action Channels for Common-Mode Distractor Rejection 
+
+# Jiazhuo Li 1∗† , Yiming Fei 2∗, Zhiruo Zhou 3, Heikichi Hayashi 4
+
+> 1
+
+University of Michigan, Ann Arbor, MI, USA 
+
+> 2
+
+Zhejiang University, Hangzhou, China 
+
+> 3
+
+Wuhan University of Technology, Wuhan, China 
+
+> 4
+
+Adrasteia Labs jiazhuo@umich.edu 
+
+Abstract 
+
+Latent world models plan by predicting future states from an action, but when a scene contains motion the agent does not control, they quietly go action-blind: predictions for differ-ent actions become indistinguishable even as the training loss keeps improving. Existing remedies suppress this distraction with reconstruction, task reward, or auxiliary objectives, each adding machinery or assumptions. We show that a minimal alternative suffices, borrowed from the dueling decomposition of value into a state baseline and an action advantage: in latent dynamics, subtracting a prediction’s mean effect over actions cancels whatever the actions share—the action-independent variation where distractors live—leaving a clean, controllable channel, with no reward, no reconstruction, and no distractor-specific auxiliary loss. Because this is only a subtraction at readout time, it applies unchanged to any action-conditioned world model, including frozen pretrained ones. Across a grid-world, synthetic generators with known factors, distracting continuous control, and natural-pixel Atari, the isolated chan-nel recovers the agent’s own effect where entangled predictors fail, with nuisance leak indistinguishable from zero; applied post hoc it surfaces an action channel in off-the-shelf models that their raw readouts miss, and it converts into goal-reaching control in the gridworld. We prove the cancellation is exact in finite samples for both discrete and sampled action sets, and we state its measured boundary—distractors whose motion tracks the action—together with the remaining limitations in the appendix. 
+
+# 1 Introduction 
+
+Latent world models (Ha and Schmidhuber 2018; Hafner et al. 2023) increasingly follow the joint-embedding predic-tive architecture (JEPA) recipe (LeCun 2022): encode ob-servations, predict future embeddings rather than pixels, and plan in the learned latent space (Assran et al. 2025; Zhou et al. 2025; Maes et al. 2026). Under action-conditioned in-stances, one monolithic predictor P (z, a ) absorbs everything predictable about the next embedding: the consequences of the agent’s action, but also the autonomous evolution of what-ever else fills the frame. That distraction degrades learned action and dynamics channels is by now established—latent 
+
+> ∗
+
+These authors contributed equally. 
+
+> †
+
+Corresponding author. 
+
+actions absorb distractor dynamics unless grounded by true action labels (Nikulin et al. 2025) or purged with external segmentation masks (Fechner et al. 2026). Existing remedies buy the separation with extra machinery: reconstruction and reward-based factorisation (Fu et al. 2021; Wang et al. 2022), separate controllable and uncontrollable branches (Pan et al. 2022), bisimulation-style objectives (Zhu et al. 2023), or an auxiliary inverse-dynamics incentive on a monolithic predic-tor (Ivashkov, Balestriero, and Schölkopf 2026). Each adds a loss, a decoder, or an assumption about the distractor pro-cess, and none isolates the action channel as a property of the predictor itself. Under action-labeled circumstances, we ask the mechanism question: what structure inside the predictor makes the given actions count? We first quantify the failure. In a 13 ×13 FourRooms grid-world we add n rolling binary distractor cells that are action-independent and track action separation (AS): the mean pair-wise distance between the predictor’s outputs for different ac-tions at the same state. As n grows to 30 , AS collapses from 
+
+≈1.28 to ≈0.002 —for every architecture we train, including ours (Fig. 2): the one-step prediction is dominated by the distractor field, and the action’s contribution shrinks below numerical relevance. Probing shows the information is not lost, as the action’s effect remains recoverable from the repre-sentation. Yet the predictor simply stops routing it anywhere readable. The failure is silent (embedding-prediction vali-dation loss keeps improving) but not benign: goal-reaching control with the standard predictor degrades sharply, and standard model selection actively prefers the pathology—on Atari Freeway, validation-loss checkpoint selection returned action-collapsed checkpoints in 17 of 36 runs. Therefore, we propose a fix that restructures the predic-tor into two streams: a passive stream that predicts how the scene evolves with the action marginalised out, and an action stream that is centered , in the sense that the mean predic-tion over actions is subtracted from it before it is added back. That subtraction is an algebraic identity rather than a learned tendency: whatever enters the action stream iden-tically across actions —common-mode variation, including whatever action-independent distractors contribute—is re-moved exactly, leaving only what distinguishes one action from another. It survives estimation, staying exact when the mean is taken over sampled actions rather than enumer-arXiv:2608.06706v1 [cs.LG] 7 Aug 2026 ated (Sec. 3). This is a claim about per-transition common-mode structure , not about the distractor process: it needs no process-level exogeneity assumption (Efroni et al. 2022), no reward, and no reconstruction (Fu et al. 2021; Wang et al. 2022; Pan et al. 2022). Whether real distractors ac-tually enter as common mode is an empirical question; our results across gridworld and Atari indicate that they over-whelmingly do. The subtraction is Dueling DQN’s identity 
+
+Q = V + ( A − ¯A) (Wang et al. 2016) transplanted from scalar values to vector latent dynamics, where centering—an identifiability device in the original—acquires a second role: common-mode rejection. The action-marginal baseline itself appears in Seitzer, Schölkopf, and Martius (2021) as a post-hoc scalar influence score for exploration, and concurrent work (Ivashkov, Balestriero, and Schölkopf 2026) pursues the same distractor-discarding outcome through an inverse-dynamics auxiliary loss on a monolithic predictor. Our claim is the readout, not the architecture: a vector-valued, common-mode–invariant action channel that centering exposes in any action-conditioned predictor—post hoc on frozen models, or embedded in the parameterization, where its invariance needs no auxiliary objective. We call the resulting model AD-JEPA (Action-Decomposed JEPA). 1
+
+The same scoping that gives the guarantee defines its limit: distractors whose dynamics correlate with the agent’s actions are not common mode and are not cancelled. We construct such cases and measure the failure—offset probes collapse to chance and nuisance rejection breaks—consistent with the published stress cases, reafferent distractors (Hutson, Kau-var, and Haber 2024) and agent-like distractors (Wang et al. 2024); incentive-based separation concedes the same failure mode (Ivashkov, Balestriero, and Schölkopf 2026). We report this boundary alongside every positive result. We also report a negative result on our own ladder: a learned gate stacked on centering is inert (it degenerates to uniform down-scaling rather than sparse selection), so centering alone is the mech-anism. 
+
+Contributions. 
+
+• We propose action-mean centering , a one-line restructur-ing of an action-conditioned latent predictor that makes its action channel common-mode–invariant, and we analyse it: the cancellation is exact in finite samples for discrete and sampled action sets alike (Propositions 1–2), with a precisely scoped boundary—action-correlated variation passes through untouched. 
+
+• We give an implementation and validate it across four settings—a gridworld, synthetic generators with known factors, distracting continuous control, and natural-pixel Atari—where the centered channel preserves the agent’s own effect with nuisance leak indistinguishable from zero, and converts into goal-reaching control in the gridworld. 
+
+• Because the mechanism lives in the readout rather than the architecture, it applies to models we did not train: the same   
+
+> 1Not to be confused with AD-L-JEPA (Zhu et al. 2026), a self-supervised LiDAR pre-training method for autonomous driving; the acronym collision is coincidental—there “AD” abbreviates au-tonomous driving , here action-decomposed .
+
+subtraction surfaces an action channel in frozen RePo and TIA world models whose raw readouts show none, which suggests such a channel is latent in action-conditioned predictors generally and merely unrouted (Sec. 4.4). All results use three seeds unless a caption states otherwise (frozen-host cells: one training run each, readout ±s.d. over five probe seeds). 
+
+# 2 Related Work 
+
+Our contribution intersects three lines of work: advantage-style decompositions that center predictions on an action marginal, latent-action and JEPA world models, and factored world models that separate controllable from exogenous dy-namics. That distractors contaminate the action channels of learned dynamics models is by now an established problem (Nikulin et al. 2025; Fechner et al. 2026); we claim a mech-anism, not the problem statement. Dueling DQN (Wang et al. 2016) writes Q = V +( A− ¯A),where subtracting the action mean is purely an identifiabil-ity device for scalar values. Transplanted to vector-valued latent dynamics, the same subtraction acquires a second se-mantics: any variation entering the per-action offsets iden-tically across actions (common-mode) cancels exactly, in the discrete and the sampled continuous case alike (§3). The arithmetic—comparing action-conditioned predictions with their mean over sampled actions—is CAI’s (Seitzer, Schölkopf, and Martius 2021), applied there post hoc as a scalar causal-influence score for exploration; the Feedback World Model (An et al. 2026) distills counterfactual varia-tion over sampled actions into per-dimension controllability weights, estimated offline and applied only during diffusion-policy guidance. Our claim is the promotion of this baseline from scalar diagnostic to channel: a vector-valued, common-mode–invariant action readout that applies post hoc to frozen predictors and, optionally, embeds in the parameterization— where it exists throughout learning and adds no auxiliary objective. Action-conditioned JEPA world models—LeWM (Maes et al. 2026) with LeJEPA-style regularization (Balestriero and LeCun 2025), V-JEPA 2-AC (Assran et al. 2025), and DINO-WM (Zhou et al. 2025)—train or post-train a single monolithic predictor P (z, a ) in which control-lable and exogenous dynamics remain entangled. SMWM (Ivashkov, Balestriero, and Schölkopf 2026) shares our out-come claim—a reward- and reconstruction-free JEPA world model that discards uncontrollable distractors—but pursues it by incentive, an inverse-dynamics auxiliary loss on a mono-lithic transformer; our separation is structural, an identity of the parameterization rather than a learned tendency. In the latent-action literature, LAPO (Schmidt and Jiang 2024), Genie (Bruce et al. 2024), and DynaMo (Cui et al. 2024) recover actions through inverse/forward-dynamics bottle-necks but leave the forward predictor undecomposed; LAOM (Nikulin et al. 2025) shows observation-only latent actions require action supervision under distractors—precisely our action-labeled regime, where centering isolates the control-lable channel with no further signals. MaskLAM (Fechner et al. 2026) purges distractors with external segmentation masks plus reconstruction, presupposing spatial separabil-ity. AC-LAM (Wei et al. 2026) is the nearest structural rel-ative: an additivity prior forbids scene-constant offsets in inferred pseudo-actions, but as a soft constraint with no action-marginal baseline; centering cancels any common-mode component on true actions, as a parameterization. PLSM (Saanum, Dayan, and Schulz 2024) regularizes how the transition depends on the state; we decompose how it depends on the action—orthogonal axes. TIA (Fu et al. 2021) and Denoised MDPs (Wang et al. 2022) factor the latent state using reward, reconstruction, and independence structure—the three dependencies center-ing removes. Iso-Dream and Iso-Dream++ (Pan et al. 2022, 2023) train separate controllable/noncontrollable RSSM branches with reconstruction and inverse-dynamics losses: a learned, incentive-based split where ours is identity-level cancellation. The Ex-BMDP line (Efroni et al. 2022; Lamb et al. 2022; Islam et al. 2023; Levine, Stone, and Zhang 2024) proves exogenous filtering under process-level exogeneity and finite-state conditions; we require only per-transition common-mode structure—an architectural identity per tran-sition, not an asymptotic recovery result. DreamerPro (Deng, Jang, and Ahn 2022), RePo (Zhu et al. 2023), and HRSSM (Sun et al. 2024) obtain reconstruction-free or bisimulation-style robustness without an explicit controllability channel (the latter two reward-dependent), and InfoPower (Bharad-hwaj et al. 2022) contrasts action-conditioned against action-marginal information inside reward-driven training—a vari-ational cousin of centering. Earlier controllability partitions separate factors via per-factor policies or adversarial losses (Thomas et al. 2017, 2018; Sawada 2018; Kooi, Hoogen-doorn, and François-Lavet 2022); ours is algebraic. Finally, two works delimit the boundary of our guarantee: AD3 (Wang et al. 2024) generatively infers implicit actions for agent-like distractors, and Policy-Shaped Prediction (Hutson, Kauvar, and Haber 2024) introduces the Reafferent DMC benchmark of action-correlated distractors. Both exemplify the action-modulated regime that common-mode cancella-tion explicitly excludes—a failure mode SMWM concedes as well—and we return to it in §5.1. 
+
+# 3 Method 
+
+AD-JEPA learns a latent world model from reward-free, action-labeled transitions (ot, a t, o t+1 ), with no decoder and no reconstruction. The design goal is not to remove dis-tractor information from the representation, but to control 
+
+where it lives: the predictor is restructured so that its action-dependent pathway cannot carry variation that is common across actions. 
+
+3.1 JEPA Backbone 
+
+Following the joint-embedding predictive architecture (Le-Cun 2022), an online encoder maps observations to latents 
+
+zt ∈ Rd and a predictor maps (zt, a t) to ˆzt+1 ; targets come from an EMA target encoder held fixed by a stop-gradient, as in BYOL (Grill et al. 2020). Action-conditioned JEPA world models (Zhou et al. 2025; Assran et al. 2025) implement the predictor as one monolithic network P (zt, a t); nothing in that parameterization separates what the action changes from what would have happened anyway, and under distractors the two entangle freely. AD-JEPA is a drop-in restructuring of this predictor. 
+
+3.2 Action-Decomposed Predictor 
+
+We decompose the predictor into a passive head and a cen-tered action-offset head: 
+
+ˆzt+1 = B(zt) + ∆( zt, a t) − ¯∆( zt)| {z }
+
+> u(zt, a t)
+
+, (1) where ¯∆( z) = Ea′∼ν [∆( z, a ′)] is the mean offset under a proposal ν over actions. The passive head B predicts how the scene evolves with the action marginalized out; the effective action channel u(z, a ) = ∆( z, a ) − ¯∆( z) carries only the action-contrastive part of the dynamics. (The gated ablation of Sec. 4.1 additionally scales the channel elementwise by a learned C(z) ∈ (0 , 1) d; Appendix F shows this gate degen-erates to uniform down-scaling, and we report it as a negative result.) The construction transplants the dueling decomposition 
+
+Q = V + ( A − mean a A) of Wang et al. (2016) from scalar values to vector latent dynamics, where the subtraction ac-quires a second semantics. As in dueling Q-learning it is an identifiability device—for any c(z), replacing ∆ 7 → ∆ + c
+
+leaves u unchanged, so the channel is well defined though ∆
+
+alone is not— and it performs exact common-mode rejection (Proposition 1). Without it, the same degeneracy lets gra-dient descent park arbitrary state- and distractor-dependent variation in the offsets, and empirically it does (Secs. 4.3, 4.2). 
+
+Estimating the action mean. For discrete action sets A we take ν uniform and enumerate: ¯∆( z) = 1
+
+> |A|
+
+P 
+
+> a′∈A
+
+∆( z, a ′),computed exactly at every step. For continuous actions, enu-meration is unavailable and ¯∆ is replaced by a Monte-Carlo mean over K=16 candidate actions: the executed action, with the remaining K−1 split evenly between actions resampled from the replay buffer and Gaussian perturbations of the exe-cuted action (standard deviation 0.3 of the action half-range, clipped to the action bounds). Proposition 2 (Sec. 3.4) shows this estimate leaves the cancellation untouched—exact at any finite K—and confines the O(1 /√K), proposal-dependent sampling error to the centering point , an action-independent shift; only under discrete enumeration is the centering point itself exact. The conditioning of ¯∆ on z is load-bearing: on frozen hosts, subtracting the global mean offset instead leaves the channel unrecovered (Appendix G.1)—the com-mon mode being cancelled is state-conditional. The arith-metic of comparing action-conditioned predictions against their sampled mean is CAI’s (Seitzer, Schölkopf, and Mar-tius 2021), applied there as a post-hoc scalar influence score; AD-JEPA promotes it to a trained, vector-valued channel centered at every forward pass. 
+
+3.3 Training Objective 
+
+The model is trained with 
+
+L = Lpred + λact Lact + λoff Loff 
+
++ λreg Lreg (+ λgate Lgate ), (2) Figure 1: Centering as a universal plug-in. (a) For any action-conditioned world model—our JEPA variants, an RSSM prior, or a frozen third-party host—subtracting the mean prediction over candidate actions yields the effective action channel u(z, a ):a readout, applied post hoc with no retraining. (b) What “distraction” means (FourRooms): distractor cells move identically under every action (common-mode), so they enter ¯∆ and cancel; the agent’s next cell depends on the action and survives in u.Action-correlated distractors break the premise—the stated boundary. with the gate term active only in the gated variant. Lpred =2 − 2 cos  ˆzt+1 , sg[˜ zt+1 ] is the scale-free JEPA prediction loss against the stop-gradient EMA target. Lact is an In-foNCE term (van den Oord, Li, and Vinyals 2018) over the K
+
+counterfactual-action predictions of Eq. (1): a cross-entropy over cosine similarities to the target requires the executed ac-tion’s prediction to be closest—penalizing action-insensitive predictors. Loff is a compactness penalty, the squared norm of the executed action’s effective offset, discouraging the channel from absorbing state persistence ( λoff = 10 −4). 
+
+Lreg is a VICReg-style anti-collapse regularizer on the online embeddings—batch-mean centering, a variance hinge, and a covariance penalty (Bardes, Ponce, and LeCun 2022)—with 
+
+λreg = 0 .1. For the gated variant, Lgate is an L1 penalty on the gate values ( λgate = 10 −5), held at zero for the first 20% of training and then ramped in. All variants train on fixed offline datasets under identical schedules; data col-lection, architectures, remaining hyperparameters, and the action-separation–gated checkpoint-selection protocol are in Appendix A. 
+
+3.4 Common-Mode Cancellation 
+
+The property we claim for Eq. (1) is an identity of the pa-rameterization, not an incentive supplied by a loss. 
+
+Proposition 1 (Common-mode cancellation) . Fix z and sup-pose the offset head decomposes as ∆( z, a ) = g(z, a )+ h(z)
+
+for some g and some action-independent h. Then, with the exact action mean ¯∆( z) = 1
+
+> |A|
+
+P 
+
+> a′∈A
+
+∆( z, a ′), for every action a
+
+∆( z, a ) − ¯∆( z) = g(z, a ) − 1
+
+> |A|
+
+P 
+
+> a′
+
+g(z, a ′) : 
+
+the common-mode component h cancels exactly, for every value of the parameters and regardless of what h encodes. Proof. h(z) appears once in ∆( z, a ) and once in every term of the mean, so it is subtracted exactly. The same holds for the sampled estimate of the continuous regime: 
+
+Proposition 2 (Sampled centering) . Let ¯∆K (z) =
+
+> 1
+> K
+
+PKk=1 ∆( z, a k) for candidate actions {ak}Kk=1 drawn from a proposal ν, and suppose ∆( z, a ) = g(z, a ) + h(z) as above. Then, for every K and every draw: (i) ∆( z, a ) −
+
+¯∆K (z) = g(z, a ) − 1
+
+> K
+
+P 
+
+> k
+
+g(z, a k)—the common-mode component h cancels exactly; and (ii) the sampling error 
+
+¯∆K (z) − Ea′∼ν [∆( z, a ′)] does not depend on the query action, is O(1 /√K) under bounded second moments of 
+
+g(z, ·), and cancels in any action-differential comparison 
+
+u(z, a ) − u(z, a ′). (Proof and remarks on self-inclusion and proposal bias: Appendix B.) 
+
+Three remarks scope this statement. First , the identity is per-transition and architectural—it holds at initialization, at every step, and at convergence, with no process-level exo-geneity assumption (Efroni et al. 2022). Because ˆzt+1 =
+
+B + u must still match the target, common-mode variation is routed into B: the model is not blind to distractors— z may represent them and B must track them—but u has nowhere to hold them. Rejection is routing, not blindness (Sec. 4.2). 
+
+Second , the guarantee is exactly as strong as the common-mode premise: action-correlated (reafferent) variation enters 
+
+g and passes through untouched (Sec. 5.1); whether real dis-tractors enter as common-mode is empirical—Sec. 4.3 tests it with known factors, and Secs. 4.2 and 4.2 show gridworld and Atari distractors do behave as common-mode in practice. 
+
+Third , the separation is a property of the function class, not the training signal: no auxiliary objective rewards discard-ing uncontrollable variation, in contrast to inverse-dynamics incentives on a monolithic predictor (Ivashkov, Balestriero, and Schölkopf 2026). 
+
+# 4 Experiments 
+
+We ask three questions in turn. Does the centered channel survive distraction where entangled predictors lose it, across environments of different character? What exactly does it contain, when the ground-truth factors are known? And is the effect a property of the readout, so that it transfers to models we did not build? Every configuration uses three seeds; tables report means, with s.e.m. where error bars are shown. 
+
+4.1 Setup and Evaluation Protocol 
+
+Variant ladder. All variants share the encoder, EMA tar-gets, and losses of Sec. 3 and differ only in the predictor: 
+
+standard ˆz′ = P (z, a ); residual z + ∆( z, a ); noncentered 
+
+B(z)+∆( z, a ); centered (ours) B(z)+[∆( z, a )− ¯∆( z)] ; and 
+
+gated , which adds a learned channel gate C(z) and proves inert (Appendix F), so centering is the operative mechanism throughout. The noncentered → centered rung isolates the contribution under test. In the discrete-action environments 
+
+¯∆ is the exact uniform mean over all actions. 
+
+Probing protocol. We measure where information lives, not just whether it is present: for the encoder representation 
+
+z, the raw predicted offset, and the effective offset [∆ − ¯∆] , we fit ridge probes to ground-truth factors (5-fold CV, held-out 
+
+R2). Comparing features distinguishes routing from blind-ness : a factor can be decodable from z yet absent from the effective offset. Action separation (AS) is the mean pair-wise distance among per-action predictions from a common state; AS → 0 means the predictor’s output ignores the ac-tion. Because validation loss alone is an unsafe selection sig-nal here—on Freeway, cosine-loss selection picked action-collapsed checkpoints in 17 of 36 runs—we gate checkpoint selection on AS with a regime-aware threshold. Environ-ments, budgets, distractor knobs and all per-experiment hy-perparameters are in Appendix A. 
+
+4.2 The Centered Channel Survives Distraction 
+
+Three environments of different character make the same point: as distraction grows, the centered offset keeps de-coding the agent’s own effect while the uncentered offset is destroyed. 
+
+Constructed distractors (gridworld). In a 13 ×13 Four-Rooms gridworld we add n rolling binary distractor cells whose dynamics do not depend on the action, so per transi-tion their contribution to the offsets is common-mode. Across 
+
+n = 0 /10 /30 /60 the centered offset probes the agent factor at 0.31 /0.55 /0.73 /0.69 while the noncentered offset falls to 0.18 /0.21 /0.00 /−0.00 (Table 7, Appendix J); in the clean environment the gap is modest, so the benefit is specifically common-mode rejection rather than a generic representation improvement. The channel is preserved but unused : AS col-lapses from ≈1.28 to ≈0.002 for every variant by n≥30 
+
+(Fig. 2), because once distractor variance dominates the tar-get the one-step objective is nearly indifferent to the action. 
+
+Pixel distraction (continuous control). On three DMC tasks (Tassa et al. 2018) we composite 16 action-independent moving occluders onto the observation—a pixel-level ana-logue of Distracting-Control distraction (Stone et al. 2021) that leaves the physics-state probe target clean (Fig. 5)—with 
+
+¯∆ a K=16 Monte-Carlo mean. Per-seed sign consistency is full (9/9): under independent distraction the centered channel probes at 0.25 –0.53 against 0.00 –0.13 noncentered (Table 5, Appendix J). As retention, centering keeps 95–106% of its own distraction-free accuracy where the noncentered abla-tion keeps 32% and 2.6%. Pre-registered criteria and their verbatim outcomes are in Appendix D. 
+
+Natural distractors (Atari). On Freeway (Bellemare et al. 2013) the distraction is generated by the environment itself— ten lanes of streaming traffic—with RAM probe ground truth (Anand et al. 2019) and frameskip as the distractor-strength knob. The centered offset decodes traffic change and traffic state at R2 ∈ [−0.001 , 0.000] at every frameskip, an exactly clean channel on natural pixels, while keeping the agent’s displacement decodable above the action-identity ceiling (0.877 /0.838 /0.795 vs. 0.810 /0.757 /0.683 ; Table 4, Ap-pendix J). Rejection is routing, not blindness: traffic remains decodable from the full latent at R2 ≈ 0.87 for every vari-ant. The noncentered ablation is not merely leaky—the leak crowds out the signal, dropping the agent’s own displacement to 0.149 –0.485 , below even the ceiling. 
+
+The channel converts to behaviour where the model is accurate. Goal-reaching model-predictive control in latent space, on the same gridworld sweep, holds at 0.92 –0.93 for the centered variants across n=10 –60 where the standard predictor falls to 0.57 ±0.03 (Table 10, Appendix J). Control therefore survives the AS collapse above: the planner adds no robustness mechanism, it converts the channel that centering preserves. A pre-registered attempt to repeat this at DMC scale returns a null, reported in full in Sec. 5.1. 
+
+The boundary is shared, and predicted. Making the dis-tractors move with the action breaks the common-mode premise, and every readout fails together: the gridworld off-set probe drops to −0.00 and control collapses to 0.55 –0.57 
+
+for all variants at exactly the configuration where the probe reads chance, and the continuous-action gate breaks rejection likewise. The representation boundary predicts the control boundary, and both fall where the analysis says they must. 
+
+4.3 What the Channel Contains: Recovery without Leakage 
+
+The environments above show the channel survives; they cannot show what it keeps, because the true factors are not separately observable. We therefore build generators whose factors are known by construction: a controllable displace-ment ∆c that depends on the action, a nuisance ∆w that does not, and an encoder that sees only a mixed observation. The nuisance is action-independent per transition (common-mode), not exogenous at the process level (Efroni et al. 2022). Two probes score the channel: held-out R2 against ∆c (re-cover , ↑) and against ∆w (reject , ↓), over 120 configurations spanning both generators and factor dimensionalities. Only the centered variant does both, at R2c = 0 .87 –0.93 
+
+with R2w ≈ − 0.00 across the whole grid (Table 6, Fig. 6, Ap-pendix J). The noncentered ablation is the diagnostic case: it recovers nearly as well but leaks heavily ( 0.74 –0.97 ), so predictive quality and channel purity are different properties. The standard predictor loses the controllable factor outright Figure 2: Gridworld sweep (n rolling distractor cells, 3 seeds). Left: the centered offset keeps decoding the agent’s effect while the noncentered offset collapses. Right: output-level action separation collapses for every variant—the channel is preserved but unused. Legends use the code name dueling for centered. once the nuisance dominates. Residual structure buys recov-ery; subtracting ¯∆ buys rejection. 
+
+Purity is not an artifact of unpredictability. A skeptic can attribute a low nuisance-R2 to unlearnability—no model predicts an unpredictable nuisance—so we sweep the nui-sance from fully predictable to nearly stochastic and mea-sure leak two ways: against the nuisance displacement and against the nuisance state . The confound is real (Table 8): the noncentered ∆-leak decays 0.947 → 0.022 as the nui-sance becomes stochastic—read naively, stochasticity “pu-rifies” the model—while its state-leak persists at 0.80 , be-cause the channel still carries where the nuisance is . Cen-tered is flat at every predictability level, as expected of a per-transition cancellation rather than an incentive that depends on what is learnable. Hence the rule we apply throughout: under stochastic nuisance, measure leak against the nuisance state. 
+
+The sampled estimator preserves the picture. Repeating the same generator with continuous actions and the K=16 
+
+Monte-Carlo mean of Sec. 3, centered recovers at 0.87 and rejects at −0.00 ; noncentered recovers while leaking ( 0.96 ); standard does neither (Table 9, Appendix J). The failure that does register is the intended one—an action-correlated nui-sance breaks rejection to +0 .19 —so the binding assumption is common-mode structure, not the quality of the estimate. 
+
+4.4 Centering as a Plug-in: Frozen RePo and TIA Hosts 
+
+The mechanism is a property of the readout, not of our ar-chitecture: any world model exposing an action-conditioned latent transition admits the same subtraction. We test this on RePo (Zhu et al. 2023) and TIA (Fu et al. 2021), each trained 500k steps on the three DMC tasks under DAVIS video (Pont-Tuset et al. 2017)—their own regime, not ours— comparing three readouts of the same frozen model under one held-out ridge protocol: the full latent, the raw action-delta 
+
+∆( z, a ), and the post-hoc centered channel ∆( z, a ) − ¯∆( z)
+
+Figure 3: Centering as an inference-only plug-in (frozen RePo/TIA, 500k steps, DAVIS video). Raw action-delta probes ≈0; the same model’s centered readout recovers R2
+
+0.19 –0.52 ; trained-in (hatched) matches or exceeds post hoc on five of six cells. Open markers: full-latent reference. Per-cell numbers: Table 2. (K=16 uniform-action mean)—inference-only, no retrain-ing, no training data. The raw action-delta reads ≈0 on every cell ( −0.002 to 
+
++0 .052 ) while the centered readout of the same frozen pre-dictor reaches 0.19 –0.52 (Fig. 3; per-cell numbers in Ta-ble 2)—including on TIA-cartpole, whose full latent has col-lapsed ( 0.03 ) yet still yields a 0.19 centered channel. Train-ing the centering in (both hosts, same budget and regime) passes the same bar on all six cells; against the post-hoc readout it matches or exceeds on RePo ( 0.268 /0.349 /0.577 
+
+vs. 0.264 /0.323 /0.457 ) and is comparable on TIA for cart-pole and reacher ( 0.198 /0.506 vs. 0.190 /0.519 ) but weaker on TIA-cheetah ( 0.168 vs. 0.345 ): the mechanism’s bene-fit is fully available at readout time on a frozen model, and training it in is neither required nor uniformly better. In the trained-in models, linearly decodable action-effect informa-tion concentrates in the offset channel—the full-latent probe falls to between −0.04 and 0.13 across all six cells (frozen baselines: 0.03 –0.79 ); we return to what this concentration implies in Sec. 5.1. 
+
+The matched baseline: post-hoc centering of our own standard predictor. If the mechanism is a readout it must work without our architecture: for any monolithic predic-tor, uP (z, a ) = P (z, a ) − mean a′ P (z, a ′) can be formed at inference time. On FourRooms the centered readout of the plain standard predictor probes at 0.23 /0.66 /0.70 /0.59 
+
+across n=0 /10 /30 /60 vs. 0.31 /0.54 /0.71 /0.66 trained-in (differences ≤ 0.12 either way), and resurrects the trained noncentered variant’s dead channel (0.00 →
+
+0.69 at n=30 ). On DMC the parity is exact to two decimals ( 0.533 /0.328 /0.186 vs. 0.528 /0.323 /0.192 ,reacher/cheetah/cartpole), and within one model the con-trast is stark: the standard predictor’s raw one-step-change probe reads −9.2 (cheetah, video distraction) while the same 
+
+frozen model’s centered readout reads +0 .33 . The action-correlated boundary is readout-independent (every post-hoc channel collapses on d30ac). The channel is a property of action-conditioned prediction itself; the trained decomposi-tion is one convenient instantiation—the one that carries the control result—not a requirement. For existing models we recommend the inference-time form: retrofitting the decom-position into a host’s recurrence degrades its control (returns fall on five of six RePo/TIA cells), while the post-hoc readout leaves behavior untouched by construction. 
+
+Perturbation test with controls. Probes are correlational, so we also test the channel’s direction : push the host’s state along the post-hoc centered offset and decode the induced physics displacement (first-order pushes; the host is not rolled forward—direction, not control; Appendix G.1). On the five hosts whose instrument validates, the decoded displacement aligns with the action’s counterfactual-centered effect in four (cosine +0 .09 to +0 .41 ); an equal-norm random push scores 
+
+≈0, permuting the action pairing collapses the alignment, and subtracting a global mean instead of the state-conditional marginal recovers nothing. The fifth cell is an instructive null—that host keeps physics in its deterministic belief—and across hosts the alignment tracks the pushed block’s physics content ( ρ=0 .90 , n=5 ). 
+
+# 5 Discussion 
+
+5.1 Limitations 
+
+Centering cancels exactly what enters the action offsets iden-tically across actions; it needs no process-level exogeneity assumption (cf. Efroni et al. 2022), but by the same token it offers no guarantee once a distractor’s dynamics are modu-lated by the agent’s action. Our stress tests locate this bound-ary: in the action-correlated FourRooms configuration the centered-offset probe collapses to chance and control de-grades for every variant alike, and rejection breaks in the continuous gate (Secs. 4.2, 4.2, 4.3)—a failure mode shared by the published reafferent and agent-like stress cases (Hut-son, Kauvar, and Haber 2024; Wang et al. 2024) and con-ceded by incentive-based separation (Ivashkov, Balestriero, and Schölkopf 2026); what distinguishes centering is that the boundary is legible in the algebra. Nor does the iden-tity itself guarantee distractor removal: it removes what the 
+
+learned offsets represent identically across actions (a zero-mean interaction sdist (z)ϕ(a) would survive)—so the chan-nel is common-mode–rejecting by construction, distractor-rejecting only as measured (Secs. 4.3, 4.2). Finally, the pre-served channel does not by itself restore control at scale: a multi-step planner converts it into behavior in FourRooms, but a pre-registered DMC-scale attempt missed its gate across a 4× training and 32 × planning ladder—a null whose sig-nature (transient-correct steering, late rollout drift) points to model accuracy rather than a channel defect, though it does not exclude a composition failure at the control hori-zon (Appendix H); a frozen-model perturbation corroborates the channel side (Appendix G). The control claim is therefore sufficiency, never superiority at scale; the payoff we defend is representation-level—the post-hoc channel on frozen predic-tors (Sec. 4.4). Centering marginalizes only the ego action, so entities that react to the agent inherit the reafferent boundary. 
+
+5.2 Outlook 
+
+The decomposition is not tied to one-step prediction: a successor-feature head (Dayan 1993; Barreto et al. 2017) written in centered form, Ψ( z, a ) = Ψ B (z) + [Ψ ∆(z, a ) −
+
+Ea′ Ψ∆(z, a ′)] , extends common-mode rejection to accumu-lated features and, with rewards linear in features, repro-duces the dueling value decomposition—the analogy closes. A common-mode–invariant Ψ∆ is a natural substrate for gen-eralized policy improvement; validating this, and scaling the representation-to-control conversion, is future work. 
+
+# 6 Conclusion 
+
+Action-mean centering restructures an action-conditioned la-tent predictor as ˆz′ = B(z) + [∆( z, a ) − ¯∆( z)] : any vari-ation entering the action offsets identically across actions cancels—exactly, for discrete and sampled action sets alike— with no reward, no reconstruction, and no distractor-specific supervision. Across synthetic, gridworld, distracting-DMC, and Atari testbeds, the centered channel keeps the agent’s own effect decodable where entangled predictors go action-blind, with nuisance leak indistinguishable from zero. The mechanism is a property of the readout, not the architecture: applied post hoc, the same subtraction recovers an action-effect channel from a plain entangled predictor and from frozen RePo and TIA models—no retraining. Control gains come from the passive/offset decomposition rather than cen-tering and do not yet extend beyond the gridworld; the chan-nel’s value is representational, and its boundary—action-correlated distractors—is explicit in its algebra. A learned gate proved inert and is reported as a negative result. We hope centering becomes a default readout for action-conditioned world models. 
+
+# References 
+
+An, T.; Jia, J.; Li, G.; Li, J.; Zhou, C.; Liu, P.; Lyu, B.; Bai, J.; Guo, X.; Li, G.; and Yang, J. 2026. Feedback World Model Enables Precise Guidance of Diffusion Policy. arXiv preprint arXiv:2605.15705 .Anand, A.; Racah, E.; Ozair, S.; Bengio, Y.; Côté, M.-A.; and Hjelm, R. D. 2019. Unsupervised State Representation Learning in Atari. In Advances in Neural Information Pro-cessing Systems 32 (NeurIPS) . ArXiv:1906.08226. Assran, M.; Bardes, A.; Fan, D.; Garrido, Q.; Howes, R.; Komeili, M.; Muckley, M.; Rizvi, A.; Roberts, C.; Sinha, K.; et al. 2025. V-JEPA 2: Self-Supervised Video Models En-able Understanding, Prediction and Planning. arXiv preprint arXiv:2506.09985 .Ba, J. L.; Kiros, J. R.; and Hinton, G. E. 2016. Layer Nor-malization. arXiv preprint arXiv:1607.06450 .Balestriero, R.; and LeCun, Y. 2025. LeJEPA: Provable and Scalable Self-Supervised Learning Without the Heuristics. 
+
+arXiv preprint arXiv:2511.08544 .Bardes, A.; Ponce, J.; and LeCun, Y. 2022. VICReg: Variance-Invariance-Covariance Regularization for Self-Supervised Learning. In Proceedings of the 10th Inter-national Conference on Learning Representations (ICLR) .ArXiv:2105.04906. Barreto, A.; Dabney, W.; Munos, R.; Hunt, J. J.; Schaul, T.; van Hasselt, H.; and Silver, D. 2017. Successor Features for Transfer in Reinforcement Learning. In Advances in Neural Information Processing Systems (NeurIPS) .Bellemare, M. G.; Naddaf, Y.; Veness, J.; and Bowling, M. 2013. The Arcade Learning Environment: An Evaluation Platform for General Agents. Journal of Artificial Intelli-gence Research , 47: 253–279. Bharadhwaj, H.; Babaeizadeh, M.; Erhan, D.; and Levine, S. 2022. Information Prioritization through Empowerment in Visual Model-Based RL. In Proceedings of the 10th Inter-national Conference on Learning Representations (ICLR) .ArXiv:2204.08585. Bruce, J.; Dennis, M. D.; Edwards, A.; Parker-Holder, J.; Shi, Y.; Hughes, E.; Lai, M.; Mavalankar, A.; Steigerwald, R.; Apps, C.; et al. 2024. Genie: Generative Interactive En-vironments. In Proceedings of the 41st International Con-ference on Machine Learning (ICML) . ArXiv:2402.15391. Cui, Z. J.; Pan, H.; Iyer, A.; Haldar, S.; and Pinto, L. 2024. DynaMo: In-Domain Dynamics Pretraining for Visuo-Motor Control. In Advances in Neural Information Processing Sys-tems 37 (NeurIPS) . ArXiv:2409.12192. Dayan, P. 1993. Improving Generalization for Temporal Dif-ference Learning: The Successor Representation. Neural Computation , 5(4): 613–624. de Boer, P.-T.; Kroese, D. P.; Mannor, S.; and Rubinstein, R. Y. 2005. A Tutorial on the Cross-Entropy Method. Annals of Operations Research , 134(1): 19–67. Deng, F.; Jang, I.; and Ahn, S. 2022. DreamerPro: Reconstruction-Free Model-Based Reinforcement Learning with Prototypical Representations. In Proceedings of the 39th International Conference on Machine Learning (ICML) .ArXiv:2110.14565. Efroni, Y.; Misra, D.; Krishnamurthy, A.; Agarwal, A.; and Langford, J. 2022. Provably Filtering Exogenous Distractors using Multistep Inverse Dynamics. In Proceedings of the 10th International Conference on Learning Representations (ICLR) . ArXiv:2110.08847. Fechner, M.; Adnan, H.; Lüth, C. C.; Jackson, M. T.; Za-kharov, A.; and Zöllner, J. M. 2026. Segment to Focus: Guiding Latent Action Models in the Presence of Distrac-tors. arXiv preprint arXiv:2602.02259 .Fu, X.; Yang, G.; Agrawal, P.; and Jaakkola, T. 2021. Learn-ing Task Informed Abstractions. In Proceedings of the 38th International Conference on Machine Learning (ICML) .ArXiv:2106.15612. Grill, J.-B.; Strub, F.; Altché, F.; Tallec, C.; Richemond, P. H.; Buchatskaya, E.; Doersch, C.; Avila Pires, B.; Guo, Z. D.; Gheshlaghi Azar, M.; et al. 2020. Bootstrap Your Own Latent: A New Approach to Self-Supervised Learning. In Advances in Neural Information Processing Systems 33 (NeurIPS) . ArXiv:2006.07733. Ha, D.; and Schmidhuber, J. 2018. World Models. arXiv preprint arXiv:1803.10122 .Hafner, D.; Lillicrap, T.; Fischer, I.; Villegas, R.; Ha, D.; Lee, H.; and Davidson, J. 2019. Learning Latent Dynam-ics for Planning from Pixels. In Proceedings of the 36th International Conference on Machine Learning (ICML) .ArXiv:1811.04551. Hafner, D.; Pasukonis, J.; Ba, J.; and Lillicrap, T. 2023. Mastering Diverse Domains through World Models. arXiv preprint arXiv:2301.04104 .Hutson, M.; Kauvar, I.; and Haber, N. 2024. Policy-Shaped Prediction: Avoiding Distractions in Model-Based Rein-forcement Learning. In Advances in Neural Information Processing Systems 37 (NeurIPS) . ArXiv:2412.05766. Islam, R.; Tomar, M.; Lamb, A.; Efroni, Y.; Zang, H.; Di-dolkar, A.; Misra, D.; Li, X.; van Seijen, H.; Tachet des Combes, R.; and Langford, J. 2023. Agent-Controller Rep-resentations: Principled Offline RL with Rich Exogenous Information. In Proceedings of the 40th International Con-ference on Machine Learning (ICML) . ArXiv:2211.00164. Ivashkov, P.; Balestriero, R.; and Schölkopf, B. 2026. Sen-sorimotor World Models: Perception for Action via Inverse Dynamics. arXiv preprint arXiv:2606.20104 . Concurrent work. Kooi, J. E.; Hoogendoorn, M.; and François-Lavet, V. 2022. Disentangled (Un)Controllable Features. arXiv preprint arXiv:2211.00086 .Lamb, A.; Islam, R.; Efroni, Y.; Didolkar, A.; Misra, D.; Fos-ter, D.; Molu, L.; Chari, R.; Krishnamurthy, A.; and Lang-ford, J. 2022. Guaranteed Discovery of Control-Endogenous Latent States with Multi-Step Inverse Models. arXiv preprint arXiv:2207.08229 .LeCun, Y. 2022. A Path Towards Autonomous Machine Intelligence. OpenReview preprint, version 0.9.2. Levine, A.; Stone, P.; and Zhang, A. 2024. Multistep Inverse Is Not All You Need. Reinforcement Learning Journal , 2: 884–925. Presented at the Reinforcement Learning Confer-ence (RLC); arXiv:2403.11940. Louizos, C.; Welling, M.; and Kingma, D. P. 2018. Learning Sparse Neural Networks through L0 Regularization. In Pro-ceedings of the 6th International Conference on Learning Representations (ICLR) . ArXiv:1712.01312. Maes, L.; Le Lidec, Q.; Scieur, D.; LeCun, Y.; and Balestriero, R. 2026. LeWorldModel: Stable End-to-End Joint-Embedding Predictive Architecture from Pixels. arXiv preprint arXiv:2603.19312 .Nikulin, A.; Zisman, I.; Tarasov, D.; Lyubaykin, N.; Pol-ubarov, A.; Kiselev, I.; and Kurenkov, V. 2025. Latent Action Learning Requires Supervision in the Presence of Distrac-tors. In Proceedings of the 42nd International Conference on Machine Learning (ICML) . ArXiv:2502.00379. Pan, M.; Zhu, X.; Wang, Y.; and Yang, X. 2022. Iso-Dream: Isolating and Leveraging Noncontrollable Visual Dynamics in World Models. In Advances in Neural Information Pro-cessing Systems 35 (NeurIPS) . ArXiv:2205.13817. Pan, M.; Zhu, X.; Zheng, Y.; Wang, Y.; and Yang, X. 2023. Model-Based Reinforcement Learning with Isolated Imagi-nations. arXiv preprint arXiv:2303.14889 .Pont-Tuset, J.; Perazzi, F.; Caelles, S.; Arbeláez, P.; Sorkine-Hornung, A.; and Van Gool, L. 2017. The 2017 DAVIS Challenge on Video Object Segmentation. arXiv preprint arXiv:1704.00675 .Saanum, T.; Dayan, P.; and Schulz, E. 2024. Simplifying Latent Dynamics with Softly State-Invariant World Models. In Advances in Neural Information Processing Systems 37 (NeurIPS) . ArXiv:2401.17835. Sawada, Y. 2018. Disentangling Controllable and Uncon-trollable Factors of Variation by Interacting with the World. 
+
+arXiv preprint arXiv:1804.06955 .Schmidt, D.; and Jiang, M. 2024. Learning to Act without Actions. In Proceedings of the 12th International Conference on Learning Representations (ICLR) . ArXiv:2312.10812. Seitzer, M.; Schölkopf, B.; and Martius, G. 2021. Causal In-fluence Detection for Improving Efficiency in Reinforcement Learning. In Advances in Neural Information Processing Systems 34 (NeurIPS) . ArXiv:2106.03443. Stone, A.; Ramirez, O.; Konolige, K.; and Jonschkowski, R. 2021. The Distracting Control Suite – A Challenging Benchmark for Reinforcement Learning from Pixels. arXiv preprint arXiv:2101.02722 .Sun, R.; Zang, H.; Li, X.; and Islam, R. 2024. Learning Latent Dynamic Robust Representations for World Models. In Proceedings of the 41st International Conference on Ma-chine Learning (ICML) . ArXiv:2405.06263. Tassa, Y.; Doron, Y.; Muldal, A.; Erez, T.; Li, Y.; de Las Casas, D.; Budden, D.; Abdolmaleki, A.; Merel, J.; Lefrancq, A.; et al. 2018. DeepMind Control Suite. arXiv preprint arXiv:1801.00690 .Thomas, V.; Bengio, E.; Fedus, W.; Pondard, J.; Beaudoin, P.; Larochelle, H.; Pineau, J.; Precup, D.; and Bengio, Y. 2018. Disentangling the Independently Controllable Factors of Variation by Interacting with the World. arXiv preprint arXiv:1802.09484 .Thomas, V.; Pondard, J.; Bengio, E.; Sarfati, M.; Beaudoin, P.; Meurs, M.-J.; Pineau, J.; Precup, D.; and Bengio, Y. 2017. Independently Controllable Factors. arXiv preprint arXiv:1708.01289 .van den Oord, A.; Li, Y.; and Vinyals, O. 2018. Represen-tation Learning with Contrastive Predictive Coding. arXiv preprint arXiv:1807.03748 .Wang, T.; Du, S. S.; Torralba, A.; Isola, P.; Zhang, A.; and Tian, Y. 2022. Denoised MDPs: Learning World Models Better Than the World Itself. In Proceedings of the 39th International Conference on Machine Learning (ICML) .ArXiv:2206.15477. Wang, Y.; Wan, S.; Gan, L.; Feng, S.; and Zhan, D.-C. 2024. AD3: Implicit Action is the Key for World Models to Distin-guish the Diverse Visual Distractors. In Proceedings of the 41st International Conference on Machine Learning (ICML) .ArXiv:2403.09976. Wang, Z.; Schaul, T.; Hessel, M.; van Hasselt, H.; Lanc-tot, M.; and de Freitas, N. 2016. Dueling Network Archi-tectures for Deep Reinforcement Learning. In Proceedings of the 33rd International Conference on Machine Learning (ICML) , 1995–2003. Wei, H.; Chen, X.; Zhang, C.; Pearce, T.; Chen, J.; Lamb, A.; Zhao, L.; and Bian, J. 2026. Learning Additively Com-positional Latent Actions for Embodied AI. arXiv preprint arXiv:2604.03340 .Zhou, G.; Pan, H.; LeCun, Y.; and Pinto, L. 2025. DINO-WM: World Models on Pre-trained Visual Features En-able Zero-shot Planning. In Proceedings of the 42nd International Conference on Machine Learning (ICML) .ArXiv:2411.04983. Zhu, C.; Simchowitz, M.; Gadipudi, S.; and Gupta, A. 2023. RePo: Resilient Model-Based Reinforcement Learn-ing by Regularizing Posterior Predictability. In Advances in Neural Information Processing Systems 36 (NeurIPS) .ArXiv:2309.00082. Zhu, H.; Dong, Z.; Topollai, K.; Sha, B.; and Choroman-ska, A. 2026. Self-Supervised Representation Learning with Joint Embedding Predictive Architecture for Automotive Li-DAR Object Detection. In Proceedings of the 40th AAAI Conference on Artificial Intelligence (AAAI) . AD-L-JEPA; arXiv:2501.04969. A Implementation and Training Details 
+
+Shared setup. All variants share the encoder, an EMA target encoder ( τ =0 .996 , buffers copied), the optimizer (AdamW, base learning rate 3 × 10 −4, weight decay 10 −6,cosine-annealed over training with Tmax equal to the step budget, gradient-norm clip 10 ), and the loss weights (λact =0 .1 with softmax temperature 0.1, λoff =10 −4,
+
+λgate =10 −5 with a warm-up over the first 20% of steps, 
+
+λreg =0 .1). Only the predictor head differs across the ladder (Sec. 3.2). 
+
+Architecture. The MLP encoder flattens the observation and applies Linear →SiLU →Linear →SiLU →Linear (two hidden layers of width 256 ) to dimension d, followed by 
+
+LayerNorm (Ba, Kiros, and Hinton 2016). The CNN en-coder applies three 3×3 convolutions ( c→32 →64 →64 chan-nels, strides 1, 2, 2, padding 1, SiLU), flattens, and maps to d
+
+through a 256 -wide hidden layer and LayerNorm (a 64 ×64 
+
+input reduces to 16 ×16 ×64 before the head). Every predic-tion head is a two-hidden-layer, width-256 SiLU MLP: the passive head B: d→d; the discrete offset head d→|A|· d (all offsets in one pass, so ¯∆ is exact and free); the continu-ous offset head (d+m)→d; and the entangled baseline P ,which embeds the action to 32 dimensions (learned embed-ding for discrete, linear map for continuous) before an MLP 
+
+(d+32) →d. The gate C is a one-hidden-layer MLP to a sig-moid (or a hard-concrete L0 gate; Louizos, Welling, and Kingma 2018), initialized open.                                                        
+
+> FourRooms DMC Freeway Synth. Setting grid DMC Atari synth. Observation 4×13 23×64 23×64 2R64
+> Encoder MLP CNN CNN MLP Latent d64 256 256 64
+> Actions 5 disc. cont. 3 disc. 5 disc. Transitions 200 k100 k200 k30 k/ 8kSteps 60 k/ 100 k∗50 k40 k5kBatch 256 128 128 256
+> Distractor knob ncells 16 sq. frameskip dwdims (swept) {0,10 ,indep./ {2,4,8}{0,4,
+> 30 ,60 }corr. 16 ,32 }
+
+Table 1: Per-environment settings, for the FourRooms grid-world, DMC (Tassa et al. 2018), Atari (Bellemare et al. 2013) and the synthetic testbed. Continuous DMC action dimen-sion is task-dependent ( 1 cartpole-swingup, 2 reacher-easy, 
+
+6 cheetah-run); ncf counterfactual states = 1000 (discrete) / 500 (continuous). Synthetic transitions are 30 k train / 8ktest, self-generated per cell over 3 seeds. ∗FourRooms: 60 ksteps for the probe-sweep runs, 100 k for the goal-reaching control runs. 
+
+Estimating ¯∆ for continuous actions. K=16 candidate actions per state: the executed action (index 0), 7 actions resampled from the replay buffer, and 8 Gaussian pertur-bations of the executed action with standard deviation 0.3
+
+of the action half-range, clipped to the action bounds—the most even split available of the remaining K−1=15 candi-dates (the main text’s “split evenly”). For discrete actions ¯∆
+
+is the exact mean over all |A| offsets. 
+
+FourRooms distractors. The 13 ×13 layout adds a fourth binary observation channel of n cells that deterministically roll one column per step ( np.roll ), independent of the ac-tion; we sweep n ∈ { 0, 10 , 30 , 60 }. In the action-correlated stress configuration ( d30ac ), the same field instead rolls by the agent’s own (∆row , ∆col) displacement each step, so it is no longer common-mode and centering does not cancel it—the measured boundary. The five actions are up/down/left/right/no-op. 
+
+Synthetic identifiability generator. A controllable factor 
+
+c ∈ R2 is moved by fixed per-action displacements (no-op and ±0.3 along each axis; 5 actions), clipped to [−1, 1] . A distractor w ∈ Rdw evolves action-independently as w ←
+
+Rw with R a fixed block-rotation (angles ∼ U (0 .2, 0.5) ); in the correlated variant w ← Rw +Va with Va ∼ N (0 , 0.15 2)
+
+per action. The observation is a fixed random mixing G of 
+
+[c; w] into R64 , either linear (orthonormal columns) or non-linear (two tanh layers, width 64 ). Episodes have length 
+
+50 ; we probe the held-out change feature (the centered off-set for centered/noncentered/gated, the one-step change for standard) against the true ∆c (R2 
+
+> c
+
+, recover) and ∆w (R2
+
+> w
+
+,reject). 
+
+Checkpoint selection. The reported “best” checkpoint is the lowest validation cosine loss among checkpoints whose action separation exceeds a regime-aware threshold. An explicit override always wins; otherwise FourRooms with rolling action-independent distractors uses threshold 0—there even healthy runs sit at AS ≈0.002 (with offset-probe 
+
+R2 ≈ 0.74 ) while dead ones reach ≈0.008 , so AS carries no collapse signal and the ridge probe is the health diagnostic— and every other setting uses 0.01 . If no checkpoint passes, the highest-AS checkpoint is used and the run is flagged collapsed. 
+
+Code and configurations. Every model-training run has a named configuration file carrying the per-experiment over-rides above; the synthetic testbeds are self-contained scripts with their settings inlined. Those configuration files, the run scripts, and our full training and evaluation code are provided in the supplementary code archive. 
+
+# B Proof of Proposition 2 (Sampled Centering) 
+
+We restate the proposition, which is proved in full here; it appears as Proposition 2 in the main text. 
+
+Proposition 2 (Sampled centering) . Fix z and let ¯∆K (z) = 
+
+> 1
+> K
+
+PKk=1 ∆( z, a k) for candidate actions {ak}Kk=1 drawn from a proposal ν, and suppose the offset head decomposes as ∆( z, a ) = g(z, a ) + h(z) for some g and some action-independent h. Then, for every K and every draw: (i) ∆( z, a ) − ¯∆K (z) = g(z, a ) − 1
+
+K
+
+> K
+
+X
+
+> k=1
+
+g(z, a k), so the common-mode component h cancels exactly; and (ii) the sampling error ¯∆K (z)−Ea′∼ν [∆( z, a ′)] does not de-pend on the query action a, is O(1 /√K) under bounded second moments of g(z, ·), and cancels in any action-differential comparison u(z, a ) − u(z, a ′).Proof. Part (i). Substituting ∆( z, a k) = g(z, a k)+ h(z) into the definition of ¯∆K and using 1
+
+> K
+
+PKk=1 1 = 1 ,
+
+¯∆K (z) = 1
+
+K
+
+> K
+
+X
+
+> k=1
+
+g(z, a k) + h(z)
+
+= 1
+
+K
+
+> K
+
+X
+
+> k=1
+
+g(z, a k) + h(z),
+
+since h(z) is constant across the averaged terms. Subtracting this from ∆( z, a ) = g(z, a ) + h(z) gives 
+
+∆( z, a ) − ¯∆K (z) = g(z, a ) − 1
+
+K
+
+> K
+
+X
+
+> k=1
+
+g(z, a k),
+
+which is claim (i). The cancellation is term by term and therefore holds for every K ≥ 1 and every realised candidate set; no independence, coverage, or unbiasedness property of 
+
+ν is used. 
+
+Part (ii). By the same substitution, and because the h
+
+components coincide in both terms and drop, 
+
+¯∆K (z) − Ea′∼ν [∆( z, a ′)] = 1
+
+K
+
+> K
+
+X
+
+> k=1
+
+g(z, a k) − Ea′∼ν [g(z, a ′)] .
+
+The right-hand side involves only g and is a single quantity that does not depend on the query action a; it is therefore an action-independent shift of the channel. If the ak are drawn i.i.d. from ν and g(z, ·) has bounded second moments, it is a sample mean minus its expectation, so its standard deviation is O(1 /√K). Finally, since the shift is common to every action, it cancels in any action-differential comparison: 
+
+u(z, a ) − u(z, a ′) = ∆( z, a ) − ¯∆K (z)
+
+− ∆( z, a ′) − ¯∆K (z)
+
+= ∆( z, a ) − ∆( z, a ′).
+
+Two remarks. Self-inclusion. In practice the executed ac-tion occupies one candidate slot ( a1 = a); for that query the channel is attenuated by exactly (1 − 1/K ): u(z, a ) = 
+
+> K−1
+> K
+
+g(z, a )− 1
+
+> K−1
+
+P 
+
+> k≥2
+
+g(z, a k)—an O(1 /K ) effect on 
+
+g only, with the h-cancellation unaffected. Proposal bias. Abiased or narrow ν (e.g. a state-dependent behavior policy) shifts Eν [g] and hence where the channel is centered; by (i) it cannot re-admit the common mode. Empirics. A K-sweep over all 108 DMC checkpoints ( K ∈ { 2, 4, 8, 16 , 32 })matches the proposition: channel probe R2 rises from ≈0 at 
+
+K=2 —where the (1 − 1/K ) self-inclusion attenuation is 12
+
+and the centering point rests on a single fresh sample—to its plateau by K ≈ 16 (e.g. 0.52 of the K=32 value 0.56 on reacher-independent), while the noncentered channel, which uses no sampled mean, is exactly flat in K—a built-in nega-tive control. The resampling dispersion of the post-hoc cen-tering point decays monotonically in K (fitted log-log slope 
+
+−0.26 ± 0.03 across noncentered and standard hosts; shal-lower than the i.i.d. − 12 because the proposal is structured— the executed action is pinned and the replay/perturbation composition shifts with K). For the trained-in decomposi-tion the candidate-mean prediction is B(z) exactly , for ev-ery draw— 1
+
+> K
+
+P
+
+> k
+
+[∆( z, a k) − ¯∆K (z)] = 0 —so its output’s centering point is draw-invariant by construction (measured dispersion at float precision, ∼10 −7): a small but provable advantage of embedding the readout in the parameterization. 
+
+# C The Out-of-Distribution Goal Pathology 
+
+Episodes that terminate on goal contact leave the on-goal state absent from the training marginal: in 200k FourRooms transitions it never appears as a start state. The converged en-coder then decodes the on-goal state 10 .5 cells off (all other cells: ∼0.005 ), so no imagined plan can ever terminate “at the goal” and MPC success is 0.00 despite perfect in-distribution prediction, rollout, and position-decoding metrics — metrics that are all blind to the missing state. Allowing the collec-tion policy (only) to walk through the goal restores the state to the training distribution and MPC success to 1.00 across both variants and all seeds, with in-distribution metrics un-changed. We report this as a cautionary protocol note: rollout fidelity does not imply planning success when the plan’s tar-get is itself out of distribution. 
+
+# D Distracting DMC: Pre-Registered Gate — Criteria and Outcomes 
+
+The DMC decision criteria were fixed before the matrix ran: (i) a centered-minus-noncentered probe gap ≥ 0.2 under independent distraction with 3/3 seed sign-consistency per task; (ii) an absolute bar of R2 ≥ 0.5 under distraction; (iii) a correlated-regime gap within ±0.05 . Outcomes, verbatim: (i) 
+
+pass on 3/3 tasks, 9/9 seeds (gaps +0 .212 /+0 .244 /+0 .493 
+
+on cheetah/cartpole/reacher); (ii) fail , diagnosed as ceiling mis-calibration—the distraction-free probe ceilings are 0.26 
+
+(cartpole) and ≈0.32 –0.40 (cheetah), so a fixed absolute bar cannot be met even without distractors on two of three tasks (only reacher’s ceiling exceeds 0.5); (iii) within tolerance on 2/3 tasks ( +0 .033 cheetah, −0.040 cartpole), with the reacher inversion ( −0.153 ) analyzed as contamination-boost: the noncentered offset’s correlated-regime probe ( 0.535 ) ex-ceeds its own distraction-free level ( 0.169 ), so the surplus is distractor signal masquerading as action effect. Per-seed values for the four variants run at DMC scale—standard (which exposes no isolated channel), noncentered, centered, and gated (whose gate is inert)—are given in Table 11; the 
+
+residual rung of the main text’s ladder was not part of the DMC matrix. 
+
+# E Plug-in: Per-Cell Numbers 
+
+Table 2 gives the exact per-cell probe values behind Fig. 3. Readout variance over five probe seeds (same checkpoints, resampled evaluation data and probe splits): the centered column varies by s.d. 0.009 –0.030 per cell (RePo 0.260 ±.024 /0.300 ±.016 /0.454 ±.014 ,TIA 0.184 ±.030 /0.336 ±.009 /0.504 ±.011 for cart-pole/cheetah/reacher), with raw ∆ at ≤ 0.061 throughout; the one-training-run caveat is a host property, not readout noise.                                 
+
+> host task full latent raw ∆centered trained-in RePo cartpole 0.559 −0.002 0.264 0.268
+> cheetah 0.644 0.026 0.323 0.349
+> reacher 0.624 −0.002 0.457 0.577
+> TIA cartpole 0.027 −0.002 0.190 0.198
+> cheetah 0.789 0.052 0.345 0.168
+> reacher 0.737 0.006 0.519 0.506
+
+Table 2: Centering as a plug-in (probe R2, higher is better except raw ∆ which diagnoses the entangled readout). RePo (Zhu et al. 2023) and TIA (Fu et al. 2021) trained 500k steps under DAVIS video backgrounds (Pont-Tuset et al. 2017), one training seed per cell; probes on frozen final checkpoints over 
+
+5,000 held-out random-policy transitions, target = change in physics state. Raw ∆ vs. centered : identical model, identi-cal data—the only change is subtracting the K=16 action-mean at readout. Trained-in : centering inside the RSSM prior (Hafner et al. 2019) for the full 500k run (both hosts). Bud-gets and protocols differ from ours; no cross-method return comparison is implied. 
+
+# F The Gate Ablation Is Inert 
+
+The gated variant was designed as a learned per-dimension controllability mask: a sigmoid gate C(z) ∈ (0 , 1) d under an L1 sparsity penalty, intended to select which latent dimen-sions the action channel may write to. It does not learn this. Across all testbeds the gate converges to near-uniform down-scaling rather than sparse selection—an inert reparameteri-zation, since a uniform gate can be absorbed into the scale of 
+
+∆, and L1-on-sigmoid admits exactly this shrink-everything solution. Replacing L1 with a hard-concrete L0 relaxation (Louizos, Welling, and Kingma 2018) does not rescue it: the 
+
+L0 gate collapses at every sparsity coefficient we tested. The gate does not improve channel purity over plain centering and adds a genuine failure mode at the strongest distractor setting (Sec. 4.2). We therefore report it as a negative result: AD-JEPA sets C ≡ 1, centering is the sole mechanism, and the gated rung survives only as an ablation. 
+
+# G Steering Along the Channel Under Distraction 
+
+We test the action channel by perturbation rather than by correlation. For a frozen DMC checkpoint we push the latent along the model’s own channel u(z, a ) (centered offset for centered/gated, raw offset for noncentered, ˆz′ − z for stan-dard), project back to the encoder’s layer-norm manifold, and decode the induced state displacement with a nonlinear MLP trained only as a measurement instrument. The steering direc-tion comes from the channel alone—no privileged signal en-ters, unlike the compass-scored planner of Appendix H. We report the cosine between the decoded displacement and the action’s counterfactual state effect ∆s(a) − 1
+
+> K
+
+P 
+
+> k
+
+∆s(ak)
+
+(cf-cos) and, as the load-bearing control, the same quan-tity for an equal-norm random push through the identical decoder—absolute decoder quality cancels, so the compar-ison is instrument-relative. 3 tasks × 3 distractor modes ×
+
+4 variants × 3 seeds; push scales γ ∈ { 0.5, 1, 2}; we quote 
+
+γ=1 throughout (cf-cos is positive and monotone in γ wher-ever it is nonzero, so no push scale is selected post hoc). Pushes are first-order and the predictor is not rolled forward from the pushed latent: the measurement is directional— channel alignment, not closed-loop control. 
+
+Result (cheetah-run). Without distractors every channel steers (cf-cos 0.42 /0.42 /0.29 /0.43 for cen-tered/gated/noncentered/ standard). Under independent 
+
+distraction only the centered variants survive ( 0.27 /0.26 vs. 
+
+0.00 /0.02 ; random control ≈0.01 throughout; 3/3 seeds): centering retains ∼65% of its no-distractor steering where the raw-offset and standard channels retain essentially none. Two properties sharpen this. (i) Norm does not buy efficacy :the channel that steers has ∥u∥ ≈ 0.13 ; the standard channel that does not has ∥u∥ ≈ 16 . (ii) Selectivity : a centered push moves the decoded distractor state about half as much as an equal-norm random push, and about 5× less than the noncentered channel’s push. Under action-correlated 
+
+distraction centered steering collapses to ≈0.07 even at the most favorable push scale—the pre-registered boundary. 
+
+Scope and instrument. The instrument is a nonlinear MLP; because the matched random push absorbs decoder quality, the claim is directional and instrument-relative— what a low absolute decode R2 under distraction permits. The contrast is not an instrument artifact: across five decoder configurations (widths 128 –512 , depths 1–3, with and with-out input noise; test R2 spanning −1.8 to −3.6), the centered channel’s alignment is flat ( 0.25 –0.31 ) while the noncen-tered and standard channels stay at ≈0 in every configuration. reacher-easy is uninformative: no channel steers even without distractors, consistent with its documented undertraining at this budget (Appendix D) rather than a task property—fully trained baselines reach state R2 0.80 –0.92 on the same task, and post-hoc centering on those frozen models yields a 0.46 –
+
+0.58 channel (Sec. 4.4). cartpole-swingup is weakly positive for the centered variant only ( 0.06 vs. random 0.02 ). We therefore report cheetah-run as the clean case and the other two as gated out by a no-distractor model-quality check, per our report-either-way pre-commitment. 
+
+G.1 Frozen Third-Party Hosts 
+
+The same intervention ports to the frozen RePo/TIA hosts of Sec. 4.4—RSSM architectures and objectives we did not design, trained with the authors’ released code and frozen before the readout is applied. These hosts run under DAVIS video (action-independent distraction only, no dis-tractor ground truth), so the test measures action-specificity 
+
+of the channel direction, not common-mode rejection. We push the host’s stochastic state along the post-hoc channel 
+
+u(z, a ) = m(z, a ) − 116 
+
+P 
+
+> k
+
+m(z, a k) of the RSSM prior mean m, decode with an MLP fitted per host (shuffled-split calibration, matching the reference ridge protocol), and score the decoded displacement against the action’s counterfactual-centered physics effect at fixed γ=1 ; three evaluation seeds per host, one training run per cell.                                           
+
+> host task centered glob. raw rand perm R2/R2
+> s
+> RePo cartpole +.41 ±.08 +.02 +.02 +.02 +.01 .85 /.32
+> RePo cheetah +.09 ±.02 −.00 +.00 +.00 −.00 .76 /.11
+> RePo reacher −.02 ±.05 −.01 −.01 +.01 −.02 .88 /.04
+> TIA cheetah +.14 ±.01 +.05 +.04 −.01 +.01 .87 /.20
+> TIA reacher +.18 ±.05 +.06 +.07 −.00 −.01 .97 /.39
+
+Table 3: Steering frozen third-party hosts (cosine to the counterfactual-centered physics effect, γ=1 , mean ±s.d. over 3 evaluation seeds). Controls: glob. subtracts the global mean offset instead of the state-conditional marginal; rand is an equal-norm random push through the same decoder; perm 
+
+scores against permuted (deranged) targets. R2/R2 
+
+> s
+
+: decoder fit from the full latent / from the pushed state block alone. TIA-cartpole is excluded: its instrument fails ( R2= − 0.07 )on a host whose full latent is independently known to be collapsed ( 0.03 , Table 2). Four observations. (i) The three controls isolate the chan-nel: the equal-norm random push and the permutation null are ≈0 everywhere (the alignment carries per-sample action information), and the global-mean control tracks raw rather than centered—only the state-conditional marginal recovers the channel, the observation behind the design note in Sec. 3. 
+
+(ii) repo-reacher is an honest null on a validated instrument (R2=0 .88 ): that host keeps physics almost entirely in its de-terministic belief ( R2 
+
+> belief
+
+= 0 .89 vs. R2 
+
+> s
+
+= 0 .04 ), so the pushed block has nothing to steer; across the five validated cells the alignment tracks R2 
+
+> s
+
+(Spearman ρ = 0 .90 , n=5 —suggestive, not confirmatory). (iii) Stability tracks instrument validity: across three independent evaluation runs, validated-instrument cells replicate closely (repo-cartpole moves by 
+
+0.003 ) while broken-instrument numbers moved arbitrarily in both directions—we therefore report only validated cells. 
+
+(iv) The result is directional (first-order pushes; the host is never rolled forward) and says nothing about distractor in-variance, which DAVIS hosts cannot measure. 
+
+# H Extended Discussion 
+
+This appendix gives the full-length analysis of the control null summarized in Sec. 5.1. 
+
+The one-step predictor does not use the channel unaided. 
+
+Action separation (AS; the mean pairwise distance between per-action predictions) collapses from ∼1.28 to ∼0.002 for 
+
+every variant—including centered—once FourRooms dis-traction reaches n ≥ 30 cells, even though the centered offset probe still reads the agent factor at R2 = 0 .73 from the same checkpoints (Sec. 4.2). The channel is preserved but unused: when distractor variance dominates the predic-tion target, the one-step objective is nearly indifferent to the action, and the predictor shrinks its action sensitivity toward zero. A consumer with a longer horizon can restore it at small scale: in the FourRooms grid, the gridworld planner, trained with a multi-step rollout loss, reaches 0.92 ± 0.02 
+
+goal-reaching success at n=30 where the standard predictor manages 0.57 ± 0.03 (Sec. 4.2); this conversion does not replicate at DMC scale (below). The practical corollary is the AS-gated checkpoint-selection rule of Sec. 4.1; we sus-pect the same selection pathology affects other latent world models trained under heavy distraction. 
+
+The longer-horizon consumer does not restore control at DMC scale. The multi-step planner converts the preserved channel into behavior in FourRooms, but the conversion does not replicate at DMC scale within our compute budget. We fixed a pre-registered gate—beat a random-action ref-erence at goal tolerances 0.05 /0.1—before running, ported the gridworld recipe to reacher-easy (three seeds per vari-ant trained to 200k steps with the same multi-step rollout loss, planned with CEM MPC (de Boer et al. 2005) at 30 episodes per run, five of the six runs evaluated, and scored by the same position-decoding compass head the gridworld planner uses—privileged, and used only to score candidate plans), and missed the gate across the full effort ladder. The outcome is not merely at-chance: at the tolerances where a random policy has traction, the centered planner is sub-random (goal-reaching success 0.03 /0.10 vs. 0.23 /0.57 at tolerance 0.2/0.3, two seeds)—planning through the model is worse there than not planning—while at the pre-registered tight tolerances both planner and random are at zero, and the aggregate final distance matches random ( 2.35 vs. 2.44 ). The standard ablation is strictly worse: zero success at ev-ery tolerance across all three of its seeds ( 0/90 episodes) at mean final distance 4.64 . The null holds across 4× training (50k → 200k steps), 32 × planning budget (shipped →huge CEM), the multi-step rollout loss, and oracle scoring; on the earlier 50k checkpoints performance additionally de-graded as the planning horizon grew—the signature of search through a drifting model. Because the compass scorer is privileged—an upper bound on the scoring information any reward-free readout could supply—the null is generous-case: the planner lost even with the best available plan scorer, which forecloses a “needs a better reward” rescue. 
+
+The null is consistent with a model-accuracy bottleneck, not a channel defect. Within an episode the centered plan-ner transiently steers the right way—best in-episode distance falls to ∼0.15 —before drifting back out to final distances of 
+
+∼1–5: the expected signature of CEM planning through an inaccurate model, not of a channel that misdirects. Consistent with a representation that is not itself the bottleneck, the cen-tered readout is the more accurate open-loop model: five-step decoded-state rollout error (standardized) is 0.62 for centered vs. 0.74 for standard, non-overlapping across three seeds; but both sit far above the sub-0.4 target we pre-set when porting the recipe, and both drift upward late in training. We there-fore read the null as a candidate model-accuracy limit rather than a proven one. A direct intervention on the same frozen checkpoints corroborates this localization: pushing the latent along the model’s own centered channel reproduces the exe-cuted action’s counterfactual state effect on cheetah-run un-der independent distraction (cf-cos ≈0.27 at γ=1 vs. ≈0.01 
+
+for an equal-norm random push through the same decoder), where the noncentered and standard channels—which steer comparably without distractors—collapse to ≈0; the effect is monotone in the push scale and respects the action-correlated boundary (Appendix G). The failure is also distinct from the out-of-distribution-goal artifact of Appendix C: there the goal state was absent from the training marginal; here the goal is in-distribution and the rollout itself drifts. 
+
+# I Scope of the Claim 
+
+What the identity does—and does not—guarantee. 
+
+Proposition 1 removes whatever the learned offsets repre-sent identically across actions; it does not by itself guar-antee that all action-independent distractors are removed. If the offset head learns a zero-mean action interaction, 
+
+∆( z, a ) = h(z) + sdist (z) ϕ(a) with Ea′∼ν ϕ(a′) = 0 , cen-tering leaves sdist (z) ϕ(a) intact even though the distractor’s environmental dynamics never depend on the action. Invari-ance to a distractor is therefore a joint property of the identity and of what the trained offsets happen to represent—which is precisely what the channel-purity probes measure rather than assume. Empirically, such interactions do not arise where the nuisance is action-independent: centered-channel leak is in-distinguishable from zero (Secs. 4.3, 4.2). 
+
+Sufficiency, not superiority. The representation-to-control conversion is demonstrated in the 13 ×13 FourRooms gridworld (centered 0.92 vs. standard 0.57 at n=30 ; Sec. 4.2) and does not replicate at DMC scale at this compute budget; we treat it as a bounded existence proof that the preserved channel can convert to control where the world model is accu-rate enough to plan through—which our gridworld models are and our continuous-control models, at this budget, are not—and never as a control-superiority claim at scale. 
+
+Single-agent scope. Centering marginalizes over the ego agent’s action alone. Entities driven by their own poli-cies cancel only while their transitions are common-mode with respect to that action; the moment they react to the agent—pursuit, evasion, coordination—they become action-correlated and inherit the reafferent boundary. A multi-agent extension would center over joint actions or per-agent marginals, which presupposes observing or inferring the other agents’ actions—exactly the supervision our action-labeled setting assumes only for the ego agent. 
+
+# J Supplementary Figures and Tables 
+
+This section collects the floats relocated from the main text for the page limit, in ascending float number. Each is repro-duced exactly as generated; the surrounding text says only what the float contains and how to read it. We begin with the two natural-distraction testbeds. Table 4 gives the Freeway channel-purity numbers behind the dis-cussion in the main text: the agent’s own displacement read out of the effective offset, scored against the one-hot(action) ceiling, alongside the traffic leak measured against both the traffic change and the traffic state.                                          
+
+> agent own-∆R2↑traffic R2↓separation ↑
+> features fs 2 fs 4 fs 8 (∆& state) (mean ±s.d.) one-hot (a)ceiling 0.810 0.757 0.683 ——
+> centered (ours) 0.877 0.838 0.795 [−0.001 ,0.000] + 0.837 ±0.036
+> excess †+0 .19 –0.23 (9/9) gated 0.825 0.851 0.788 ‡[−0.001 ,0.000] +0 .736 ±0.272
+> noncentered 0.149 –0.485 0.545 –0.612 −0.256 ±0.302
+> full latent z(any var.) —≈0.87 —
+
+Table 4: Freeway channel purity (end-of-training check-points, 3 seeds per frameskip; the 3/36 collapsed runs are kept in pooled separation statistics, excluded from per-frameskip aggregates). Ridge R2 from the effective offset for the agent’s displacement (read against the one-hot ceiling) and the traffic factors; per the predictability control the leak column covers traffic state as well as ∆. Separation = agent R2 − traffic-state R2 per run. †Excess = agent R2 after regressing out one-hot (a). ‡Gated fs 8: mean of the two healthy seeds. Bot-tom row: traffic state decoded from the full latent z rather than the offset—rejection is routing, not blindness. Table 5 is the continuous-control counterpart, covering three DMC tasks under the three distractor regimes. The in-dependent column is the one the claim rests on; the correlated column is the stated boundary, and reacher-easy’s noncen-tered cell there is the contamination-as-signal case discussed above. 
+
+probe R2 (effective offset) task method none indep. corr. reacher-easy noncentered 0.169 0.039 0.535 
+
+centered (ours) 0.162 0.533 0.382 
+
+cheetah-run noncentered 0.398 0.128 0.223 
+
+centered (ours) 0.321 0.340 0.256 
+
+cartpole-swingup noncentered 0.116 0.003 0.279 
+
+centered (ours) 0.261 0.248 0.239 
+
+Table 5: Distracting DMC (3 seeds; per-seed values and seed s.d. in Table 11—s.d. ≤ 0.014 outside reacher-easy, whose correlated cells reach 0.094 ). Probe R2 of the controllable state change from the effective offset. Under independent distraction (bold) the centered channel survives on all tasks (9/9 seeds); the correlated column is the stated boundary, and reacher’s noncentered correlated cell is contamination-as-signal. Figure 4: What “distraction” is, concretely (FourRooms observations, rendered from the environment). Left: n=0 .
+
+Right: n=30 rolling distractor cells (blue). The room, the agent (orange) and the goal (green) are identical; only the dis-tractor field differs, and it rolls one column per step regardless of the action . That per-transition invariance across actions is what the action mean absorbs. In the action-correlated con-figuration the same field instead rolls by the agent’s own displacement, which is the boundary of the guarantee. Figure 5 shows the same contrast for continuous control, at the exact settings every DMC run used. 
+
+Figure 5: The same, in continuous control (cheetah-run observations, rendered from the environment at the settings every DMC run used: 64 ×64 , 16 occluders). Left: clean. 
+
+Right: the same transition under distraction. Both panels are stepped with the same action sequence and the occluders are composited onto the pixels only, so the physics—and with it the probe target—is bit-identical between them while 
+
+13 .6% of pixels change. In the independent configuration the occluders translate a fixed 2 px per frame whatever the action; in the action-correlated configuration they translate by the action instead. A single frame cannot tell the two apart: they differ only in the motion rule, which is precisely the property the action mean is sensitive to. The next group covers the synthetic generator, where the controllable and nuisance factors are known by construction and both halves of the claim can be scored directly. Table 6 summarises recovery and rejection across the full grid.             
+
+> Variant R2c(recover ↑)R2w(reject ↓)Standard 0.02–0.04 †—Noncentered 0.75–0.89 0.74–0.97 Centered (ours) 0.87–0.93 −0.00
+
+Table 6: Synthetic identifiability: ranges of held-out probe 
+
+R2 across the 120-cell grid (3 seeds per cell). †At nuisance dimension dw ≥ 16 ; recovery fails outright, so rejection is moot (cell not reported). −0.00 denotes a value that is negative and rounds to zero; held-out R2 can be slightly negative. Table 7 gives the gridworld sweep the main text quotes, including the action-correlated configuration at which both variants fail.                  
+
+> rolling distractor cells n
+> Offset probe R2010 30 60 d30ac Centered (ours) 0.31 0.55 0.73 0.69 −0.00
+> Noncentered 0.18 0.21 0.00 −0.00 −0.00
+
+Table 7: Gridworld distractor sweep (held-out probe R2,agent factor from the effective offset; 3 seeds). Both variants die under action-correlated d30ac—the stated boundary. Figure 6 plots the same synthetic study against the nui-sance dimension, so the two requirements can be read against each other as the distractor grows. The curves sweep dw on the linear generator; the × markers, offset slightly to the right of dw=16 , carry the action-correlated configuration at that same dimension, so the boundary can be compared against the action-independent case without a second panel. Reading the two panels together separates the two ways a channel can fail. Panel (a) is the recovery requirement: both centered variants hold at 0.91 –0.93 across the sweep, and the noncentered ablation recovers just as well, so recovery alone does not discriminate between them. Panel (b) is the rejec-tion requirement, and there the two separate completely—the centered variants sit at −0.00 at every dimension while the noncentered offset carries the distractor at 0.88 –0.95 . The standard predictor fails the first requirement outright rather than the second: its recovery decays from 0.88 to 0.02 as 
+
+dw grows, which is why its rejection column is not infor-mative and is left unreported in Table 6. At the boundary markers, rejection breaks for the centered variants as well (−0.00 → 0.17 ), which is the same failure the gridworld sweep shows under its action-correlated configuration. Figure 6: Synthetic identifiability on the linear generator: recover ( R2c , top) versus reject ( R2w, bottom) against the nui-sance dimension dw. The × markers are the action-correlated boundary at dw=16 . Error bars: s.e.m. over 3 seeds. Values are discussed in the text; the nonlinear generator and the full 
+
+120 -cell grid are in Table 6. Two controls follow. Table 8 varies how predictable the nuisance dynamics are, separating a leak of the nuisance 
+
+change from a leak of the nuisance state —the distinction that makes the leak metric informative when the nuisance is stochastic.                      
+
+> nuisance predictability Variant Leak metric 1.00 0.76 0.05
+> Noncentered ∆w-leak 0.947 0.578 0.022 Noncentered state-leak 0.947 0.797 0.804 Standard state-leak 0.97 0.89 0.97 Centered (ours) state-leak −0.01 to −0.00 (all levels)
+
+Table 8: Predictability control: leak of the action channel un-der increasingly stochastic nuisance dynamics. ∆-leak van-ishes for the noncentered ablation as the nuisance becomes unpredictable, but its state-leak persists: the channel still en-codes where the nuisance is . The centered variant is clean at every predictability level. Entries are means over 3 seeds. Table 9 repeats the recover-and-reject test in the continuous-action regime, where the action mean is a Monte-Carlo estimate rather than an exact enumeration.              
+
+> Variant R2c↑R2w↓
+> Standard 0.04 0.97 Noncentered 0.81 0.96 Centered (ours) 0.87 −0.00
+> Centered, action-correlated nuisance —0.19
+
+Table 9: Stage 0 (continuous actions): sampled centering (K=16 ; entries are means over 3 seeds). The discrete-case pattern survives Monte-Carlo estimation of ¯∆; an action-correlated nuisance breaks rejection, marking the common-mode boundary rather than an estimator failure. The remaining floats concern behaviour rather than rep-resentation. Table 10 reports goal-reaching success under latent MPC across the gridworld sweep.                   
+
+> rolling distractor cells n
+> Success rate 010 30 60 Standard 0.98 0.72 ±0.07 0.57 ±0.03 0.71 ±0.10 Centered (ours) 1.00 0.93 ±0.01 0.92 ±0.02 0.93 ±0.01 Gated 1.00 0.99 ±0.01 0.99 ±0.01 0.95 ±0.02 Random policy 0.18–0.28
+
+Table 10: Gridworld control: the planner converts the preserved channel into control. Goal-reaching success un-der latent MPC (FourRooms; variants run here: standard, centered, gated; 3 seeds, mean ±s.e.m.). Both centered vari-ants stay near ceiling across the sweep while the standard predictor degrades. Under the action-correlated d30ac con-figuration, all three variants fall to 0.55 –0.57 — the same boundary as the probe sweep. Figure 7 places the probe and control curves side by side, so the representation boundary and the control boundary can be compared directly. Figure 7: Gridworld control across the distractor sweep. 
+
+Decomposed variants hold near ceiling where the standard predictor degrades; representation and control break at the same action-correlated point. Variants shown: standard, cen-tered, gated; error bars are s.e.m. over 3 seeds. Legends use 
+
+dueling for centered. Figure 8 shows the Freeway readout across frameskips in the same format. 
+
+Figure 8: Freeway. Agent vs. traffic probe R2 from the ef-fective offset across frameskips (dotted = one-hot ceiling): centered decodes the agent above the ceiling with traffic leak pinned at zero; noncentered inverts the pattern. Error bars: s.d. over 3 seeds. Finally, Table 11 lists every DMC run individually, so the per-seed spread behind the aggregated cells above can be inspected directly.                                                                                                                                                                   
+
+> variant regime s0s1s2mean s.d.
+> reacher-easy
+> noncentered none 0.183 0.158 0.167 0.169 0.013
+> indep. 0.046 0.040 0.032 0.039 0.007
+> corr. 0.576 0.428 0.603 0.535 0.094
+> centered (ours) none 0.147 0.142 0.197 0.162 0.030
+> indep. 0.530 0.536 0.532 0.533 0.003
+> corr. 0.459 0.336 0.351 0.382 0.067
+> gated none 0.113 0.024 0.115 0.084 0.052
+> indep. 0.528 0.534 0.526 0.529 0.004
+> corr. 0.287 0.058 0.422 0.256 0.184
+> standard none — (no offset channel) indep. — (no offset channel) corr. — (no offset channel)
+> cheetah-run
+> noncentered none 0.399 0.396 0.398 0.398 0.002
+> indep. 0.137 0.133 0.114 0.128 0.013
+> corr. 0.237 0.223 0.209 0.223 0.014
+> centered (ours) none 0.320 0.322 0.321 0.321 0.001
+> indep. 0.341 0.340 0.337 0.340 0.002
+> corr. 0.261 0.252 0.256 0.256 0.004
+> gated none 0.319 0.320 0.314 0.317 0.003
+> indep. 0.340 0.338 0.339 0.339 0.001
+> corr. 0.245 0.250 0.243 0.246 0.004
+> standard none — (no offset channel) indep. — (no offset channel) corr. — (no offset channel)
+> cartpole-swingup
+> noncentered none 0.120 0.120 0.108 0.116 0.007
+> indep. 0.008 0.001 0.001 0.003 0.004
+> corr. 0.282 0.276 0.279 0.279 0.003
+> centered (ours) none 0.260 0.261 0.261 0.261 0.001
+> indep. 0.248 0.246 0.249 0.248 0.001
+> corr. 0.240 0.239 0.238 0.239 0.001
+> gated none 0.262 0.260 0.261 0.261 0.001
+> indep. 0.246 0.249 0.247 0.247 0.001
+> corr. 0.233 0.237 0.233 0.234 0.002
+> standard none — (no offset channel) indep. — (no offset channel) corr. — (no offset channel)
+
+Table 11: Per-seed effective-offset probe R2 for the four variants run at DMC scale (standard, noncentered, centered, gated) × 3 tasks × 3 distractor regimes ( 108 runs); the resid-ual rung of the main-text ladder was not run in this matrix. The standard predictor is monolithic and exposes no offset channel, so it has no entry here. Seed s.d. is at most 0.014 
+
+outside reacher-easy; within reacher-easy the correlated cells reach 0.184 (gated), 0.094 (noncentered) and 0.067 (cen-tered), and the distraction-free cells reach 0.052 (gated) and 
+
+0.030 (centered). The independent-distraction column—the one the claim rests on—is tight everywhere (s.d. ≤ 0.013 ).

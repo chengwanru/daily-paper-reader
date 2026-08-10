@@ -1,0 +1,311 @@
+Title: Entity-Aware Sequence Transduction for Player-Centric Ball Action Spotting
+
+URL Source: https://arxiv.org/pdf/2608.01696v1
+
+Published Time: Tue, 04 Aug 2026 01:49:19 GMT
+
+Number of Pages: 17
+
+Markdown Content:
+# Entity-Aware Sequence Transduction for Player-Centric Ball Action Spotting 
+
+## Ruifeng Wang 1, Di Yang 2∗, Jiangtao Wang 2∗
+
+> 1
+
+School of Artificial Intelligence & Data Science, USTC, Hefei, China 
+
+> 2
+
+Suzhou Institute for Advanced Research, USTC, Suzhou, China 
+
+> ∗
+
+Correspondence: di.yang@ustc.edu.cn; wangjiangtao@ustc.edu.cn 
+
+Abstract 
+
+Player-centric ball action spotting requires temporally precise event detection together with actor attribution in crowded, partially observed multi-agent sports videos. Existing Denoising Sequence Transduction (DST) baselines treat the player-role dimension as part of a flattened frame-level representation, which weakens the inductive bias for modeling player-specific temporal evolution and inter-player interactions. To address this limitation, we propose Multi-Entity Denoising Sequence Transduction (ME-DST). ME-DST keeps the role-slot dimension throughout encoding. It uses temporal attention to model the history of each role slot, and spatial attention to exchange information across role slots at each frame. This factorized design gives the model a direct structure for separating within-player evolution from inter-player context. We also add learnable role embeddings, tracking-derived tactical features, and fused visual predictions from X3D-L and Swin3D-S. Experiments on the FOOTPASS dataset show that ME-DST reaches a Micro F1 of 0.778. This improves the strongest official TAAD+DST baseline by 10.3 percentage points. Controlled ablations show that preserving the entity axis and encoding role identity are central to this gain. These results suggest that explicit entity modeling is an effective inductive bias for player-centric sports event understanding. 
+
+# Introduction 
+
+Soccer is the most widely followed sport in the world, and modern broadcasts generate large-scale video archives that are valuable for event indexing, tactical analysis, coaching, scouting, and fan engagement. This scale has made automated soccer video understanding an important direction in AI for sport. The task is also technically demanding. Soccer actions are brief, frequent, and often visually subtle, and many events occur in crowded scenes where several players move around the ball at the same time. A useful model must therefore go beyond coarse clip-level recognition. It must localize events in time, distinguish fine-grained ball actions, and identify the player responsible for each action. These requirements make player-centric soccer analysis a natural testbed for structured multi-agent video understanding. A central task in this setting is action spotting [1]. Unlike conventional action recognition, which operates on pre-trimmed clips, action spotting requires simultaneously predicting the tem-poral location and class of every event in untrimmed video—discriminating true events from a background that occupies the vast majority of a 90-minute match while maintaining frame-level temporal precision. Ball action spotting [2] narrows this formulation to events involving contact with the ball. Unlike general action spotting, which targets a broad spectrum of match incidents spanning goals, cards, and set pieces, ball action spotting isolates the dense, rapid exchanges that constitute open play—passes, drives, crosses, shots, headers, throw-ins, tackles, and blocks— offering a finer granularity of analysis. This shift added a significant layer of complexity: models must detect not only salient moments such as shots, but also subtle and fleeting ball contacts 1arXiv:2608.01696v1 [cs.CV] 3 Aug 2026 that unfold in a fraction of a second yet are critical to the rhythm of the game. Player-centric ball action spotting (SoccerNet 2026 Challenge, https://www.soccer-net.org/challenges/2026 )further raises the bar by requiring the model to identify who performed each detected action. Beyond predicting the action class and its temporal location, a model must attribute every event to a specific player, identified by jersey number, and evaluated under joint four-dimensional matching—frame, team, jersey, and class all correct for a true positive. This progression from event-level to actor-level understanding demands qualitatively new capabilities in identity rea-soning, role understanding, and fine-grained spatio-temporal modeling. The SoccerNet benchmark series established action spotting as a reproducible task with standardized evaluation protocols [1, 3]. Early work centered on feature-pooling approaches: NetVLAD++ [4] aggregated frame-level ResNet features over temporal windows using NetVLAD pooling [5], achieving 53.4 average-mAP on SoccerNet-v2 [3] but suffering from coarse temporal resolution. CALF [6] introduced direct timestamp regression with a context-aware loss that penalized temporal errors in proportion to their distance from ground-truth, improving tight-mAP by 12.5% over NetVLAD++. E2E-Spot [7] replaced the two-stage feature-extraction-and-classification pipeline with an end-to-end RegNetY transformer, reaching 61.8 tight-mAP. Subsequent Transformer-based methods explored complementary directions for soccer action spotting. ASTRA [8] combined audio-visual modeling with balanced mixup and uncertainty-aware temporal displacement, whereas COMEDIAN [9] used self-supervised pretraining and knowledge distillation to improve spatial–temporal Transformer initialization. Dense Detection Anchors [10] reformulated the problem as dense prediction over one anchor per time instant per class, using a Transformer encoder trunk with temporal displacement regression, and won the SoccerNet 2022 Challenge [11] with 67.8 tight-mAP. Ball action spotting narrowed the focus to ball-contact events. The 2023 SoccerNet Ball Action Spotting Challenge [2] introduced a 2-class formulation (Pass and Drive); the winning solution combined EfficientNetV2-B0 [12] with 3D convolutional blocks in a slow-fusion architec-ture, achieving 87.9 mAP@1, while the runner-up, BME [13], applied boosted model ensembling to the E2E-Spot baseline (85.5 mAP@1). The 2024 edition [14] expanded the taxonomy to 12 classes. T-DEED [15] introduced a temporally discriminative encoder-decoder that sharpened per-token attention distributions for precise localization, winning the challenge. The 2025 Team Ball Action Spotting task further required each detected action to be assigned to the team per-forming it [16]. The winning solution extended T-DEED with a unified action–team classification head and large-scale pretraining, achieving 60.03 Team-mAP@1. These methods progressively enrich event-level prediction from action and time to action, time, and team, but they do not identify the individual player responsible for each event. The transition to player-centric ball action spotting, formalized by the SoccerNet 2026 Chal-lenge, introduces an additional attribution requirement: a correct prediction must match the ground-truth frame, team, jersey number, and action class. FOOTPASS [17] subsequently estab-lished the player-centric benchmark, providing 54 broadcast matches with synchronized tracking data and 102,992 annotations across eight ball-action classes. FOOTPASS introduces three baselines that progressively incorporate player and sequence context. The Track-Aware Action Detector (TAAD) [18] performs frame-wise visual classification for individual role slots using an X3D-L backbone. TAAD+GNN [19] augments these predictions with message passing over a player-proximity graph. The strongest baseline, TAAD+DST [20], formulates event spotting as Denoising Sequence Transduction. Given visual logits and track-ing features over a 750-frame window, DST uses a Transformer encoder–decoder to generate an ordered sequence of player-specific events. This sequence-level formulation substantially outper-forms frame-wise TAAD, demonstrating the importance of longer-term context and structured event decoding. The original DST encoder nevertheless removes the explicit entity structure of its input before temporal modeling. At each frame, features from all 26 role slots are concatenated into a single 2vector, and self-attention is then applied over the resulting temporal sequence. Consequently, the encoder must infer several distinct forms of structure within the same flattened representation: the temporal evolution of each player, the relationships among different players, and the identity associated with each fixed role slot. Although this formulation captures global match context, 
+
+it does not explicitly distinguish within-player temporal dependencies from cross-player interactions .We address this limitation with Multi-Entity Denoising Sequence Transduction (ME-DST), an extension of the FOOTPASS DST framework that preserves the role-slot dimension through-out encoding. ME-DST, illustrated in Fig. 1, first models the temporal evolution of each role slot independently and then exchanges information among role slots at each frame. This factorization separates player-specific temporal reasoning from cross-player spatial reasoning while retaining the autoregressive denoising decoder of DST. Learnable role embeddings provide explicit slot identity, allowing the encoder to distinguish representations associated with different tactical roles. We additionally examine two sources of information that complement the multi-entity en-coder. First, tracking data are augmented with tactical descriptors derived from player mo-tion, local proximity, pressure, and position relative to the attacking goal. These features make geometric relations available directly to the sequence model instead of requiring them to be reconstructed exclusively from absolute coordinates. Second, visual predictions from X3D-L [21] and Swin3D-S [22] TAAD branches are fused to combine complementary convolutional and transformer-based video representations.         
+
+> Figure 1: Overview of ME-DST. (1) Fused TAAD logits from X3D-L and Swin3D-S are concatenated with tracking and tactical features to form the entity tensor X∈RT×26 ×22 . (2) Role- and time-aware entity embeddings are processed by factorized temporal and spatial attention and pooled into the memory
+> M∈RT×512 . (3) An autoregressive decoder predicts the action, frame, and role of each player-centric event.
+
+The main contributions of this work are as follows: • We introduce ME-DST, an entity-aware sequence transduction framework for player-centric ball action spotting. ME-DST preserves player-role slots during encoding and predicts an ordered sequence of player-specific events. 3• We design a factorized multi-entity encoder that separates two forms of reasoning that are mixed in flat DST representations. Temporal attention models the evolution of each role slot over time, while spatial attention models interactions among role slots at each frame. Learnable role embeddings further provide stable role identity, which helps bind temporal evidence to the correct player. • We integrate tracking-derived tactical descriptors and complementary visual predictions into the entity-aware representation. • Extensive experiments on the FOOTPASS dataset show that ME-DST reaches a Micro F1 of 0.778 and improves the strongest official TAAD+DST baseline by 10.3 percentage points. 
+
+# Results 
+
+This section reports the validation performance of ME-DST. We first compare against the official FOOTPASS baselines, then isolate the effects of the main design choices through controlled ablations. We conclude with per-class analysis and representative examples that illustrate the player-centric nature of the task. 
+
+## Experimental Setup 
+
+Experiments are conducted on the FOOTPASS dataset [17], which contains 54 full-match broad-casts from major European soccer leagues during the 2023–24 season, including 48 matches for training, 3 for validation, and 3 for testing. The dataset provides 102,992 frame-level annotations covering eight event categories: Drive, Pass, Cross, Throw-in, Shot, Header, Tackle, and Block. Following the official evaluation protocol, performance is measured using micro-averaged preci-sion, recall, and F1. Predictions are regarded as correct if they fall within ±12 frames ( ±0.48 sat 25 fps) of the ground-truth event, using a confidence threshold of 0.15. Visual predictions are generated by two TAAD models with pretrained X3D-L [21] and Swin3D-S [22] backbones. Both models process 50-frame clips together with player regions of interest and visibility masks to produce frame-wise logits for 26 role slots. The Swin3D-S predictions are temporally smoothed using a one-dimensional Gaussian filter ( σ = 1 .5) before fusion. Unless otherwise stated, the visual prior used by subsequent DST models is obtained by weighted averaging of the two prediction streams: 
+
+z = 0 .6zX3D + 0 .4zSwin .
+
+Unless explicitly specified in the corresponding ablation, all experiments use the same opti-mization strategy and training protocol. Detailed implementation settings are provided in the Methods section. 
+
+## Main Results 
+
+Table 1 summarizes the comparison between ME-DST and the official FOOTPASS baselines on the validation set. Unless otherwise noted, the reported ME-DST configuration uses fused visual predictions, eight-dimensional tactical features, two factorized attention blocks, role embeddings, and no global temporal refinement. ME-DST achieves the best overall performance, reaching a Micro F1 of 0.778 on the FOOT-PASS validation set. Compared with the strongest official baseline, TAAD+DST, the proposed method improves Micro F1 by 10.3 percentage points, while increasing precision from 0.682 to 0.792 and recall from 0.668 to 0.765. Larger gains are observed relative to TAAD and 4Table 1: Comparison with existing methods on the FOOTPASS validation set. 
+
+Method Micro F1 Precision Recall 
+
+TAAD [17] 0.359 0.256 0.599 TAAD+GNN [17] 0.521 0.445 0.627 TAAD+DST [17] 0.675 0.682 0.668 
+
+ME-DST (ours) 0.778 0.792 0.765 
+
+TAAD+GNN, with absolute improvements of 41.9 and 25.7 percentage points in Micro F1, respectively. The baseline results in Table 1 are taken from the official FOOTPASS benchmark. For the ablation studies presented in the following sections, we use our reproduced X3D-L+DST implementation as the reference model to ensure a consistent experimental setting. 
+
+## Ablation Study 
+
+To evaluate the contribution of individual design choices, we perform ablation experiments on the FOOTPASS validation set following the official SoccerNet 2026 evaluation protocol. Unless otherwise specified, only one component is modified at a time while the remaining settings are kept unchanged. 
+
+Visual Backbone 
+
+Table 2 reports the effect of replacing the single X3D-L visual branch with fused predictions from X3D-L and Swin3D-S. Without tactical features, visual fusion improves Micro F1 from 0.667 to 0.710. A similar improvement is observed when three-dimensional tactical features are included, increasing Micro F1 from 0.670 to 0.715. The three-dimensional tactical features provide a modest improvement under both visual backbones. Their effect is limited for the X3D-L model (+0.3 percentage points) and slightly larger for the fused representation (+0.5 percentage points). Among the evaluated configurations in Table 2, the combination of fused visual predictions and three-dimensional tactical features achieves the highest Micro F1 of 0.715. Table 2: Comparison of visual backbones with and without tactical features. P = Precision, R = Recall. 
+
+Configuration Micro F1 Precision Recall 
+
+X3D-L + DST 0.667 0.678 0.656 X3D-L + DST + 3-dim features 0.670 0.684 0.656 Fusion + DST 0.710 0.725 0.696 Fusion + DST + 3-dim features 0.715 0.723 0.708 Temporal Preprocessing Module 
+
+We next evaluate whether additional temporal preprocessing improves the sequence representa-tion before the DST encoder. Three alternatives are considered: a one-dimensional convolution (Conv1D), an additional Transformer encoder layer [23], and a bidirectional GRU [24]. Table 3 shows that the three temporal modules produce comparable performance under the same visual and feature configuration. Using fused visual predictions and three-dimensional tactical features, Conv1D, Transformer, and GRU achieve Micro F1 scores of 0.710, 0.708, and 50.703, respectively. Conv1D gives the highest score among the three variants, although the performance differences remain within 0.7 percentage points. Across all evaluated configurations, the best result in this group is obtained by combining fused visual predictions with Conv1D, reaching a Micro F1 of 0.714. Overall, the choice of temporal preprocessing has only a modest influence on performance compared with the visual backbone explored in the previous section. Table 3: Comparison of temporal preprocessing modules. 
+
+Configuration Micro F1 Precision Recall 
+
+X3D-L + DST + Conv1D 0.666 0.682 0.650 X3D-L + DST + 3-dim features + Conv1D 0.674 0.689 0.660 Fusion + DST + Conv1D 0.714 0.734 0.696 Fusion + DST + 3-dim features + Conv1D 0.710 0.721 0.700 
+
+Fusion + DST + 3-dim features + Transformer 0.708 0.718 0.698 Fusion + DST + 3-dim features + GRU 0.703 0.725 0.683 
+
+Feature Engineering 
+
+We further examine how the dimensionality of tactical features affects performance under dif-ferent encoder architectures. Table 4 compares three feature configurations for the flat DST encoder and two configurations for the multi-entity encoder. For the flat DST encoder, introducing three-dimensional tactical features increases the Micro F1 from 0.710 to 0.715, whereas replacing them with the full eight-dimensional feature set reduces performance slightly to 0.708. In contrast, the multi-entity encoder benefits from the richer representation: Micro F1 improves from 0.758 with three-dimensional features to 0.778 when the complete eight-dimensional feature set is used. This pattern suggests that tactical descriptors are not universally beneficial as additional input dimensions, rather, their utility depends on whether the encoder can preserve the player-level structure to which these descriptors refer. Table 4: Impact of tactical feature dimensionality under flat DST and multi-entity encoders. 
+
+Feature Configuration Micro F1 Precision Recall 
+
+Flat DST encoder (Fusion backbone) 
+
+No tactical features 0.710 0.725 0.696 3-dim (speed, teammate dist, opponent dist) 0.715 0.723 0.708 8-dim (full set) 0.708 0.720 0.696 
+
+Multi-entity encoder, no global refinement (Fusion backbone) 
+
+3-dim 0.758 0.769 0.748 8-dim 0.778 0.792 0.765 Multi-Entity Encoder Components 
+
+Finally, we examine the contribution of individual components in the proposed multi-entity encoder. All configurations in Table 5 use fused visual predictions and the eight-dimensional tactical feature set, while only the encoder architecture is modified. Among all evaluated components, role embeddings have the largest impact on performance. Removing role embeddings decreases the Micro F1 from 0.736 to 0.569, corresponding to a 6reduction of 16.7 percentage points. By comparison, removing spatial attention results in a much smaller decrease, from 0.736 to 0.733. The global temporal refinement layer does not improve performance in our setting. Removing this layer increases the Micro F1 from 0.736 to 0.778, which is the best result obtained in this ablation study. Reducing the encoder depth from two factorized blocks to one yields intermediate performance, with Micro F1 scores of 0.749 and 0.753 for the refined and non-refined variants, respectively. Taken together, these results indicate that explicit role information is the most influential component of the proposed encoder, whereas the global refinement layer is unnecessary for the final model configuration adopted in this work. Table 5: Ablation of ME-DST encoder components using fused visual logits and eight-dimensional tactical features. Base: 2 blocks, spatial attention, role embeddings, and global refinement (F1 = 0.736). 
+
+Configuration Micro F1 Precision Recall 
+
+Base (2 blocks + spatial + role + refine) 0.736 0.757 0.717 – global refinement 0.778 0.792 0.765 
+
+– spatial attention 0.733 0.744 0.723 – role embeddings 0.569 0.574 0.565 1 block + spatial + role 0.749 0.756 0.742 1 block + spatial + role, no refine 0.753 0.764 0.743 
+
+## Per-Class Analysis 
+
+Table 6 compares the per-class performance of the reproduced X3D-L+DST baseline and the final ME-DST model. Improvements are observed across all action categories, although their magnitude varies considerably. Table 6: Per-class performance: reproduced X3D-L + DST vs. ME-DST best configuration (2 blocks + role, no refine). P = Precision, R = Recall, TP = True Positives, FN = False Negatives. 
+
+∆F1 denotes the absolute F1 improvement of ME-DST over the reproduced baseline. 
+
+X3D-L + DST ME-DST (ours) Class P R F1 TP FN P R F1 TP FN ∆F1 
+
+Drive 0.659 0.651 0.655 1609 861 0.793 0.776 0.784 1916 554 +0.129 Pass 0.725 0.703 0.714 2152 907 0.822 0.795 0.808 2431 628 +0.094 Cross 0.539 0.495 0.516 55 56 0.716 0.748 0.732 83 28 +0.216 Throw-in 0.735 0.742 0.738 72 25 0.755 0.732 0.743 71 26 +0.005 Shot 0.623 0.493 0.550 33 34 0.667 0.597 0.630 40 27 +0.080 Header 0.303 0.272 0.287 44 118 0.548 0.457 0.498 74 88 +0.211 Tackle 0.000 0.000 0.000 0 26 0.053 0.038 0.044 1 25 +0.044 Block 0.262 0.205 0.230 16 62 0.423 0.385 0.403 30 48 +0.173 Overall 0.678 0.656 0.667 3981 2089 0.792 0.765 0.778 4646 1424 +0.111 Fig. 2 complements Table 6 with an event-level confusion matrix. To remain consistent with the official spotting protocol, diagonal entries are first obtained using class-aware matching over frame, team, jersey number, and action class. The remaining unmatched predictions and ground-truth events are then paired within the same player and temporal window while ignoring 7the action class, exposing residual class substitutions as off-diagonal entries. Under this analysis, ME-DST reduces class substitutions from 224 to 200, while also decreasing residual missed events and unmatched predictions.  
+
+> Figure 2: Event-level confusion matrices for the reproduced X3D-L+DST baseline and ME-DST. Rows denote ground-truth action classes and columns denote predicted action classes. Diagonal cells are offi-cial class-aware true positives. Off-diagonal cells show residual player-aware temporal matches with an incorrect predicted class. The rightmost column reports missed ground-truth events, and the bottom row reports predictions with no matched ground-truth event. Percentages are row-normalized.
+
+The largest gains are observed for Cross (+0.216), Header (+0.211), and Block (+0.173), while Drive and Pass also improve substantially by 0.129 and 0.094, respectively. In contrast, Throw-in changes only marginally (+0.005). Although Tackle remains the most challenging cate-gory, the proposed model detects one event that is missed by the reproduced baseline, increasing the class F1 from 0 to 0.044. The same trend is observed under different evaluation subsets. Compared with the Fu-sion+DST baseline, ME-DST improves recall from 0.760 to 0.826 on ball-visible events and from 0.391 to 0.480 on ball-hidden events. Recall also increases on replay segments (0.474 to 0.513) and live-play segments (0.720 to 0.794). The improvement is particularly pronounced under ball-hidden conditions, where recall increases by 8.9 percentage points. Fig. 3 shows representative validation examples. These examples illustrate the joint time-action-player matching required by player-centric ball action spotting. ME-DST produces pre-dictions that more closely match the ground truth in these examples, which is consistent with the quantitative improvements reported above. 
+
+# Discussion 
+
+The results suggest that player-centric ball action spotting benefits from keeping the player-role axis explicit during sequence modeling. This section discusses the implications of this finding, the role of explicit identity cues, and the main limitations of the current approach. 
+
+## Factorized Attention for Multi-Agent Sports Understanding 
+
+Our experiments indicate that explicitly separating temporal modeling from inter-player inter-action provides a more effective representation for multi-agent sports understanding than the 8Figure 3: Baseline errors corrected by ME-DST. Yellow dashed boxes mark the annotated actor; green, red, and blue boxes show the ground truth, reproduced X3D-L+DST baseline, and ME-DST results, respectively. (A) A Header is corrected from pass by ME-DST. (B) A Cross mistaken as a Shot is corrected (C) A rare Block is discovered by ME-DST. (D) A Throw-in by the line is corrected from pass. 
+
+flat sequence formulation adopted by the original DST encoder. This conclusion is supported by the consistent improvements observed across the main benchmark, the component ablations, and the per-class analysis. Similar factorized designs have recently been explored for American football defensive coverage analysis [25] and badminton stroke recognition [26], suggesting that separating temporal dynamics from entity interaction may constitute a broadly applicable design principle for structured sports analysis. A possible explanation is that the two types of dependencies captured in soccer videos dif-fer in nature. The temporal evolution of an individual player provides evidence for predicting player-specific actions, whereas many events are also influenced by the spatial configuration of surrounding teammates and opponents [27, 28, 29, 30]. Modeling these dependencies separately allows temporal information to be preserved within each player trajectory before information is exchanged across players through spatial attention. By contrast, the original DST encoder flattens all player representations into a single sequence, requiring temporal dynamics and inter-player relationships to be learned simultaneously within the same representation. The feature engineering experiments provide further evidence that model architecture and handcrafted tactical cues should be considered jointly rather than independently. Increasing the feature dimensionality produces little benefit for the flat DST encoder, whereas the same feature set consistently improves performance in the multi-entity formulation. This observation suggests that richer tactical descriptors become more useful when the underlying representation explicitly preserves player-level structure throughout the encoding process. Several limitations should also be acknowledged. Although the ablation study isolates the contribution of individual components within the proposed framework, it does not fully disentan-gle architectural changes from differences in model capacity. Additional controlled comparisons, such as parameter-matched variants or alternative multi-agent encoders, would provide a more rigorous assessment of the proposed design. We leave this direction for future work. 
+
+## The Importance of Explicit Role Information 
+
+Among all architectural components evaluated in this study, removing role embeddings results in the largest performance degradation, reducing the Micro F1 from 0.736 to 0.569. This finding suggests that explicitly encoding player roles provides information that cannot be recovered reliably from motion trajectories alone. 9One possible explanation is that players occupying different tactical roles exhibit distinct spatial distributions and action patterns over the course of a match. Providing this information explicitly enables the encoder to distinguish players with similar short-term trajectories but different tactical responsibilities. In contrast, when role embeddings are removed, the model must infer these distinctions solely from observed motion, which is likely to be more challenging, particularly under limited training data. Although our implementation represents each role using a learnable embedding vector, the underlying idea is not specific to soccer. Many multi-agent sports involve relatively stable player identities or tactical assignments, suggesting that explicit role information may provide a useful inductive bias beyond the FOOTPASS benchmark. Evaluating this hypothesis on additional sports datasets represents an interesting direction for future work. 
+
+## When Less Is More: Revisiting Global Temporal Refinement 
+
+Removing the global temporal refinement layer consistently improves performance, increasing the Micro F1 from 0.736 to 0.778. This observation suggests that, under the proposed architecture, the two factorized attention blocks already provide sufficient temporal modeling before the final prediction stage. Each block captures long-range temporal dependencies for individual player representations while simultaneously modeling interactions across players, reducing the need for an additional global Transformer encoder. One possible interpretation is that the benefit of additional temporal refinement depends on the information already encoded by earlier stages of the network. In our implementation, each player representation has already aggregated information over approximately 750 frames (about 30 seconds of game time) before reaching the refinement layer. Under this setting, an additional round of global temporal attention appears to provide limited benefit and may even interfere with temporal localization. Although this hypothesis is consistent with our ablation results, further analyses, such as attention visualization or boundary localization experiments, would be required to verify the underlying mechanism. More broadly, these findings suggest that temporal modeling capacity should be considered at the level of the entire architecture rather than individual modules. When long-range temporal dependencies have already been explicitly modeled upstream, adding further temporal refinement may introduce redundancy instead of complementary information. This observation may also be relevant to other sequence modeling problems in which hierarchical temporal representations are employed. 
+
+## Limitations and Future Directions 
+
+Several limitations qualify the conclusions of this study. First, performance remains strongly affected by the class distribution of FOOTPASS. ME-DST improves all eight action categories, but Tackle remains difficult, with only one correctly detected event and an F1 score of 0.044. The F1 scores for Header and Block also remain below 0.5 despite substantial improvements over the reproduced baseline. These results indicate that modifying the sequence encoder does not by itself resolve the limited supervision available for rare and visually ambiguous actions [31]. Imbalance-aware objectives, targeted sampling, and class-specific temporal augmentation warrant further investigation. Second, ME-DST operates on visual logits produced by separately trained TAAD branches. Errors in player detection, action classification, or temporal localization are therefore propagated to the sequence model and cannot be corrected through joint visual–sequence optimization. This dependency is particularly relevant under occlusion, where the visual evidence for both the player and the ball may be incomplete. Jointly training the visual branches and the denoising sequence model could help determine how much of the remaining error arises from upstream perception and how much arises from sequence transduction. 10 The current role representation also depends on the organization and annotations provided by FOOTPASS. Role indices are converted to player identities using shirt-number observations propagated across missing frames. This procedure can be unreliable near substitutions, changes in tactical assignment, or extended periods without a visible shirt number. Similarly, the tac-tical descriptors are manually specified and rely on normalized tracking coordinates. Learned trajectory representations or identity-association modules may provide greater robustness when role definitions, tracking quality, or camera configurations differ from those in FOOTPASS [32]. Our architectural conclusions should also be interpreted within the scope of the reported ab-lations. The experiments show that the proposed multi-entity encoder, role embeddings, tactical features, and visual fusion are effective in the evaluated configurations, but they do not fully separate architectural effects from differences in parameter count or optimization. In particu-lar, the benefit of preserving entity structure should be examined using parameter-matched flat and multi-entity encoders, multiple random seeds, and additional player-centric datasets. The limited number of validation matches further makes uncertainty estimates important for future comparisons. Beyond action spotting, Denoising Sequence Transduction could be extended to settings in which the output remains an ordered event sequence but the prediction target changes, such as action anticipation [33] or tactical event forecasting. These directions would test whether explicit entity-wise encoding remains useful when the model must predict future rather than observed events. Evaluation on other sports would further clarify which aspects of ME-DST depend on soccer-specific role structure and which transfer to more general multi-agent sequence transduction. In summary, our results identify a specific limitation of the original FOOTPASS DST encoder: concatenating all role slots before temporal modeling removes the explicit player dimension from the encoded sequence. Preserving this dimension and separately modeling within-player temporal dynamics and cross-player interactions improves player-centric ball action spotting in the FOOTPASS setting. ME-DST should therefore be viewed as an entity-aware extension of Denoising Sequence Transduction rather than as a replacement for its sequence-decoding formulation. Establishing how broadly this extension transfers will require controlled evaluation beyond the present benchmark. 
+
+# Methods 
+
+This section describes the full ME-DST pipeline. We first define the player-centric ball ac-tion spotting task and the event representation used by the decoder. We then describe the visual logits, tracking-derived tactical features, multi-entity encoder, and autoregressive decod-ing procedure. Finally, we provide the training, inference, and evaluation settings used for all experiments. 
+
+## Problem Formulation 
+
+We formulate soccer action spotting as a sequence prediction problem over structured player representations. The input consists of a soccer broadcast containing T video frames sampled at 25 fps together with synchronized player tracking data organized into 26 predefined team-role slots (13 roles for each team). The goal is to predict a sequence of ball action events, 
+
+E = {e1, e 2, . . . , e K },
+
+where each event is represented as 
+
+ek = ( tk, ℓ k, j k, c k, s k).
+
+11 Here, tk denotes the event frame, ℓk ∈ { 0, 1} identifies the team, jk is the jersey number, ck is one of the eight action categories (Drive, Pass, Cross, Throw-in, Shot, Header, Tackle, or Block), and sk denotes the prediction confidence. The decoder predicts an autoregressive sequence over the eight action classes augmented with start-of-sequence (SOS) and end-of-sequence (EOS) tokens. No explicit background token is included in the output vocabulary. 
+
+## Visual Feature Extraction 
+
+Visual observations are represented using two complementary TAAD branches based on pre-trained X3D-L [21] and Swin3D-S [22] backbones. Both branches follow the same TAAD de-tection pipeline, in which hierarchical visual features are aggregated through a feature pyramid, pooled within player regions of interest using ROIAlign, and decoded into frame-wise action logits. The two models differ only in the underlying video backbone, allowing them to capture complementary visual representations while sharing an identical detection framework. Each branch processes 50-frame clips with a spatial resolution of 352 ×640 and predicts logits in R9×26 ×T , corresponding to nine action categories (eight actions and one background class) for every role slot at each frame. Before fusion, the Swin3D-S predictions are temporally smoothed using a one-dimensional Gaussian filter ( σ = 1 .5). The final visual representation is obtained by weighted averaging: 
+
+Zfused = 0 .6ZX3D + 0 .4ZSwin . (1) For each role slot, the fused visual logits are concatenated with 13 tracking-derived features, including five raw tracking attributes and eight engineered tactical descriptors (Section ), pro-ducing a 22-dimensional representation that serves as the input to the multi-entity encoder. 
+
+## Tactical Feature Representation 
+
+In addition to visual predictions, each player is represented by tracking-derived features describ-ing motion, local interactions, and field geometry. The raw tracking data provide five basic attributes at each frame: normalized position (x, y ), velocity (vx, v y), and a binary visibility indicator. To enrich the player representation, we compute eight engineered tactical features that can be grouped into three categories. 
+
+Motion features describe the player’s instantaneous movement and include the speed 
+
+f0 =
+
+q
+
+v2 
+
+> x
+
++ v2 
+
+> y
+
+,
+
+and the acceleration magnitude 
+
+f3 =
+
+q
+
+(∇vx)2 + ( ∇vy)2,
+
+computed from consecutive visible observations. 
+
+Interaction features characterize the local player configuration. These include the distance to the nearest visible teammate ( f1), the distance to the nearest visible opponent ( f2), and a pressure index ( f7), defined as the normalized number of opponents within a radius of 0.05 in pitch coordinates. 
+
+Field-geometry features encode the player’s position relative to the attacking goal. They consist of the Euclidean distance to the goal center ( f4) together with the sine and cosine of the goal direction angle ( f5 and f6), providing a continuous representation of player orientation while avoiding angular discontinuities. The resulting 13-dimensional tracking representation (five raw and eight engineered features) is concatenated with the fused 9-dimensional visual logits to produce a 22-dimensional represen-tation for each role slot. 12 For the feature ablation experiments, the three-dimensional configuration retains only speed, nearest-teammate distance, and nearest-opponent distance, whereas the full configuration in-cludes all eight engineered tactical features. 
+
+## Multi-Entity DST Architecture 
+
+The proposed Multi-Entity DST (ME-DST) encoder transforms the per-player representations described above into a global event representation through four successive stages: player embed-ding, factorized temporal–spatial encoding, global aggregation, and autoregressive decoding. 
+
+Player representation. For each role slot and each frame, the 22-dimensional input vector is independently projected into a dmodel = 512 latent representation using a two-layer multilayer perceptron with GELU activation and LayerNorm, 
+
+h(0)  
+
+> t,n
+
+= MLP( xt,n ), h(0)  
+
+> t,n
+
+∈ R512 , (2) where t denotes the frame index and n denotes the role slot. A learnable role embedding is added to every player representation, 
+
+h(0)  
+
+> t,n
+
+← h(0)  
+
+> t,n
+
++ rn, (3) followed by standard sinusoidal positional encoding computed from frame indices within the current temporal window [23]. 
+
+Factorized temporal–spatial encoding. The encoded player representations are processed by two identical factorized attention blocks. Within each block, temporal self-attention is first applied independently to each player trajectory, 
+
+Htemp  
+
+> n
+
+= TemporalAttn( H(i−1)  
+
+> n
+
+), (4) after which spatial self-attention models interactions among all role slots at every frame, 
+
+Hspat  
+
+> t
+
+= SpatialAttn( Htemp  
+
+> t
+
+). (5) Both attention modules are implemented using Pre-LN Transformer encoder layers with eight attention heads and a hidden dimension of 512. Spatial attention is evaluated in chunks to reduce memory consumption without changing the computation. 
+
+Global event representation. The player-level representations are aggregated into a shared event representation using a learnable query token, 
+
+Mt = LayerNorm  MHA( q, Hspat  
+
+> t
+
+, Hspat  
+
+> t
+
+) + q. (6) An additional Transformer encoder operating along the temporal dimension can optionally refine this global memory. As shown in the ablation study, the best-performing configuration omits this refinement stage. 
+
+Autoregressive event decoding. The final event representation is decoded using a six-layer Pre-LN Transformer decoder [34]. At each decoding step, the model predicts the action category, player role, and event frame jointly through three output heads. Decoding terminates when the EOS token is generated or when the maximum decoding length of 25 events is reached. 13 Training 
+
+The model is trained by jointly optimizing action classification, player-role prediction, and tem-poral localization. The overall objective is the sum of three cross-entropy losses, 
+
+L = Laction + Lrole + Lframe . (7) Label smoothing ( ϵ = 0 .05 ) [35] is applied to the action and role prediction losses, whereas the frame localization loss is optimized without smoothing. To alleviate class imbalance, the action classification loss uses class-specific weights, while all padding positions are excluded from loss computation. Optimization is performed using AdamW [36] with linear learning-rate warmup followed by exponential decay. Gradient checkpointing [37] is enabled for the multi-entity encoder to reduce memory consumption during training. Unless otherwise specified, all experiments reported in this work use the same optimization settings. 
+
+## Inference 
+
+During inference, each match half is partitioned into consecutive 750-frame windows, with zero-padding applied only to the final incomplete window. For each window, the autoregressive decoder predicts an ordered sequence of candidate events and terminates when either an EOS token is generated or the maximum decoding length is reached. Each predicted event consists of an action category, a role index, a frame location, and an asso-ciated confidence score. The predicted role index is subsequently converted to the corresponding team side and jersey number using the available shirt-number annotations with temporal inter-polation across missing observations. Events assigned to the neutral role or localized outside the valid temporal range are discarded. The remaining predictions are merged across all windows to produce the final event sequence for evaluation. 
+
+## Evaluation Metrics 
+
+Evaluation follows the official SoccerNet 2026 Challenge protocol ( https://www.soccer-net. org/challenges/2026 ). Predictions with confidence scores below 0.15 are discarded before eval-uation. A predicted event is considered correct if it can be uniquely matched to a ground-truth event of the same action class, team side, and jersey number within a temporal tolerance of ±12 
+
+frames. Each ground-truth event can be matched to at most one prediction. Performance is reported using micro-averaged precision, recall, and F1 over all evaluated matches. 
+
+# Data Availability 
+
+The FOOTPASS dataset [17] is available through the SoccerNet organization on Hugging Face (https://huggingface.co/SoccerNet ) under the access conditions specified by its maintainers. Access to the broadcast videos requires acceptance of the SoccerNet Non-Disclosure Agreement. The fused X3D-L and Swin3D-S logits and the evaluation outputs generated in this study are available from the corresponding author upon reasonable request and are not part of the official FOOTPASS release. 
+
+# Code Availability 
+
+The code used to train and evaluate the models in this study is available at the ME-DST GitHub repository ( https://github.com/WRF32-10/ME-DST ). 14 Author Contributions 
+
+R. W. was responsible for conceiving the study, developing the method, implementing the models, conducting the experiments, analysing the results, and drafting the manuscript. D. Y. and J. W. supervised the study and revised the manuscript. All authors read and approved the final manuscript. 
+
+# Acknowledgements 
+
+This work was supported by the National Natural Science Foundation of China under Grant No. 62502492 and the Natural Science Foundation of Jiangsu Province Basic Research Program under Grant No. BK20250489. 
+
+# Competing Interests 
+
+All authors declare no financial or non-financial competing interests. 
+
+## Use of generative AI 
+
+Large language models were used to assist with language editing, LaTeX formatting, and biblio-graphic consistency checks. All scientific content, experimental design, analyses, references, and conclusions were verified and approved by the authors. 
+
+# References 
+
+[1] Giancola, S., Amine, M., Dghaily, T. & Ghanem, B. SoccerNet: A scalable dataset for action spotting in soccer videos. In Proc. IEEE/CVF Conf. Comput. Vis. Pattern Recognit. Workshops 1711–1721 (2018). [2] Cioppa, A. et al. SoccerNet 2023 challenges results. Sports Eng. 27 , 24; 10.1007/s12283-024-00466-4 (2024). [3] Deliège, A. et al. SoccerNet-v2: A dataset and benchmarks for holistic understanding of broadcast soccer videos. In Proc. IEEE/CVF Conf. Comput. Vis. Pattern Recognit. Work-shops (2021). [4] Giancola, S. & Ghanem, B. Temporally-aware feature pooling for action spotting in soccer broadcasts. In Proc. IEEE/CVF Conf. Comput. Vis. Pattern Recognit. Workshops 4490– 4499 (2021). [5] Arandjelović, R., Gronat, P., Torii, A., Pajdla, T. & Sivic, J. NetVLAD: CNN architecture for weakly supervised place recognition. In Proc. IEEE Conf. Comput. Vis. Pattern Recognit. 
+
+5297–5307 (2016). [6] Cioppa, A. et al. A context-aware loss function for action spotting in soccer videos. In Proc. IEEE/CVF Conf. Comput. Vis. Pattern Recognit. (2020). [7] Hong, J., Zhang, H., Gharbi, M., Fisher, M. & Fatahalian, K. Spotting temporally precise, fine-grained events in video. In Proc. Eur. Conf. Comput. Vis. 33–51 (2022). [8] Xarles, A., Escalera, S., Moeslund, T. B. & Clapés, A. ASTRA: An action spotting TRAns-former for soccer videos. In Proc. 6th Int. Workshop Multimedia Content Anal. Sports 93–102 (2023). 15 [9] Denize, J., Liashuha, M., Rabarisoa, J., Orcesi, A. & Hérault, R. COMEDIAN: Self-supervised learning and knowledge distillation for action spotting using transformers. In 
+
+Proc. IEEE/CVF Winter Conf. Appl. Comput. Vis. Workshops 530–540 (2024). [10] Soares, J. V. B., Shah, A. & Biswas, T. Temporally precise action spotting in soccer videos using dense detection anchors. In Proc. IEEE Int. Conf. Image Process. 2796–2800; 10.1109/ICIP46576.2022.9897256 (2022). [11] Giancola, S. et al. SoccerNet 2022 challenges results. In Proc. 5th Int. ACM Workshop Multimedia Content Anal. Sports 75–86; 10.1145/3552437.3558545 (2022). [12] Tan, M. & Le, Q. V. EfficientNetV2: Smaller models and faster training. In Proc. 38th Int. Conf. Mach. Learn. 10096–10106 (2021). [13] Wang, L., Guo, H. & Liu, B. A boosted model ensembling approach to ball action spotting in videos: The runner-up solution to the CVPR 2023 SoccerNet Challenge. arXiv 2306.05772 (2023). [14] Cioppa, A. et al. SoccerNet 2024 challenges results. arXiv 2409.10587 (2024). [15] Xarles, A., Escalera, S., Moeslund, T. B. & Clapés, A. T-DEED: Temporal-discriminability enhancer encoder-decoder for precise event spotting in sports videos. In Proc. IEEE/CVF Conf. Comput. Vis. Pattern Recognit. Workshops (2024). [16] Giancola, S. et al. SoccerNet 2025 challenges results. arXiv 2508.19182 (2025). [17] Ochin, J., Chekroun, R., Stanciulescu, B. & Manitsaris, S. FOOTPASS: A multi-modal multi-agent tactical context dataset for play-by-play action spotting in soccer broadcast videos. arXiv 2511.16183 (2025). [18] Singh, G., Choutas, V., Saha, S., Yu, F. & Van Gool, L. Spatio-temporal action detec-tion under large motion. In Proc. IEEE/CVF Winter Conf. Appl. Comput. Vis. 6009–6018 (2023). [19] Ochin, J., Devineau, G., Stanciulescu, B. & Manitsaris, S. Game state and spatio-temporal action detection in soccer using graph neural networks and 3D convolutional networks. In 
+
+Proc. 14th Int. Conf. Pattern Recognit. Appl. Methods 636–646 (2025). [20] Ochin, J., Chekroun, R., Stanciulescu, B. & Manitsaris, S. Beyond pixels: Leveraging the language of soccer to improve spatio-temporal action detection in broadcast videos. In Ad-vanced Concepts for Intelligent Vision Systems: 22nd International Conference, ACIVS 2025 552–563; 10.1007/978-3-032-07343-3_44 (Springer, 2026). [21] Feichtenhofer, C. X3D: Expanding architectures for efficient video recognition. In Proc. IEEE/CVF Conf. Comput. Vis. Pattern Recognit. 200–210 (2020). [22] Liu, Z. et al. Video Swin Transformer. In Proc. IEEE/CVF Conf. Comput. Vis. Pattern Recognit. 3202–3211 (2022). [23] Vaswani, A. et al. Attention is all you need. Adv. Neural Inf. Process. Syst. 30 (2017). [24] Cho, K. et al. Learning phrase representations using RNN encoder–decoder for statistical machine translation. In Proc. 2014 Conf. Empir. Methods Nat. Lang. Process. 1724–1734 (2014). [25] Song, K. et al. Decoding defensive coverage responsibilities in American football using fac-torized attention-based transformer models. In Sports Analytics: Third International Con-ference, ISACE 2026 170–187 (Springer, 2026). 16 [26] Ibh, M., Grasshof, S., Witzner, D. & Madeleine, P. TemPose: A new skeleton-based transformer model designed for fine-grained motion recognition in badminton. In Proc. IEEE/CVF Conf. Comput. Vis. Pattern Recognit. Workshops (2023). [27] Gavrilyuk, K., Sanford, R., Javan, M. & Snoek, C. G. M. Actor-transformers for group activity recognition. In Proc. IEEE/CVF Conf. Comput. Vis. Pattern Recognit. 839–848 (2020). [28] Li, S. et al. GroupFormer: Group activity recognition with clustered spatial-temporal trans-former. In Proc. IEEE/CVF Int. Conf. Comput. Vis. 13668–13677 (2021). [29] Yuan, Y., Weng, X., Ou, Y. & Kitani, K. M. AgentFormer: Agent-aware transformers for socio-temporal multi-agent forecasting. In Proc. IEEE/CVF Int. Conf. Comput. Vis. 
+
+9813–9823 (2021). [30] Mohamed, A., Qian, K., Elhoseiny, M. & Claudel, C. Social-STGCNN: A social spatio-temporal graph convolutional neural network for human trajectory prediction. In Proc. IEEE/CVF Conf. Comput. Vis. Pattern Recognit. 14424–14432 (2020). [31] Santra, S., Chudasama, V., Wasnik, P. & Balasubramanian, V. N. Precise event spotting in sports videos: Solving long-range dependency and class imbalance. In Proc. IEEE/CVF Conf. Comput. Vis. Pattern Recognit. 3163–3172 (2025). [32] Cabado, B. et al. Beyond the Premier: Assessing action spotting transfer capability across diverse domains. In Proc. IEEE/CVF Conf. Comput. Vis. Pattern Recognit. Workshops 
+
+3386–3398 (2024). [33] Dalal, A. et al. Action anticipation from SoccerNet football video broadcasts. In Proc. IEEE/CVF Conf. Comput. Vis. Pattern Recognit. Workshops (2025). [34] Xiong, R. et al. On layer normalization in the Transformer architecture. In Proc. Int. Conf. Mach. Learn. (2020). [35] Szegedy, C., Vanhoucke, V., Ioffe, S., Shlens, J. & Wojna, Z. Rethinking the Inception ar-chitecture for computer vision. In Proc. IEEE Conf. Comput. Vis. Pattern Recognit. (2016). [36] Kingma, D. P. & Ba, J. Adam: A method for stochastic optimization. In Proc. 3rd Int. Conf. Learn. Represent. (2015). [37] Chen, T., Xu, B., Zhang, C. & Guestrin, C. Training deep nets with sublinear memory cost. 
+
+arXiv 1604.06174 (2016). 17

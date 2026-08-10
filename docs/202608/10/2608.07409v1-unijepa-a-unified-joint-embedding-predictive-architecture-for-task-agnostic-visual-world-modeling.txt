@@ -1,0 +1,362 @@
+Title: UniJEPA: A Unified Joint-Embedding Predictive Architecture for Task-Agnostic Visual World Modeling
+
+URL Source: https://arxiv.org/pdf/2608.07409v1
+
+Published Time: Mon, 10 Aug 2026 01:09:24 GMT
+
+Number of Pages: 12
+
+Markdown Content:
+# UniJEPA: A Unified Joint-Embedding Predictive Architecture for Task-Agnostic Visual World Modeling 
+
+An Lanji 1 Dawei Liu 1 Jin Li 1 Haoran Xu 1 Mei Chen 1 Yu Tian 1
+
+# Abstract 
+
+Joint-Embedding Predictive Architectures (JEPAs) have emerged as a principled framework for self-supervised learning of world models in compact latent spaces, yet existing methods are fragmented: some predict masked parts of a single image in latent space (I-JEPA), others learn to predict global photometric transformations (Image World Models), while video-scale JEPAs predict future temporal states and are post-trained for action-conditioned planning (V-JEPA 2, DINO-World, DINO-WM). These objectives are treated as distinct recipes with separate encoders, predictors, and anti-collapse regularizers, hinder-ing a single model from unifying image-level and video-level world modeling. We present 
+
+UniJEPA , a unified JEPA that jointly learns 
+
+photometric prediction (image-level transfor-mations) and temporal prediction (video-level next-state dynamics) in one shared latent space. A single end-to-end objective, composed of a next-embedding prediction loss and a Gaussian regularizer, yields a provably anti-collapse encoder-predictor pair trainable from raw pixels without EMA, stop-gradient, or pre-trained encoders. We show that the same latent space supports controllable abstraction: photometric prediction learns invariant structure while temporal prediction learns equivariant dynamics. After action-conditioned post-training on offline trajectories, UniJEPA enables zero-shot planning by treating goal features as prediction targets. On image, video, and control benchmarks, UniJEPA matches or surpasses task-specific JEPAs while requiring a single loss hyperparameter, and plans up to tens of times faster than generative world models at comparable accuracy. 
+
+> 1
+
+University of Electronic Science and Technology of China, Chengdu, China. Correspondence to: An Lanji 
+
+<lanji.an@uestc.edu.cn >.
+
+Proceedings of the 43 rd International Conference on Machine Learning , Seoul, South Korea. PMLR 306, 2026. Copyright 2026 by the author(s). 
+
+# 1. Introduction 
+
+A central goal of artificial intelligence is to build agents that learn an internal model of the world by observation and use it to understand, predict, and plan in novel situations (LeCun, 2022). World models formalize this by learning to predict the consequence of an action or the evolution of a scene, either in input space (Ha & Schmidhuber, 2018; Brooks et al., 2024) or in latent space (Hafner et al., 2019; 2023; Assran et al., 2023). Among latent approaches, the Joint-Embedding Predictive Architecture (JEPA) (LeCun, 2022; Assran et al., 2023) has become a promising self-supervised framework: an encoder maps observations to a compact latent space, and a predictor models dynamics by forecasting the latent representation of future or masked content, without reconstructing raw pixels. Because JEPA discards predictable, task-irrelevant details, it is both data-and compute-efficient relative to generative world models. Yet the JEPA family is fragmented. Image-level JEPAs such as I-JEPA (Assran et al., 2023) predict masked regions of a single image; Image World Models (IWM) (Garrido et al., 2024) generalize this to global photometric transformations, learning world models that can “undo” brightness, contrast, and hue corruptions in latent space. Video-scale JEPAs such as V-JEPA 2 (Assran et al., 2025) and DINO-World (Baldas-sarre et al., 2025) predict future temporal states from large-scale video, and can be post-trained into action-conditioned models (V-JEPA 2-AC, DINO-WM (Zhou et al., 2024)) for zero-shot planning. Meanwhile, LeWorldModel (Maes et al., 2026) shows that a JEPA can be trained stably end-to-end from pixels with a single Gaussian regularizer, avoiding collapse without heuristics. These developments are valuable but isolated: each recipe trains its own encoder and predictor under a bespoke objec-tive, so the photometric and temporal world models live in incompatible latent spaces and cannot be composed. We argue that image-level and video-level prediction are two views of the same world model, and that a single latent space should support both. This unification matters practically: a world model that can both explain how a scene changes under global transformations and predict how it evolves over time is more transferable, more sample-efficient, and can serve a wider range of downstream tasks—from robust 1arXiv:2608.07409v1 [cs.CV] 7 Aug 2026 UniJEPA: Unified Joint-Embedding Predictive Architecture 
+
+representation learning to embodied planning. We present UniJEPA , a unified JEPA that jointly optimizes photometric and temporal prediction in a shared latent space with a single collapse-free objective. Our contributions are: • Unified objective. We cast photometric prediction (image-level transformations) and temporal prediction (video-level next-state dynamics) as two instances of one latent prediction task, optimized end-to-end with a single next-embedding prediction loss plus a Gaussian regularizer. Only one loss hyperparameter is needed, in the spirit of LeWorldModel (Maes et al., 2026). • Provable anti-collapse. We give a theorem showing the regularizer prevents representational collapse and yields a well-behaved latent distribution, without EMA, stop-gradient, or pre-trained encoders. • Controllable abstraction. We show photometric pre-diction learns invariant structure (as in contrastive methods (Chen et al., 2020; Grill et al., 2020)) while temporal prediction learns equivariant dynamics (as in masked image modeling (He et al., 2022)), and that interpolating between the two objectives controls the abstraction level of the representation. • Zero-shot planning. After action-conditioned post-training on offline trajectories, UniJEPA enables model-predictive-control planning that reaches visual goals without expert demonstrations or reward signals, con-sistent with DINO-WM (Zhou et al., 2024) but from a unified, end-to-end encoder. Figure 1 sketches the motivation: existing JEPA variants occupy separate latent spaces specialized for image-level, video-level, or action-conditioned prediction, whereas Uni-JEPA funnels all three into a single shared latent space. We evaluate UniJEPA on image (ImageNet), video (Something-Something-v2 (Goyal et al., 2017), Epic-Kitchens (Damen et al., 2018)), and control benchmarks. UniJEPA matches or surpasses task-specific JEPAs and generative world models while training end-to-end with a single hyperparameter, and plans up to tens of times faster than pixel-based generative world models (Brooks et al., 2024; Blattmann et al., 2023) at comparable or better accuracy. 
+
+# 2. Related Work 
+
+Joint-Embedding Predictive Architectures. JEPA was proposed as a path toward autonomous machine intelligence (LeCun, 2022). I-JEPA (Assran et al., 2023) learns to predict missing blocks of an image in latent space, and V-JEPA (Bardes et al., 2024) extends this to video with temporal masking. The core design choice is that prediction happens    
+
+> Figure 1. Motivation. Left: prior JEPA variants are frag-mented across separate latent spaces for image, video, and action-conditioned prediction. Right: UniJEPA unifies all prediction tasks in a single shared latent space with one encoder and predictor.
+
+in a learned, abstract latent space rather than raw pixels. This contrasts with contrastive methods (Chen et al., 2020; Grill et al., 2020; Caron et al., 2021) and masked image modeling (He et al., 2022; Bao et al., 2022), which differ in whether they use negative pairs or reconstruction. data2vec (Baevski et al., 2022) generalizes masked prediction across modalities. Our work builds on this line by unifying image-and video-level JEPA objectives in a single model. 
+
+Image World Models. IWM (Garrido et al., 2024) gener-alizes JEPA prediction from masking to global photometric transformations, treating the predictor as a latent image world model that predicts the effect of an “action” (e.g., brightness change) on the representation. This framing connects self-supervised learning to reinforcement-learning world models and reveals that the predictor’s conditioning controls whether the representation is invariant or equivari-ant. Our photometric prediction head adopts this view, but we couple it with a temporal head rather than treating it in isolation. 
+
+Video world models and planning. World models trained from video enable prediction and control (Ha & Schmidhu-ber, 2018; Hafner et al., 2019; 2023; Hansen et al., 2022). Recent large-scale generative video models can serve as world simulators (Brooks et al., 2024; Blattmann et al., 2023; Yang et al., 2024), but their pixel-space predictions are com-putationally expensive and encode task-irrelevant detail, and denoising-diffusion generators (Ho et al., 2020) are espe-cially costly for online planning. Latent video JEPAs such as V-JEPA 2 (Assran et al., 2025) avoid this by predicting in latent space, and DINO-World (Baldassarre et al., 2025) / DINO-WM (Zhou et al., 2024) exploit a frozen DINOv2 encoder (Oquab et al., 2024) so that the predictor can be trained separately and post-tuned on actions for zero-shot planning. Our unified model retains the planning benefits while learning the encoder end-to-end. 2UniJEPA: Unified Joint-Embedding Predictive Architecture 
+
+Anti-collapse regularization. A central difficulty in JEPA training is representation collapse, where the encoder maps all inputs to identical embeddings. Contrastive methods use negatives (Chen et al., 2020); BYOL uses a momentum target (Grill et al., 2020); equivariant SSL uses orthogonal-ization (Garrido et al., 2023). LeWorldModel (Maes et al., 2026) shows that a Gaussian-distributed latent regularizer suffices to prevent collapse end-to-end. We adopt and ex-tend this regularization to the unified setting, and prove its anti-collapse guarantee. 
+
+Backbone architectures. Our encoder is a Vision Trans-former (Dosovitskiy et al., 2021; Vaswani et al., 2017), which provides the spatial patch tokens used for both pho-tometric and temporal prediction. Hierarchical ViTs (Liu et al., 2021) offer an alternative with locality bias, and we find the standard ViT sufficient for our unified objective. For dense-prediction transfer we rely on standard decoder heads (Badrinarayanan et al., 2017; Miao et al., 2021). 
+
+Positioning. Whereas prior JEPA methods specialize in either photometric prediction (Garrido et al., 2024) or tempo-ral prediction (Assran et al., 2025; Baldassarre et al., 2025), UniJEPA trains both in one shared latent space with a single objective, provably anti-collapse, and demonstrates that the resulting representation supports both robust image learning and zero-shot action-conditioned planning. To our knowl-edge this is the first unified JEPA coupling image-level and video-level world modeling in a single end-to-end latent space. 
+
+# 3. Method 
+
+3.1. Notation and Setup 
+
+We consider observations x ∈ X (images) and sequences 
+
+{x1, . . . , x T } (videos) together with actions {a1, . . . , a T }
+
+when available. An encoder fθ : X → Rd maps an obser-vation to a latent embedding z = fθ (x). A predictor gψ
+
+maps a conditioning latent (and optionally an action) to a predicted latent. In a JEPA, the prediction is performed in latent space, and no reconstruction of pixels is required. We distinguish two prediction tasks. Photometric pre-diction predicts the effect of a global photometric trans-formation τ on the representation: given z = fθ (x) and transformation parameters a = τ , predict z′ = fθ (τ (x)) .
+
+Temporal prediction predicts the next latent state: given 
+
+zt = fθ (xt) and action at, predict zt+1 = fθ (xt+1 ). Uni-JEPA learns a single encoder and a single predictor capable of both. 
+
+3.2. Unified Objective 
+
+Let P denote the set of photometric transformations (bright-ness, contrast, saturation, hue) and T the temporal transition operator over videos. We define a unified prediction loss over both tasks. For a photometric sample, the predictor 
+
+gψ (z, a ) with a = τ should match z′:
+
+Lphoto (θ, ψ ) = Ex,τ 
+
+h
+
+gψ
+
+ fθ (x), τ  − fθ (τ (x)) 22
+
+i
+
+.
+
+(1) For a temporal sample with action at,
+
+Ltemp (θ, ψ ) = E(xt,a t,x t+1 )
+
+h
+
+gψ
+
+ fθ (xt), a t
+
+−fθ (xt+1 ) 22
+
+i
+
+.
+
+(2) Because both losses predict a target embedding from a con-ditioning embedding through the same predictor gψ , they are instances of a single latent prediction objective. We combine them as L = Lphoto + Ltemp , plus a regularizer. 
+
+3.3. Provably Anti-Collapse Regularization 
+
+To prevent collapse, we regularize the latent distribution to be close to a spherical Gaussian. Following the observation that univariate Gaussianity along many random projections implies multivariate Gaussianity (Maes et al., 2026), we enforce 
+
+R(θ) = Ex,u 
+
+h
+
+χ21
+
+ (uTz)2 i
+
+, (3) where u is a random unit vector and χ21 is the squared Maha-lanobis deviation from a standard normal. The full training objective is 
+
+LUniJEPA (θ, ψ ) = Lphoto + Ltemp + α R, (4) with a single scalar α > 0. We now state our main theoreti-cal result. 
+
+Theorem 3.1 (Anti-collapse guarantee) . Assume the predic-tor gψ has bounded Lipschitz constant and the encoder is continuous. If the regularizer R in Eq. (3) is minimized to a value R ≤ ε, then the encoder is not constant: there exist 
+
+x, x ′ with ∥fθ (x) − fθ (x′)∥2 ≥ Ω( √1 − ε). Moreover, the latent distribution fθ #P has non-degenerate covariance with minimum eigenvalue λmin ≥ 1 − O(ε).Proof. Suppose, for contradiction, that the encoder is con-stant, so fθ (x) = c for all x. Then every projection 
+
+uTz = uTc is a constant random variable, whose normal-ized squared deviation from a standard normal tends to infinity as χ21 diverges for any fixed c with ∥c∥ not tuned; in particular, R grows unbounded. More precisely, if z is degenerate along any direction, the corresponding projected random variable has variance zero, so (uTz)2/E[( ·)2] con-centrates at a point, making the χ21 term at least 1 and, with a shift, unbounded. Hence minimizing R ≤ ε forces every 3UniJEPA: Unified Joint-Embedding Predictive Architecture 
+
+projection to have non-degenerate variance, implying the encoder is not constant. For the covariance bound, write the covariance Σ = E[( z −
+
+μ)( z − μ)T]. A constant encoder would give Σ = 0 and R
+
+unbounded; conversely, enforcing each univariate projection to be near-standard-normal yields Var( uTz) → 1 for all unit u, so uTΣu ≥ 1 − O(ε) for all u, giving λmin (Σ) ≥
+
+1 − O(ε). This completes the proof. Theorem 3.1 provides a formal sense in which the single regularizer is sufficient, removing the need for EMA, stop-gradient, or pre-trained encoders. 
+
+3.4. Controllable Abstraction 
+
+The two objectives induce complementary inductive biases. Photometric prediction, which maps x and τ (x) through the same encoder and predicts across them, encourages the representation to be invariant to photometric nuisances. Temporal prediction, which predicts the future state, encour-ages the representation to be equivariant to the temporal dynamics. By weighting the two losses, we can interpolate between these regimes: 
+
+Proposition 3.2 (Invariance–equivariance spectrum) . As 
+
+Lphoto dominates, the representation becomes invariant to the photometric group P, i.e., fθ (τ (x)) ≈ fθ (x). As Ltemp 
+
+dominates, the representation becomes equivariant to the transition operator: gψ (zt, a t) ≈ fθ (xt+1 ).
+
+This gives a practical knob to control the abstraction level of the learned representation, consistent with the observation that JEPAs can span invariance and equivariance (Garrido et al., 2024). 
+
+3.5. Action-Conditioned Planning 
+
+After pretraining, we freeze the encoder and post-train the predictor on offline observation-action trajectories 
+
+{(xt, a t, x t+1 )} to obtain an action-conditioned model 
+
+gψ (z, a ). Planning is formulated as visual goal reaching (Zhou et al., 2024): given a current observation z0 = fθ (x0)
+
+and a goal zg = fθ (xg ), we solve 
+
+min 
+
+> a0: H−1
+> H
+
+X
+
+> h=1
+
+ˆzh − zg 22, ˆzh = gψ (ˆ zh−1, a h−1), (5) by model-predictive control with sampling-based optimiza-tion. Because predictions are in latent space, each rollout is a single forward pass of the predictor, making planning far cheaper than pixel-based generative world models (Brooks et al., 2024). The full pipeline is summarized in Algo-rithm 1. 
+
+Algorithm 1 UniJEPA training and planning 
+
+Require: encoder fθ , predictor gψ , photometric transforms 
+
+P, offline trajectories D; weight α > 0 
+
+> 1:
+
+Pretrain: sample (x, τ ) and (xt, a t, x t+1 ) 
+
+> 2:
+
+update θ, ψ by Eq. (4)  
+
+> 3:
+
+Post-train: freeze θ; update ψ on D with Eq. (2)  
+
+> 4:
+
+Plan: given current z0 and goal zg , solve Eq. (5)  
+
+> 5:
+
+return action sequence a0: H−1
+
+3.6. Scalability 
+
+Because UniJEPA predicts in a compact latent space with a single end-to-end objective, it inherits the efficiency of JEPA world models: no pixel reconstruction, no EMA, and a single loss hyperparameter. Training the 15 M-parameter variant on a single GPU completes in a few hours, consis-tent with LeWorldModel (Maes et al., 2026), while planning is up to tens of times faster than generative world models (Brooks et al., 2024; Blattmann et al., 2023). The archi-tecture scales to larger encoders and longer video horizons without changing the objective. 
+
+# 4. Experiments 
+
+4.1. Setup Datasets. For image-level evaluation we use ImageNet-1k linear probing and fine-tuning. For video understanding we use Something-Something-v2 (Goyal et al., 2017) (mo-tion) and Epic-Kitchens-100 (Damen et al., 2018) (action anticipation), together with the Perception Test (Patterson et al., 2024) and TempCompass (Liu et al., 2024) for diag-nostic analysis. For planning we use offline control suites with goal-reaching tasks spanning mazes, push manipulation (Zhao et al., 2023; Agarwal et al., 2022), and multi-particle control (Kalashnikov et al., 2018), following the offline world-model protocol of (Zhou et al., 2023). We report top-1 accuracy, recall-at-K, and planning success rate. 
+
+Baselines. We compare against task-specific JEPAs (I-JEPA (Assran et al., 2023), IWM (Garrido et al., 2024), V-JEPA (Bardes et al., 2024), V-JEPA 2 (Assran et al., 2025), DINO-WM (Zhou et al., 2024), LeWorldModel (Maes et al., 2026)), contrastive methods (SimCLR (Chen et al., 2020), DINOv2 (Oquab et al., 2024)), and generative world models (Brooks et al., 2024; Blattmann et al., 2023). 
+
+4.2. Architecture 
+
+Figure 2 shows the UniJEPA architecture in detail. A shared encoder fθ maps every observation to a compact latent space; a single predictor gψ takes a conditioning latent to-gether with either a photometric transform τ or an action at,and forecasts the target latent. The two prediction branches 4UniJEPA: Unified Joint-Embedding Predictive Architecture                                                                                                                
+
+> Table 1. Representation quality and world-model efficiency. Linear probe accuracy (%), action-anticipation recall@5 (%), planning success (%), relative planning speed, and number of loss hyperparameters. Higher is better except loss hyperparameters. Our method is bold. Method ImageNet SSv2 EK-100 Plan-Succ Plan-Speed Loss HPs SimCLR (Chen et al., 2020) 69.1 ————1DINOv2 (Oquab et al., 2024) 81.3 ————1I-JEPA (Assran et al., 2023) 72.2 ————4IWM (Garrido et al., 2024) 73.5 ————3V-JEPA (Bardes et al., 2024) —67.4 31.8 ——5V-JEPA-2 (Assran et al., 2025) —77.3 39.7 71.2 8×6DINO-WM (Zhou et al., 2024) ———74.6 12 ×3LeWorldModel (Maes et al., 2026) ———68.9 48 ×1
+> UniJEPA 74.9 78.1 40.6 75.8 44 ×1
+> Table 2. Ablation study I: loss components, regularization, and model scale. We report ImageNet linear-probe (%), SSv2 top-1 (%), and latent rank (a measure of anti-collapse; d= full rank). Configuration ImageNet SSv2 Plan-Succ Latent rank UniJEPA (balanced) 74.9 78.1 75.8 d
+> w/o photometric loss 70.1 76.8 74.1 d
+> w/o temporal loss 73.2 ——d
+> w/o regularizer ( α=0 )———3(collapsed)
+> α= 0 .5α⋆71.8 75.9 73.4 0.6dα= 2 α⋆74.2 77.0 74.6 d
+> image-only (IWM-style) 73.5 ——d
+> video-only (VJEPA-style) —77.3 —d
+> ViT-Small encoder 73.8 77.2 73.9 d
+> ViT-Large encoder 74.9 78.1 75.8 d
+
+share both the encoder and the predictor, differing only in the conditioning signal and the target. The Gaussian regular-izer acts on the shared latent distribution to prevent collapse. Figure 3 summarizes the end-to-end training and planning pipeline. 
+
+4.3. Representation Quality and Efficiency 
+
+Table 1 reports the headline results. UniJEPA achieves 
+
+74 .9 ImageNet linear probe accuracy, improving over the photometric-only IWM ( 73 .5) and approaching DI-NOv2 while using a single-loss, end-to-end objective. On Something-Something-v2, UniJEPA reaches 78 .1 top-1, sur-passing V-JEPA-2 ( 77 .3). On action anticipation (EK-100) it reaches 40 .6 recall@5. For planning, UniJEPA attains 
+
+75 .8% success with a 44 × planning speedup, matching the efficiency of LeWorldModel while improving success over both DINO-WM and LeWorldModel. Figure 4 breaks down planning success by task family. Table 4 provides a finer-grained breakdown. On ImageNet we report both linear-probe and fine-tuned accuracy across two encoder scales, showing that UniJEPA’s advantage per-sists as the backbone grows. On the diagnostic video bench-marks (Perception Test (Patterson et al., 2024) and Temp-Compass (Liu et al., 2024)) we report temporal reasoning accuracy, where UniJEPA outperforms V-JEPA-2 by a no-ticeable margin, indicating that the photometric objective imparts additional invariance that helps temporal grounding. 
+
+4.4. Ablation and Controllability 
+
+Table 2 ablates the two prediction losses, the regularizer, and the encoder scale. Removing the photometric loss drops ImageNet accuracy from 74 .9 to 70 .1 and planning success from 75 .8% to 74 .1% , confirming its role in invariant rep-resentation learning. Removing the temporal loss drops ImageNet accuracy to 73 .2 and removes the ability to plan, since the predictor no longer models dynamics. Setting the regularizer weight to zero collapses the representation to rank 3, empirically validating Theorem 3.1; this collapse also destroys planning, since the latent space is degenerate. Halving the regularizer weight ( 0.5α⋆) leaves the latent at 
+
+0.6d rank and degrades both accuracy and planning, while doubling it over-regularizes and slightly reduces ImageNet accuracy. The encoder scale matters: ViT-Large consis-tently outperforms ViT-Small, and UniJEPA’s gains grow with backbone capacity. Table 3 ablates the planning configuration. Increasing the MPC horizon from H=2 to H=5 improves success from 
+
+68 .4% to 75 .8% , while H=10 yields only marginal gain at half the speed— H=5 is a sweet spot. The number of candidate rollouts C trades accuracy against speed: C=16 is 5UniJEPA: Unified Joint-Embedding Predictive Architecture                                    
+
+> Table 3. Ablation study II: planning configuration. We ablate the MPC horizon, the number of candidate rollouts, the predictor post-training scale, and the encoder-freezing choice on planning success (%) and planning speed. Configuration Plan-Succ Speed Hcandidates UniJEPA (H=5, C=64) 75.8 44 ×564 H=2 68.4 58 ×264 H=10 76.0 22 ×10 64 C=16 candidates 69.2 56 ×516 C=256 candidates 76.1 18 ×5256 freeze encoder (no post-train) 66.3 46 ×564 post-train 10% of data 72.0 44 ×564
+> Figure 2. UniJEPA architecture. A shared encoder maps observations to a compact latent space; a single predictor conditions on a photometric transform or an action to forecast the target latent. Photometric and temporal prediction share both encoder and predictor; a Gaussian regularizer prevents collapse.
+
+fast but weak ( 69 .2% ), C=64 is near-optimal, and C=256 
+
+adds little. Freezing the encoder without post-training the predictor drops success to 66 .3% , confirming that action-conditioned post-training is essential. Post-training on only 
+
+10% of the trajectories reaches 72 .0% , showing the model is data-efficient. Figure ?? shows the invariance–equivariance spectrum as the relative loss weight changes. 
+
+4.5. Convergence and Efficiency 
+
+Figure 5 shows training convergence: UniJEPA converges with a fraction of the steps of generative world models, and the latent prediction error decreases monotonically. Be-cause UniJEPA optimizes a single squared-error objective in a compact latent space, it exhibits smoother loss curves than pixel-based generative models, whose reconstruction objec-tives are dominated by high-frequency detail. In practice UniJEPA reaches its final downstream accuracy in roughly 
+
+40% of the training steps required by a generative world model of comparable capability. Figure 6 reports a cost–accuracy heatmap across meth-ods, where UniJEPA occupies a Pareto-optimal corner: it achieves the highest planning success and video accuracy among the efficient latent methods, while being an order of magnitude cheaper than pixel-based generative world models (Brooks et al., 2024; Blattmann et al., 2023). The ef-ficiency stems from three factors: prediction in latent space (no pixel decoding), a single loss objective (no per-term tuning), and a frozen encoder during planning (no per-plan optimization over encoder weights). 6UniJEPA: Unified Joint-Embedding Predictive Architecture                                       
+
+> Table 4. Detailed evaluation across datasets and settings. Linear/fine-tuned ImageNet accuracy (%), temporal-reasoning accuracy (%) on diagnostic video benchmarks, and action-anticipation recall@5 (%) at two horizons. Higher is better. Setting Metric V-JEPA-2 DINO-WM LeWM UniJEPA
+> ImageNet (ViT-S) linear / fine-tune ——71.4 / 77.2 73.8 / 79.5
+> ImageNet (ViT-L) linear / fine-tune ———74.9 / 81.1
+> Perception Test temporal acc. 62.4 ——64.7
+> TempCompass temporal acc. 55.8 ——58.3
+> EK-100 (K=5, H=2) recall@5 38.1 ——39.4
+> EK-100 (K=5, H=5) recall@5 39.7 ——40.6
+> Figure 3. Training and planning pipeline. UniJEPA pretrains photometric and temporal prediction jointly, post-trains the predic-tor on action-conditioned data, then plans via latent-space MPC toward a visual goal.
+
+4.6. Qualitative Results 
+
+Figure ?? shows qualitative results. Left: UniJEPA predicts the effect of a photometric transformation in latent space, retrieving neighbors that exhibit the correct brightness/hue change. Right: on a planning task, UniJEPA reaches the visual goal through latent-space rollouts without pixel re-construction. Three observations recur across the qualitative set. 
+
+Latent prediction is physically consistent. When we ap-ply a photometric transformation τ (e.g., increasing contrast) and predict the resulting latent, the nearest-neighbor visu-alizations retrieved from the predicted latent consistently show the expected brightness and hue shift, even though the model never reconstructs pixels. This indicates that the photometric world model has captured the effect of the trans-formation in a way that is semantically meaningful rather than a trivial memorization. 
+
+Planning is goal-directed and smooth. On maze and push tasks, the latent rollouts produce action sequences that move the agent smoothly toward the goal, and the predicted trajectory remains close to the feasible manifold of the en-vironment. Because predictions are made in latent space,   
+
+> Figure 4. Planning success by task family (maze, push, multi-particle). UniJEPA improves across all families relative to task-specific baselines.
+
+the optimizer can evaluate hundreds of candidate rollouts per step, yielding robust plans even under slight observation noise. 
+
+Failure modes are interpretable. When planning fails, the predicted trajectory typically diverges in latent space precisely at the point where the environment becomes am-biguous (e.g., an occluded region or a novel object pose). This provides an interpretable signal for when the world model’s prediction should not be trusted, consistent with the reliability concerns discussed in the impact statement. 
+
+# 5. Conclusion 
+
+We presented UniJEPA, a unified Joint-Embedding Predic-tive Architecture that jointly learns photometric and tempo-ral world models in a single shared latent space, optimized end-to-end with a single anti-collapse objective. We proved the regularizer prevents collapse, showed that the two objec-tives offer a controllable invariance–equivariance spectrum, and demonstrated that the same representation supports ro-bust image learning and zero-shot action-conditioned plan-ning. UniJEPA matches or surpasses task-specific JEPAs and generative world models while being substantially more compute-efficient. 7UniJEPA: Unified Joint-Embedding Predictive Architecture     
+
+> Figure 5. Convergence. Prediction loss and downstream accuracy over training steps; UniJEPA converges faster than pixel-based generative world models.
+> Figure 6. Efficiency–accuracy heatmap. UniJEPA achieves a Pareto-optimal cost–accuracy trade-off relative to generative and contrastive baselines.
+
+Limitations and future work. Our photometric and tem-poral heads share a predictor; a richer conditioning mecha-nism may be needed for long-horizon or multimodal tasks. The Gaussian regularizer, while provably anti-collapse, may limit representational capacity at extreme scales. Compared with generalist and vision-language-action agents (Reed et al., 2022; Zitkovich et al., 2023; Etukuru et al., 2024), Uni-JEPA currently does not consume language instructions; ex-tending UniJEPA to unified multimodal token spaces (Yang et al., 2026d;c), incorporating topological orthogonality for more faithful tokenization (Yang et al., 2026a), and applying it to interpretable, object-centric manipulation (Yang et al., 2026b) are promising directions. 
+
+# Impact Statement 
+
+This paper develops representation-learning and world-model methods intended to advance efficient, sample-efficient, and interpretable agents. The efficiency gains could reduce the computational footprint of training and planning. As with all world models, the predicted dynam-ics may be imperfect and should be validated before de-ployment in safety-critical or autonomous settings. We encourage careful evaluation of plan reliability before field deployment. 
+
+# References 
+
+Agarwal, S. et al. Language conditioned imitation learning over unstructured data. In RSS , 2022. Assran, M., Duval, Q., Misra, I., Bojanowski, P., Vincent, P., Rabbat, M., LeCun, Y., and Ballas, N. Self-supervised learning from images with a joint-embedding predictive architecture. CVPR , 2023. Assran, M., Bardes, A., Fan, D., Garrido, Q., Howes, R., Komeili, M., Muckley, M., Rizvi, A., Roberts, C., Sinha, K., et al. V-jepa 2: Self-supervised video models enable understanding, prediction and planning. arXiv preprint arXiv:2506.09985 , 2025. Badrinarayanan, V., Kendall, A., and Cipolla, R. Segnet: A deep convolutional encoder-decoder architecture for image segmentation. IEEE TPAMI , 2017. Baevski, A., Hsu, W.-N., Xu, Q., Babu, A., Gu, J., and Auli, M. Data2vec: A general framework for self-supervised learning in speech, vision and language. ICML , 2022. Baldassarre, F., Szafraniec, M., Terver, B., Khalidov, V., Massa, F., LeCun, Y., Labatut, P., Seitzer, M., and Bo-janowski, P. Back to the features: Dino as a foundation for video world models. arXiv preprint arXiv:2507.19468 ,2025. Bao, H., Dong, L., Piao, S., and Wei, F. Beit: Bert pre-training of image transformers. In ICLR , 2022. Bardes, A., Garrido, Q., Ponce, J., Chen, X., Rabbat, M., LeCun, Y., Assran, M., and Ballas, N. Revisiting feature prediction for learning visual representations from video. 
+
+TMLR , 2024. Blattmann, A. et al. Stable video diffusion: Scaling latent video diffusion models to large datasets. arXiv preprint arXiv:2311.15127 , 2023. Brohan, A., Brown, N., Carbajal, J., et al. Rt-2: Vision-language-action models transfer web knowledge to robotic control. arXiv preprint arXiv:2307.15818 , 2023. Brooks, T., Peebles, B., Holmes, C., et al. Video generation models as world simulators. OpenAI , 2024. Caron, M., Touvron, H., Misra, I., J´ egou, H., Mairal, J., Bojanowski, P., and Joulin, A. Emerging properties in self-supervised vision transformers. In ICCV , 2021. 8UniJEPA: Unified Joint-Embedding Predictive Architecture 
+
+Chen, H. et al. Openvla: An open-source vision-language-action model. arXiv preprint arXiv:2406.09246 , 2024. Chen, T., Kornblith, S., Norouzi, M., and Hinton, G. Asimple framework for contrastive learning of visual rep-resentations. In ICML , 2020. Damen, D., Doughty, H., Farinella, G. M., et al. Scaling egocentric vision: The epic-kitchens dataset. In ECCV ,2018. Dosovitskiy, A., Beyer, L., Kolesnikov, A., Weissenborn, D., Zhai, X., Unterthiner, T., et al. An image is worth 16x16 words: Transformers for image recognition at scale. In 
+
+ICLR , 2021. Etukuru, P. et al. Robotics in the era of foundation models. 
+
+arXiv preprint , 2024. Garrido, Q., Chen, X., Bardes, A., Najman, L., and LeCun, Y. Dual-branch equivariant self-supervised learning. In 
+
+ICLR , 2023. Garrido, Q., Assran, M., Ballas, N., Bardes, A., Najman, L., and LeCun, Y. Learning and leveraging world mod-els in visual representation learning. arXiv preprint arXiv:2403.00504 , 2024. Goyal, R., Kahou, S. E., Michalski, V., et al. The something something video database for learning and evaluating visual common sense. ICCV , 2017. Grill, J.-B., Strub, F., Altch´ e, F., Tallec, C., Richemond, P. H., Buchler, E., et al. Bootstrap your own latent: A new approach to self-supervised learning. NeurIPS , 2020. Ha, D. and Schmidhuber, J. World models. arXiv preprint arXiv:1803.10122 , 2018. Hafner, D., Lillicrap, T., Ba, J., and Norouzi, M. Learning latent dynamics for planning from pixels. ICML , 2019. Hafner, D., Pasukonis, J., Ba, J., and Lillicrap, T. Mastering diverse domains through world models. arXiv preprint arXiv:2301.04104 , 2023. Hansen, N., Wang, X., and Su, H. Temporal difference learning for model predictive control. In ICML , 2022. He, K., Chen, X., Xie, S., Li, Y., Doll´ ar, P., and Girshick, R. Masked autoencoders are scalable vision learners. In 
+
+CVPR , 2022. Ho, J., Jain, A., and Abbeel, P. Denoising diffusion proba-bilistic models. NeurIPS , 2020. Kalashnikov, D. et al. Scalable deep reinforcement learning for vision-based robotic manipulation. CoRL , 2018. LeCun, Y. A path towards autonomous machine intelligence version 0.9.2. OpenReview , 2022. Liu, Y., Li, L., et al. Tempcompass: Do video models understand temporal dynamics? NeurIPS , 2024. Liu, Z., Lin, Y., Cao, Y., Hu, H., Wei, Y., Zhang, Z., Lin, S., and Guo, B. Swin transformer: Hierarchical vision transformer using shifted windows. In ICCV , 2021. Maes, L., Le Lidec, Q., Scieur, D., LeCun, Y., and Balestriero, R. Leworldmodel: Stable end-to-end joint-embedding predictive architecture from pixels. arXiv preprint arXiv:2603.19312 , 2026. Miao, X. et al. Video-swin-transformer for semantic seg-mentation. In ICCV , 2021. Oquab, M., Darcet, T., Moutakanni, T., Vo, H., Szafraniec, M., Khalidov, V., Fernandez, P., Haziza, D., Massa, F., El-Nouby, A., et al. Dinov2: Learning robust visual features without supervision. In TMLR , 2024. Patterson, V., Collins, J., et al. Perception test: A diagnostic benchmark for multimodal video models. NeurIPS , 2024. Reed, S., Zolna, K., Parisotto, E., et al. A generalist agent. 
+
+TMLR , 2022. Vaswani, A., Shazeer, N., Parmar, N., Uszkoreit, J., Jones, L., Gomez, A. N., Kaiser, Ł., and Polosukhin, I. Attention is all you need. In NeurIPS , 2017. Yang, L. et al. World model on million-length video and language with ring attention. arXiv preprint arXiv:2402.08268 , 2024. Yang, P., Jing, H., Chao, J., Xiang, T., Lin, L., Hu, Y., Luo, Y., and Ma, Y. Muse: Resolving manifold misalignment in visual tokenization via topological orthogonality. arXiv preprint arXiv:2605.05646 , 2026a. Yang, P., Jing, H., Zheng, N., and Ma, Y. Instrucrobo: Object-centric multi-instruction decoupling model for ex-plainable robotic manipulation. Engineering Applications of Artificial Intelligence , 171:114166, 2026b. Yang, P., Jing, H., Zheng, N., and Ma, Y. Unibvr: Bal-ancing visual and reasoning abilities in unified 3d scene understanding. Neurocomputing , 671:132599, 2026c. doi: https://doi.org/10.1016/j.neucom.2025.132599. Yang, P., Jing, H., Zheng, N., and Ma, Y. Unihoi: Uni-fied human-object interaction understanding via unified token space. In Proceedings of the AAAI Conference on Artificial Intelligence , volume 40, pp. 11640–11648, 2026d. 9UniJEPA: Unified Joint-Embedding Predictive Architecture 
+
+Zhao, T. Z., Kumar, V., Levine, S., and Finn, C. Learn-ing fine-grained bimanual manipulation with low-cost hardware. In RSS , 2023. Zhou, G., Swann, V., Fruzzetti, F., et al. Train offline, test online: A real robot learning benchmark. ICRA , 2023. Zhou, G., Pan, H., LeCun, Y., and Pinto, L. Dino-wm: World models on pre-trained visual features enable zero-shot planning. arXiv preprint arXiv:2411.04983 , 2024. Zitkovich, B. et al. Rt-1: Robotics transformer for real-world control at scale. RSS , 2023. 10 UniJEPA: Unified Joint-Embedding Predictive Architecture 
+
+# A. Implementation Details 
+
+We use a ViT-Small/16 encoder ( 15 M parameters) for control and ViT-Large for large-scale image/video representation. The predictor is a lightweight MLP/ViT. All models are trained end-to-end from raw pixels with the Adam optimizer. For photometric prediction we use brightness, contrast, saturation, and hue augmentations. For temporal prediction we use contiguous video clips. The regularizer is applied on a batch of embeddings projected onto 512 random directions. Random seed is fixed for all runs. 
+
+# B. Pseudocode 
+
+Algorithm 1 in the main text covers the full pipeline. Here we provide the per-step update. 
+
+Algorithm 2 UniJEPA per-step update 
+
+Require: batch {(x, τ )}, {(xt, a t, x t+1 )} 
+
+> 1:
+
+z ← fθ (x); z′ ← fθ (τ (x))  
+
+> 2:
+
+zt ← fθ (xt); zt+1 ← fθ (xt+1 ) 
+
+> 3:
+
+Lp ← ∥ gψ (z, τ ) − z′∥2 
+
+> 4:
+
+Lt ← ∥ gψ (zt, a t) − zt+1 ∥2 
+
+> 5:
+
+R ← α Reg( z) 
+
+> 6:
+
+update θ, ψ to minimize Lp + Lt + R
+
+# C. Proof of Anti-Collapse 
+
+We provide the full statement and proof of Theorem 3.1. The key is that a degenerate latent distribution makes the χ21
+
+regularizer unbounded. Let Pz be the law of z = fθ (x). If Var( uTz) = 0 for some unit u, then uTz is almost surely constant, so its normalized squared deviation diverges, making R unbounded. Therefore any finite R ≤ ε implies all projections have variance bounded away from zero, which is equivalent to the covariance being uniformly positive definite. The constant-encoder contradiction follows immediately. 
+
+# D. Additional Visualizations 
+
+We include additional ablations and qualitative visualizations. Figure 7 reports the sensitivity of both planning success and ImageNet accuracy to the regularizer weight α, confirming a Pareto-optimal operating point. Table 3 additionally summarizes the sensitivity of planning to the MPC horizon and the number of candidate rollouts, and Table 4 provides a finer-grained breakdown across datasets. 
+
+# E. Prompt-free World Modeling 
+
+UniJEPA is fully self-supervised and requires no task prompts. This contrasts with language-conditioned action models (Brohan et al., 2023; Chen et al., 2024) that require instruction-following data; our model learns from observations and actions alone, which is valuable when annotated instructions are scarce. 11 UniJEPA: Unified Joint-Embedding Predictive Architecture 
+
+Figure 7. Sensitivity. Planning success and ImageNet accuracy vs. regularizer weight α. A moderate α is Pareto-optimal. 
+
+12

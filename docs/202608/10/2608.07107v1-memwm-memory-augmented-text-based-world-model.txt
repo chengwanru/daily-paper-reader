@@ -1,0 +1,568 @@
+Title: MemWM: Memory-Augmented Text-Based World Model
+
+URL Source: https://arxiv.org/pdf/2608.07107v1
+
+Published Time: Mon, 10 Aug 2026 00:59:54 GMT
+
+Number of Pages: 22
+
+Markdown Content:
+# MEM WM: Memory-Augmented Text-Based World Model 
+
+Yujun Wang 1,2,3 * Tao Zhang 4 * Jinhe Bi 1,2 Aniri 1
+
+Wenxuan Ye 3,5 Boliang Liu 3,6 Sikuan Yan 1,2,3 Shuning Wang Xuebing Zhou 3 Sören Pirk 7 Hinrich Schütze 1,2 Yunpu Ma 1,2 
+
+Abstract 
+
+World models are increasingly used to sup-port planning in agents by predicting how en-vironment states evolve in response to agent actions. Yet fluent next-state predictions can still omit task-critical facts, corrupt product attributes, or apply incorrect transition rules. To address such systematic prediction errors, we introduce M EM WM, a memory-augmented text-based world model. M EM WM uses world memory , a curated memory bank of transition rules, state caches, and hard-to-predict facts, to condition next-state imagination. We evaluate factual state preservation with Structured State Fidelity (SSF), which scores predicted states through benchmark-specific facts and fields. Compared with SFT, memory-augmented train-ing improves SSF by up to 206.3%. In the full planning setting, we keep the policy model frozen and provide policy-side world skill : re-trieved task-level skills and step-wise correc-tive guidance for action selection. Across ALF-World, WebShop, and ScienceWorld, memory-augmented agents improve downstream suc-cess over an SFT-trained world-model agent, with up to a 65.4% relative gain. Sensitivity analyses further show that retrieved memory improves task success and efficiency under dif-ferent memory and action-budget settings. 
+
+1 Introduction 
+
+Large language model agents are increasingly used for sequential decision making in interactive envi-ronments, ranging from embodied household tasks to scientific simulations and web navigation (Yao et al., 2023; Ahn et al., 2022; Park et al., 2023; Wang et al., 2023a; Shinn et al., 2023). A cen-tral ingredient behind such agents is the ability                          
+
+> 1LMU Munich; 2Munich Center for Machine Learning (MCML); 3Huawei Heisenberg Research Center; 4Zhejiang University; 5Technical University of Munich (TUM); 6TU Berlin; 7Kiel University.
+> *Equal contribution. Corresponding authors: Yujun Wang (yujun_wang_cn@hotmail.com )and Yunpu Ma (cognitive.yunpu@gmail.com ).
+
+to reason about how the world changes after an action. World models provide this capability by allowing an agent to imagine future states, com-pare candidate trajectories, and plan before acting (Sutton, 1991; Ha and Schmidhuber, 2018; Hafner et al., 2020; Janner et al., 2019; Schrittwieser et al., 2020). Recent work has therefore begun to study language models as implicit or explicit text-based world models for planning and decision making (Qiao et al., 2024; Li et al., 2025; Liu et al., 2026; Huang et al., 2026). Despite this promise, text-based world models face a state-fidelity bottleneck. A predicted next state can be fluent and locally plausible while still losing the facts that determine whether a future ac-tion is valid or useful. For example, an embodied agent may remember that it moved to a room but forget which object was left in which receptacle; a scientific environment may preserve the wording of an observation while changing a device state or numeric measurement; a shopping agent may keep the user’s broad intent while corrupting a product identifier, price, or option. Such errors are easy to overlook at the surface level, but they are pre-cisely the errors that compound during lookahead planning. This bottleneck is partly hidden by standard next-state prediction metrics. Exact match is too strict: harmless paraphrases, formatting changes, or re-ordered facts can receive zero credit. Word F1 is too permissive: predictions that swap an object, location, state, product ID, or price can still share most of their tokens with the gold state. As a result, a world model can appear strong under surface over-lap while remaining unreliable as a planning com-ponent. This motivates evaluating world models by whether they preserve structured, behavior-relevant state facts rather than by whether they reproduce the same string. Figure 1 illustrates this motivation: memory is useful not because it makes the prediction longer, arXiv:2608.07107v1 [cs.AI] 7 Aug 2026 World 
+
+Model 
+
+## ෡𝑺 𝒕+𝟏  𝑺 𝒕+𝟏 
+
+Prediction  Ground Truth 
+
+World 
+
+Model 
+
+## 𝑺 𝒕 
+
+## 𝒂 𝒕  World  
+
+> Memory
+
+## ෡𝑺 𝒕+𝟏  𝑺 𝒕+𝟏 
+
+Prediction  Ground Truth  Ground Truth 
+
+> Mem-aug
+> Prediction
+> Hallucination:
+> Missing:
+
+Vanilla World Model 
+
+Memory-augmented 
+
+World Model Figure 1: Illustration of the state-fidelity bottleneck in world modeling. Upper: Given the current state st and action at, a world model without retrieved memory may produce a fluent but low-fidelity next state, hallucinating objects, missing task-relevant facts, or applying the wrong transition rule. Lower: By retrieving curated world memory, M EM WM conditions prediction on relevant state caches, transition rules, and hard-to-predict facts, producing an imagined state that better matches the ground truth st+1 .
+
+but because it helps preserve the structured state facts that determine whether the imagined future is faithful. This raises the central question of this paper: 
+
+How can a text-based world model use experience-derived memory to avoid sys-tematic fact, rule, and state-transition er-rors while keeping imagined states faithful to behavior-critical world facts? 
+
+In response to this question, we propose MEM WM, a memory-augmented text-based world model for state-faithful imagination. The core idea is to equip the world model with world memory ,a curated memory bank of transition rules, state caches, and hard-to-predict facts that help next-state prediction avoid recurring errors. In the full agent, M EM WM is further coupled with policy-side world skill , providing task-level skills and step-wise corrective guidance that strengthen ac-tion selection. We evaluate this idea across three text-based decision-making benchmarks: ALFWorld, Science-World, and WebShop. These benchmarks stress different forms of state fidelity: object locations and receptacle states in embodied household inter-action, scientific facts and numeric/device states in ScienceWorld, and product identities, prices, op-tions, and user constraints in WebShop. This di-versity allows us to test whether memory augmen-tation improves world modeling beyond a single environment template. Our contributions are organized around three points: 
+
+❶ Structured state-fidelity evaluation. We show that surface next-state metrics can ob-scure behavior-critical fact, rule, and state-transition errors, and introduce Structured State Fidelity (SSF) to evaluate predicted states by comparing benchmark-specific world facts rather than surface string overlap. 
+
+❷ World-memory-augmented world model-ing. We introduce a memory-augmented world model that retrieves curated world mem-ory, including transition rules, state caches, and hard-to-predict facts, to improve the fi-delity of imagined next states. 
+
+❸ Stronger agents without policy train-ing. With frozen policy models, memory-augmented world models improve down-stream success across ALFWorld, Science-World, and WebShop; policy-side world skill further strengthens action selection by adding task-level skills and step-wise corrective guid-ance. Sensitivity analyses further show that these gains are not merely due to larger ac-tion budgets and can improve successful-task efficiency. 
+
+2 Related Work 
+
+Text-based world models for agents. Text-based games and interactive language environ-Rollout 
+
+> Filter
+
+World 
+
+Model  
+
+> Hard Negatives
+> Transition Collection World Memory Construction
+> Memory-
+> Augmented
+> World Model
+> Mem-augmented RL
+
+Policy 
+
+Model 
+
+> …
+> World
+> Memory
+> …
+> Memory-
+> Augmented
+> World Model
+> …
+
+Value 
+
+Model 
+
+## Best 
+
+Memory-Augmented 
+
+Lookahead 
+
+Planning 
+
+Positive 
+
+Trajectories  Negative 
+
+Trajectories 
+
+> World
+> Corrective
+> Guidance
+> World
+> Task Skills
+> World Skill Memory Curation
+
+## World 
+
+## Skills     
+
+> World
+> Memory Figure 2: Overview of the M EM WM planning pipeline. Top: The left branch builds reusable state and transition memories; the right branch builds reusable action-selection experience. Bottom: At inference time, the agent retrieves relevant entries, imagines candidate next states, scores the candidates, and commits to the highest-scoring action in the environment.
+
+ments have long served as testbeds for agents that infer latent state, track objects, and act through natural-language commands (Narasimhan et al., 2015; Côté et al., 2018; Hausknecht et al., 2020; Shridhar et al., 2021; Wang et al., 2022; Yao et al., 2022). Recent work studies language models as explicit or implicit text-based world models: world-knowledge models inject environment knowledge (Qiao et al., 2024), Word-to-World analyzes in-ternal text-world dynamics (Li et al., 2025), and lookahead planners use imagined trajectories for action selection (Liu et al., 2026). These direc-tions show that planning can benefit from imagined states, but remains sensitive to fine-grained state errors. 
+
+Evaluating state fidelity. Automatic text-generation metrics usually measure surface overlap or semantic similarity, as in BLEU, ROUGE, and BERTScore (Papineni et al., 2002; Lin, 2004; Zhang et al., 2020). Factuality metrics decompose text into finer-grained units (Min et al., 2023), and recent text-world evaluation emphasizes downstream behavioral consistency (Huang et al., 2026). Complementary decoding-time work addresses hallucination at generation time: ASCD steers cross-modal attention to reduce hallucination in multimodal language models (Wang et al., 2026). For text-based world models, this distinction matters because paraphrases and behavior-critical corruptions can receive misleading overlap scores. SSF follows this fact-oriented view with benchmark-specific state structure. 
+
+Memory-augmented language systems. 
+
+Retrieval-augmented generation and dense re-trieval give language models access to external evidence beyond parametric memory (Guu et al., 2020; Karpukhin et al., 2020; Lewis et al., 2020; Izacard and Grave, 2021). Long-term memory systems further study how stored context can support recall, consistency, and adaptation over time (Borgeaud et al., 2022; Wang et al., 2023b; Zhong et al., 2023). In contrast to general knowledge retrieval, our memory is organized around world-model prediction errors, transition patterns, and reusable state facts. 
+
+Policy-side skills and feedback. A separate line of agent work improves action selection through reusable skills or feedback from past tri-als. Reflexion stores verbal feedback for future attempts (Shinn et al., 2023), Voyager builds a skill library during open-ended exploration (Wang et al., 2023a), and SkillRL studies recursive skill-augmented reinforcement learning (Xia et al., 2026). We use policy-side world skill only as retrieval-time guidance for the frozen policy in the full agent. 
+
+Broader LLM reasoning and training. Com-plementary work investigates rollout reuse and re-inforcement mid-training for LLM reasoning (Bi et al., 2026a; Tian et al., 2025), layerwise trajectory self-evaluation and verifier-guided long-chain-of-thought synthesis (Bi et al., 2026b; Huang et al., 2025), and the broader landscape of multimodal code intelligence (Zhao et al., 2026). These di-rections address general reasoning, training, and code-oriented capabilities, whereas our focus is state-faithful prediction and retrieval-time memory in interactive text environments. 
+
+3 Preliminaries 
+
+This section defines the next-state prediction set-ting and Structured State Fidelity (SSF), which we use to evaluate whether imagined states preserve behavior-critical world facts. 
+
+3.1 Task Formulation and Notation 
+
+We consider a language-agent interaction over dis-crete time steps. At step t, the agent observes a textual state st, takes an action at ∈ A , and re-ceives the next textual state st+1 . We write the interaction history as ht = ( s1, a 1, . . . , s t), denote world memory by Mwm  
+
+> t
+
+, and denote policy-side world skill by Mskill  
+
+> t
+
+. A text-based world model 
+
+fθ predicts the consequence of a candidate action by generating 
+
+ˆst+1 = fθ(ct, a t), (1) where ct denotes the context available to the model. In the common local-context setting, ct contains only the current observation or a short recent tra-jectory window. The world-model-side memory Mwm  
+
+> t
+
+, or world memory , stores persistent task information ex-tracted from ht. A memory-augmented world model predicts 
+
+ˆst+1 = fθ (ct, a t, R wm (qwm  
+
+> t
+
+, Mwm  
+
+> t
+
+)) , (2) where qwm  
+
+> t
+
+is a retrieval query derived from the cur-rent context and candidate action, and Rwm returns a compact set of relevant world memory entries. These entries provide state facts, transition rules, or constraints that help the model predict the action-conditioned next state more faithfully. For policy-side behavior, we use a separate mem-ory channel Mskill  
+
+> t
+
+, or world skill , to condition the acting policy on reusable experience. World skill has two forms: world task skill , a task-level prior retrieved once at the beginning of an episode, and 
+
+world corrective guidance , step-level guidance re-trieved at each decision step. You are in the kitchen. A clean mug is on the countertop. The fridge is closed. The apple is inside the fridge.      
+
+> Surface variation
+> In the kitchen, there is a clean mug on the countertop.
+> The fridge remains closed, and the apple is in the fridge.
+> Entity/location swap
+> You are in the kitchen. A clean mug is inside the fridge .The fridge is closed. The apple is on the countertop .
+> Fact corruption
+> You are in the kitchen. A dirty mug is on the countertop. The fridge is closed. The apple is inside the fridge.
+> State flip
+> You are in the kitchen. A clean mug is on the countertop.
+> The fridge is open . The apple is inside the fridge.
+> Surface
+> var.
+> Identity
+> Ent./loc.
+> swap
+> Fact
+> corr.
+> State
+> flip
+
+Figure 3: Metric stress test motivating Structured State Fidelity. Exact match is brittle under non-identical but faithful states, while Word F1 can remain high after behavior-critical fields are corrupted. SSF more directly tracks degradation in structured state in-formation. 
+
+3.2 Structured State Fidelity 
+
+Existing text metrics such as exact match and word-level F1, in the same family of surface-overlap evaluation as BLEU and ROUGE (Papineni et al., 2002; Lin, 2004), are poorly aligned with text-based world modeling. Exact match is too strict because harmless paraphrases, formatting differ-ences, and ordering changes can make a correct state receive zero credit. Word F1 is often too per-missive because a prediction can share most tokens with the gold state while corrupting the facts that determine future behavior, such as swapping an object identity, changing a receptacle, flipping an open/closed state, or replacing a product price. Figure 3 visualizes this mismatch with controlled perturbations of gold next states. To address it, we propose Structured State Fidelity (SSF ), a domain-aware metric that compares predicted and gold states after projecting them into structured world facts. For a domain d, let Φd be a state ex-tractor, and let Cd denote the set of structured com-ponents used in that domain. For each component 
+
+c, let ˆzc = Φ d,c (ˆ st+1 ) and zc = Φ d,c (st+1 ) denote the predicted and gold structured values. SSF is defined as 
+
+SSF d(ˆ st+1 , s t+1 ) = X
+
+> c∈C d
+
+wc · sim c(ˆ zc, z c), (3) where wc is a component weight and sim c com-pares the predicted and gold values of component 
+
+c. Depending on the component type, sim c can be exact match for categorical fields, set F1 for fact or identifier sets, lexical F1 for short text fields, or a relative-error score for numeric fields such as prices. This formulation makes the metric explicit about which state fields matter, while allowing the extractor and component set to match the structure of each environment. Algorithm 1 summarizes how SSF is computed in our experiments. ALFWorld and ScienceWorld share the same fact-set view: both predicted and gold states are projected into normalized canon-ical facts, and SSF is their fact-level F1. Web-Shop follows the same principle but uses page-specific structured fields, because its observations are search-result pages, product pages, or terminal pages rather than generic fact lists.                                               
+
+> Algorithm 1 Structured State Fidelity (SSF)
+> 1: Input: ˆst+1 ,st+1 , domain d.Output: SSF d.2: Fact-Set SSF:
+> 3: if d∈ { ALFW ORLD ,SCIENCE WORLD }then
+> 4: Instantiate fact extractor Φdwith a tiny LLM. 5: ˆF , F ←Φd(ˆ st+1 ),Φd(st+1 ).6: return fact-F1 ( ˆF , F ).▷fact-set score 7: Page-Field SSF:
+> 8: else if d=WEB SHOP then
+> 9: Instantiate extractor Φdwith a rule-based page parser. 10: ˆz, z ←Φd(ˆ st+1 ),Φd(st+1 ).11: Compute sim c(ˆ zc, z c)for each field c.12: return weighted score. ▷field score 13: end if
+
+SSF is designed to be a metric, not an unre-stricted LLM judge. Whenever a domain has sta-ble textual templates, we prefer deterministic ex-traction rules because they are transparent, repro-ducible, and less prone to completing missing infor-mation. Appendix B gives the benchmark-specific fact schemas, WebShop fields, parser details, and sanity checks. 
+
+4 MEM WM 
+
+4.1 Overview 
+
+MEM WM is motivated by recurring world-model errors in facts, rules, and state transitions. A text-based world model may generate a fluent next state while omitting an object binding, corrupting a prod-uct attribute, or applying an incorrect environment rule. To reduce such errors, M EM WM augments next-state prediction with world memory , whose entries are derived from previous observations, ac-tions, inferred state facts, and curated transition knowledge. SSF then provides a structured way to measure whether this memory improves state fidelity. World memory conditions next-state imagina-tion, while a separate policy-side world skill chan-nel can be used in the full agent to condition action selection. The two channels are used at different points in planning: one supports consequence pre-diction, and the other supports deciding which ac-tions to consider. Algorithm 2 summarizes how these components are used during planning. The algorithm is inde-pendent of the specific planner: the scoring rule can be greedy action selection, lookahead search, or another downstream decision rule.                                                            
+
+> Algorithm 2 M EM WM Planning
+> 1: Input: goal g, state s1, world memory Mwm , skill memory Mskill .2: Initialize history h1= ( s1).3: τ←Rtask (g, Mskill ).4: for decision step t= 1 , . . . , T do
+> 5: Build world-model context ctfrom htand st.6: γt←Rcorr (ct,Mskill ).7: Propose candidate actions At←πψ(ct, τ, γ t).8: Memory-Conditioned Imagination:
+> 9: for each a∈ A tdo
+> 10: mt(a)←Rwm (ct, a, Mwm ).11: ˆst+1 (a)←fθ(ct, a, m t(a)) .12: J(a)←Score( a, ˆst+1 (a), h t).13: end for
+> 14: Execute at←arg max a∈A tJ(a); observe
+> st+1 .15: Update ht+1 and memory evidence. 16: end for
+
+4.2 Memory Construction World memory. The world memory module stores compact keyed entries distilled from past world-model experience, structured states, and re-curring transition patterns. Each entry is curated as a transition rule, a state-cache record, or a hard-to-predict fact that the model may otherwise omit or corrupt. In household tasks, entries can encode action preconditions, object-state changes, and re-ceptacle relations; in ScienceWorld, experimental preconditions, recipes, temperatures, and progress markers; in WebShop, product identifiers, prices, option values, and user constraints. Entries are kept concise and keyed for lightweight retrieval. 
+
+World skill. The policy-side memory stores reusable behavior-level experience. A world task skill summarizes a high-level strategy for a task family, such as which subgoals to pursue first or which page fields to inspect before buying a prod-uct. A world corrective guidance entry records a local action correction, such as avoiding an invalid repeated action, revisiting a needed object, check-ing an option before purchasing, or preserving a scientific precondition before the next manipula-tion. These entries are phrased as guidance for the policy, not as state facts for the world model. 
+
+4.3 Memory Retrieval 
+
+Given a state-prediction prompt, M EM WM re-trieves a compact set of world-memory entries us-ing structured cues from the current context and the action being predicted. Retrieval is instantiated with lightweight domain-specific matching, so the returned entries are tied to the predicted transition rather than generic background knowledge. If re-trieved memory conflicts with the visible trajectory, the trajectory remains authoritative. World skill follows a separate retrieval sched-ule. Task-level skill is retrieved once from the task instruction or goal, while corrective guidance is retrieved at each decision step from the current observation, recent action history, and available failure or planner signals. This schedule keeps pol-icy advice separate from world-state memory while allowing both channels to inform planning. 
+
+4.4 Memory-Conditioned Imagination 
+
+The world model predicts the next state from the local trajectory context plus the retrieved world-memory entries. Rather than changing the decod-ing objective, M EM WM inserts the retrieved en-tries as auxiliary evidence in the state-prediction prompt, making relevant constraints visible at gen-eration time. The model then generates a flu-ent next state conditioned on both the immediate observation-action context and the retrieved evi-dence. 
+
+4.5 Integration with Planning 
+
+MEM WM separates action selection from conse-quence prediction while allowing both to benefit from memory. At task start, the policy retrieves a world task skill to form a high-level solving prior. At each decision step, world corrective guidance helps the policy propose candidate actions. The planner then evaluates these candidates by query-ing the memory-augmented world model: for each candidate, world memory is retrieved, the next state is imagined, and the resulting trajectory is scored 
+
+Model Method ALF. Web. Sci. 
+
+Llama3.2-1B SFT 0.815 0.277 0.887 RL 0.835 0.464 0.895 Mem-Aug RL 0.865 0.639 0.912 
+
+Qwen3-4B SFT 0.855 0.726 0.884 RL 0.861 0.814 0.902 Mem-Aug RL 0.894 0.884 0.915 
+
+Qwen2.5-7B SFT 0.286 0.561 0.880 RL 0.848 0.664 0.903 Mem-Aug RL 0.876 0.799 0.915    
+
+> Table 1: Structured State Fidelity (SSF) of world-model predictions. Scores measure preservation of benchmark-specific structured state facts. ALF., Web., and Sci. denote ALFWorld, WebShop, and Science-World, respectively. RL denotes reinforcement learn-ing without memory; Mem-Aug RL denotes memory-augmented reinforcement learning. Best scores within each model block and benchmark are bolded.
+
+by the downstream planning rule. After execution, the observed transition can be added back to the memory bank, allowing later predictions and deci-sions to reuse the new evidence. 
+
+5 Experiment 
+
+In this section, we evaluate M EM WM through three questions: RQ1 : does world memory im-prove structured next-state fidelity? RQ2 : do world memory and policy-side world skill improve down-stream agent performance? RQ3 : how sensitive are the gains to memory availability and the action budget? 
+
+5.1 Experiment Setup Benchmarks. We evaluate on ALFWorld (Shrid-har et al., 2021), ScienceWorld (Wang et al., 2022), and WebShop (Yao et al., 2022). These bench-marks test complementary forms of structured state fidelity: household object states and receptacles, scientific entities and procedural preconditions, and shopping-page fields such as product identifiers, prices, options, and user constraints. 
+
+Metrics. For next-state prediction, we report Structured State Fidelity (SSF), since exact match and word-level F1 do not capture the behavior-critical facts that matter for text-based world mod-els in our setting. We use exact match and word F1 only in the metric stress test that motivates SSF. For SSF 
+
+> SciWorld  WebShop  ALFWorld
+
+Memory block dropout (%) Figure 4: SSF sensitivity to world-memory dropout. 
+
+> With Qwen3-4B, increasing prediction-time memory dropout reduces SSF across ALFWorld, WebShop, and ScienceWorld.
+
+downstream behavior, we report task success; in sensitivity analyses, we also report successful-task average steps when relevant. 
+
+Baselines. For world-model training, we com-pare SFT, RL without memory, and memory-augmented RL. For downstream agent evaluation, we compare against CoT, ReAct, RAP, ITP where applicable, an SFT-trained world-model (WM) agent, and memory-augmented variants with and without policy-side world skill. 
+
+Implementation. All methods use the same benchmark interface, action space, decoding setup, and evaluation budget within each benchmark. In our downstream agent rows, the policy backbone is kept frozen: we do not fine-tune it with supervised learning or reinforcement learning. The differences come from the world model, retrieved world mem-ory, and optional retrieval-time world skill. Bench-mark and implementation details are provided in Appendices A and C. 
+
+5.2 Main Results Takeaway ❶: Memory-augmented training con-sistently improves structured next-state fidelity. 
+
+Table 1 reports SSF for world-model predictions. Mem-Aug RL obtains the best score in all nine model–benchmark cells, indicating that the gains are not tied to a single backbone or environment. Compared with RL without memory, the largest im-provements appear on WebShop, where preserving Overall Success (%)  ↑ 
+
+> Avg. Steps  ↓
+> # Actions
+> Figure 5: Action-budget sensitivity on ALFWorld.
+> Memory-augmented world modeling improves success across candidate-action budgets while keeping success-ful trajectories comparable in length.
+
+product identifiers, prices, and page fields is espe-cially important: +0.175 for Llama3.2-1B, +0.070 for Qwen3-4B, and +0.135 for Qwen2.5-7B. The improvements on ALFWorld and ScienceWorld are smaller but consistent, showing that world memory 
+
+also helps preserve state facts and transition rules. Figure 4 provides a direct inference-time check. When retrieved world memory blocks are removed from the prediction prompt, SSF decreases across ALFWorld, WebShop, and ScienceWorld. This supports the interpretation that retrieved memory is used by the world model during imagination, rather than merely adding inert context. 
+
+Takeaway ❷: Memory improves agent perfor-mance without policy training. Table 2 reports task success. Across both backbones, M EM WM improves over the SFT-trained WM agent on ALF-World overall and WebShop total, and adding world skill yields the strongest ALFWorld results. On ScienceWorld, memory-augmented variants also improve over the corresponding SFT-trained WM agent in the Qwen2.5-7B block and on the Qwen3-8B seen split. Because the policy model is frozen in all our agent variants, these gains come from memory-conditioned imagination and retrieved policy-side guidance rather than additional policy training. 
+
+5.3 Sensitivity Analysis Takeaway ❸: The gains are not an artifact of a single search budget or full-memory setting. 
+
+Figure 5 varies the number of candidate actions considered by the planner. Memory-augmented world modeling improves success across the tested budgets, including the default five-action setting. At the same time, successful-task step counts are comparable to or lower than the SFT-trained WM setting. Thus, the improvement is not simply ob-Model Method ALFWorld WebShop ScienceWorld Pick Look Clean Heat Cool Pick2 All Total Seen Unseen 
+
+Qwen2.5-7B CoT 17.14 15.38 18.52 18.75 16.00 0.00 14.29 5.10 3.09 4.63 ReAct 20.00 23.08 22.22 18.75 20.00 0.00 17.14 15.28 8.24 9.93 RAP 40.00 15.38 33.33 6.25 32.00 20.83 27.86 11.28 10.30 16.55 ITP 65.71 30.77 25.93 25.00 24.00 25.00 35.71 20.10 16.49 17.88 WM 75.00 72.22 54.84 43.48 42.86 5.88 49.05 41.57 11.86 12.32 MEM WM 70.83 88.89 45.16 47.83 71.43 17.65 56.96 46.90 15.46 16.58 MEM WM+Skill 62.50 83.30 64.52 47.83 61.90 23.53 57.27 46.44 19.59 20.38 
+
+Qwen3-8B CoT 14.29 15.38 14.81 12.50 12.00 12.50 13.57 6.32 2.44 1.99 ReAct 25.71 7.69 22.22 12.50 12.00 25.00 19.29 18.62 9.79 8.61 RAP 42.86 15.38 37.04 37.50 16.00 4.17 28.57 12.40 15.46 27.14 
+
+ITP 82.86 23.08 25.93 12.50 16.00 54.17 41.43 25.25 20.61 19.86 WM 70.83 38.89 41.94 47.83 38.10 70.59 51.36 50.00 20.10 20.63 MEM WM 75.00 50.00 42.94 65.22 42.86 58.82 55.64 51.85 23.37 19.91 MEM WM+Skill 87.50 55.56 61.29 65.22 57.14 64.17 65.24 53.41 24.23 21.85   
+
+> Table 2: Main task-performance results across ALFWorld, WebShop, and ScienceWorld. CoT, ReAct, RAP, and ITP are prompting or planning baselines; WM denotes the SFT-trained world-model agent; M EM WM uses memory-augmented world modeling; and M EM WM+Skill additionally uses policy-side world skill. Within each backbone block, best scores in each column are bolded, and second-best scores are underlined.
+
+Memory drop rate (%)    
+
+> WM-mem WM-sft full memory no memory
+
+Step  ↓
+
+Success 
+
+Rate  ↑  
+
+> Figure 6: Task-level memory-dropout sensitivity on ALFWorld. With Qwen2.5-7B, full world memory gives the highest success rate, while heavier memory dropout lowers performance.
+
+tained by exploring more actions; retrieved mem-ory also helps the agent choose useful actions more efficiently. Figure 6 studies task-level memory removal. Full world memory gives the strongest ALFWorld success rate. Moderate dropout retains most of the success rate and can reduce the number of steps for successful tasks, while heavier dropout lowers performance. Since the all-drop setting still uses the RL-trained world model, it is not identical to the SFT reference; the gap between full memory and all-drop therefore isolates the contribution of retrieval at inference time. 
+
+6 Conclusion 
+
+We introduce M EM WM, a memory-augmented text-based world model that uses world memory 
+
+to retrieve curated transition rules, state caches, and hard-to-predict facts during next-state imagina-tion. To evaluate whether imagined states preserve behavior-critical information, we propose Struc-tured State Fidelity (SSF), which compares pre-dicted and gold states through benchmark-specific structured facts and fields. Across ALFWorld, WebShop, and ScienceWorld, memory-augmented training improves SSF over SFT and RL with-out memory. In downstream planning, combin-ing world memory with policy-side world skill im-proves task success on ALFWorld and WebShop, while sensitivity analyses show that retrieved mem-ory contributes useful information at inference time. Overall, the results show that externalized world memory is a practical mechanism for improving both state fidelity and downstream planning in text-based agents. 
+
+References 
+
+> Michael Ahn, Anthony Brohan, Noah Brown, Yev-gen Chebotar, Omar Cortes, Byron David, Chelsea Finn, Chuyuan Fu, Keerthana Gopalakrishnan, Karol Hausman, Alex Herzog, Daniel Ho, Jasmine Hsu,
+
+Julian Ibarz, Brian Ichter, Alex Irpan, Eric Jang, Rosario Jauregui Ruano, Kyle Jeffrey, and 26 oth-ers. 2022. Do as i can, not as i say: Grounding language in robotic affordances. arXiv preprint arXiv:2204.01691 .Jinhe Bi, Aniri, Minglai Yang, Xingcheng Zhou, Wenke Huang, Sikuan Yan, Yujun Wang, Zixuan Cao, Michael Färber, Xun Xiao, Volker Tresp, and Yunpu Ma. 2026a. EchoRL: Reinforcement learning via rollout echoing. In Forty-third International Confer-ence on Machine Learning .Jinhe Bi, Danqi Yan, Yifan Wang, Wenke Huang, Haokun Chen, Guancheng Wan, Mang Ye, Xun Xiao, Hinrich Schuetze, Volker Tresp, and Yunpu Ma. 2026b. The geometry of reasoning: Self-evaluation via layerwise trajectory evolution. In Forty-third In-ternational Conference on Machine Learning .Sebastian Borgeaud, Arthur Mensch, Jordan Hoff-mann, Trevor Cai, Eliza Rutherford, Katie Milli-can, George Bm Van Den Driessche, Jean-Baptiste Lespiau, Bogdan Damoc, Aidan Clark, Diego De Las Casas, Aurelia Guy, Jacob Menick, Roman Ring, Tom Hennigan, Saffron Huang, Loren Mag-giore, Chris Jones, Albin Cassirer, and 9 others. 2022. Improving language models by retrieving from tril-lions of tokens. In Proceedings of the 39th Interna-tional Conference on Machine Learning , volume 162 of Proceedings of Machine Learning Research , pages 2206–2240. PMLR. Marc-Alexandre Côté, Ákos Kádár, Xingdi Yuan, Ben Kybartas, Tavian Barnes, Emery Fine, James Moore, Ruo Yu Tao, Matthew Hausknecht, Layla El Asri, Mahmoud Adada, Wendy Tay, and Adam Trischler. 2018. Textworld: A learning environment for text-based games. In CGW@IJCAI .Kelvin Guu, Kenton Lee, Zora Tung, Panupong Pasupat, and Ming-Wei Chang. 2020. REALM: Retrieval-augmented language model pre-training. In Proceed-ings of the 37th International Conference on Machine Learning .David Ha and Jürgen Schmidhuber. 2018. World mod-els. arXiv preprint arXiv:1803.10122 .Danijar Hafner, Timothy Lillicrap, Jimmy Ba, and Mo-hammad Norouzi. 2020. Dream to control: Learning behaviors by latent imagination. In International Conference on Learning Representations .Shibo Hao, Yi Gu, Haodi Ma, Joshua Hong, Zhen Wang, Daisy Zhe Wang, and Zhiting Hu. 2023. Reasoning with language model is planning with world model. In Proceedings of the 2023 Conference on Empiri-cal Methods in Natural Language Processing , pages 8154–8173. Matthew Hausknecht, Prithviraj Ammanabrolu, Marc-Alexandre Côté, and Xingdi Yuan. 2020. Interactive fiction games: A colossal adventure. Proceedings of the AAAI Conference on Artificial Intelligence ,34(5):7903–7910. Xingyue Huang, Rishabh, Gregor Franke, Ziyi Yang, Jiamu Bai, Weijie Bai, Jinhe Bi, Zifeng Ding, Yiqun Duan, Chengyu Fan, Wendong Fan, Xin Gao, Ruohao Guo, Yuan He, Zhuangzhuang He, Xianglong Hu, Neil Johnson, Bowen Li, Fangru Lin, and 27 others. 2025. Loong: Synthesize long chain-of-thoughts at scale through verifiers. Preprint , arXiv:2509.03059. Youling Huang, Guanqiao Chen, Junchi Yao, Lu Wang, Fangkai Yang, Chao Du, ChenZhuo Zhao, Pu Zhao, Qingwei Lin, Saravan Rajmohan, and Dongmei Zhang. 2026. Beyond state consistency: Behav-ior consistency in text-based world models. arXiv preprint arXiv:2604.13824 .Gautier Izacard and Edouard Grave. 2021. Leveraging passage retrieval with generative models for open do-main question answering. In Proceedings of the 16th Conference of the European Chapter of the Associa-tion for Computational Linguistics , pages 874–880. Michael Janner, Justin Fu, Marvin Zhang, and Sergey Levine. 2019. When to trust your model: Model-based policy optimization. In Advances in Neural Information Processing Systems , volume 32. Peter Jansen and Marc-alexandre Cote. 2023. TextWorldExpress: Simulating text games at one million steps per second. In Proceedings of the 17th Conference of the European Chapter of the Association for Computational Linguistics: System Demonstrations , pages 169–177. Association for Computational Linguistics. Vladimir Karpukhin, Barlas Oguz, Sewon Min, Patrick Lewis, Ledell Wu, Sergey Edunov, Danqi Chen, and Wen-tau Yih. 2020. Dense passage retrieval for open-domain question answering. In Proceedings of the 2020 Conference on Empirical Methods in Natural Language Processing , pages 6769–6781. Patrick Lewis, Ethan Perez, Aleksandra Piktus, Fabio Petroni, Vladimir Karpukhin, Naman Goyal, Hein-rich Küttler, Mike Lewis, Wen-tau Yih, Tim Rock-täschel, Sebastian Riedel, and Douwe Kiela. 2020. Retrieval-augmented generation for knowledge-intensive nlp tasks. In Advances in Neural Infor-mation Processing Systems , volume 33, pages 9459– 9474. Curran Associates, Inc. Yixia Li, Hongru Wang, Jiahao Qiu, Zhenfei Yin, Dongdong Zhang, Cheng Qian, Zeping Li, Po shan Cathy Ma, Guanhua Chen, Heng Ji, and Mengdi Wang. 2025. From word to world: Can large lan-guage models be implicit text-based world models? 
+
+ArXiv , abs/2512.18832. Chin-Yew Lin. 2004. ROUGE: A package for automatic evaluation of summaries. In Text Summarization Branches Out , pages 74–81. Youwei Liu, Jian Wang, Hanlin Wang, Beichen Guo, and Wenjie Li. 2026. Imagine-then-plan: Agent learning from adaptive lookahead with world models. 
+
+arXiv preprint arXiv:2601.08955 , abs/2601.08955. Sewon Min, Kalpesh Krishna, Xinxi Lyu, Mike Lewis, Wen-tau Yih, Pang Koh, Mohit Iyyer, Luke Zettle-moyer, and Hannaneh Hajishirzi. 2023. FActScore: Fine-grained atomic evaluation of factual precision in long form text generation. In Proceedings of the 2023 Conference on Empirical Methods in Natural Language Processing , pages 12076–12100, Singa-pore. Association for Computational Linguistics. Karthik Narasimhan, Tejas Kulkarni, and Regina Barzi-lay. 2015. Language understanding for text-based games using deep reinforcement learning. In Pro-ceedings of the 2015 Conference on Empirical Meth-ods in Natural Language Processing , pages 1–11. Kishore Papineni, Salim Roukos, Todd Ward, and Wei-Jing Zhu. 2002. BLEU: A method for automatic evaluation of machine translation. In Proceedings of the 40th Annual Meeting of the Association for Computational Linguistics , pages 311–318. Joon Sung Park, Joseph C. O’Brien, Carrie J. Cai, Meredith Ringel Morris, Percy Liang, and Michael S. Bernstein. 2023. Generative agents: Interactive simu-lacra of human behavior. In Proceedings of the 36th Annual ACM Symposium on User Interface Software and Technology .Shuofei Qiao, Runnan Fang, Ningyu Zhang, Yuqi Zhu, Xiang Chen, Shumin Deng, Yong Jiang, Pengjun Xie, Fei Huang, and Huajun Chen. 2024. Agent planning with world knowledge model. ArXiv ,abs/2405.14205. Julian Schrittwieser, Ioannis Antonoglou, Thomas Hu-bert, Karen Simonyan, Laurent Sifre, Simon Schmitt, Arthur Guez, Edward Lockhart, Demis Hassabis, Thore Graepel, Timothy Lillicrap, and David Silver. 2020. Mastering Atari, Go, chess and shogi by plan-ning with a learned model. Nature , 588:604–609. Noah Shinn, Federico Cassano, Ashwin Gopinath, Karthik Narasimhan, and Shunyu Yao. 2023. Re-flexion: language agents with verbal reinforcement learning. In Advances in Neural Information Process-ing Systems , volume 36, pages 8634–8652. Curran Associates, Inc. Mohit Shridhar, Xingdi Yuan, Marc-Alexandre Côté, Yonatan Bisk, Adam Trischler, and Matthew Hausknecht. 2021. ALFWorld: Aligning text and embodied environments for interactive learning. In 
+
+International Conference on Learning Representa-tions .Richard S. Sutton. 1991. Dyna, an integrated archi-tecture for learning, planning, and reacting. ACM SIGART Bulletin , 2(4):160–163. Yijun Tian, Shaoyu Chen, Zhichao Xu, Yawei Wang, Jinhe Bi, Peng Han, and Wei Wang. 2025. Reinforce-ment mid-training. Preprint , arXiv:2509.24375. Guanzhi Wang, Yuqi Xie, Yunfan Jiang, Ajay Man-dlekar, Chaowei Xiao, Yuke Zhu, Linxi Fan, and An-ima Anandkumar. 2023a. Voyager: An open-ended embodied agent with large language models. arXiv preprint arXiv:2305.16291 .Ruoyao Wang, Peter Jansen, Marc-Alexandre Côté, and Prithviraj Ammanabrolu. 2022. ScienceWorld: Is your agent smarter than a 5th grader? In Proceedings of the 2022 Conference on Empirical Methods in Natural Language Processing , pages 11279–11298. Weizhi Wang, Li Dong, Hao Cheng, Xiaodong Liu, Xifeng Yan, Jianfeng Gao, and Furu Wei. 2023b. Augmenting language models with long-term mem-ory. arXiv preprint arXiv:2306.07174 .Yujun Wang, Aniri, Jinhe Bi, Soren Pirk, and Yunpu Ma. 2026. ASCD: Attention-steerable contrastive decod-ing for reducing hallucination in MLLM. Proceed-ings of the AAAI Conference on Artificial Intelligence ,40(12):10306–10314. Jason Wei, Xuezhi Wang, Dale Schuurmans, Maarten Bosma, Brian Ichter, Fei Xia, Ed H. Chi, Quoc V. Le, and Denny Zhou. 2022. Chain-of-thought prompt-ing elicits reasoning in large language models. In 
+
+Advances in Neural Information Processing Systems ,volume 35, pages 24824–24837. Peng Xia, Jianwen Chen, Hanyang Wang, Jiaqi Liu, Kaide Zeng, Yu Wang, Siwei Han, Yiyang Zhou, Xu-jiang Zhao, Haifeng Chen, Zeyu Zheng, Cihang Xie, and Huaxiu Yao. 2026. SkillRL: Evolving agents via recursive skill-augmented reinforcement learning. 
+
+arXiv preprint arXiv:2602.08234 .Shunyu Yao, Howard Chen, John Yang, and Karthik Narasimhan. 2022. WebShop: Towards scalable real-world web interaction with grounded language agents. In Advances in Neural Information Processing Sys-tems , volume 35. Shunyu Yao, Jeffrey Zhao, Dian Yu, Nan Du, Izhak Shafran, Karthik Narasimhan, and Yuan Cao. 2023. ReAct: Synergizing reasoning and acting in language models. In International Conference on Learning Representations .Tianyi Zhang, Varsha Kishore, Felix Wu, Kilian Q. Weinberger, and Yoav Artzi. 2020. BERTScore: Evaluating text generation with BERT. In Interna-tional Conference on Learning Representations .Xuanle Zhao, Qiushi Sun, Jingyu Xiao, Xuexin Liu, Haoyue Yang, Qiaosheng Chen, Xianzhen Luo, Jing Huang, Yufeng Zhong, Lei Chen, Shuai Fu, Zhenlin Wei, Jinhe Bi, Lei Jiang, Haibo Qiu, Siqi Yang, Peng Shi, Jian Hu, and Zhixiong Zeng. 2026. Beyond nl2code: A structured survey of multimodal code intelligence. Preprint , arXiv:2606.15932. Wanjun Zhong, Lianghong Guo, Qiqi Gao, He Ye, and Yanlin Wang. 2023. MemoryBank: Enhancing large language models with long-term memory. arXiv preprint arXiv:2305.10250 .Domain Training Test       
+
+> ALFWorld 3,119 139 ScienceWorld 1,483 Seen: 194; Unseen: 211 WebShop 1,824 200
+> Table 3: Dataset split statistics for the three evaluation domains.
+
+A Benchmark and Evaluation Setup 
+
+Common protocol. All experiments use the text interface provided by each benchmark. At each decision step, the agent receives a textual observa-tion and issues a textual action from the benchmark action interface. For downstream task evaluation, we use the task success or task score returned by the original benchmark environment. Within each benchmark, all compared methods use the same task instances, observation format, action interface, evaluation budget, decoding settings, and planner interface. For world-model evaluation, each example is an environment transition. Given the current textual state st, optional interaction history ht, and candi-date action at, the world model predicts an imag-ined next state ˆst+1 . The benchmark environment provides the gold next state st+1 after executing at,which is used only for evaluation. We report Struc-tured State Fidelity (SSF) as the primary next-state metric; exact match and word F1 are used only in the metric stress test to illustrate why surface metrics are insufficient. 
+
+Prompting baselines in Table 2. The first four rows in each backbone block of Table 2 repro-duce the prompting-based baseline results from the Imagine-then-Plan study (Liu et al., 2026). CoT 
+
+prompts the agent to produce step-by-step ratio-nales before acting, following chain-of-thought prompting (Wei et al., 2022). ReAct interleaves reasoning traces with environment actions, so the agent repeatedly reasons about the current ob-servation and then issues an action (Yao et al., 2023). RAP treats the LLM as both a policy and a world model, and uses Monte Carlo Tree Search to plan over imagined action–state continuations (Hao et al., 2023). ITP denotes the training-free ITPI variant from Liu et al. (2026): the agent selects an adaptive lookahead horizon, rolls out imagined futures with a learned world model, and conditions the next action on a reflection over those imagined futures. We use the label ITP for compactness in the table; it should not be confused with the rein-forced ITPR variant reported in the source paper. 
+
+ALFWorld. ALFWorld (Shridhar et al., 2021) is a text-based embodied household benchmark aligned with ALFRED-style goals. An agent navi-gates rooms, inspects receptacles, manipulates ob-jects, and completes goal-conditioned household tasks. Our evaluation reports the six task cate-gories shown in the main results table: pick-and-place, look-at-object, clean-and-place, heat-and-place, cool-and-place, and pick-two-object tasks, together with the overall success rate. For state-prediction evaluation, the gold state is the textual observation returned by ALFWorld after executing the candidate action. This setting stresses whether a world model preserves object identities, receptacle relations, object states, and action preconditions. 
+
+ScienceWorld. ScienceWorld (Wang et al., 2022) is an interactive text environment for elementary-school science tasks. Episodes require an agent to manipulate objects, containers, devices, and sub-stances while satisfying procedural and scientific constraints. The benchmark distinguishes seen and unseen task settings, which we keep separate in the downstream table when reporting non-memory baselines. For world-model evaluation, each tran-sition prediction is scored against the next textual observation produced by the simulator. This bench-mark stresses preservation of entities, device states, container contents, numeric measurements, recipes, and scientific process feedback. 
+
+WebShop. WebShop (Yao et al., 2022) is a sim-ulated e-commerce website built from real-world product data and crowd-sourced shopping instruc-tions. Given a user request, an agent searches, navigates result pages and product pages, selects options, and attempts to purchase a matching prod-uct. We report the benchmark’s total task score in the main table. For state-prediction evaluation, the gold next state is the next webpage observa-tion after an action such as searching, opening a product, selecting an option, navigating pages, or buying. This benchmark stresses preservation of page type, product identifiers, titles, prices, op-tion groups, navigation affordances, and the user’s stated constraints. 
+
+B Structured State Fidelity Details 
+
+This appendix gives additional implementation de-tails for Structured State Fidelity (SSF), the pro-posed metric introduced in Section 3.2. SSF eval-uates a predicted next state by first extracting a structured representation from both the prediction and the gold state, then computing similarity over the extracted state elements. This differs from ex-act match and word F1, which operate directly on surface strings. 
+
+B.1 ALFWorld SSF 
+
+For ALFWorld, SSF converts each observation into a set of canonical facts using a tiny LLM extractor. The extractor normalizes surface descriptions into object–receptacle relations (e.g., ON and IN ), empty-receptacle facts ( EMPTY ), object-state facts ( STATE 
+
+with values such as open, closed, heated, cooled, cleaned, dirty, or sliced), and task-specific facts such as CLEANED . It preserves object and receptacle identities, including numeric indices, because these identities are behavior-critical in ALFWorld. Given predicted facts ˆF and gold facts F , the ALFWorld score is fact-set F1. We compute preci-sion, recall, and SSF as 
+
+P = | ˆF ∩ F || ˆF | , R = | ˆF ∩ F ||F | ,
+
+SSF ALFW ORLD = 2P R P + R .
+
+(4) 
+
+B.2 ScienceWorld SSF 
+
+For ScienceWorld, SSF follows the same fact-set F1 design, but uses a hybrid extractor. A deter-ministic parser first handles frequent ScienceWorld observation patterns, including room and location descriptions, visible objects, surface and container relations, empty containers, door and device states, movement or focus feedback, electrical connec-tions, thermometer readings, waiting and pouring feedback, recipe text, ambiguous action menus, and short fallback messages. The resulting fact schema groups these observations into location facts, vis-ibility and containment facts, object-state facts, device and measurement facts, and task-feedback facts. If the local parser cannot extract facts, a small LLM extractor is used as a fallback. We use the hybrid parser rather than a pure LLM extractor because metric extraction itself should not repair the prediction being evaluated. In pi-lot checks, a pure LLM-only extractor sometimes over-completed corrupted predictions into gold-like facts, producing a perturbation maximum of 
+
+1.000 even when the prediction had been delib-erately corrupted. The hybrid extractor anchors frequent ScienceWorld templates with determin-istic rules and invokes the small LLM only as a fallback. With cache disabled on 64 stratified ScienceWorld samples, the hybrid metric gives identity comparisons a mean/min/max score of 
+
+1.000 /1.000 /1.000 , while simple perturbations re-ceive a mean score of 0.008 and a maximum of 
+
+0.250 . This supports the intended behavior: faith-ful states are preserved, but corrupted facts are not silently repaired by the extractor. ScienceWorld also illustrates why surface met-rics can hide meaningful improvements. On the test split, a Qwen3-4B world model using only the current observation obtained word F1 0.962 and ScienceWorld SSF 0.848 . With ten steps of his-tory, word F1 increased modestly to 0.973 , while ScienceWorld SSF increased to 0.910 . This sug-gests that word overlap is already near saturation, whereas structured state fidelity remains sensitive to improvements in behavior-relevant facts. 
+
+B.3 WebShop SSF 
+
+For WebShop, observations are structured pages rather than generic fact lists. The metric first clas-sifies each state as a search-result page, product-detail page, terminal or completion page, or un-known page. For search-result pages, it extracts page number, total result count, navigation buttons, top-k product identifiers, product titles, and prices, with k = 3 in our experiments. For product-detail pages, it extracts title, price, option keys, option groups, and page affordances such as description, features, reviews, and buy-now buttons. The WebShop score is a weighted structured sim-ilarity. Categorical fields use exact match, product identifiers and option sets use set F1, titles use lexical F1, and prices use a relative-error score. The final page score is the weighted sum of field scores, clipped to [0 , 1] . For search-result pages, the weights are 0.100 for page type, page number, and total result count; 0.050 for each navigation affordance (previous, next, and back-to-search); 
+
+0.300 for top-k product identifiers; 0.150 for prod-uct titles; and 0.100 for prices. For product-detail pages, the weights are 0.150 for page type, 0.200 
+
+for title, 0.150 for price, 0.100 each for option keys and option groups, and 0.050 each for previous, back-to-search, description, features, reviews, and buy-now affordances. This design rewards preserv-ing product identity and actionable attributes rather than merely matching the surrounding page text. B.4 Metric Stress Test 
+
+We further validate the motivation for SSF with a controlled metric stress test. The test samples real gold next states from ALFWorld, ScienceWorld, and WebShop, then constructs synthetic predictions that isolate different metric behaviors. We com-pare three metrics: normalized exact match (EM), token-count word F1 over normalized text, and SSF. The stress test targets 50 examples per perturbation class and scores SSF with the benchmark-specific structured metrics described above. The perturbations are designed to test two desiderata. First, a metric should be robust to meaning-preserving paraphrase or layout changes. Second, it should be sensitive to behavior-critical corruptions, including object or location swaps, entity swaps, identifier changes, price or numeric changes, option deletion, and state flips. Figure 3 summarizes the aggregate pattern in the main text. EM fails the paraphrase condition because all para-phrases receive zero exact-match score. Word F1 remains high even under fact corruption: ob-ject/location/entity swaps average 0.925 word F1, and ID/price/numeric/option corruptions average 0.934 word F1. SSF separates the cases more sharply: paraphrase/layout changes retain score 1.000, while object/location/entity swaps drop to 0.151 and state flips drop to 0.393. The same pattern holds within individual bench-marks. In ALFWorld, location swaps receive word F1 0.920 but SSF 0.000, showing that token over-lap can miss an entirely wrong receptacle or room. In ScienceWorld, entity and numeric swaps simi-larly retain word F1 above 0.920 while receiving SSF 0.000. In WebShop, product identifier swaps receive word F1 0.989 but SSF 0.450 because the page text is almost unchanged while the top prod-uct identities are wrong. These results support the central motivation for SSF: world-model eval-uation should measure preservation of structured state facts, not only lexical overlap. 
+
+B.5 Exact Extraction Prompts and Parser Rules 
+
+We next provide the exact extraction interfaces used by SSF. The extractors process the predicted and gold next states independently. ALFWorld uses a constrained canonical-fact prompt; ScienceWorld first applies deterministic rules and invokes a con-strained fallback prompt only if no local rule pro-duces a fact; WebShop uses a deterministic page parser throughout. 
+
+B.5.1 ALFWorld Canonical-Fact Prompt 
+
+The complete instruction passed to the ALF-World extractor is shown below. The placeholder 
+
+{observation} is replaced by one predicted or gold next-state observation. 
+
+> Exact ALFWorld SSF Extraction Prompt
+> You are an information extraction system for ALFWorld observations. Your task is to convert ONE observation into a canonical fact list. You must normalize semantically equivalent expressions into the SAME canonical fact format. You must follow the canonicalization rules exactly. ## Canonical fact rules 1. Visibility on a surface: - "On the X, you see a A, a B, and a C." -> ON(X, A) -> ON(X, B) -> ON(X, C) 2. Visibility inside a container: - "In the X, you see a A, a B, and a C." -> IN(X, A) -> IN(X, B) -> IN(X, C) 3. Empty observations: The following expressions must all be normalized to EXACTLY: - EMPTY(X) Examples: - "The X is empty." -> EMPTY(X) - "On the X, you see nothing." -> EMPTY(X) - "In the X, you see nothing." -> EMPTY(X) - "Inside, you see nothing." -> EMPTY(X), after resolving the pronoun to the correct entity 4. State observations: - "The X is open." -> STATE(X, open) - "The X is closed." -> STATE(X, closed) - "The X is heated." -> STATE(X, heated) - "The X is cooled." -> STATE(X, cooled) - "The X is cleaned." -> STATE(X, cleaned) - "The X is dirty." -> STATE(X, dirty) - "The X is sliced." -> STATE(X, sliced) 5. Cleaning actions: If the observation says an object is cleaned using a sinkbasin or similar receptacle, the ONLY valid canonical fact is: - CLEANED(OBJECT, RECEPTACLE)
+
+Examples: - "You clean the dishsponge 2 using the sinkbasin 1." -> CLEANED(dishsponge 2, sinkbasin 1) - "You clean the cloth 1 using the sinkbasin 1." -> CLEANED(cloth 1, sinkbasin 1) Never output CLEAN(...). Always output CLEANED(...). 6. Observations containing both an action sentence and a resulting world-state sentence: Only keep the resulting world-state facts. Do NOT output redundant action facts. Examples: - "You open the fridge 1. The fridge 1 is open." -> STATE(fridge 1, open) - "You open the drawer 1. The drawer 1 is open. In it, you see a fork 2." -> STATE(drawer 1, open) -> IN(drawer 1, fork 2) - "You open the fridge 1. The fridge 1 is open. Inside, you see nothing." -> STATE(fridge 1, open) -> EMPTY(fridge 1) 7. Pronoun resolution: Resolve pronouns such as: - "Inside" - "In it" - "On it" to the explicit receptacle/entity mentioned earlier in the same observation. 8. Identity preservation: Object identity must be preserved exactly, including indices. Examples: - candle 1 != candle 2 - spraybottle 1 != spraybottle 2 Receptacle identity must be preserved exactly, including indices. Examples: - drawer 1 != drawer 2 - fridge 1 != fridge 2 ## Output format Return the facts ONLY between the two markers below: BEGIN_FACTS <one complete canonical fact per line> END_FACTS Strict output rules: - One fact per line - Each fact must be complete on a single line - Never split one fact across multiple lines - Never output partial facts - Never output explanations - Never output JSON - Never output numbering - Never output bullets - Never output markdown code fences - Never output any text before BEGIN_FACTS - Never output any text after END_FACTS If there are multiple facts, output all of them, one per line. If there is exactly one fact, output exactly one line between BEGIN_FACTS and END_FACTS. If no fact can be extracted, output: BEGIN_FACTS END_FACTS ## Observation {observation} 
+
+The output parser first removes an optional 
+
+Next state: or The next state is: pre-fix, retains only lines between BEGIN_FACTS and 
+
+END_FACTS , accepts only complete facts match-ing [A-Z_]NAME(arguments) , and deduplicates the accepted lines. Action descriptions are there-fore not scored unless they explicitly encode the resulting state. 
+
+B.5.2 ScienceWorld Deterministic Rules and Fallback Prompt 
+
+The deterministic ScienceWorld parser applies the following priority order: ambiguous-request op-tions; temperature readings; electrical connections; object movements; focus actions; wait actions; pouring; activation and open/closed states; recipes; structured room or outside-location descriptions; and finally short fallback messages. Structured de-scriptions additionally extract visible entities, sur-face and container relations, empty containers, door states, object/device attributes, and numeric mea-surements. Entity strings are lowercased, leading articles are removed, whitespace is collapsed, and explicitly stated numeric values are retained ex-actly. If these rules extract no fact, the following fall-back prompt is used. 
+
+Exact ScienceWorld Fallback Extraction Prompt 
+
+Convert ONE ScienceWorld environment observation into canonical facts. You are a deterministic parser. Extract only facts that are explicitly stated in the observation. Do not infer hidden state. Do not use commonsense. Do not copy fact-format placeholders. Do not invent temperature, room, containers, or objects. Do not repeat facts. Use the exact entity names from the observation, lowercased except proper labels such as A/B/M. Return facts only between BEGIN_FACTS and END_FACTS. Allowed fact formats: - ROOM(name) - LOCATION(name) - VISIBLE(object) - ON(surface, object) - IN(container, object) - CONTAINS(container, object) - EMPTY(container) - STATE(object, state) - DOOR(destination, state) - MOVED(object, destination) - FOCUS(object) - CONNECTED(endpoint 1, endpoint 2) - TEMPERATURE(integer, celsius) - WAIT(iterations) - POURED(source container, destination) - RECIPE(product, ingredient) - AMBIG_OPTION(index, action text) - MESSAGE(text) Canonicalization rules: 1. Strip the leading "Observation:" prefix before parsing. 2. For room descriptions: - "This room is called the workshop." -> ROOM(workshop) - "This outside location is called the outside." -> LOCATION(outside) 3. Visible objects: - "In it, you see: a table." -> VISIBLE( table) - "the agent" -> VISIBLE(agent) - "a substance called air" -> VISIBLE(air )4. Surface membership: - "On the table is: a yellow wire, a battery." -> ON(table, yellow wire), ON (table, battery) - Also output STATE(object, state) when an item says "which is on/off/open/ closed/activated/deactivated". 5. Container content: - "a blue box (containing nothing)" -> VISIBLE(blue box), EMPTY(blue box) - "a fountain (containing a substance called water)" -> VISIBLE(fountain), CONTAINS(fountain, water) - "In the sink is: nothing." -> EMPTY( sink) 6. Device and door states: - "a sink, which is turned off" -> STATE( sink, off) - "The cupboard door is closed." -> STATE (cupboard door, closed) - "A door to the hallway (that is open)" -> DOOR(hallway, open) 7. Action-result messages: For short action-result messages, output only the action-result fact. Do not add VISIBLE facts. - "You move the metal pot to the inventory." -> MOVED(metal pot, inventory) - "You focus on the metal pot." -> FOCUS( metal pot) - "terminal 2 on orange wire is now connected to cathode on blue light bulb " -> CONNECTED(terminal 2 on orange wire, cathode on blue light bulb) - "the thermometer measures a temperature of 23 degrees celsius" -> TEMPERATURE (23, celsius) - "You decide to wait for 10 iterations." -> WAIT(10) - "You pour the contents of the jug into the flower pot 1." -> POURED(jug, flower pot 1) 8. Recipes: - "To make salt water, you need to mix sodium chloride, water." -> RECIPE(salt water, sodium chloride), RECIPE(salt water, water) 9. Ambiguous menus: - For each numbered option, output AMBIG_OPTION(index, action text) 10. If the observation is a short unstructured message and no other fact applies, output MESSAGE(message text). Examples: Observation: Observation: terminal 2 on orange wire is now connected to cathode on blue light bulb BEGIN_FACTS CONNECTED(terminal 2 on orange wire, cathode on blue light bulb) END_FACTS Observation: Observation: the thermometer measures a temperature of -4 degrees celsius BEGIN_FACTS TEMPERATURE(-4, celsius) END_FACTS Observation: Observation: You move the metal pot to the inventory. BEGIN_FACTS MOVED(metal pot, inventory) END_FACTS Observation: Observation: You pour the contents of the jug into the flower pot 1. BEGIN_FACTS POURED(jug, flower pot 1) END_FACTS Observation: Observation: This room is called the workshop. In it, you see: a table. On the table is: a yellow wire, a battery, a switch, which is off, a blue light bulb, which is on. the agent You also see: A door to the hallway (that is open) BEGIN_FACTS ROOM(workshop) VISIBLE(table) ON(table, yellow wire) ON(table, battery) ON(table, switch) STATE(switch, off) ON(table, blue light bulb) STATE(blue light bulb, on) VISIBLE(agent) DOOR(hallway, open) END_FACTS Observation: {observation} 
+
+Fallback outputs are parsed with the same marker discipline as ALFWorld and must match a complete canonical-fact form. This hybrid design prevents the extractor from repairing corrupted pre-dictions with unstated commonsense facts while retaining coverage for uncommon simulator mes-sages. 
+
+B.5.3 WebShop Deterministic Page Parser 
+
+WebShop observations are split on [SEP] after re-moving an optional Next state: prefix. Page types are assigned in a fixed priority order: aproduct-detail page contains a price field and at least one detail marker (rating, description, fea-tures, reviews, or buy-now); a search-result page contains both a Page N (Total results: M) 
+
+header and a ten-character product identifier; termi-nal pages contain an explicit purchase-completion, score, or reward message; all remaining pages are marked unknown. For search pages, the parser scans from the page header and accepts triples only when the first token is a ten-character uppercase alphanumeric prod-uct identifier and the third token is a price. For product-detail pages, option values are collected after known option keys (e.g., size, color, style, flavor, material, pattern, pack size, or count) until another key or a fixed page marker is encountered. These rules, together with the weights specified above, fully determine the WebShop SSF score. 
+
+B.6 Blinded Annotator Validation 
+
+We validate SSF against behavior-critical state judg-ments on 200 predicted/gold next-state pairs, with 100 pairs each from ALFWorld and WebShop. Pairs are stratified by SSF score. The annotator is blinded to model identity, memory condition, and all automatic metric values, and judges whether the prediction preserves the schema-critical facts while ignoring harmless surface paraphrases. We com-pare this judgment with exact match, word F1, and SSF using Pearson and Spearman correlation, as well as AUROC and AUPRC for detecting factually faithful predictions. These results complement the controlled stress test: SSF is not only invariant to designed surface perturbations, but also aligns more closely with independent judgments of whether a predicted state preserves facts needed for subsequent actions. 
+
+B.7 Extractor Identity-Consistency Audit 
+
+We additionally audit 100 state transitions from each domain. Because this check asks whether identical normalized states receive identical struc-tured representations, we report identity consis-tency , rather than treating it as an estimate of end-to-end parser accuracy. 
+
+B.8 WebShop Field-Weight Sensitivity 
+
+WebShop is the only benchmark whose SSF aggre-gates heterogeneous page fields with non-uniform weights. Using the Qwen3-4B setting reported in Table 1, we test whether the memory-augmentation conclusion depends on one hand-chosen weighting scheme by recomputing SFT, RL without mem-ory, and memory-augmented RL scores under five alternative schemes, including random ±20% per-turbations. The margin varies with the emphasis assigned to product identity, price/options, and page affor-dances, but its sign is stable across all tested vari-ants. The WebShop result is therefore not an arti-fact of one manually selected field-weight vector. 
+
+B.9 Cross-Domain Transfer to CookingWorld 
+
+To test whether the SSF design principle trans-fers beyond the three main benchmarks, we in-stantiate it in the held-out TextWorldExpress– CookingWorld domain (Jansen and Cote, 2023). The deterministic schema covers inventory items, required recipe ingredients, recipe steps, prepara-tion and cooking states, ingredient locations, con-tainer states, and task progress. We then apply surface-preserving and behavior-critical perturba-tions to gold transitions. Page type Extracted fields Field scoring           
+
+> Search results Page number, total result count, previous/next/back-to-search affordances, and top-kproduct identifiers, titles, and prices (k= 3 )Exact match for categorical fields; set F1 for product iden-tifiers; lexical F1 for aligned titles; relative-error score for aligned prices and total count Product detail Title, price, option keys, option-value groups, and previous, back-to-search, description, features, reviews, and buy-now affordances Lexical F1 for title; relative-error score for price; set F1 for option keys and option values; exact match for affordances Terminal or comple-tion Explicit completion, score, or reward message Exact or message-level match-ing
+
+Table 4: Deterministic WebShop extraction and field-scoring rules. Product titles and prices are aligned only through product identifiers shared by the prediction and gold page.                                  
+
+> Domain Metric Pearson ↑Spearman ↑AUROC ↑AUPRC ↑
+> WebShop Exact match 0.495 0.475 0.632 0.561 Word F1 0.735 0.781 0.894 0.852 SSF 0.785 0.874 0.946 0.925
+> ALFWorld Exact match 0.680 0.620 0.780 0.750 Word F1 0.740 0.695 0.977 0.981 SSF 0.851 0.828 0.995 0.993
+
+Table 5: Agreement between automatic metrics and blinded behavior-critical state judgments. SSF gives the strongest correlation and factual-state discrimination in both domains. 
+
+Layout/paraphrase changes drive exact match to zero while leaving SSF at 1.000. Conversely, corrupted ingredients, locations, preparation states, and progress markers retain high word overlap but reduce SSF. The experiment supports transfer of the evaluation recipe—identify behavior-critical state components, extract canonical facts, and compare them component-wise—while making clear that each new domain still requires an explicit schema and parser instantiation. 
+
+C Additional Implementation Details 
+
+C.1 World Memory Construction 
+
+World memory is a keyed memory bank that stores transition rules, state caches, and hard-to-predict facts distilled from past world-model experience. For each benchmark, we construct this bank from hard-negative prediction failures, previously ob-served structured states, or recurring transition pat-terns, then retrieve matched entries as soft hints during next-state imagination. Across domains, world memory construction follows the same abstraction. First, we collect world-model experience from training trajectories or scored prediction failures. Second, we normal-ize the experience into a compact structured form, such as action schemas, fact types, product fields, or state-cache records. Third, we assign each entry a prediction-time retrieval key. Finally, retrieved entries are inserted into the world-model prompt as bounded hint blocks. The visible trajectory remains authoritative whenever it conflicts with retrieved memory. For ALFW ORLD , world memory is built from SFT hard-negative transitions. Hard negatives are bucketed by goal signature, action schema, object type, target type, room-like context, and recently seen receptacles. Each eligible bucket is summa-rized into a short positive transition hint and a neg-ative error pattern to avoid. For S CIENCE WORLD ,we use residual fact memories from hist10 pre-diction errors, and also support train-world fact caches that store reusable facts such as recipes, temperature readings, room facts, entity observa-tions, and ambiguous action menus. For W EB -SHOP , world memory is a persistent site cache built from observed page states, storing search-result pages, product-detail records, and option-conditioned product states. For LLM-curated transition memories, we use a short construction prompt that asks the curator to summarize each hard-negative bucket into one pos-itive hint and one error pattern. The full trajectory evidence is provided as structured JSON outside Domain Extractor Identity consistency Observed failure mode            
+
+> ALFWorld LLM canonical-fact extractor 97.1% Ambiguous in /on wording can be canonicalized inconsistently. WebShop Deterministic rule parser 100.0% None observed in the identity-consistency subset. ScienceWorld Hybrid fact extractor 100.0% None observed in the identity-consistency subset.
+
+Table 6: Identity-consistency audit of the benchmark-specific SSF extractors.                               
+
+> Weight variant SFT RL w/o Mem Mem-Aug RL ∆Mem-Aug–RL
+> Original 0.726 0.814 0.884 +0.070 Uniform 0.757 0.854 0.864 +0.010 Product-identity-heavy 0.702 0.809 0.886 +0.077 Price-option-heavy 0.709 0.813 0.883 +0.070 Affordance-heavy 0.744 0.844 0.849 +0.005 Random ±20% 0.730 0.832 0.871 +0.039
+
+Table 7: WebShop SSF under alternative field-weight schemes. Memory-augmented RL remains above RL without memory in every case. 
+
+the paper; the prompt block has the following form. 
+
+> Prompt (World Memory Construction)
+> SYSTEM: Write short memory hints for a world model. Return JSON only. USER: Given one bucket of trajectory evidence and prediction errors, create one memory entry with two fields: - positive: what to preserve or predict when this context applies. - negative: what common error to avoid. Use conditional wording, summarize the majority pattern, and do not copy object ids or invent exact next states. BUCKET_JSON: {trajectory_bucket_json}
+
+Representative entries are compact keyed records. For example, an ALFWorld open-fridge key stores a positive hint to preserve the open state and revealed contents, and a negative hint not to mark the fridge empty unless emptiness is observed. A ScienceWorld boil-water key stores observed temperature changes so later predictions do not re-set the substance to room temperature. A WebShop product-detail key stores product id, title, price, selected options, and availability. 
+
+C.2 World Memory Prompt Templates 
+
+At prediction time, retrieved entries are inserted as bounded hint blocks before the original world-model prompt. The templates differ by benchmark but follow the same pattern: identify the memory source, present a retrieval key, list the retrieved facts or hints, and state that the visible trajectory overrides memory. Compact examples are shown below. 
+
+> Prompt Templates for Retrieved World Memory
+> ALFWorld: [BEGIN ALFWORLD_MEMORY] Key: {memory_key} Positive: {positive_transition_hint} Negative: {negative_error_pattern} [END ALFWORLD_MEMORY] ScienceWorld: [BEGIN SCIWORLD_MEMORY] Key: {memory_key} Positive: {positive_fact_hint} Negative: {negative_error_pattern} [END SCIWORLD_MEMORY] WebShop: [BEGIN WEBSHOP_SITE_CACHE] search[{query}] page {page_num}; products: { product_id} | {title} | {price} [END WEBSHOP_SITE_CACHE]
+
+C.3 Training Setup 
+
+For world-model experiments, we use three back-bone models: Meta Llama-3.2-1B-Instruct, Qwen3-4B-Instruct-2507, and Qwen2.5-7B-Instruct. Each backbone is first supervised fine-tuned for next-state prediction using LLaMA-Factory, yielding the SFT world models reported in Table 1. We then optimize the same next-state prediction model with GRPO using the verl training framework. Memory-augmented variants use the same GRPO recipe, but replace the original train and validation files with the corresponding memory-augmented files constructed from the memory bank. For downstream planning, we evaluate Qwen2.5-7B-Instruct and Qwen3-8B-Instruct as policy back-bones for the agent-level comparisons in Table 2. Perturbation N EM Word F1 SSF macro                                     
+
+> Identity 100 1.000 1.000 1.000 Layout/paraphrase 100 0.000 0.963 1.000 Hallucinated item 100 0.000 0.981 0.959 Missing required inventory 100 0.000 0.979 0.919 Recipe-required corruption 100 0.000 0.975 0.922 Ingredient-location swap 100 0.000 0.991 0.871 Preparation-state corruption 100 0.000 0.988 0.931 Cook-state corruption 100 0.000 0.991 0.957 Progress flip 50 0.000 0.926 0.725
+> Table 8: Transferability stress test on TextWorldExpress–CookingWorld. SSF preserves meaning-equivalent layout changes while responding to behavior-critical fact corruptions.
+
+Unless otherwise stated, GRPO training uses a learning rate of 1 × 10 −6, rollout group size 8, KL coefficient 0.001 with low-variance KL, vLLM roll-out, gradient checkpointing, and 10 training epochs. ALFWorld and ScienceWorld use train batch size 
+
+64 , optimization mini-batch size 64 , micro-batch size 16 per GPU, and maximum prompt length 
+
+8192 . WebShop uses train batch size 32 , optimiza-tion mini-batch size 32 , micro-batch size 8 per GPU, and maximum prompt length 24000 . The maximum response length is 256 for ALFWorld and 512 for WebShop and ScienceWorld. We run GRPO training on 4 GPUs with validation before training and periodic validation/checkpointing. 
+
+Result reporting. Unless otherwise stated, all re-ported quantitative results are averaged over four independent runs under the same experimental con-figuration. Tables 1 and 2 report mean Structured State Fidelity and downstream task-performance scores, respectively. Figures 4–6 report the corre-sponding mean sensitivity results across the evalu-ated memory-dropout and action-budget settings. 
+
+Artifact licenses, terms, and intended use. Our experiments use public research artifacts, including ALFWorld, ScienceWorld, and WebShop, and pub-licly released model and software artifacts, includ-ing Llama- and Qwen-family instruction models, LLaMA-Factory, verl, and vLLM. We use these artifacts under their original licenses and terms of use, and only for their intended research purposes: benchmarking, training, and evaluating text-based agents and world-modeling methods. The world-memory and world-skill entries used in M EM WM are derived from benchmark trajectories, simula-tor observations, and model prediction traces for research evaluation. These derived artifacts are not intended for deployment or use outside research contexts, and we do not redistribute original bench-mark data, third-party model checkpoints, or third-party software beyond their original release terms. 
+
+C.4 World Skill Construction 
+
+World skill is the policy-side memory used by the full agent. Unlike world memory, which is re-trieved for next-state imagination, world skill is written as action-selection guidance for the policy. This is related to experience-derived skill banks for agents such as SkillRL (Xia et al., 2026), but our use of world skill is retrieval-time guidance for a frozen policy rather than recursive policy evolu-tion. In our implementation it has two complemen-tary forms: task-level world task skill , retrieved from the task type, and step-level world corrective guidance , retrieved dynamically from the current trajectory state. 
+
+C.4.1 World Task Skill Construction 
+
+For ScienceWorld, world task skills are distilled from gold trajectories. The goal is to extract reusable task-execution experience rather than to rewrite each trajectory into an individual instruc-tion. We first read the gold trajectory set and re-tain successful trajectories whose final step is com-pleted and whose final score reaches the thresh-old. Each retained trajectory is compressed into a structured record containing the task name, task description, task identifier, variation information, final score, completion status, a de-duplicated ac-tion skeleton, and a selected trace of informative observations and inventory states. The selected trace keeps decision-relevant parts of the trajectory while avoiding full trajectory re-play. It prioritizes steps around high-information actions such as focusing an object, picking up an item, moving between rooms, using a device, mix-ing substances, reading a thermometer, or placing an object in a target box. This compression re-duces prompt length while preserving the evidence needed to infer reusable procedural knowledge. We then group trajectories by task type and select representative examples from each group. Selection favors completed, high-scoring trajec-tories with concise but informative action skele-tons, rich state traces, and non-empty task descrip-tions. To avoid over-representing near-duplicate variations, examples are also diversified by task description and task identifier. The resulting evi-dence packs contain both cross-task examples and per-task examples. Cross-task examples support general ScienceWorld skills and common mistake summaries, while per-task examples support task-specific skills. An LLM then summarizes the evidence into a skill bank with three fields: general skills, task-specific skills, and common mistakes. The task-specific portion is used as world task skill. At infer-ence time, once the current ScienceWorld task type is identified, the corresponding task-specific skills are inserted into the policy prompt as static task-level guidance. These skills are not regenerated during the episode; they provide a stable task prior that describes likely subgoals, ordering constraints, measurement requirements, and task-specific pit-falls. After generation, the skill bank is normalized before use. We parse the LLM output as JSON, remove duplicate or near-duplicate entries, assign stable identifiers, fill missing fields, cap the number of skills in each category, and validate the final schema. A second-pass polish stage may further remove redundancy and make triggering conditions more concrete, but if the polished output is not valid JSON, we fall back to the normalized first-pass skill bank.                                         
+
+> Algorithm 3 World Task Skill Construction
+> 1: Input: gold trajectories Dgold , task types K.Out-put: world task skills Mtask .2: Initialize evidence packs Egen and {E task
+> k}k∈K .3: for each trajectory τ∈ D gold do
+> 4: if τis successful then
+> 5: Compress τinto a structured record r.6: Extract task type k, action skeleton, and se-lected state trace. 7: Add rto Egen and Etask
+> k.8: end if
+> 9: end for
+> 10: Select high-quality and diverse records for each task type. 11: Prompt an LLM to summarize reusable skills and common mistakes. 12: Normalize JSON, deduplicate entries, assign stable IDs, and validate schema. 13: return task-specific entries as Mtask .▷task-start skills
+> Example World Task Skill
+> {"title": "Focus the Substance First", "task skill": "Find the named substance, focus it once, and choose a real heating route. For compounds without a boiling point, direct combustion/ heating such as use lighter on the substance can be acceptable.", "when_to_use": "At the start of a boil task." }
+
+C.4.2 World Corrective Guidance Construction 
+
+World corrective guidance is constructed for state-level intervention during policy execution. Instead of being retrieved only from the task type, it is selected at each decision step from the current ob-servation, recent action history, and lightweight diagnostic flags. The purpose is to provide con-crete local reminders when the trajectory enters an error-prone state, such as an invalid action loop, an empty-container manipulation, a conductivity setup, a grow-plant procedure, a temperature mea-surement, or a recipe-like mixture task. We identify recurring failure patterns from infer-ence trajectories and write them as compact correc-tive rules. Each rule has a trigger condition and a short guidance text. During inference, the retriever recomputes the trajectory flags at every step, selects the matching rules, and inserts only the triggered guidance into the policy prompt. This makes world corrective guidance dynamic: it can appear for one state and disappear at the next, depending on the observed state and recent actions. Algorithm 4 World Corrective Guidance Construction                                           
+
+> 1: Input: inference trajectories Dinf , trigger set F.
+> Output: corrective guidance rules Mcorr .2: Offline Rule Construction:
+> 3: Identify recurring local failure patterns in Dinf .4: Write each pattern as a rule r= ( ϕr, g r)with trigger ϕrand guidance gr.5: Add compact, non-duplicate rules to Mcorr .6: Step-Level Retrieval:
+> 7: for each decision step tdo
+> 8: Compute flags ϕtfrom observation, admissible actions, and recent history. 9: Retrieve Gt← { gr:r∈ M corr , ϕ r(ϕt) = 1}.10: Keep a compact set of triggered guidance en-tries. 11: Insert Gtinto the policy prompt. ▷step-wise correction 12: end for
+
+For example, in a grow-plant Science-World task, a step may trigger the invalid-action, recipe-task, and growth-task flags. The retriever then selects rules such as invalid_action_copy_admissible ,
+
+paint_mix_use_pour_not_move , and 
+
+growth_needs_seed_soil_water_wait . The resulting policy prompt receives step-specific guidance that discourages inventing repairs for invalid actions, reminds the agent to use admissible commands, and states the relevant procedural chain for planting and growing: obtain the task-specified seeds, plant them in flower pots, water them, wait or check growth, and then focus the requested plant or fruit. This guidance is local to the current state and is intended to steer action selection, not to provide evidence for world-model state prediction. 
+
+> Example World Corrective Guidance
+> Step-specific guidance for the current state :- The previous action was invalid or not admissible. Do not repair by inventing text. Copy one exact current admissible command. - For paint or mixture tasks, combining contents usually requires pouring or moving contents into a real container, then mixing that container. - For grow-plant or fruit tasks, follow the chain: get the seed jar from the task-specified room, plant the named seeds in flower pots, water them with a sink or jug, wait/check growth, and then focus the requested plant or fruit.
+
+D Additional Component-Wise Ablations 
+
+We conduct controlled ALFWorld ablations around the Qwen2.5-7B setting to separate world-model training, prediction-time world memory, policy-side knowledge, and lookahead planning. All world-model variants use the same lookahead con-figuration; the policy-only controls omit the world model entirely. The policy-only controls remain below MEM WM (0.4194/0.4578 versus 0.5696), showing that policy-side skill or direct world knowledge alone does not explain the gain. RL without memory improves over the SFT world model (0.5076 versus 0.4905) but remains below MEM WM, so RL training alone is insufficient. Relevant retrieval also helps an SFT world model (0.5385), while memory-augmented training without prediction-time retrieval reaches 0.5439; their combination in M EM WM reaches 0.5696, indicating complementary contributions from memory-aware training and inference-time retrieval. Random and irrelevant memory reduce perfor-mance to 0.4712 and 0.4403, respectively. Thus, the improvement is not explained by prompt length or the presence of arbitrary additional context, but depends on retrieving relevant memory. Finally, adding policy-side world skill on top of M EM WM yields a smaller increase from 0.5696 to 0.5727, indicating that world skill provides complementary action-selection guidance while world-model-side memory accounts for most of the gain. Variant World model WM training Test-time memory Policy skill/knowledge Lookahead ALFWorld Avg. 
+
+Skill-only policy No — No Skill only No 0.4194 Policy-only + skill/world knowledge No — No Skill + world knowledge No 0.4578 Random memory Yes Mem-Aug RL Random No Yes 0.4712 Irrelevant memory Yes Mem-Aug RL Irrelevant No Yes 0.4403 WM Yes SFT No No Yes 0.4905 RL w/o Mem WM Yes RL w/o memory No No Yes 0.5076 SFT WM + retrieval Yes SFT Relevant No Yes 0.5385 Mem-Aug RL WM, no retrieval Yes Mem-Aug RL No No Yes 0.5439 MEM WM Yes Mem-Aug RL Relevant No Yes 0.5696 MEM WM+Skill Yes Mem-Aug RL Relevant Yes Yes 0.5727 
+
+Table 9: Controlled component-wise ablations on ALFWorld. The planner and lookahead budget are fixed across all world-model rows while world-model training, memory content, prediction-time retrieval, and policy-side guidance are varied.
