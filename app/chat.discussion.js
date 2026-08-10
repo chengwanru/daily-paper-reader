@@ -11,6 +11,37 @@ window.PrivateDiscussionChat = (function () {
   const MAX_RECENT_QUESTIONS = 10; // 展示与保存都只保留最近 10 个（用户诉求）
   const MAX_PINNED_QUESTIONS = 50; // 防止无限增长
 
+  let activeChatSession = null; // { controller, generationId, userAborted }
+  let chatGenerationSeq = 0;
+
+  const setChatBusyState = (busy) => {
+    const input = document.getElementById('user-input');
+    const sendBtn = document.getElementById('send-btn');
+    const stopBtn = document.getElementById('stop-btn');
+    if (input) input.disabled = !!busy;
+    if (sendBtn) {
+      sendBtn.disabled = !!busy;
+      sendBtn.style.display = busy ? 'none' : '';
+      if (!busy) sendBtn.innerText = '发送';
+    }
+    if (stopBtn) {
+      stopBtn.style.display = busy ? '' : 'none';
+      stopBtn.disabled = !busy;
+    }
+  };
+
+  const stopActiveChat = (reason) => {
+    if (!activeChatSession || !activeChatSession.controller) return false;
+    activeChatSession.userAborted = true;
+    activeChatSession.abortReason = reason || 'stop';
+    try {
+      activeChatSession.controller.abort();
+    } catch {
+      // ignore
+    }
+    return true;
+  };
+
   const resizeChatInput = (input) => {
     if (!input) return;
     const style = window.getComputedStyle ? window.getComputedStyle(input) : null;
@@ -235,7 +266,8 @@ window.PrivateDiscussionChat = (function () {
           <textarea id="user-input" rows="3" placeholder="针对这篇论文提问，仅自己可见..."></textarea>
           <div class="chat-input-actions">
             <button id="chat-questions-toggle-btn" class="chat-questions-toggle-btn" type="button" title="最近提问">🕘</button>
-            <button id="send-btn">发送</button>
+            <button id="stop-btn" class="chat-stop-btn" type="button" title="停止回答" style="display:none;">停止</button>
+            <button id="send-btn" type="button">发送</button>
           </div>
         </div>
         <div id="chat-questions-panel" class="chat-questions-panel" style="display:none"></div>
@@ -704,9 +736,10 @@ window.PrivateDiscussionChat = (function () {
 
     const { renderMarkdownWithTables, renderMathInEl } = window.DPRMarkdown || {};
     historyDiv.innerHTML = '';
-    data.forEach((msg) => {
+    data.forEach((msg, msgIndex) => {
       const item = document.createElement('div');
       item.className = 'msg-item';
+      item.setAttribute('data-history-index', String(msgIndex));
 
       const role = (msg.role || '').toLowerCase();
       const isThinking = role === 'thinking';
@@ -739,6 +772,20 @@ window.PrivateDiscussionChat = (function () {
         }
 
         item.appendChild(contentDiv);
+
+        if (isUser) {
+          const actions = document.createElement('div');
+          actions.className = 'msg-user-actions';
+          const editBtn = document.createElement('button');
+          editBtn.type = 'button';
+          editBtn.className = 'msg-edit-btn';
+          editBtn.textContent = '编辑';
+          editBtn.title = '编辑并重新回答';
+          editBtn.setAttribute('data-edit-index', String(msgIndex));
+          actions.appendChild(editBtn);
+          item.appendChild(actions);
+        }
+
         historyDiv.appendChild(item);
         return;
       }
@@ -810,7 +857,78 @@ window.PrivateDiscussionChat = (function () {
 
   const renderQuestionNav = () => {};
 
-  const sendMessage = async (paperId) => {
+  const beginEditUserMessage = (paperId, msgIndex) => {
+    const historyDiv = document.getElementById('chat-history');
+    if (!historyDiv) return;
+    const item = historyDiv.querySelector(
+      `.msg-item[data-history-index="${msgIndex}"]`,
+    );
+    if (!item) return;
+    const contentDiv = item.querySelector('.msg-content-user');
+    if (!contentDiv) return;
+    if (item.querySelector('.msg-edit-form')) return;
+
+    const original = contentDiv.textContent || '';
+    contentDiv.style.display = 'none';
+    const actions = item.querySelector('.msg-user-actions');
+    if (actions) actions.style.display = 'none';
+
+    const form = document.createElement('div');
+    form.className = 'msg-edit-form';
+    const textarea = document.createElement('textarea');
+    textarea.className = 'msg-edit-textarea';
+    textarea.value = original;
+    textarea.rows = Math.min(8, Math.max(3, original.split('\n').length + 1));
+    const formActions = document.createElement('div');
+    formActions.className = 'msg-edit-form-actions';
+    const cancelBtn = document.createElement('button');
+    cancelBtn.type = 'button';
+    cancelBtn.className = 'msg-edit-cancel-btn';
+    cancelBtn.textContent = '取消';
+    const saveBtn = document.createElement('button');
+    saveBtn.type = 'button';
+    saveBtn.className = 'msg-edit-save-btn';
+    saveBtn.textContent = '保存并重新回答';
+    formActions.appendChild(cancelBtn);
+    formActions.appendChild(saveBtn);
+    form.appendChild(textarea);
+    form.appendChild(formActions);
+    item.appendChild(form);
+    textarea.focus();
+    textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+
+    const cleanup = () => {
+      form.remove();
+      contentDiv.style.display = '';
+      if (actions) actions.style.display = '';
+    };
+    cancelBtn.addEventListener('click', cleanup);
+    saveBtn.addEventListener('click', () => {
+      const next = (textarea.value || '').trim();
+      if (!next) {
+        textarea.focus();
+        return;
+      }
+      cleanup();
+      sendMessage(paperId, { question: next, replaceFromIndex: msgIndex });
+    });
+    textarea.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        cleanup();
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+        e.preventDefault();
+        saveBtn.click();
+      }
+    });
+  };
+
+  const sendMessage = async (paperId, options) => {
+    const opts = options && typeof options === 'object' ? options : {};
+    const replaceFromIndex = Number.isInteger(opts.replaceFromIndex)
+      ? opts.replaceFromIndex
+      : -1;
     // 游客模式或尚未解锁密钥时，禁止直接调用大模型
     if (window.DPR_ACCESS_MODE === 'guest' || window.DPR_ACCESS_MODE === 'locked') {
       const statusEl = document.getElementById('chat-status');
@@ -839,7 +957,9 @@ window.PrivateDiscussionChat = (function () {
       return;
     }
 
-    const question = input.value.trim();
+    const question = String(
+      opts.question != null ? opts.question : input.value,
+    ).trim();
     let paperContent = '';
 
     if (!question) {
@@ -848,6 +968,30 @@ window.PrivateDiscussionChat = (function () {
         statusEl.style.color = '#c00';
       }
       return;
+    }
+
+    if (activeChatSession && activeChatSession.controller) {
+      stopActiveChat(replaceFromIndex >= 0 ? 'edit' : 'restart');
+    }
+
+    const generationId = ++chatGenerationSeq;
+    // 先占位，避免旧请求 finally 误把 busy 状态清掉
+    activeChatSession = {
+      controller: null,
+      generationId,
+      userAborted: false,
+      abortReason: '',
+    };
+
+    if (replaceFromIndex >= 0) {
+      try {
+        const existing = await loadChatHistory(paperId);
+        const truncated = existing.slice(0, replaceFromIndex);
+        await saveChatHistory(paperId, truncated);
+        await renderHistory(paperId);
+      } catch (e) {
+        console.warn('[DPR CHAT] 截断历史失败：', e);
+      }
     }
 
     // 优先使用与后端一致的 .txt 抽取全文作为上下文（不截断）
@@ -896,8 +1040,7 @@ window.PrivateDiscussionChat = (function () {
       renderQuestionsPanel(null);
     }
 
-    input.disabled = true;
-    btn.disabled = true;
+    setChatBusyState(true);
     btn.innerText = '思考中...';
 
     const historyDiv = document.getElementById('chat-history');
@@ -1046,9 +1189,10 @@ window.PrivateDiscussionChat = (function () {
           '未检测到可用 Chat 模型，请检查密钥配置。';
         statusEl.style.color = '#c00';
       }
-      input.disabled = false;
-      btn.disabled = false;
-      btn.innerText = '发送';
+      if (activeChatSession && activeChatSession.generationId === generationId) {
+        activeChatSession = null;
+      }
+      setChatBusyState(false);
       return;
     }
 
@@ -1074,9 +1218,10 @@ window.PrivateDiscussionChat = (function () {
         statusEl.textContent = '未配置 Chat LLM API Key。';
         statusEl.style.color = '#c00';
       }
-      input.disabled = false;
-      btn.disabled = false;
-      btn.innerText = '发送';
+      if (activeChatSession && activeChatSession.generationId === generationId) {
+        activeChatSession = null;
+      }
+      setChatBusyState(false);
       return;
     }
 
@@ -1087,9 +1232,10 @@ window.PrivateDiscussionChat = (function () {
         statusEl.textContent = '未配置 Chat 模型。';
         statusEl.style.color = '#c00';
       }
-      input.disabled = false;
-      btn.disabled = false;
-      btn.innerText = '发送';
+      if (activeChatSession && activeChatSession.generationId === generationId) {
+        activeChatSession = null;
+      }
+      setChatBusyState(false);
       return;
     }
 
@@ -1116,9 +1262,10 @@ window.PrivateDiscussionChat = (function () {
         statusEl.textContent = 'Chat 模型配置缺少 baseUrl，请在配置页修正。';
         statusEl.style.color = '#c00';
       }
-      input.disabled = false;
-      btn.disabled = false;
-      btn.innerText = '发送';
+      if (activeChatSession && activeChatSession.generationId === generationId) {
+        activeChatSession = null;
+      }
+      setChatBusyState(false);
       return;
     }
 
@@ -1140,6 +1287,7 @@ window.PrivateDiscussionChat = (function () {
     // 默认以折叠模式展示思考过程，仅显示前若干行
     let thinkingCollapsed = true;
     let renderTimer = null;
+    let sessionRef = null;
 
     const { renderMarkdownWithTables, renderMathInEl } =
       window.DPRMarkdown || {};
@@ -1210,7 +1358,8 @@ window.PrivateDiscussionChat = (function () {
       messages.push({
         role: 'system',
         content:
-          '你是学术讨论助手，负责围绕当前论文内容进行深入分析与讨论。请使用中文回答，并使用 Markdown + LaTeX 表达公式。',
+          '你是学术讨论助手，负责围绕当前论文内容进行深入分析与讨论。请使用中文回答，并使用 Markdown + LaTeX 表达公式。' +
+          '读者在海外学习：请保持中文叙述，但专业术语、模型名、方法名、数据集与评价指标在首次出现时写成「中文（English）」或保留英文专名并附简短中文解释。',
       });
       // 使用全文上下文（优先 .txt 抽取结果），不再做 8000 字截断
       if (paperContent) {
@@ -1220,7 +1369,7 @@ window.PrivateDiscussionChat = (function () {
         });
       }
 
-          const prev = await loadChatHistory(paperId);
+      const prev = await loadChatHistory(paperId);
       prev.forEach((m) => {
         if (m.role === 'user' || m.role === 'ai') {
           messages.push({
@@ -1229,27 +1378,36 @@ window.PrivateDiscussionChat = (function () {
           });
         }
       });
-
-      messages.push({
-        role: 'user',
-          content: question,
-      });
+      // history 已在发送前写入当前 user 问题，避免再重复追加一次
 
       const controller = new AbortController();
       const timeoutMs = 120000;
-      const timerId = setTimeout(() => controller.abort(), timeoutMs);
+      const timerId = setTimeout(() => {
+        if (activeChatSession && activeChatSession.generationId === generationId) {
+          activeChatSession.userAborted = false;
+          activeChatSession.abortReason = 'timeout';
+        }
+        controller.abort();
+      }, timeoutMs);
+      activeChatSession = {
+        controller,
+        generationId,
+        userAborted: false,
+        abortReason: '',
+      };
+      sessionRef = activeChatSession;
       let resp = null;
 
       const baseUrl = (modelEntry && modelEntry.baseUrl ? modelEntry.baseUrl : '').trim();
-	      const primaryPayload = buildStreamingChatPayload(baseUrl, model, messages);
-	      const fallbackPayload = {
-	        model,
-	        messages,
-	        stream: true,
-	      };
-	      if (primaryPayload && primaryPayload.max_tokens) {
-	        fallbackPayload.max_tokens = primaryPayload.max_tokens;
-	      }
+      const primaryPayload = buildStreamingChatPayload(baseUrl, model, messages);
+      const fallbackPayload = {
+        model,
+        messages,
+        stream: true,
+      };
+      if (primaryPayload && primaryPayload.max_tokens) {
+        fallbackPayload.max_tokens = primaryPayload.max_tokens;
+      }
 
       const doChatFetch = async (payload) => fetch(endpoint, {
           method: 'POST',
@@ -1288,6 +1446,7 @@ window.PrivateDiscussionChat = (function () {
           }
         }
       } finally {
+        // 仅清理连接超时；流式读取阶段仍可被用户停止
         clearTimeout(timerId);
       }
 
@@ -1393,9 +1552,10 @@ window.PrivateDiscussionChat = (function () {
       updated.push({
         role: 'ai',
         content: answerBuffer || '（模型未返回内容）',
-      time: nowStrAnswer,
-    });
-    await saveChatHistory(paperId, updated);
+        time: nowStrAnswer,
+      });
+      await saveChatHistory(paperId, updated);
+      await renderHistory(paperId);
 
       // 新一轮对话完成后，再次刷新 Zotero 元数据
       try {
@@ -1415,12 +1575,49 @@ window.PrivateDiscussionChat = (function () {
       resizeChatInput(input);
     } catch (e) {
       console.error(e);
-      const isTimeout =
+      const abortedByUser = !!(sessionRef && sessionRef.userAborted);
+      const abortReason = (sessionRef && sessionRef.abortReason) || '';
+      const isAbort =
         e &&
         (e.name === 'AbortError' ||
           e.name === 'TimeoutError' ||
-          /timed out|timed_out/i.test((e.message || '')));
-      if (isTimeout) {
+          /timed out|timed_out|aborted/i.test(String(e.message || '')));
+
+      // 编辑重发会中止旧请求；旧请求不要再改写 UI / 历史
+      if (abortReason === 'edit' || abortReason === 'restart') {
+        // no-op
+      } else if (abortedByUser || (isAbort && abortReason === 'stop')) {
+        const stoppedText = (answerBuffer || '').trim()
+          ? `${answerBuffer.trim()}\n\n（已停止）`
+          : '（已停止生成）';
+        aiAnswerDiv.textContent = stoppedText;
+        try {
+          const updated = await loadChatHistory(paperId);
+          if ((answerBuffer || '').trim() || (thinkingBuffer || '').trim()) {
+            const nowStop = new Date().toLocaleString();
+            if ((thinkingBuffer || '').trim()) {
+              updated.push({
+                role: 'thinking',
+                content: thinkingBuffer,
+                time: nowStop,
+              });
+            }
+            updated.push({
+              role: 'ai',
+              content: stoppedText,
+              time: nowStop,
+            });
+            await saveChatHistory(paperId, updated);
+          }
+          await renderHistory(paperId);
+        } catch {
+          // ignore
+        }
+        if (statusEl) {
+          statusEl.textContent = '已停止回答';
+          statusEl.style.color = '#666';
+        }
+      } else if (isAbort) {
         aiAnswerDiv.textContent =
           '请求超时（120 秒），请稍后重试或检查网络后再试。';
         if (statusEl) {
@@ -1441,9 +1638,6 @@ window.PrivateDiscussionChat = (function () {
           statusEl.style.color = '#c00';
         }
       }
-      if (statusEl) {
-        statusEl.style.color = '#c00';
-      }
     } finally {
       // 确保思考动画及其容器被移除
       const responseHeader = aiItem.querySelector('.ai-response-header');
@@ -1451,10 +1645,14 @@ window.PrivateDiscussionChat = (function () {
         responseHeader.remove();
       }
       window.removeEventListener('scroll', onUserScroll);
-      input.disabled = false;
-      btn.disabled = false;
-      btn.innerText = '发送';
-      input.focus();
+      if (activeChatSession && activeChatSession.generationId === generationId) {
+        activeChatSession = null;
+        setChatBusyState(false);
+        input.focus();
+      } else if (!activeChatSession) {
+        setChatBusyState(false);
+        input.focus();
+      }
     }
   };
 
@@ -1601,9 +1799,11 @@ window.PrivateDiscussionChat = (function () {
 
     const enableChatControls = () => {
       const sendBtn = document.getElementById('send-btn');
+      const stopBtn = document.getElementById('stop-btn');
       const input = document.getElementById('user-input');
       const status = document.getElementById('chat-status');
       const select = document.getElementById('chat-llm-model-select');
+      const historyDiv = document.getElementById('chat-history');
 
       if (sendBtn && !sendBtn._boundSend) {
         sendBtn._boundSend = true;
@@ -1611,6 +1811,27 @@ window.PrivateDiscussionChat = (function () {
         sendBtn.title = '';
         sendBtn.addEventListener('click', () => {
           sendMessage(paperId);
+        });
+      }
+
+      if (stopBtn && !stopBtn._boundStop) {
+        stopBtn._boundStop = true;
+        stopBtn.addEventListener('click', () => {
+          stopActiveChat('stop');
+        });
+      }
+
+      if (historyDiv && !historyDiv._boundEdit) {
+        historyDiv._boundEdit = true;
+        historyDiv.addEventListener('click', (e) => {
+          const editBtn = e.target && e.target.closest
+            ? e.target.closest('.msg-edit-btn')
+            : null;
+          if (!editBtn) return;
+          e.preventDefault();
+          const idx = Number(editBtn.getAttribute('data-edit-index'));
+          if (!Number.isInteger(idx) || idx < 0) return;
+          beginEditUserMessage(paperId, idx);
         });
       }
 

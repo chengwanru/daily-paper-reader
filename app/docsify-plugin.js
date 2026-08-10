@@ -2172,6 +2172,20 @@ window.$docsify = {
           });
         };
 
+        const favoriteSpaceDetector =
+          window.DPRFavorites && typeof window.DPRFavorites.createTripleSpaceDetector === 'function'
+            ? window.DPRFavorites.createTripleSpaceDetector({ windowMs: 700 })
+            : null;
+
+        const favoriteCurrentFromNav = () => {
+          const current = DPR_NAV_STATE.currentHref || '';
+          const m = current.match(/^#\/(.+)$/);
+          if (!m) return;
+          if (window.DPRFavorites && typeof window.DPRFavorites.favoriteCurrentPaper === 'function') {
+            window.DPRFavorites.favoriteCurrentPaper(m[1]);
+          }
+        };
+
         // 通用书签切换函数：数字键 1234 对应 绿蓝紫红
         const toggleBookmarkForCurrent = (bookmarkType) => {
           const current = DPR_NAV_STATE.currentHref || '';
@@ -2225,8 +2239,17 @@ window.$docsify = {
           }
 
           if (key === ' ') {
-            // 空格键：切换"不错（绿色勾）"
+            // 空格：单击切换「不错」；连续三下加入收藏夹
             e.preventDefault();
+            const current = DPR_NAV_STATE.currentHref || '';
+            const onPaper = /^#\/.+/.test(current) && isPaperHref(current);
+            if (onPaper && favoriteSpaceDetector) {
+              const result = favoriteSpaceDetector.onSpace();
+              if (result === 'triple') {
+                favoriteCurrentFromNav();
+                return;
+              }
+            }
             toggleGoodForCurrent();
             return;
           }

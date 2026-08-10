@@ -325,7 +325,8 @@ def translate_title_and_abstract_to_zh(
 
     system_prompt = (
         "你是一名熟悉机器学习与自然科学论文的专业翻译，请将英文标题和摘要翻译为自然、准确的中文。"
-        "保持学术风格，尽量保留专有名词，不要额外添加评论。"
+        "保持学术风格。读者在海外学习：请保持中文表达，但专业术语、模型名、方法名、数据集与指标"
+        "在首次出现时写成「中文（English）」或保留英文专名并附简短中文解释；不要额外添加评论。"
     )
     payload = {"title": title, "abstract": abstract}
     user_text = json.dumps(payload, ensure_ascii=False)
@@ -578,6 +579,8 @@ def generate_deep_summary(
     system_prompt = (
         "你是一名资深学术论文分析助手，请使用中文、以 Markdown 形式，"
         "对给定论文做结构化、深入、客观的总结。"
+        "读者在海外学习：请保持中文叙述，但专业术语、模型名、方法名、数据集与评价指标"
+        "在首次出现时写成「中文（English）」或保留英文专名并附简短中文解释。"
     )
     user_prompt = (
         "请基于下面提供的论文内容，生成一段详细的中文总结，要求按照如下要点依次展开：\n"
@@ -590,6 +593,7 @@ def generate_deep_summary(
         "7. 优点：方法或实验设计上有哪些亮点。\n"
         "8. 不足与局限：包括实验覆盖、偏差风险、应用限制等。\n\n"
         "请用分层标题和项目符号（Markdown 格式）组织上述内容，语言尽量简洁但信息要尽量完整。\n"
+        "术语要求：不要把专业词只写成中文；关键术语请同时给出英文（例如：注意力机制（attention）、消融实验（ablation study））。\n"
         "要求：最后单独输出一行“（完）”作为结束标记。"
     )
 
@@ -645,7 +649,11 @@ def generate_glance_overview(
         log("[WARN] 未配置 LLM_CLIENT，跳过速览生成。")
         return None
 
-    system_prompt = "你是论文速览助手，请用中文生成信息密度高、但不冗长的论文速览。"
+    system_prompt = (
+        "你是论文速览助手，请用中文生成信息密度高、但不冗长的论文速览。"
+        "读者在海外学习：保持中文叙述，但专业术语、模型名、方法名、数据集与指标"
+        "在首次出现时写成「中文（English）」或保留英文专名并附简短中文解释。"
+    )
     payload = {"title": title, "abstract": abstract}
     user_text = json.dumps(payload, ensure_ascii=False)
     user_prompt = (
@@ -654,7 +662,7 @@ def generate_glance_overview(
         "要求：\n"
         "- tldr：150-220个中文字符，不是一句话口号；通常写成3-4个短句，按“问题背景→核心方法→关键结果→贡献意义”的顺序组织\n"
         "- motivation/method/result/conclusion：每个字段30-70个中文字符，通常一句话；对标论文页速览卡片，简洁但必须包含具体信息\n"
-        "- 不要把英文句子放进中文字段；可保留必要英文术语或模型名\n"
+        "- 不要把整句英文放进中文字段；但专业术语必须中英对照（如：自注意力（self-attention）、消融实验（ablation study））\n"
         "Output must be strict JSON only, no markdown, no fences, no extra text."
     )
 

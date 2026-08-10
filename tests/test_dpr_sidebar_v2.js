@@ -749,6 +749,10 @@ function testSidebarFooterControlsReplaceRefresh() {
   assert.ok(html.includes('class="dpr-sidebar-footer-btn dpr-sidebar-collapse-btn"'));
   assert.ok(html.includes('data-sidebar-collapse'));
   assert.ok(html.includes('aria-label="收起侧边栏"'));
+  assert.ok(html.includes('class="dpr-sidebar-footer-actions"'));
+  assert.ok(html.includes('class="dpr-sidebar-footer-btn dpr-sidebar-favorites-btn"'));
+  assert.ok(html.includes('data-sidebar-favorites'));
+  assert.ok(html.includes('aria-label="打开收藏夹"'));
   assert.ok(html.includes('class="dpr-sidebar-footer-btn dpr-sidebar-settings-btn"'));
   assert.ok(html.includes('data-sidebar-settings'));
   assert.ok(html.includes('aria-label="打开设置"'));
@@ -758,6 +762,7 @@ function testSidebarFooterControlsReplaceRefresh() {
   const collapsedHtml = tools.renderSidebarFooterControls(true);
   assert.ok(collapsedHtml.includes('aria-label="展开侧边栏"'));
   assert.ok(collapsedHtml.includes('title="展开侧边栏"'));
+  assert.ok(collapsedHtml.includes('data-sidebar-favorites'));
 
   const css = fs.readFileSync('app/app.css', 'utf8');
   const bodyRule = cssRule(css, 'body.dpr-sidebar-v2');
@@ -775,6 +780,11 @@ function testSidebarFooterControlsReplaceRefresh() {
   assert.ok(/width:\s*34px/i.test(footerBtnRule));
   assert.ok(/height:\s*34px/i.test(footerBtnRule));
   assert.ok(/display:\s*inline-flex/i.test(footerBtnRule));
+  const footerActionsRule = cssRule(css, '.dpr-sidebar-footer-actions');
+  assert.ok(/margin-left:\s*auto/i.test(footerActionsRule));
+  assert.ok(/display:\s*inline-flex/i.test(footerActionsRule));
+  assert.ok(css.includes('.dpr-favorites-overlay'));
+  assert.ok(css.includes('.dpr-favorites-modal'));
 
   const collapsedRootRule = cssRule(css, '#dpr-sidebar-v2.is-collapsed');
   assert.ok(/width:\s*var\(--dpr-sidebar-collapsed-width\)/i.test(collapsedRootRule));

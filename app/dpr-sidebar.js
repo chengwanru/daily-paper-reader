@@ -1503,7 +1503,10 @@
       '<div class="dpr-sidebar-footer">' +
       '  <button type="button" class="dpr-sidebar-footer-btn dpr-sidebar-collapse-btn" data-sidebar-collapse aria-label="' +
       safeAttr(collapseLabel) + '" title="' + safeAttr(collapseLabel) + '">☰</button>' +
-      '  <button type="button" class="dpr-sidebar-footer-btn dpr-sidebar-settings-btn" data-sidebar-settings aria-label="打开设置" title="打开设置">⚙️</button>' +
+      '  <div class="dpr-sidebar-footer-actions">' +
+      '    <button type="button" class="dpr-sidebar-footer-btn dpr-sidebar-favorites-btn" data-sidebar-favorites aria-label="打开收藏夹" title="打开收藏夹">⭐</button>' +
+      '    <button type="button" class="dpr-sidebar-footer-btn dpr-sidebar-settings-btn" data-sidebar-settings aria-label="打开设置" title="打开设置">⚙️</button>' +
+      '  </div>' +
       '</div>'
     );
   }
@@ -1535,6 +1538,16 @@
         });
       }
     }, 100);
+  }
+
+  function openFavoritesPanel() {
+    try {
+      if (window.DPRFavorites && typeof window.DPRFavorites.openFavoritesPanel === 'function') {
+        window.DPRFavorites.openFavoritesPanel();
+        return true;
+      }
+    } catch (e) {}
+    return false;
   }
 
   function openFeedbackPanel() {
@@ -2300,6 +2313,15 @@
         openSettingsPanel();
         return;
       }
+      var favoritesBtn = e.target.closest('.dpr-sidebar-favorites-btn');
+      if (favoritesBtn) {
+        e.preventDefault();
+        openFavoritesPanel();
+        if (isOverlaySidebarViewport()) {
+          toggleMobile(false);
+        }
+        return;
+      }
       var feedbackBtn = e.target.closest('.dpr-sidebar-feedback-btn');
       if (feedbackBtn) {
         e.preventDefault();
@@ -2627,6 +2649,7 @@
         toggleSidebarCollapsed: toggleSidebarCollapsed,
         syncResponsiveSidebarMode: syncResponsiveSidebarMode,
         openSettingsPanel: openSettingsPanel,
+        openFavoritesPanel: openFavoritesPanel,
         openFeedbackPanel: openFeedbackPanel,
       },
     };
