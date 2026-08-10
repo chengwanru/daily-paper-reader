@@ -1480,14 +1480,6 @@
     );
   }
 
-  function renderFeedbackQuickButton() {
-    return (
-      '<button type="button" class="dpr-sidebar-quick dpr-sidebar-feedback-btn" data-sidebar-feedback aria-label="打开反馈" title="打开反馈">' +
-      '<span class="dpr-sidebar-quick-label"><span class="dpr-sidebar-quick-icon" aria-hidden="true">💬</span>反馈</span>' +
-      '</button>'
-    );
-  }
-
   function renderFavoritesQuickButton(active) {
     var isActive = !!active;
     return (
@@ -1507,7 +1499,6 @@
       renderQuickLink('dpr-sidebar-quick-home', homeHref, '🏠', homeLabel) +
       renderQuickLink('dpr-sidebar-quick-tutorial', tutorialHref, '📖', normalizeTutorialLabel(tutorialLabel)) +
       renderFavoritesQuickButton(favoritesActive) +
-      renderFeedbackQuickButton() +
       '</header>'
     );
   }
@@ -1585,17 +1576,6 @@
     if (state.contentMode !== 'favorites') return false;
     setContentMode('browse');
     return true;
-  }
-
-  function openFeedbackPanel() {
-    try {
-      if (window.DPRFeedback && typeof window.DPRFeedback.open === 'function') {
-        window.DPRFeedback.open();
-        return true;
-      }
-    } catch (e) {}
-    dispatchNamedEvent('dpr-open-feedback');
-    return false;
   }
 
   function renderShell(root) {
@@ -2495,15 +2475,6 @@
         }
         return;
       }
-      var feedbackBtn = e.target.closest('.dpr-sidebar-feedback-btn');
-      if (feedbackBtn) {
-        e.preventDefault();
-        openFeedbackPanel();
-        if (isOverlaySidebarViewport()) {
-          toggleMobile(false);
-        }
-        return;
-      }
       var axisToggle = e.target.closest('.dpr-sidebar-axis-toggle');
       if (axisToggle) {
         var axisGroup = axisToggle.getAttribute('data-axis-toggle');
@@ -2825,7 +2796,6 @@
         resolveCurrentPaperHrefForRender: resolveCurrentPaperHrefForRender,
         updatePaperTitleOverflowMarks: updatePaperTitleOverflowMarks,
         renderQuickLink: renderQuickLink,
-        renderFeedbackQuickButton: renderFeedbackQuickButton,
         renderFavoritesQuickButton: renderFavoritesQuickButton,
         renderSidebarHeader: renderSidebarHeader,
         renderSidebarFooterControls: renderSidebarFooterControls,
@@ -2836,7 +2806,6 @@
         openSettingsPanel: openSettingsPanel,
         openFavoritesPanel: openFavoritesPanel,
         closeFavoritesPanel: closeFavoritesPanel,
-        openFeedbackPanel: openFeedbackPanel,
         setContentMode: setContentMode,
       },
     };

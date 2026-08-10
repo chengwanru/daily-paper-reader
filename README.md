@@ -10,25 +10,9 @@
 - 论文页 AI 问答（可停止 / 编辑重问）
 - GitHub Actions + Pages，无需自建服务器
 
-## 快速开始
+## 网站
 
-1. Fork 本仓库  
-2. 开启 Actions 与 GitHub Pages（`main` / `/(root)`）  
-3. 打开站点，按引导配置 LLM API Key 与 GitHub PAT  
-
-站点示例：`https://<你的用户名>.github.io/daily-paper-reader`
-
-## News
-
-- **2026-08-10** 收藏夹改到侧栏展示；读论文 AI 支持停止与编辑重问；中文总结附带专业名词英文；支持 OpenAI 兼容 API。
-
-## 本地调试
-
-```bash
-scripts/bootstrap_local.sh
-```
-
-然后访问 `http://127.0.0.1:8567`。
+https://chengwanru.github.io/daily-paper-reader
 
 ## 致谢
 

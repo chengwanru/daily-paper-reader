@@ -2285,12 +2285,14 @@ def build_home_readme_content(
     )
 
     lines: List[str] = []
-    lines.append(notice_md or "（公告模块为空）")
-    lines.append("")
+    if notice_md:
+        lines.append(notice_md)
+        lines.append("")
     lines.append(latest_report_md)
     lines.append("")
-    lines.append(promo_md or "（宣传模块为空）")
-    lines.append("")
+    if promo_md:
+        lines.append(promo_md)
+        lines.append("")
     return "\n".join(lines)
 
 

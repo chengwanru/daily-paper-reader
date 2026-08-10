@@ -160,13 +160,12 @@ async function testJsonAssetsArePrefetchedWithAssetBatch() {
   assert.ok(appended.jsonPromises['app/conference-stats.json']);
 }
 
-function testFeedbackModuleLoadsAfterGithubToken() {
+function testFeedbackModuleIsNotLoaded() {
   const html = fs.readFileSync('index.html', 'utf8');
   const tokenIndex = html.indexOf("path: 'app/subscriptions.github-token.js'");
-  const feedbackIndex = html.indexOf("path: 'app/feedback.issue.js'");
 
   assert.ok(tokenIndex >= 0, 'GitHub token module should be loaded');
-  assert.ok(feedbackIndex > tokenIndex, 'feedback module should load after GitHub token module');
+  assert.ok(!html.includes("path: 'app/feedback.issue.js'"), 'feedback module should be removed');
 }
 
 Promise.resolve()
@@ -176,7 +175,7 @@ Promise.resolve()
   .then(testVersionedAppAssetsUseImmutableCdnPath)
   .then(testLatestIsRejectedAsAppAssetVersion)
   .then(testJsonAssetsArePrefetchedWithAssetBatch)
-  .then(testFeedbackModuleLoadsAfterGithubToken)
+  .then(testFeedbackModuleIsNotLoaded)
   .then(testInitialLoadFailureCannotLeavePendingBlankScreen)
   .then(() => {
     console.log('index asset loader tests passed');

@@ -171,9 +171,6 @@ def test_init_homepage_renders_exactly_four_dashboard_cards():
     content = path.read_text(encoding="utf-8")
     assert content.count('class="dpr-home-dashboard-card ') == 4, path
     assert content.count('class="dpr-home-dashboard-grid"') == 1, path
-    dashboard_region = _section_between(
-        content,
-        '<div class="dpr-home-dashboard-grid">',
-        '<div class="dpr-home-promo-card dpr-home-panel">',
-    )
-    assert "<a " not in dashboard_region, path
+    assert "dpr-home-promo-card" not in content, path
+    assert "dpr-home-notice-card" not in content, path
+    assert "<a " not in content, path

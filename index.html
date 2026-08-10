@@ -588,7 +588,7 @@
     ]).then(function () {
       document.addEventListener('dpr-docsify-ready', function loadDeferredAssetsOnce() {
         document.removeEventListener('dpr-docsify-ready', loadDeferredAssetsOnce);
-        // 首页统计是非关键增强，加载失败不能阻断设置、反馈等主功能。
+        // 首页统计是非关键增强，加载失败不能阻断设置等主功能。
         window.DPRLoadAssets([
           { type: 'script', path: 'app/site-stats.js' },
         ]).catch(function (err) {
@@ -601,7 +601,6 @@
           { type: 'script', path: 'app/vendor/katex/0.16.9/dist/contrib/auto-render.min.js' },
           { type: 'script', path: 'app/chat.discussion.js' },
           { type: 'script', path: 'app/subscriptions.github-token.js' },
-          { type: 'script', path: 'app/feedback.issue.js' },
           { type: 'script', path: 'app/subscriptions.smart-query.js' },
           { type: 'script', path: 'app/subscriptions.keywords.js' },
           { type: 'script', path: 'app/subscriptions.zotero.js' },

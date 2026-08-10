@@ -124,10 +124,8 @@ def test_same_day_home_sync_replaces_the_dashboard_instead_of_appending(tmp_path
     assert "共 3 篇" in content
     assert "合并后重新生成。" in content
     assert "第一次生成。" not in content
-    dashboard = content.split('<div class="dpr-home-dashboard-grid">', 1)[1].split(
-        '<div class="dpr-home-promo-card', 1
-    )[0]
-    assert "<a " not in dashboard
+    assert "dpr-home-promo-card" not in content
+    assert "<a " not in content
 
 
 def test_home_sync_reads_stable_templates_instead_of_runtime_modules(tmp_path):
