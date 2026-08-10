@@ -801,7 +801,8 @@
       return true;
     } catch (e) {
       console.error('[SECRET] 保存 GitHub Secrets 失败：', e);
-      return false;
+      const message = e && e.message ? String(e.message) : String(e || '未知错误');
+      return { ok: false, error: message };
     }
   }
 
@@ -2059,7 +2060,7 @@
           genBtn.disabled = true;
 
           if (!localOnly) {
-            const secretsOk = await saveSummarizeSecretsToGithub(
+            const secretsResult = await saveSummarizeSecretsToGithub(
               githubToken,
               {
                 providerType: providerDraft.providerType,
@@ -2080,9 +2081,16 @@
                 setErrorText(`(${current}/${total}) 正在上传 GitHub Secret：${secretName}...`, '#666');
               },
             );
+            const secretsOk = secretsResult === true;
             if (!secretsOk) {
+              const detail =
+                secretsResult && typeof secretsResult === 'object' && secretsResult.error
+                  ? secretsResult.error
+                  : '';
               setErrorText(
-                '❌ 写入 GitHub Secrets 失败，请检查网络、Token 权限（需 Classic PAT + repo/workflow/gist）或稍后重试。',
+                detail
+                  ? `❌ 写入 GitHub Secrets 失败：${detail}`
+                  : '❌ 写入 GitHub Secrets 失败，请检查网络、Token 权限（需 Classic PAT + repo/workflow/gist）或稍后重试。',
                 '#c00',
               );
               return;
