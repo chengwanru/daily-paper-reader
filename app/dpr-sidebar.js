@@ -1704,16 +1704,76 @@
     };
   }
 
-  function renderFavoritePaper(p, readMap, currentPaperId) {
-    var html = renderPaper(p, readMap, currentPaperId);
-    var removeBtn =
-      '<button type="button" class="dpr-sidebar-favorite-remove-btn" data-remove-favorite="' +
-      safeAttr(paperIdentity(p)) +
-      '" title="取消收藏" aria-label="取消收藏">★</button>';
-    return html.replace(
-      '<div class="dpr-sidebar-paper-actions" aria-label="论文标记">',
-      '<div class="dpr-sidebar-paper-actions" aria-label="论文标记">' + removeBtn
+  function isPaperFavorited(paperId) {
+    var id = String(paperId || '');
+    if (!id) return false;
+    try {
+      var favApi =
+        (typeof window !== 'undefined' && window.DPRFavorites) ||
+        (typeof globalThis !== 'undefined' && globalThis.DPRFavorites) ||
+        null;
+      return !!(favApi && typeof favApi.isFavorite === 'function' && favApi.isFavorite(id));
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function renderFavoriteBadge(paperId, favorited) {
+    var id = String(paperId || '');
+    var on = !!favorited;
+    return (
+      '<button type="button" class="dpr-sidebar-paper-fav-btn' +
+      (on ? ' is-favorited' : '') +
+      '" data-favorite-toggle="' +
+      safeAttr(id) +
+      '" title="' +
+      (on ? '取消收藏' : '加入收藏') +
+      '" aria-label="' +
+      (on ? '取消收藏' : '加入收藏') +
+      '" aria-pressed="' +
+      (on ? 'true' : 'false') +
+      '">' +
+      (on ? '★' : '☆') +
+      '</button>'
     );
+  }
+
+  function updateFavoriteMarks(scope) {
+    var root = scope || state.bodyEl;
+    if (!root || !root.querySelectorAll) return;
+    $$('.dpr-sidebar-paper-fav-btn', root).forEach(function (btn) {
+      var id = btn.getAttribute('data-favorite-toggle') || '';
+      var on = isPaperFavorited(id);
+      btn.classList.toggle('is-favorited', on);
+      btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+      btn.setAttribute('title', on ? '取消收藏' : '加入收藏');
+      btn.setAttribute('aria-label', on ? '取消收藏' : '加入收藏');
+      btn.textContent = on ? '★' : '☆';
+    });
+  }
+
+  function collectFavoriteMetaFromPaperEl(paperEl, paperId) {
+    var id = String(paperId || '');
+    var title = '';
+    var titleZh = '';
+    var href = '';
+    if (paperEl) {
+      var titleEl = $('.dpr-sidebar-paper-title', paperEl);
+      var evidenceEl = $('.dpr-sidebar-paper-evidence', paperEl);
+      title = (titleEl && titleEl.textContent) || '';
+      titleZh = (evidenceEl && evidenceEl.textContent) || '';
+      href = paperEl.getAttribute('data-href') || '';
+    }
+    return {
+      id: id,
+      href: href || id,
+      title: String(title || '').trim() || id,
+      titleZh: String(titleZh || '').trim(),
+    };
+  }
+
+  function renderFavoritePaper(p, readMap, currentPaperId) {
+    return renderPaper(p, readMap, currentPaperId);
   }
 
   function renderFavoritesBodyHtml(viewState) {
@@ -2131,8 +2191,11 @@
   function renderPaper(p, readMap, currentPaperId) {
     var sectionClass = p.section ? ' dpr-sidebar-paper-' + p.section : '';
     var paperId = p.id || '';
+    var identity = paperIdentity(p) || paperId;
+    var favorited = isPaperFavorited(identity);
     var status = paperReadStatus(p, readMap || {});
-    var activeClass = currentPaperId && paperIdentity(p) === currentPaperId ? ' is-active' : '';
+    var activeClass = currentPaperId && identity === currentPaperId ? ' is-active' : '';
+    var favClass = favorited ? ' is-favorited' : '';
     var dataAttrs = [
       'data-paper-id="' + safeAttr(paperId) + '"',
       'data-href="' + safeAttr(p.href) + '"',
@@ -2140,6 +2203,7 @@
       'data-search="' + safeAttr(paperSearchText(p)) + '"',
       'data-read="' + (status ? '1' : '0') + '"',
       'data-read-status="' + safeAttr(status) + '"',
+      'data-favorited="' + (favorited ? '1' : '0') + '"',
     ].join(' ');
     var stars = starHtmlFromScore(p.score);
     var tagBits = tagsHtml(p.tags);
@@ -2155,7 +2219,8 @@
       );
     }).join('');
     return (
-      '<li class="dpr-sidebar-paper' + sectionClass + activeClass + '" ' + dataAttrs + '>' +
+      '<li class="dpr-sidebar-paper' + sectionClass + activeClass + favClass + '" ' + dataAttrs + '>' +
+      renderFavoriteBadge(identity, favorited) +
       '  <div class="dpr-sidebar-paper-main">' +
       '    <a class="dpr-sidebar-paper-link" href="' + safeAttr(p.href) + '">' +
       '      <span class="dpr-sidebar-paper-title">' + safeText(p.title) + '</span>' +
@@ -2457,21 +2522,32 @@
       if (homeOrTutorial && state.contentMode === 'favorites') {
         closeFavoritesPanel();
       }
-      var removeFavoriteBtn = e.target.closest('[data-remove-favorite]');
-      if (removeFavoriteBtn) {
+      var favoriteToggle = e.target.closest('[data-favorite-toggle]');
+      if (favoriteToggle) {
         e.preventDefault();
         e.stopPropagation();
-        var removeId = removeFavoriteBtn.getAttribute('data-remove-favorite') || '';
+        var favId = favoriteToggle.getAttribute('data-favorite-toggle') || '';
+        var paperEl = favoriteToggle.closest('.dpr-sidebar-paper');
         try {
-          if (window.DPRFavorites && typeof window.DPRFavorites.removeFavorite === 'function') {
-            window.DPRFavorites.removeFavorite(removeId);
-            if (window.DPRFavorites.showToast) {
-              window.DPRFavorites.showToast('已取消收藏');
+          if (window.DPRFavorites && typeof window.DPRFavorites.toggleFavorite === 'function') {
+            var result = window.DPRFavorites.toggleFavorite(
+              favId,
+              collectFavoriteMetaFromPaperEl(paperEl, favId),
+            );
+            if (result && result.ok && window.DPRFavorites.showToast) {
+              window.DPRFavorites.showToast(result.favorited ? '已加入收藏夹' : '已取消收藏');
             }
           }
         } catch (err) {}
         if (state.contentMode === 'favorites') {
           rerenderSidebarBody({ syncActive: false });
+        } else {
+          updateFavoriteMarks(paperEl || state.bodyEl);
+          if (paperEl) {
+            var nowOn = isPaperFavorited(favId);
+            paperEl.classList.toggle('is-favorited', nowOn);
+            paperEl.setAttribute('data-favorited', nowOn ? '1' : '0');
+          }
         }
         return;
       }
@@ -2724,6 +2800,16 @@
     document.addEventListener('dpr-favorites-changed', function () {
       if (state.contentMode === 'favorites') {
         rerenderSidebarBody({ syncActive: false });
+      } else {
+        updateFavoriteMarks();
+        if (state.bodyEl) {
+          $$('.dpr-sidebar-paper', state.bodyEl).forEach(function (li) {
+            var id = li.getAttribute('data-paper-id') || '';
+            var on = isPaperFavorited(id);
+            li.classList.toggle('is-favorited', on);
+            li.setAttribute('data-favorited', on ? '1' : '0');
+          });
+        }
       }
     });
     document.addEventListener('dpr-open-favorites', function () {
@@ -2800,6 +2886,9 @@
         renderSidebarHeader: renderSidebarHeader,
         renderSidebarFooterControls: renderSidebarFooterControls,
         renderFavoritesBodyHtml: renderFavoritesBodyHtml,
+        renderFavoriteBadge: renderFavoriteBadge,
+        isPaperFavorited: isPaperFavorited,
+        updateFavoriteMarks: updateFavoriteMarks,
         applySidebarCollapsed: applySidebarCollapsed,
         toggleSidebarCollapsed: toggleSidebarCollapsed,
         syncResponsiveSidebarMode: syncResponsiveSidebarMode,

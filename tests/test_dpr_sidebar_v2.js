@@ -981,7 +981,7 @@ function testSidebarPaperVisualStateCssContract() {
   const linkRule = cssRule(css, '.dpr-sidebar-paper-link');
   assert.ok(/width:\s*100%/i.test(linkRule));
   assert.ok(/box-sizing:\s*border-box/i.test(linkRule));
-  assert.ok(/padding:\s*7px 8px 7px 14px/i.test(linkRule));
+  assert.ok(/padding:\s*7px 8px 7px 26px/i.test(linkRule));
 
   const titleRule = cssRule(css, '.dpr-sidebar-paper-title');
   assert.ok(/display:\s*block/i.test(titleRule));
@@ -1659,12 +1659,16 @@ testAxisToggleCollapsesOnlyItsOwnPanel();
 testExpandedAxisSectionSetSerializesCorrectly();
 testReadStatusNormalization();
 testFavoritesSidebarBodyUsesPaperRows();
+testPaperFavoriteBadgeRendersHollowAndFilled();
 
 console.log('dpr sidebar v2 tests passed');
 
 function testFavoritesSidebarBodyUsesPaperRows() {
   const sidebar = loadSidebarForTest('#/');
   window.DPRFavorites = {
+    isFavorite(id) {
+      return id === '20260301/demo-paper';
+    },
     listFavorites() {
       return [
         {
@@ -1688,6 +1692,28 @@ function testFavoritesSidebarBodyUsesPaperRows() {
   assert.ok(html.includes('class="dpr-sidebar-paper'));
   assert.ok(html.includes('href="#/20260301/demo-paper"'));
   assert.ok(html.includes('Demo Paper'));
-  assert.ok(html.includes('data-remove-favorite="20260301/demo-paper"'));
+  assert.ok(html.includes('data-favorite-toggle="20260301/demo-paper"'));
+  assert.ok(html.includes('dpr-sidebar-paper-fav-btn is-favorited'));
   assert.ok(html.includes('is-active'));
+}
+
+function testPaperFavoriteBadgeRendersHollowAndFilled() {
+  const sidebar = loadSidebarForTest('#/');
+  window.DPRFavorites = {
+    isFavorite(id) {
+      return id === 'fav/paper';
+    },
+  };
+  const filled = sidebar.__test.renderFavoriteBadge('fav/paper', true);
+  const hollow = sidebar.__test.renderFavoriteBadge('plain/paper', false);
+  assert.ok(filled.includes('is-favorited'));
+  assert.ok(filled.includes('★'));
+  assert.ok(filled.includes('data-favorite-toggle="fav/paper"'));
+  assert.ok(hollow.includes('☆'));
+  assert.ok(!hollow.includes('is-favorited'));
+
+  const css = fs.readFileSync('app/app.css', 'utf8');
+  assert.ok(css.includes('.dpr-sidebar-paper-fav-btn'));
+  assert.ok(css.includes('.dpr-sidebar-paper-fav-btn.is-favorited'));
+  assert.ok(!css.includes('.dpr-sidebar-favorite-remove-btn'));
 }

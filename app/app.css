@@ -8471,6 +8471,39 @@ body.dpr-sidebar-resizing {
   z-index: 6;
   pointer-events: none;
 }
+.dpr-sidebar-paper-fav-btn {
+  position: absolute;
+  left: 4px;
+  top: 4px;
+  z-index: 7;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  color: #cbd5e1;
+  font-size: 13px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 0 0 1px rgba(148, 163, 184, 0.35);
+  transition: color .12s ease, background .12s ease, box-shadow .12s ease;
+}
+.dpr-sidebar-paper-fav-btn:hover,
+.dpr-sidebar-paper-fav-btn:focus-visible {
+  color: #f59e0b;
+  background: #fffbeb;
+  box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.45);
+  outline: none;
+}
+.dpr-sidebar-paper-fav-btn.is-favorited {
+  color: #f59e0b;
+  background: #fffbeb;
+  box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.35);
+}
 .dpr-sidebar-paper-main {
   display: block;
   position: relative;
@@ -8483,7 +8516,7 @@ body.dpr-sidebar-resizing {
   width: 100%;
   min-width: 0;
   box-sizing: border-box;
-  padding: 7px 8px 7px 14px;
+  padding: 7px 8px 7px 26px;
   text-decoration: none;
   color: #1f2937;
   cursor: pointer;
@@ -8761,23 +8794,6 @@ body.dpr-sidebar-resizing {
   margin: 0;
   padding: 4px 0 0;
 }
-.dpr-sidebar-favorite-remove-btn {
-  border: 0;
-  background: transparent;
-  color: #f59e0b;
-  font-size: 12px;
-  line-height: 1;
-  padding: 2px 4px;
-  border-radius: 4px;
-  cursor: pointer;
-  opacity: 0.85;
-}
-.dpr-sidebar-favorite-remove-btn:hover,
-.dpr-sidebar-favorite-remove-btn:focus-visible {
-  background: #fffbeb;
-  color: #b45309;
-  outline: none;
-}
 
 .dpr-favorites-toast {
   position: fixed;
@@ -8865,6 +8881,18 @@ body.dpr-dark .dpr-sidebar-paper.is-active {
 }
 body.dpr-dark .dpr-sidebar-paper[data-read="0"]::after {
   box-shadow: 0 0 0 2px #0f172a;
+}
+body.dpr-dark .dpr-sidebar-paper-fav-btn {
+  background: rgba(15, 23, 42, 0.92);
+  color: #64748b;
+  box-shadow: 0 0 0 1px rgba(51, 65, 85, 0.9);
+}
+body.dpr-dark .dpr-sidebar-paper-fav-btn:hover,
+body.dpr-dark .dpr-sidebar-paper-fav-btn:focus-visible,
+body.dpr-dark .dpr-sidebar-paper-fav-btn.is-favorited {
+  color: #fbbf24;
+  background: #422006;
+  box-shadow: 0 0 0 1px rgba(251, 191, 36, 0.35);
 }
 body.dpr-dark .dpr-sidebar-paper-link {
   color: #e2e8f0;
