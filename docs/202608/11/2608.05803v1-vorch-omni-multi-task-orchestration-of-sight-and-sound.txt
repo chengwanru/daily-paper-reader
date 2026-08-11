@@ -1,0 +1,574 @@
+Title: Vorch-Omni: Multi-Task Orchestration of Sight and Sound
+
+URL Source: https://arxiv.org/pdf/2608.05803v1
+
+Published Time: Fri, 07 Aug 2026 00:55:29 GMT
+
+Number of Pages: 35
+
+Markdown Content:
+Vorch-Omni: Multi-Task Orchestration of Sight and Sound 
+
+# Vorch-Omni: Multi-Task Orchestration of Sight and Sound 
+
+Vorch Team Multi-Reference Audio-Video Generation 
+
+source video  output video 
+
+> source video output video
+> Character Replacement
+> Video Extension
+> ref image
+> ref image
+> output video & audio
+> ref audio
+> ref audio
+
+source video  output video Video Editing 
+
+Prompt : Keep the orange tabby kitten from Video in a bright sunny room. Use a top-down wide shot that slowly pushes toward a medium shot, with a large circular woven rug and wooden 
+
+floor at the edge. The kitten slowly opens its eyes, stands, stretches its forelegs forward, arches its back, curls the tip of its tail upward, and looks comfortably sleepy. Add crisp morning 
+
+birdsong and one soft, extended meow during the stretch.   
+
+> Prompt :Refer to Video and keep its background unchanged. Replace the main subject with the tabby kitten in
+> image, wearing an ornate pearl-and-gem headdress and jeweled collar. Preserve the original motion exactly
+> Prompt :Continue the video. The little girl takes out a map, raises her hand, points ahead,
+> and says: "According to the map, the treasure is over there!"
+
+Figure 1: Representative capabilities of Vorch-Omni . Top: character replacement transfers a referenced subject while preserving the source motion, and video extension coherently continues a source clip. Middle: multi-reference audio-video generation composes image and audio references into synchronized scenes with consistent subject appearance and voices. Bottom: instruction-guided video editing adds the requested content while preserving the source scene, camera, and overall visual appearance. All examples are produced by the same unified model. 
+
+## Abstract 
+
+Recent advances in generative video modeling have enabled diverse generation, reference-based synthesis, extension, and editing capabilities, but many remain fragmented across task-specific models and pipelines. A shared model must disambiguate heterogeneous tar-get, source, and reference signals —deciding what to generate, preserve, or use as guidance —
+
+while limiting interference among task objectives. Meanwhile, joint audio-visual generation further expands the space of conditioning and output configurations and introduces hetero-geneous roles across modalities. We present Vorch-Omni , a unified multi-task framework for joint audio-visual synthesis. At its core is an arbitrary-condition-to-arbitrary-output 
+
+formulation that flexibly assigns video and audio signals as either clean conditioning to-kens or noisy generation targets. Token-level conditioning masks and task identifiers ex-1arXiv:2608.05803v1 [cs.CV] 6 Aug 2026 Vorch-Omni: Multi-Task Orchestration of Sight and Sound plicitly distinguish generation targets, source content, and heterogeneous references, while position types separate temporally contiguous context from independent conditions. To capture both high-level semantic intent and fine-grained visual structure, we employ com-plementary visual conditioning paths: a vision-language model jointly interprets sampled condition frames and text instructions, while a video VAE encodes the conditions into clean latent tokens for direct structural guidance. To support this broad task space, we build a distributed data pipeline that curates diverse, temporally aligned audio-visual clips, pro-duces structured video captions and audio metadata, and packs the same versioned corpus into task-ready configurations; weighted sampling further balances their heterogeneous dis-tributions. Built upon a single flow-matching diffusion transformer, the resulting model supports more than 10 tasks without task-specific architectural modifications, including text-to-video, text-to-audio-video, image- and reference-conditioned synthesis, temporal ex-tension, audio-driven generation, video transformation, and unimodal or audio-visual edit-ing. This unified formulation provides a scalable foundation for general-purpose generation and manipulation across diverse audio-visual conditions and outputs. The project page is available at https://vorch-project.github.io/Vorch-Omni-project/ .
+
+## 1 Introduction 
+
+Diffusion Transformers have substantially advanced video synthesis, expanding the field from text- and image-conditioned generation to reference-based synthesis, temporal extension, and instruction-guided editing (Ma et al., 2025a; Peebles & Xie, 2023; Vaswani, 2017; Wan, 2025; HunyuanVideo, 2025). Despite this progress, these capabilities are commonly developed as separate task-specific models or pipelines. Recent unified video models have begun to consolidate generation and editing into a shared framework, but doing so introduces a fundamental ambiguity: when target videos, source clips, and one or more references coexist in the input, the model must infer which content should be generated, which should be preserved, and which should only provide identity, structure, or style. We view these seemingly disparate tasks as a shared conditional denoising problem with heterogeneous token roles. Explicitly identifying these roles gives the model direct cues about what to reconstruct, preserve, modify, or reference, thereby reducing interference among tasks with different conditioning requirements. Commercial releases further reflect this convergence: systems such as Veo 3.1 (DeepMind, 2025) and Sora 2 (OpenAI, 2025) have exposed native audio-video generation as a practical product capability, while Runway Aleph (Runway, 2025) and Kling-Omni (Kling, 2025) broaden video creation toward in-context editing and multimodal reference control. However, their public descriptions generally cover only subsets of the possible condition-output configurations and provide limited detail about the underlying task formulation and training protocol. This leaves open a broader research question: can a reproducible and extensible task interface support not only diverse visual tasks, but also arbitrary combinations of audio and video conditions and outputs? 
+
+Extending task-unified video modeling to audio is not a simple matter of attaching an audio decoder. Audio and video can each act as a generation target, a temporally contiguous context, or an independent reference. The resulting task space includes, among others, text-to-video, text-to-audio-video, video-to-audio, audio-to-video, joint audio-video extension, subject- or frame-referenced synthesis, audio cloning, and unimodal or cross-modal editing. These configurations also expose bidirectional generative dependencies: speech can determine lip motion, while visual events and environments determine impacts, Foley, ambience, and reverberation (Cheng et al., 2025). Sequential pipelines that synthesize one modality after the other model only one direction at a time and can accumulate errors or require post-hoc synchronization (Low et al., 2025; OpenMOSS, 2026; Ji et al., 2026). A general system must therefore unify both the task space , which defines what is conditioned on and what is generated, and the modality space , which describes how sight and sound interact during generation. Recent joint audio-visual models have explored several effective architectural seams. Ovi couples symmetric audio and video backbones with blockwise bidirectional cross-attention (Low et al., 2025); LTX-2.3 and MOVA use asymmetric streams or towers to reflect the different capacities and information densities required by the two modalities (HaCohen et al., 2026; OpenMOSS, 2026); UniVerse-1 stitches pretrained modality 2Vorch-Omni: Multi-Task Orchestration of Sight and Sound experts through lightweight connectors (Wang et al., 2025a); NAVA separates native audio-video alignment from contextual fusion (Ji et al., 2026); and daVinci-MagiHuman instead places text, audio, and video in a single token stream (Chern et al., 2026). Baton further introduces explicit semantic planning for complex audio-visual narratives (Tu et al., 2026). Closest to our task scope, SkyReels-V4 combines multimodal inputs, joint audio-video generation, inpainting, and editing within one foundation model (Chen et al., 2026a). These works establish the promise of native audio-visual generation, but they also reveal that architectural fusion alone does not specify a general task interface. As the number, modality, and temporal relationship of conditions vary, a unified model still needs an explicit and extensible representation of token roles and input-output configurations. This broader setting presents three coupled challenges. First, cross-modal condition disambiguation : visually or acoustically similar inputs may play different roles across tasks, and implicit concatenation can conflate a source to be edited with a reference to be imitated or a prefix to be continued. Second, conditioning duality : high-level instruction following requires semantic reasoning over text and visual evidence, whereas identity, texture, layout, and motion preservation benefit from direct latent-space access to the condition. Addressing these complementary requirements calls for a semantic pathway that interprets instructions and visual evidence together, as well as a latent pathway that retains fine-grained information from the original condition. In the audio-visual setting, these complementary signals must further coexist with modality-specific latent generation and optional modality absence. Third, data consistency and balance : joint training requires genuinely aligned audio-video pairs, reusable annotations for many task configurations, and sufficient exposure to specialized reference, editing, and audio-conditioned data. Misaligned annotations and skewed task mixtures can undermine temporal correspondence and cause data-rich objectives to dominate the shared model. We address these challenges with Vorch-Omni , a unified multi-task framework built upon a single flow-matching diffusion transformer. Our central abstraction is an arbitrary-condition-to-arbitrary-output formu-lation. Each task is specified by four collections: video generation targets, video conditions, audio generation targets, and audio conditions. A token-level conditioning mask determines which signals remain clean and which are denoised, while per-token task identifiers explicitly distinguish targets, sources, subject or frame references, audio references, and editing conditions. Position types provide a complementary notion of tem-poral composition: merged conditions share a continuous timeline with the target, as in extension, whereas independent references use separate coordinates. Consequently, new input-output combinations can be ex-pressed primarily by changing the task configuration rather than the network architecture, and the same model naturally reduces to unimodal generation when one stream is absent. For visual conditions, we use two complementary paths. A vision-language model jointly interprets the instruction and sparsely sampled condition frames, supplying high-level task semantics; in parallel, a video VAE encodes the complete visual condition into clean latent tokens, preserving fine-grained appearance and structure. To make this task interface trainable at scale, we construct a distributed, versioned data pipeline that preserves and realigns paired audio, performs multi-stage quality filtering and deduplication, produces structured video captions and lightweight audio metadata, and packs the curated clips into task-ready examples with latents, task IDs, position types, and conditioning masks. Weighted multi-task sampling balances the heterogeneous mixture. Together, these components allow one model to cover more than 10 tasks spanning generation, reference conditioning, temporal extension, audio-driven synthesis, transformation, and editing. Our main contributions are summarized as follows: • We introduce Vorch-Omni , a unified framework for video and joint audio-visual generation and manipulation, covering more than 10 tasks with a single flow-matching diffusion transformer and without task-specific architectural modifications. • We formulate diverse tasks as arbitrary condition-to-output configurations and combine token-level conditioning masks, task identifiers, and position types to explicitly represent what to generate, what to preserve, what to reference, and how each condition relates temporally to the target. 3Vorch-Omni: Multi-Task Orchestration of Sight and Sound Audio Enc Video Enc                         
+
+> Structured VLM Template
+> [Task] IP /Audio -driven /…
+> [Instruction] user prompt
+> [Condition] refer -image 1…
+> Ref img 1Ref img 2
+> Gemma
+> Video frames Ref audio 1Ref audio 2
+
+b e               
+
+> Prompt tokens Image tokens Clean ref tokens Noisy video tokens Clean ref tokens Noisy audio tokens
+
+DiT  Blocks      
+
+> Task id embedding
+> Output video Output audio
+> Special token
+> Video
+> Dec
+> Audio
+> Dec
+
+Figure 2: Overview of Vorch-Omni . Diverse audio and video signals are expressed by an arbitrary-condition-to-arbitrary-output task configuration, with token-level conditioning masks, task identifiers, and position types specifying what to generate, preserve, or reference and how each condition relates temporally to the target. Visual conditions follow complementary VLM-semantic and VAE-latent paths, while audio and video latents are jointly denoised by the asymmetric dual-stream backbone. • We employ complementary visual conditioning paths that combine vision-language semantic reason-ing with direct VAE-latent structural guidance, enabling heterogeneous visual conditions to support both instruction understanding and fine-grained fidelity. • We develop a reproducible audio-visual data pipeline that curates temporally aligned clips, creates reusable structured annotations, instantiates a shared corpus into diverse task configurations, and balances them through weighted multi-task sampling. 
+
+## 2 Related Works 
+
+2.1 Unified Video Generation and Editing 
+
+Video diffusion research has increasingly moved from task-specific pipelines toward shared models for gen-eration and manipulation (Ma et al., 2026; Wang et al., 2024; Chen et al., 2024; Ma et al., 2025b; Wang et al., 2025b). VACE organizes reference, editing, and masking signals through a common Video Condition Unit and injects task concepts with a Context Adapter (Jiang et al., 2025). UNIC instead concatenates source-video tokens, noisy target latents, and task-dependent multimodal conditions in one DiT sequence, using task-aware positional encoding and condition bias to reduce collisions and confusion among hetero-geneous token roles (Ye et al., 2026). VINO combines a vision-language model with a shared multimodal diffusion backbone to support image and video generation and editing from interleaved text, image, and video context, while Kling-Omni uses unified multimodal representations for in-context video generation and editing (Chen et al., 2026b; Kling, 2025). These works demonstrate the value of explicitly organizing conditions and jointly interpreting semantic instructions and visual evidence. Their primary outputs are nevertheless visual; introducing audio makes the assignment of conditions and targets cross-modal and adds bidirectional temporal dependencies. 4Vorch-Omni: Multi-Task Orchestration of Sight and Sound 
+
+2.2 Joint Audio–Video Generative Modeling 
+
+Early joint audio-video diffusion models coupled modality-specific generators to exchange cross-modal infor-mation. MM-Diffusion learns audio and video subnetworks jointly with cross-modal attention, whereas MMDisCo cooperatively guides pretrained unimodal diffusion models through a lightweight joint mod-ule (Ruan et al., 2023; Hayakawa et al., 2025). More recent Diffusion Transformer systems explore several architectural routes. UniForm shares a denoising network across video-to-audio, audio-to-video, and text-to-audio-video tasks using task tokens and task-dependent noise schemes (Zhao et al., 2025), while UniVerse-1 stitches corresponding blocks of pretrained modality experts (Wang et al., 2025a). Ovi and UniAVGen retain separate modality branches with blockwise bidirectional interaction (Low et al., 2025; Zhang et al., 2026); LTX-2.3 allocates asymmetric capacities to the video and audio streams, and MOVA scales a mixture-of-experts design (HaCohen et al., 2026; OpenMOSS, 2026). Other models pursue tighter fusion: Apollo uses unified DiT blocks, daVinci-MagiHuman processes text, audio, and video in a single token sequence, and NAVA separates audio-video correspondence learning from context-conditioned fusion (Wang et al., 2026; Chern et al., 2026; Ji et al., 2026). Seedance 1.5 Pro and JavisDiT further combine native joint generation with specialized cross-modal interaction or synchronization priors (Seedance, 2025; Liu et al., 2026). These approaches establish effective mechanisms for native audio-video denoising, but backbone fusion alone does not determine the roles played by a varying number of sources, references, temporal contexts, and generation targets. 
+
+2.3 Multimodal References and Joint Editing 
+
+Beyond text-only synthesis, recent systems incorporate images, video clips, masks, audio references, and structural controls. SkyReels-V4 combines multimodal semantic interpretation with in-context VAE latents and audio references to support joint generation, inpainting, and editing (Chen et al., 2026a). DreamID-Omni focuses on human-centric reference generation, source-video editing, and audio-driven animation with identity and timbre control, while MMControl injects composable image, audio, depth, and pose conditions into a joint generator (Guo et al., 2026; Li et al., 2026). InstructAV2AV directly conditions a joint backbone on source audio-video latents for instruction-guided editing (Zheng et al., 2026). Specialized audio-driven video models such as OmniHuman, SkyReels-Audio, and MultiTalk demonstrate strong control of human motion and conversational behavior from speech, but concentrate on a narrower human-animation task family (Lin et al., 2025; Fei et al., 2025; Kong et al., 2026). Collectively, these systems show the importance of preserving fine-grained references while following high-level instructions. Their condition sets are generally realized through selected concatenation layouts, adapters, or control branches; our formulation instead exposes a common assignment mechanism for audio and video conditions and outputs, complemented by per-token task identities and temporal position types. 
+
+2.4 Audio–Visual Alignment, Planning, and Data 
+
+Audio and video occupy different latent grids and token rates, making temporal correspondence a central concern. Ovi and LTX-2.3 place audio and video positions on compatible temporal coordinates for cross-modal attention (Low et al., 2025; HaCohen et al., 2026), while NAVA Alignment learns correspondence in a dedicated interaction space before contextual fusion (Ji et al., 2026). Baton complements denoising with an explicit semantic blueprint whose modality-specific plan tokens guide both branches (Tu et al., 2026); AVTok instead investigates a shared tokenizer and codebook for compact one-dimensional audio-video representations (Pham et al., 2026). Alignment also depends on supervision and data construction. UniVerse-1 generates annotations for the sampled training clips to reduce temporal mismatch, MOVA applies modality-aware quality and alignment filtering, and CineDance-1M provides structured audio-video annotations for multi-shot, long-form generation (Wang et al., 2025a; OpenMOSS, 2026; Chen et al., 2026c). Our framework builds on these complementary directions but treats task specification as a separate axis of unification: token-level masks and identifiers determine what to generate, preserve, or reference, while position types distinguish temporally contiguous context from independent conditions across both modalities. 5Vorch-Omni: Multi-Task Orchestration of Sight and Sound 
+
+## 3 Method 
+
+We seek a single model that can accept a variable number of video and audio signals, assign each signal a task-dependent role, and generate either or both modalities. Fig. 2 summarizes the framework. Its central design is to separate task specification from backbone computation : a task configuration determines which signals are clean conditions, which are denoising targets, and how they are positioned relative to one another; the resulting modality sequences are then processed by one shared flow-matching audio-video transformer. This interface instantiates more than 30 trained tasks without introducing task-specific network branches. 
+
+3.1 Problem Formulation 
+
+Let Xv and Cv denote collections of video targets and video conditions, and let Xa and Ca denote their audio counterparts. We represent a task by 
+
+T = ( Xv , Cv , Xa, Ca) , (1) implemented as the four lists TaskConfig (xv , cv , xa , ca ). An X entry is a signal to be generated and therefore contributes noisy target tokens; a C entry is observed and contributes clean conditioning tokens. Any collection may be empty, allowing the same formulation to represent unimodal generation, joint generation, cross-modal generation, temporal extension, reference conditioning, transformation, and editing. Each entry additionally carries a task identifier r and a position type p, which specify its semantic role and temporal relationship to the target. For either modality q ∈ { v, a }, let xq 
+
+> 0
+
+be a clean target latent and zq ∼ N (0, I). Following flow matching (Liu et al., 2022; Lipman et al., 2022), we construct 
+
+xqσ = (1 − σ)xq 
+
+> 0
+
++ σzq , uq = zq − xq
+
+> 0
+
+, (2) where uq is the target velocity. When both modality streams are present, one noise level σ is sampled for the video sequence and reused for audio, while their Gaussian noises remain independent. This presents both streams with a matched denoising difficulty and permits blockwise audio-video interaction throughout the trajectory. 
+
+3.2 Complementary Multimodal Conditioning 
+
+All generated and observed media are represented in modality-specific latent spaces. The video VAE encodes each complete video or image condition into clean spatiotemporal latents, and the video patchifier maps them to a token sequence. The audio VAE similarly maps a waveform, through its time-frequency representation, to audio latents whose frequency axis is folded into the token channels. Target latents use the same encoders before noise is applied, so conditions and targets of one modality share a common latent space. Visual conditions also follow a semantic path. For a conditioning image or video, we sample its frames at 1 FPS when applicable and combine them with the user instruction and a task-oriented prompt template. A vision-language encoder jointly interprets this input and produces semantic context. Its output is projected into separate video and audio conditioning spaces and supplied to both transformer streams. The two visual paths are complementary: the VLM path conveys high-level instruction and reference semantics, whereas the clean VAE latents retain appearance, layout, identity, and motion details that would be difficult to recover from compressed semantic features alone. Audio conditions use the audio latent path; they interact with visual tokens natively inside the audio-video backbone. 
+
+3.3 Role-Aware Sequence Construction 
+
+For each modality, we concatenate all target and condition latents into one sequence. Let mqi ∈ { 0, 1} be the conditioning mask for token i, with mqi = 1 for an observed condition and mqi = 0 for a generation target. Noise injection is therefore 
+
+˜xqi =
+
+{
+
+xq
+
+> 0,i
+
+, mqi = 1 ,
+
+(1 − σ)xq 
+
+> 0,i
+
++ σzqi , mqi = 0 . (3) 6Vorch-Omni: Multi-Task Orchestration of Sight and Sound The corresponding per-token diffusion time is τ qi = 0 for a clean condition and τ qi = σ for a target. Thus, the transformer sees observed and generated content together but is told explicitly which tokens should remain fixed and which should be denoised. 
+
+Task identifiers. The same latent content may serve different purposes across tasks: a clip can be a prefix to extend, a source to edit, or an independent motion reference. We associate each token with a task identifier rqi and add a modality-specific learned embedding before the transformer stack: 
+
+hqi = Wq ˜xqi + Eq (rqi ), Eq (0) = 0. (4) Identifier zero is reserved for the base target or ordinary contiguous condition and contributes no task offset; nonzero identifiers distinguish subject, frame, audio, editing, transformation, animation, and camera-reference roles. Identifiers are expanded to token resolution, allowing multiple heterogeneous references to coexist in a sequence without relying on their content alone to reveal their purpose. 
+
+Position types. Task identity answers what role a signal plays ; position type answers how it is related in time . We use four values: p = −1 for an independent reference, p = 0 for context before the target, p = 1 
+
+for the target interval, and p = 2 for context after the target. Entries with p ≥ 0 are ordered and merged into a continuous latent timeline, enabling prefix/suffix extension and first/last-frame constraints. Each 
+
+p = −1 entry receives a separate positional grid, which prevents a subject, style, motion, or audio reference from being interpreted as a temporally adjacent segment. This role–position factorization lets visually or acoustically similar signals be used differently without changing the network. Video self-attention uses three-dimensional RoPE over time, height, and width, whereas audio self-attention uses its one-dimensional temporal grid (Su et al., 2024). Video temporal coordinates are derived from the latent grid and frame rate, and the backbone maps video and audio positions to compatible physical-time coordinates for cross-modal RoPE. Consequently, bidirectional cross-attention can relate events across modalities even though their token rates and latent grids differ. 
+
+3.4 Arbitrary Conditions to Arbitrary Outputs 
+
+Changing the four collections in Eq. 1, together with their role and position metadata, instantiates different trained tasks without modifying the architecture. Tab. 1 summarizes representative configurations. Text is available as global semantic conditioning, while video, audio, and images can be assigned independently as clean conditions or noisy outputs. The formulation supports task composition as well as modality absence. For example, a first-frame condition can be combined with an independent subject or audio reference, and an audio stream can be omitted entirely for text-to-video. Such configurations still require appropriate training data, but they reuse the same parameterization and input-construction procedure rather than introducing task-specific modules. 
+
+3.5 Audio–Video Flow Transformer 
+
+We instantiate the shared denoiser with the LTX-2.3 audio-video backbone, retaining its asymmetric capacity allocation. The implementation contains 48 transformer blocks. The video stream has 32 attention heads with head dimension 128, while the audio stream has 32 heads with head dimension 64, reflecting the greater spatial capacity required by video. Linear input projections map the patchified latents to their respective hidden widths, after which the task embeddings in Eq. 4 are added. Each block executes the following sequence. First, video tokens undergo AdaLN-modulated self-attention with 3D RoPE and then cross-attend to the projected semantic context. Audio tokens independently undergo self-attention with 1D RoPE and text cross-attention. When both streams are present, two gated cross-attention operations exchange information: in audio-to-video attention, video queries attend to audio keys and values; in video-to-audio attention, audio queries attend to video keys and values. Separate feed-forward networks then update the video and audio streams. Thus, cross-modal exchange occurs after the modality-specific text attention and before the two FFNs in every block. If one modality is absent, its computation and 7Vorch-Omni: Multi-Task Orchestration of Sight and Sound Table 1: Representative arbitrary-condition-to-arbitrary-output configurations. Conditions remain clean and outputs are denoised from noise. “ −” indicates an absent modality; merged denotes a continuous timeline with the target and indep an independent reference grid. 
+
+Task Configuration Conditioning Input Generation Output Video cv Audio ca Video 
+
+xv 
+
+Audio 
+
+xa 
+
+Base generation 
+
+Text → Video − − ✓ −
+
+Text → Audio+Video − − ✓ ✓
+
+Image-conditioned generation 
+
+First frame → Video 1st frame (merged )
+
+− ✓ −
+
+First frame → Audio+Video 1st frame (merged )
+
+− ✓ ✓
+
+First+last frames →
+
+Audio+Video 1st+last frames (merged )
+
+− ✓ ✓
+
+Temporal extension 
+
+Video → extended Video prefix clip (merged )
+
+− ✓ −
+
+Audio+Video → extended A+V prefix clip (merged )prefix audio (merged )
+
+✓ ✓
+
+Reference-based generation 
+
+Subject reference → Video N ref. images (indep )
+
+− ✓ −
+
+Subject reference →
+
+Audio+Video 
+
+N ref. images (indep )
+
+− ✓ ✓
+
+Frame reference →
+
+Audio+Video 
+
+N ref. clips (indep )
+
+− ✓ ✓
+
+Subject reference + subject audio → Audio+Video 
+
+N ref. images (indep )ref. audio (indep )
+
+✓ ✓
+
+Subject reference+Video source video & N ref. images (indep )source audio (indep )
+
+✓ ✓
+
+Audio-driven generation 
+
+Audio → Video − ref. audio (indep )
+
+✓ −
+
+Image+Audio → Video 1st frame (merged )ref. audio (indep )
+
+✓ −
+
+Audio cloning with Video − ref. audio (indep )
+
+✓ ✓
+
+Editing 
+
+Video semantic editing source video (indep )
+
+− ✓ −
+
+Audio-video semantic editing source video (indep )source audio (indep )
+
+✓ ✓
+
+Subject reference+Video source video & N ref. images (indep )
+
+− ✓ −
+
+Audio editing − source audio (indep )
+
+− ✓
+
+both audio-video cross-attention operations are skipped, and the model reduces naturally to the available stream. The backbone therefore supplies native bidirectional audio-video denoising, while our role-aware interface determines the semantic and temporal organization of its inputs. This separation is important: the same 8Vorch-Omni: Multi-Task Orchestration of Sight and Sound 
+
+> Diversity-oriented data sourcing Multi-stage data curation Data encoding & task packing
+> Diverse video sources Data acquisition Source prescreening Raw video records Shot-aware segmentation
+> (+ audio sync)
+> Visual overlay filtering Quality filtering Exact + semantic dedup. Distribution rebalancing Curated audio-visual clips Video captioning Audio tagging Caption records Audio metadata VAE encoding Task-ready training corpus
+
+Figure 3: Overview of the data infrastructure. Heterogeneous source videos are converted into temporally coherent audio-visual clips through segmentation, quality filtering, deduplication, and distribution rebalanc-ing. Structured visual captions, audio metadata, and modality-specific VAE latents are then attached and packed into the role-aware task configurations used for training. block stack processes a text-only target, a clean prefix followed by a noisy continuation, several independent references, or a source-target editing pair; only the token metadata and sequence composition change. 
+
+3.6 Training Objective and Inference 
+
+The model predicts one velocity sequence ̂ uq for each present modality. Loss is evaluated only on target tokens. Let Iq = {i | mqi = 0 } denote the target-token indices for modality q. We use 
+
+Lq = 1
+
+|I q |
+
+∑
+
+> i∈I q
+
+∥∥̂ uqi − (zqi − xq
+
+> 0,i
+
+)∥ ∥22 , L = Lv + La, (5) where Lq is set to zero when modality q has no target tokens, including condition-only streams. In imple-mentation, each modality loss is normalized by the fraction of target tokens before averaging, preventing a sample with many clean references from trivially reducing its loss magnitude. All task families share this objective and are balanced at the data-loader level through weighted multi-task sampling. At inference time, the requested operation is converted to the same four-list task configuration. Available media are VAE-encoded and inserted as clean condition tokens, target slots are initialized from Gaussian noise, and their task identifiers and position types are constructed exactly as in training. The flow ODE is integrated from noise to data while clean conditions remain fixed. Finally, generated video latents are decoded by the video VAE, and generated audio latents are decoded by the audio VAE and vocoder. Because output modalities are selected by the target lists, the same sampling procedure yields video-only, audio-only, or synchronized audio-video results. 
+
+## 4 Data Infrastructure 
+
+Training one model across generation, reference, extension, transformation, and editing requires more than a large collection of visually appealing clips. The training corpus must retain genuinely synchronized sound, expose conditions with different semantic and temporal roles, and remain sufficiently balanced that high-volume base-generation data do not overwhelm specialized tasks. We therefore construct the corpus with a reproducible distributed pipeline that separates source acquisition, clip-level curation, multimodal annota-tion, and task packing. Intermediate products are stored in versioned tables, allowing individual stages to be audited or rerun without rebuilding the full corpus. Fig. 3 summarizes the pipeline. 
+
+4.1 Data Curation 
+
+Distributed Pipeline and Storage. We implement dataset construction as an operator graph over ver-sioned multimodal tables. Each operator appends or refreshes typed fields: source records are repartitioned, 9Vorch-Omni: Multi-Task Orchestration of Sight and Sound clips are segmented, decoded frames are shared across scoring operators, structured annotations are attached, and encoded latents are written back for training. This organization decouples expensive stages such as shot detection, captioning, quality assessment, and VAE encoding, while retaining the lineage of every training example. 
+
+Diversity-Oriented Sourcing. We aggregate videos from heterogeneous sources to broaden coverage of duration, resolution, subject matter, scene type, action, genre, artistic style, camera motion, and audio content. This diversity is particularly important for a unified model because reference-driven and editing tasks require combinations of subjects, environments, and motions that are rare in any single source. The resulting pool is intentionally permissive at acquisition time; subsequent stages remove technical failures and distributional redundancy. 
+
+Shot-Aware Temporal Segmentation. Long-form videos are first divided into trainable clips. We detect candidate boundaries with TransNetV2 (Soucek & Lokoc, 2024) and cross-check them with the content-based detector in PySceneDetect (Castellano, 2014). Segments are capped at a fixed duration and contain one or a small number of temporally coherent shots. We verify the integrity of each audio track and use Silero VAD (Silero, 2024) to mark speech-active intervals. Music, ambience, and sound effects are retained when they pass the general audio-quality checks. For every retained track, the waveform is trimmed or padded against the decoded visual timeline, so audio-video correspondence is inherited from the media pair rather than inferred only from annotations. 
+
+Deduplication and Rebalancing. We remove exact duplicates by hashing the stored video payload and identify near-duplicates using normalized SigLIP (Zhai et al., 2023) embeddings. High-similarity neighbors are checked for duration consistency and merged into connected components. Each clip retains a canonical duplicate-group identifier, enabling downstream sampling to select a representative or down-weight an over-represented group without discarding its provenance. We then rebalance source domains, styles, semantic categories, and clip durations to preserve long-tail coverage. 
+
+4.2 Data Filtering and Annotation 
+
+Shared Visual Operators. After segmentation, frames decoded at a fixed sparse rate are shared by aesthetic, motion, optical-character-recognition, black-border, overlay, face, and visual-semantic operators. Sharing the same decoded evidence avoids repeated media I/O and makes filtering decisions comparable across operators. Models that require temporal context, including video-level perceptual-quality estimators, process the complete segmented clip and write their scores into the same record. 
+
+Overlay and Quality Filtering. Source videos frequently contain logos, watermarks, subtitles, borders, or other graphics that should not be learned as scene content. We localize these elements with text detection and rule-based heuristics, then remove or down-weight clips dominated by overlays. A complementary quality ensemble filters blur, excessive jitter, poor composition, low aesthetic quality, severe compression, and nearly static content. Thresholds are calibrated per source domain because the score distributions of, for example, animation, product footage, and natural video differ substantially. 
+
+Human-Centric Mining. Talking-head synthesis, audio-driven animation, subject reference, and char-acter editing benefit from explicit human-centric coverage. We therefore apply face detectors specialized for both photographic and animated domains, and retain person- and subject-region cues for reference mining. These signals are used to route clips into relevant task pools rather than as generation-time supervision. 
+
+Structured Video Captioning. Each retained clip receives a dense caption with a consistent dynamic– static schema. Dynamic fields describe actions, event order, and camera motion; static fields describe subject appearance, scene, lighting, style, aesthetics, and named entities. A vision-language model produces the annotation from sparse keyframes and available metadata. Storing these factors as structured fields makes the same annotation reusable for base generation, reference-conditioned synthesis, transformation, and editing. 10 Vorch-Omni: Multi-Task Orchestration of Sight and Sound 
+
+Audio Annotation. The synchronized waveform remains the primary supervision for sound. We addi-tionally record technical validity, speech activity, language, coarse speaker attributes, and broad acoustic content such as speech, singing, music, ambience, or effects. These metadata support quality filtering and task routing without replacing the fine temporal information in the waveform. 
+
+Task Packing and Mixture Balancing. The curated records are instantiated as the configurations in Sec. 3.1. Captions supervise text-to-audio-video generation; selected frames form first-, last-, or independent visual conditions; aligned prefixes form extension examples; mined subjects and clips provide identity or frame references; and paired source–target records form transformation and editing examples. Video and audio are encoded into their modality-specific VAE spaces and stored together with conditioning masks, task identifiers, position types, and annotations. A weighted distributed sampler then controls the contribution of each dataset and task family, preventing common base generation configurations from suppressing lower-frequency reference and editing tasks. 
+
+## 5 Experiments 
+
+5.1 Implementation Details 
+
+We initialize the model from the LTX-2.3 audio-video backbone described in Sec. 3.5 and fine-tune all diffusion-transformer parameters with the unified strategy; the multimodal text encoder is kept frozen. Visual conditions are sampled at 1 FPS for semantic encoding, with at most five sampled frames per condition, and the multimodal context length is capped at 4096 tokens. Training videos are represented at 24 FPS, restricted to at most 16 seconds, and bucketed under a pixel budget of 409,920 pixels per frame. First-frame, last-frame, and first–last-frame conditions are each sampled with probability 0.15. We drop the semantic condition with probability 0.1 to enable classifier-free guidance. We optimize the model for up to 50,000 updates using AdamW with a constant learning rate of 1 × 10 −5.The per-device batch size is 1 and gradients are accumulated for two iterations. We train in BF16 with a maximum gradient norm of 1.0, gradient checkpointing, and Fully Sharded Data Parallelism (FSDP). An exponential moving average of the trainable parameters is maintained with decay 0.999. Flow-matching noise levels are sampled from a shifted logit-normal distribution mixed with 10% uniformly sampled levels, improving coverage near the ends of the flow trajectory. For evaluation, samples are generated at 24 FPS with a pixel budget of 2,073,600 pixels per frame; the exact height and width preserve the aspect ratio of each condition or benchmark specification and are rounded to VAE-compatible multiples. We use the distilled LTX-2.3 sigma schedule with eight denoising updates. For audio-driven generation, the output duration is determined by the driving audio and the frame count is rounded to the nearest valid temporal latent length. All task families share this inference procedure: only the target and condition lists, task identifiers, and position types differ. 
+
+5.2 Evaluation 
+
+Evaluation Protocol. We build a human-evaluation benchmark with annotators experienced in film, advertising, and content production. It covers two broad task families: text-to-audio-video generation (T2AV) and reference-conditioned generation and manipulation (R2V). R2V further includes image and video reference, keyframe control, audio-video reference, voice cloning, character replacement, camera con-trol, video transformation, editing, and temporal continuation. Rather than reducing all comparisons to a single perceptual-preference score, the protocol separates instruction following, motion and visual quality, reference fidelity, audio quality, and audio-visual synchronization. This decomposition is important because a unified model may improve condition adherence or cross-modal alignment without uniformly changing unconditional visual preference. 
+
+Benchmark Construction. Prompts and conditions are derived from practical content-creation scenarios and stratified by subject matter, motion complexity, interaction pattern, camera language, editing operation, and audio content. We balance the task and content strata to avoid allowing a single common scenario to 11 Vorch-Omni: Multi-Task Orchestration of Sight and Sound 0 20 40 60 80 100     
+
+> Preference share (%)
+> Overall Motion Quality Prompt Following Audio Prompt Following Audio Quality Audio-Visual Sync Spatial Persistence Reference Alignment Local Editing
+> net
+> GSB |Overall & Per-Dimension
+> -0.3 -1.7 -3.9 +7.1 +3.3 +5.9 -0.4 +6.6 -1.3
+> Our Model preferred (Good) Same Wan2.7 preferred (Bad)
+
+Figure 4: GSB comparison of overall and per-dimension quality. Each bar is a 100% -stacked distribution of Good (ours preferred), Same (comparable), and Bad (Wan 2.7 preferred) judgments. The value to the right reports the net win rate. Most judgments are ties; ours obtains positive net win rates on Audio Prompt Following, Audio Quality, Audio-Visual Synchronization, and Reference Alignment. dominate the aggregate. The final benchmark contains 537 paired sample groups, each consisting of outputs from our model and Wan 2.7 under matched task inputs. 
+
+Evaluation Dimensions. The rubric follows a hierarchical primary–secondary design. Each secondary dimension is assigned one or more evidence types: P (Prompt) measures adherence to textual instructions, 
+
+R (Reference) measures inheritance from the supplied condition, and V (Video) measures intrinsic output quality. T2AV uses P- and V-type criteria; R2V additionally uses R-type criteria for identity, motion, camera, audio, and edit-scope preservation. Tab. 2 and 3 provide the full rubric. 
+
+Good–Same–Bad Comparison. Expert raters compare anonymized outputs side by side, with model order randomized independently for each sample. For every applicable secondary dimension, a rater assigns Good when ours is preferred, Same when the outputs are comparable, and Bad when Wan 2.7 is preferred. Across 527 sample groups, this process yields 11,361 dimension-level judgments. We report the three-label distribution and the net win rate (NGood − NBad )/N all . Because Same contributes zero to this statistic, net win rate captures the direction and magnitude of non-tied preferences while retaining ties in the denominator. All plots use the fixed order Good → Same → Bad. 
+
+5.3 Results 
+
+Aggregate Comparison. As shown in Fig. 4, 81.4% of aggregate judgments are Same, while Good and Bad account for 7.7% and 8.0%, respectively. Thus, most dimension-level comparisons do not reveal a perceptible difference, and the aggregate net win rate is −1.9% . The more informative pattern appears in the capability-specific dimensions: ours achieves positive net win rates for Audio-Visual Synchronization (+5 .9% ), Reference Alignment ( +6 .6% ), Audio Prompt Following ( +7 .1% ), and Audio Quality ( +3 .3% ). 12 Vorch-Omni: Multi-Task Orchestration of Sight and Sound 0 20 40 60 80 100       
+
+> Preference share (%)
+> Motion Quality Prompt Following Audio Prompt Following Audio Quality Audio-Visual Sync Spatial Persistence Reference Alignment
+> net
+> GSB |Audio-Driven (Our Model vs Wan2.7), net +3.5%
+> +5.1 -1.3 +5.9 +1.5 +24.3 +4.4 +0.4
+> Our Model preferred (Good) Same Wan2.7 preferred (Bad)
+
+(a) Audio-Driven 0 20 40 60 80 100        
+
+> Preference share (%)
+> Motion Quality Prompt Following Audio Prompt Following Audio Quality Audio-Visual Sync Spatial Persistence Reference Alignment Local Editing
+> net
+> GSB |Video Transform (Our Model vs Wan2.7), net +1.9%
+> +5.3 -8.0 +0.0 +9.1 +10.6 +12.1 +9.8 -18.2
+> Our Model preferred (Good) Same Wan2.7 preferred (Bad)
+
+(b) Video Transform 0 20 40 60 80 100       
+
+> Preference share (%)
+> Motion Quality Prompt Following Audio Quality Audio-Visual Sync Spatial Persistence Reference Alignment Local Editing
+> net
+> GSB |Animate & Replace (Our Model vs Wan2.7), net +2.0%
+> +5.1 -2.0 +4.7 -2.3 +2.6 +7.8 +3.1
+> Our Model preferred (Good) Same Wan2.7 preferred (Bad)
+
+(c) Animate Replace 0 20 40 60 80 100        
+
+> Preference share (%)
+> Motion Quality Prompt Following Audio Prompt Following Audio Quality Audio-Visual Sync Spatial Persistence Reference Alignment Local Editing
+> net
+> GSB |Video Editing (Our Model vs Wan2.7), net +1.2%
+> +3.7 -4.9 +12.3 +1.2 +0.6 +2.1 +8.0 +1.2
+> Our Model preferred (Good) Same Wan2.7 preferred (Bad)
+
+(d) Video Editing 
+
+Figure 5: Per-task GSB breakdown for four representative task families. Each panel reports the Good/Same/Bad distribution for its applicable primary dimensions and annotates the corresponding net win rate. The panels reveal different task-dependent strengths, including audio-visual synchronization, ref-erence alignment, and motion quality. These results indicate that unifying heterogeneous conditions does not produce a uniform preference shift; its clearest benefits occur where a model must coordinate modalities or preserve information from references. 
+
+Task-Level Analysis. Fig. 5 localizes these effects. Aggregating judgments by task, our model leads on the multimodal and reference-driven tasks that most directly exercise its distinctive capabilities, including audio-driven generation ( +3 .5% ), animate-and-replace ( +2 .0% ), video transform ( +1 .9% ), video editing ( +1 .2% ), camera control ( +0 .7% ), and multi-keyframe generation ( +0 .4% ). Figure 5 presents a per-dimension GSB breakdown for a representative subset of these tasks, revealing where each task-level advantage originates. The audio-driven task is the most illustrative case: its overall edge is driven almost entirely by Audio-Visual Synchronization ( +24 .3% within the task, rising to +45 .6% on lip-audio synchronization), confirming substantially tighter lip and event alignment when generation is conditioned on audio. The animate-and-replace, video-transform, and video-editing tasks derive their advantage from the reference-alignment and audio-visual dimensions while remaining at parity on core visual quality. These task-specific views make explicit that the gains are concentrated in the capability dimensions each task is designed to exercise, rather than reflecting a uniform shift across all dimensions. 13 Vorch-Omni: Multi-Task Orchestration of Sight and Sound 
+
+## 6 Conclusion 
+
+We introduced Vorch-Omni , a unified framework that treats audio-visual generation and manipulation as role-aware conditional flow matching. Instead of assigning a separate architecture to each operation, the framework represents video and audio signals as clean conditions or noisy targets, identifies their semantic roles with task embeddings, and distinguishes contiguous context from independent references through po-sition types. Complementary VLM and VAE conditioning paths combine instruction-level reasoning with fine-grained visual evidence, while a single LTX-2.3 audio-video transformer performs bidirectional cross-modal denoising. A versioned data pipeline and weighted task mixture make it possible to train more than 30 condition-to-output configurations in this shared parameterization. Human evaluation over 527 paired sample groups shows that most comparisons with Wan 2.7 are perceptually tied, while the proposed model is preferred on the dimensions most specific to unified multimodal generation: audio-visual synchroniza-tion, reference alignment, audio instruction following, and audio quality. The qualitative results further demonstrate a broad range of operations, including joint temporal extension, subject-referenced synthesis, identity-aware video transformation, semantic and style editing, and audio-driven animation. Together, these findings suggest that explicit condition roles provide a practical path toward scaling a single model across heterogeneous audio-visual tasks. The framework does not eliminate the remaining challenges of long-horizon consistency, fine-grained edit locality, or robust speech generation across languages and speakers. Addressing these limitations, together with broader standardized evaluation of open audio-visual systems, is an important direction for future work. 
+
+## 7 Contributors 
+
+Project Lead: Lin Ma, Yaohui Wang 
+
+Core Contributors: Yang Ding, Cong Han, Yuxin Hong, Jiebo Hou, Zequn Jie, Jing Liu, Yulei Lu, Xin Ma, Yinlong Qian, Peng Shi, Fang Wan, Siqi Wang, Yaole Wang, Yidi Wu, Siqian Yang, Mingyu Yin, Gang Yue, Lisai Zhang 
+
+Contributors: Xiaoyu Chen, Menglin Han, Xiang Li, Qi Liu, Siyuan Luo, Haoran Yu, Yuting Zhang 
+
+## References 
+
+Brandon Castellano. PySceneDetect: Video cut detection and analysis tool. https://github.com/ Breakthrough/PySceneDetect , 2014. Software. Guibin Chen, Dixuan Lin, Jiangping Yang, Youqiang Zhang, Zhengcong Fei, Debang Li, Sheng Chen, Chaofeng Ao, Nuo Pang, Yiming Wang, et al. Skyreels-v4: Multi-modal video-audio generation, inpainting and editing model. arXiv preprint arXiv:2602.21818 , 2026a. Junyi Chen, Tong He, Zhoujie Fu, Pengfei Wan, Kun Gai, and Weicai Ye. Vino: A unified visual generator with interleaved omnimodal context. arXiv preprint arXiv:2601.02358 , 2026b. Xinyuan Chen, Yaohui Wang, Lingjun Zhang, Shaobin Zhuang, Xin Ma, Jiashuo Yu, Yali Wang, Dahua Lin, Yu Qiao, and Ziwei Liu. Seine: Short-to-long video diffusion model for generative transition and prediction. In International Conference on Learning Representations , 2024. Yuheng Chen, Teng Hu, Yuji Wang, Qingdong He, Zhucun Xue, Qianyu Zhou, Xiangtai Li, Lizhuang Ma, Jiangning Zhang, and Dacheng Tao. Cinedance: Towards next-generation multi-shot long-form cinematic audio-video generation. arXiv preprint arXiv:2606.09639 , 2026c. Ho Kei Cheng, Masato Ishii, Akio Hayakawa, Takashi Shibuya, Alexander Schwing, and Yuki Mitsufuji. Mmaudio: Taming multimodal joint training for high-quality video-to-audio synthesis. In Computer Vision and Pattern Recognition , pp. 28901–28911, 2025. Ethan Chern, Hansi Teng, Hanwen Sun, Hao Wang, Hong Pan, Hongyu Jia, Jiadi Su, Jin Li, Junjie Yu, Lijie Liu, et al. Speed by simplicity: A single-stream architecture for fast audio-video generative foundation model. arXiv preprint arXiv:2603.21986 , 2026. 14 Vorch-Omni: Multi-Task Orchestration of Sight and Sound DeepMind. Veo-3.1, 2025. URL https://aistudio.google.com/models/veo-3 .Zhengcong Fei, Hao Jiang, Di Qiu, Baoxuan Gu, Youqiang Zhang, Jiahua Wang, Jialin Bai, Debang Li, Mingyuan Fan, Guibin Chen, et al. Skyreels-audio: Omni audio-conditioned talking portraits in video diffusion transformers. arXiv preprint arXiv:2506.00830 , 2025. Xu Guo, Fulong Ye, Qichao Sun, Liyang Chen, Bingchuan Li, Pengze Zhang, Jiawei Liu, Songtao Zhao, Qian He, and Xiangwang Hou. Dreamid-omni: Unified framework for controllable human-centric audio-video generation. arXiv preprint arXiv:2602.12160 , 2026. Yoav HaCohen, Benny Brazowski, Nisan Chiprut, Yaki Bitterman, Andrew Kvochko, Avishai Berkowitz, Daniel Shalem, Daphna Lifschitz, Dudu Moshe, Eitan Porat, et al. Ltx-2: Efficient joint audio-visual foundation model. arXiv preprint arXiv:2601.03233 , 2026. Akio Hayakawa, Masato Ishii, Takashi Shibuya, and Yuki Mitsufuji. Mmdisco: Multi-modal discriminator-guided cooperative diffusion for joint audio and video generation. In International Conference on Learning Representations , volume 2025, pp. 54368–54393, 2025. Team HunyuanVideo. Hunyuanvideo 1.5 technical report. arXiv preprint arXiv:2511.18870 , 2025. Longbin Ji, Guan Wang, Xuan Wei, Chenye Yang, Xiangrui Liu, Zhenyu Zhang, Shuohuan Wang, Yu Sun, and Jingzhou He. Native audio-visual alignment for generation. arXiv preprint arXiv:2605.30073 , 2026. Zeyinzi Jiang, Zhen Han, Chaojie Mao, Jingfeng Zhang, Yulin Pan, and Yu Liu. Vace: All-in-one video creation and editing. In International Conference on Computer Vision , pp. 17191–17202, 2025. Team Kling. Kling-omni technical report. arXiv preprint arXiv:2512.16776 , 2025. Zhe Kong, Feng Gao, Yong Zhang, Zhuoliang Kang, Xiaoming Wei, Xunliang Cai, Guanying Chen, and Wen-han Luo. Let them talk: Audio-driven multi-person conversational video generation. Neural Information Processing Systems , 38:70990–71013, 2026. Liyang Li, Wen Wang, Canyu Zhao, Tianjian Feng, Zhiyue Zhao, Hao Chen, and Chunhua Shen. Mmcontrol: Unified multi-modal control for joint audio-video generation. arXiv preprint arXiv:2604.19679 , 2026. Gaojie Lin, Jianwen Jiang, Jiaqi Yang, Zerong Zheng, Chao Liang, Yuan Zhang, and Jingtuo Liu. Omnihuman-1: Rethinking the scaling-up of one-stage conditioned human animation models. In In-ternational Conference on Computer Vision , pp. 13847–13858, 2025. Yaron Lipman, Ricky TQ Chen, Heli Ben-Hamu, Maximilian Nickel, and Matt Le. Flow matching for generative modeling. arXiv preprint arXiv:2210.02747 , 2022. Kai Liu, Wei Li, Lai Chen, Shengqiong Wu, Yanhao Zheng, Jiayi Ji, Fan Zhou, Jiebo Luo, Ziwei Liu, Hao Fei, and Tat-Seng Chua. Javisdit: Joint audio-video diffusion transformer with hierarchical spatio-temporal prior synchronization. 2026. Xingchao Liu, Chengyue Gong, and Qiang Liu. Flow straight and fast: Learning to generate and transfer data with rectified flow. arXiv preprint arXiv:2209.03003 , 2022. Chetwin Low, Weimin Wang, and Calder Katyal. Ovi: Twin backbone cross-modal fusion for audio-video generation. arXiv preprint arXiv:2510.01284 , 2025. Xin Ma, Yaohui Wang, Xinyuan Chen, Gengyun Jia, Ziwei Liu, Yuan-Fang Li, Cunjian Chen, and Yu Qiao. Latte: Latent diffusion transformer for video generation. Transactions on Machine Learning Research ,2025a. Xin Ma, Yaohui Wang, Gengyun Jia, Xinyuan Chen, Tien-Tsin Wong, Yuan-Fang Li, and Cunjian Chen. Consistent and controllable image animation with motion diffusion models. In Computer Vision and Pattern Recognition , pp. 7288–7298, 2025b. 15 Vorch-Omni: Multi-Task Orchestration of Sight and Sound Xin Ma, Yaohui Wang, Genyun Jia, Xinyuan Chen, Tien-Tsin Wong, and Cunjian Chen. Consistent and controllable image animation with motion linear diffusion transformers. IEEE Transactions on Pattern Analysis and Machine Intelligence , 2026. OpenAI. Sora 2, 2025. URL https://openai.com/index/sora-2/ .Team OpenMOSS. Mova: Towards scalable and synchronized video-audio generation. arXiv preprint arXiv:2602.08794 , 2026. William Peebles and Saining Xie. Scalable diffusion models with transformers. In International Conference on Computer Vision , pp. 4195–4205, 2023. Kien T Pham, I Chieh Chen, Qifeng Chen, and Long Chen. Avtok: 1d unified tokenization for holistic audio-video generation. arXiv preprint arXiv:2606.30811 , 2026. Ludan Ruan, Yiyang Ma, Huan Yang, Huiguo He, Bei Liu, Jianlong Fu, Nicholas Jing Yuan, Qin Jin, and Baining Guo. Mm-diffusion: Learning multi-modal diffusion models for joint audio and video generation. In Computer Vision and Pattern Recognition , pp. 10219–10228, 2023. Runway. Introducing runway aleph, 2025. URL https://runwayml.com/research/ introducing-runway-aleph .Team Seedance. Seedance 1.5 pro: A native audio-visual joint generation foundation model. arXiv preprint arXiv:2512.13507 , 2025. Team Silero. Silero vad: pre-trained enterprise-grade voice activity detector (vad), number detector and language classifier. https://github.com/snakers4/silero-vad , 2024. Tomás Soucek and Jakub Lokoc. Transnet v2: An effective deep network architecture for fast shot transition detection. In ACM International Conference on Multimedia , pp. 11218–11221, 2024. Jianlin Su, Murtadha Ahmed, Yu Lu, Shengfeng Pan, Wen Bo, and Yunfeng Liu. Roformer: Enhanced transformer with rotary position embedding. Neurocomputing , 568:127063, 2024. Shuyuan Tu, Qi Tian, Zihan Yang, Yue Wu, Xintong Han, Weijie Kong, Jiangfeng Xiong, Jian-Wei Zhang, Zhao Zhong, Liefeng Bo, et al. Baton: Explicit semantic blueprints for joint video-audio generation. arXiv preprint arXiv:2605.25195 , 2026. A Vaswani. Attention is all you need. Neural Information Processing Systems , 2017. Team Wan. Wan: Open and advanced large-scale video generative models. arXiv preprint arXiv:2503.20314 ,2025. Duomin Wang, Wei Zuo, Aojie Li, Ling-Hao Chen, Xinyao Liao, Deyu Zhou, Zixin Yin, Xili Dai, Daxin Jiang, and Gang Yu. Universe-1: Unified audio-video generation via stitching of experts. arXiv preprint arXiv:2509.06155 , 2025a. Jun Wang, Chunyu Qiang, Yuxin Guo, Yiran Wang, Xijuan Zeng, and Feng Deng. Apollo: Unified multi-task audio-video joint generation. arXiv e-prints , pp. arXiv–2601, 2026. Yaohui Wang, Xinyuan Chen, Xin Ma, Shangchen Zhou, Ziqi Huang, Yi Wang, Ceyuan Yang, Yinan He, Jiashuo Yu, Peiqing Yang, et al. Lavie: High-quality video generation with cascaded latent diffusion models. International Journal of Computer Vision , pp. 1–20, 2024. Yaohui Wang, Xin Ma, Xinyuan Chen, Cunjian Chen, Antitza Dantcheva, Bo Dai, and Yu Qiao. Leo: Generative latent image animator for human video synthesis. International Journal of Computer Vision ,133(3):1277–1289, 2025b. Zixuan Ye, Xuanhua He, Quande Liu, Qiulin Wang, Xintao Wang, Pengfei Wan, Di Zhang, Kun Gai, Qifeng Chen, and Wenhan Luo. Unic: Unified in-context video editing. In International Conference on Learning Representations , 2026. 16 Vorch-Omni: Multi-Task Orchestration of Sight and Sound Xiaohua Zhai, Basil Mustafa, Alexander Kolesnikov, and Lucas Beyer. Sigmoid loss for language image pre-training. In International Conference on Computer Vision , pp. 11975–11986, 2023. Guozhen Zhang, Zixiang Zhou, Teng Hu, Ziqiao Peng, Youliang Zhang, Yi Chen, Yuan Zhou, Qinglin Lu, and Limin Wang. Uniavgen: Unified audio and video generation with asymmetric cross-modal interactions. In Computer Vision and Pattern Recognition , pp. 1950–1960, 2026. Lei Zhao, Linfeng Feng, Dongxu Ge, Rujin Chen, Fangqiu Yi, Chi Zhang, Xiao-Lei Zhang, and Xuelong Li. Uniform: A unified multi-task diffusion transformer for audio-video generation. arXiv preprint arXiv:2502.03897 , 2025. Haojie Zheng, Yixin Yang, Siqi Yang, Shuchen Weng, and Boxin Shi. Instructav2av: Instruction-guided audio-video joint editing. arXiv preprint arXiv:2605.18467 , 2026. 17 Vorch-Omni: Multi-Task Orchestration of Sight and Sound 
+
+## A Appendix 
+
+This appendix presents representative results across temporal extension, reference-conditioned generation, video transformation, editing, audio-driven generation and the detailed evaluation rubric. For each example, we provide the original instruction, an English translation when the instruction is in Chinese, and a visual-ization of the conditions and generated output. Because static figures cannot convey sound directly, audio waveforms or log-mel spectrograms are shown where available; the corresponding videos contain the gener-ated dialogue, music, ambience, and sound effects. To keep each visualization associated with its instruction, every result figure is placed on a dedicated page immediately after the instruction text. 
+
+A.1 Temporal Extension 
+
+We show two extensions that continue an observed audio-video prefix while following a new instruction. The examples respectively test character and music continuity in a dialogue-free scene, and synchronized action and speech in a spoken continuation. 
+
+Instruction (given to the model): 延续 Video-1 的尾帧继续生成，保留 Video-1 中深灰色毛茸茸、戴白 色厨师帽、穿红色马甲的黑熊形象，以及棕灰色同样戴着厨师帽的小浣熊形象。场景背景由粉色爱心特效迅 速恢复为原本阳光明媚的森林草地。黑熊从陶醉闭眼中回过神，收起泪珠并露出欣慰的笑容，它从餐桌上拿 起一枚羊毛毡质地的金黄色橡果奖牌挂在小浣熊脖子上，并伸手轻轻拍打小浣熊的肩膀以示赞许。小浣熊盯 着胸前的奖牌，露出腼腆害羞的微笑，同时用爪子不好意思地挠了挠头。全片保持定格动画风格，无语音， 背景音效为温馨舒缓的音乐。 
+
+Instruction (English translation): Continue generating footage starting from the final frame of Video 1. Retain the characters from Video 1: a dark gray fluffy black bear wearing a white chef ’s hat and a red vest, as well as a brownish-gray raccoon cub also fitted with a chef ’s hat. The background ’s pink heart special effects fade rapidly to revert to the original sunlit forest meadow. The black bear snaps out of its blissful closed-eye trance, wipes away its teardrops and breaks into a gratified smile. It picks up a golden wool-felt acorn medal from the dining table, hangs it around the raccoon cub ’s neck, then gently pats the cub ’s shoulder to show approval. The raccoon cub stares down at the medal on its chest, wearing a bashful, shy grin while sheepishly scratching the back of its head with its paw. The entire sequence maintains a stop-motion animation style with no dialogue, accompanied by warm, soothing background music. Video frames Audio log-mel Condition Audio-Video · 5.06 s Generated Extension · 5.04 s time → extension boundary 
+
+Figure 6: Music-aware joint audio-video extension. The blue interval is the observed prefix and the orange interval is generated. The model preserves the stop-motion characters and scene style, continues their interaction, and extends the warm background music across the temporal boundary. 18 Vorch-Omni: Multi-Task Orchestration of Sight and Sound 
+
+Instruction (given to the model): 视频续写，小女孩拿出地图，抬手指向前方，说：根据地图，宝藏就 在那边！ 
+
+Instruction (English translation): Continuation of the video: The little girl pulls out a map, points forward with her finger, and says, “According to the map, the treasure ’s right over there! ”Video frames Audio log-mel Condition Audio-Video · 6.36 s Generated Extension · 5.08 s time → extension boundary 
+
+Figure 7: Speech-aware joint audio-video extension. The model continues the animated scene from the observed prefix, generates the map-unfolding and pointing actions, and synthesizes the prompted Mandarin utterance in the extended interval. The log-mel strips visualize the input and generated audio. 19 Vorch-Omni: Multi-Task Orchestration of Sight and Sound 
+
+A.2 Reference-based Generation A.2.1 Subject-Referenced Joint Audio-Video Generation 
+
+These examples test whether a subject reference can be preserved across multi-shot generation while the model jointly realizes the requested dialogue, music, ambience, and sound effects. We include both realistic science-fiction and stylized 3D fantasy settings to illustrate the breadth of the conditioning. 
+
+Instruction (given to the model): 总体描述 : 视频为高质感写实电影风格，将精致优雅的高级时装与荒 凉冷硬的科幻工业场景完美融合，画面色调以深灰与幽蓝为主，呈现出一种冷峻、深邃且富有叙事张力的视 觉氛围。 分镜 1，0-4s ：中景侧面跟拍镜头。画面展现一个昏暗且充满压抑感的科幻工业基地食堂（参考 Image-2[ 环境]，空间广阔，天花板布满裸露的金属管道，冷白色的微弱灯光从顶端洒下，过道两旁整齐排列着厚重的黑 色金属餐桌） 。一名优雅冷艳女性（参考 Image-1[ 全身 ]，黑色大波浪长卷发，身着领口带有巨大黑色蝴蝶结 装饰的收腰黑色长大衣，颈间佩戴多层珍珠项链，耳垂挂着圆润珍珠耳饰，红唇醒目，神态冷峻从容）正从 画面右侧向左侧缓步走动。镜头平稳地以侧面视角跟随她的步速移动。字幕无。 0-4s ：优雅冷艳女性步伐稳 健，黑色大衣的下摆随着她的走动轻轻晃动。室内微弱的冷光扫过她颈间的珍珠项链，折射出柔润而高级的 白色光泽，与背景中粗糙、生锈的金属管道形成鲜明视觉对比。 [说话音频 ] 无。 < 视频 BGM> 为低沉的电 子合成器氛围音，带有节奏缓慢的金属撞击回响。 「音效」清脆而有节奏的高跟鞋踩踏金属地面的声音，伴 随着基地通风系统细微的嗡鸣声。 分镜 2，4-7s ：中景转近景侧面跟拍镜头。随着角色的行进，过道左侧出现了一扇巨大的弧形观景窗，窗外 是泛着幽蓝荧光的外星森林（参考 Image-2[ 左侧窗外 ]，奇形怪状的巨型植物在夜色中散发着蓝绿色的微光， 空气中弥漫着淡淡的雾气） 。优雅冷艳女性（参考 Image-1[ 面部 ]，神情沉静）在行走中微微侧头，视线投向 窗外的奇异景象。字幕无。 4-7s ：她转头的动作优雅而缓慢，侧脸轮廓在窗外蓝光的映照下显得愈发深邃。 珍珠耳饰在光影交错中微微摇曳，镜头捕捉到她眼中流露出一抹复杂而忧郁的情绪。 [说话音频 ] 无。 < 视频 
+
+BGM> 音乐加入了一段空灵的女性吟唱，旋律忧伤。 [音效 ] 窗外隐约传来外星生物低沉的咆哮声。 分镜 3，7-10s ：特写镜头，聚焦角色侧脸与红唇。优雅冷艳女性（参考 Image-1[ 面部 ]，妆容精致，眼神深邃） 依然保持着向左侧头注视的姿态，背景中巨大的观景窗透出的幽蓝光芒将她的轮廓勾勒出一层冷色调的轮廓 光。字幕无。 ”。7-10s ：她停下脚步，红唇轻启，呼出一口极浅的白气，轻声低语。随后她收回目光，重新望 向前方昏暗的走廊深处，继续迈步前行。 [说话音频 ] 为成熟女性低沉且富有磁性的御姐音，语气带着一丝宿 命感： “雨季就快到了。 ”。< 视频 BGM> 氛围音效逐渐增强，随后在角色走入阴影时戛然而止。 「音效」衣 料摩擦的细微声，以及最后一声沉重的高跟鞋落地声。 
+
+Instruction (English translation): Overall Description The video adopts a high-fidelity realistic cinematic style, seamlessly blending refined and elegant haute couture with desolate, stark sci-fi industrial backdrops. Dominated by dark gray and deep blue tones, the visuals craft a frigid, profound visual atmosphere brimming with narrative tension. Shot 1, 0 –4s: Medium Side Tracking Shot The frame reveals a dim, oppressive cafeteria within a sci-fi industrial facility (environment referenced from Image-2). It is a spacious space lined with exposed metal piping across the ceiling, faint cool-white light pouring down from overhead, and heavy black metal dining tables neatly lined along both sides of the aisle. An elegant, aloof woman (full-body reference: Image-1) walks slowly from the right to the left of the frame. She has voluminous long wavy black hair and wears a tailored long black overcoat decorated with an oversized black bow at the collar. Multiple pearl necklaces drape her neck, round pearl earrings hang from her earlobes, her bold red lips stand out sharply, and her demeanor is cool and composed. The camera glides steadily alongside her in profile, matching her walking pace. No subtitles. 0–4s: The woman strides steadily, the hem of her black coat swaying gently as she moves. Dim cool indoor light glints across her pearl necklaces, casting soft, luxurious white highlights that create a stark visual contrast against the rough, rusted metal pipes in the background. No dialogue audio. Video BGM: Low atmospheric electronic synthesizer soundscape layered with slow, resonant metallic clangs. Sound Effects: Crisp, rhythmic tapping of high heels on the metal floor, mixed with the faint hum of the facility ’s ventilation system. Shot 2, 4 –7s: Medium Shot Cutting to Close-Up Side Tracking Shot As the character advances, a massive curved observation window comes into view on the left side of the aisle. Beyond the window lies an alien 20 Vorch-Omni: Multi-Task Orchestration of Sight and Sound forest glowing with faint indigo luminescence (exterior view on the left referenced from Image-2): bizarre giant flora emits pale teal glows amid the night, with thin mist hanging in the air. The elegant, aloof woman (facial reference: Image-1) tilts her head slightly mid-walk to gaze at the otherworldly scenery outside. No subtitles. 4 –7s: Her head turns with slow, graceful poise; the cyan glow from outside deepens the contours of her side profile. Her pearl earrings sway subtly amid shifting light, and the camera captures a flicker of tangled melancholy in her eyes. No dialogue audio. Video BGM: An ethereal female vocal chant with a mournful melody is woven into the track. Sound Effects: Distant low roars of alien creatures drifting through the window. Shot 3, 7 –10s: Close-Up Shot Focused on the Character ’s Side Profile and Red Lips The elegant, aloof woman (facial reference: Image-1, with flawless makeup and profound eyes) keeps her head tilted left to stare out the window. Deep blue light spilling through the enormous observation window outlines her silhouette with cool rim lighting. No subtitles. 7–10s: She halts mid-step, her red lips parting slightly to exhale a thin wisp of white mist as she murmurs softly. She then pulls her gaze away, refocuses on the shadowed corridor ahead, and resumes walking. Dialogue Audio: A deep, magnetic mature female voice with an aloof aura, tinged with a sense of inevitability: “The rainy season is almost here. ”Video BGM: The atmospheric soundscape swells gradually before cutting off abruptly as the character steps into shadow. Sound Effects: Faint rustling of fabric, followed by one heavy final heel strike on the metal floor. Ref. image Output video Output audio 
+
+Figure 8: Subject-referenced joint audio-video generation in a cinematic science-fiction setting. Given the woman’s appearance reference, the model preserves her facial features, black coat, and pearl accessories across the generated shots while following the requested camera progression. It jointly produces the final spoken line, atmospheric music, footsteps, and environmental effects; the bottom strip visualizes the generated audio. 21 Vorch-Omni: Multi-Task Orchestration of Sight and Sound 
+
+Instruction (given to the model): 总体描述 : 视频为影视级 3D 玄幻风格，画风精细且具有厚重的史诗 感，整体色调以地下洞穴的幽暗深蓝与法阵的暗红为主，通过金色的圣洁光芒与角色眼中的冷蓝灵力形成强 烈的视觉对比，营造出一种庄严、神秘且充满张力的施法氛围。 分镜 1，0-3s ：远景平稳推镜头。画面首帧完全衔接 Image-3 ，展现一个宏大且深邃的地下秘密洞穴。洞穴 中央是一个巨大的圆形玄台（参考 Image-2[ 全景 ]，由多层同心圆环组成，环间流动着暗红色的如血液般的 能量物质，最外圈刻满了密集的古老符文） 。八根巨大的石雕龙柱环绕四周，每根柱子上都通过锁链悬挂着 数盏散发着暖橙色火光的灯笼，火光在湿润的空气中形成微弱的晕影。黑衣金纹长袍男子（参考 Image-1[ 全身]、Image-3[ 位置 ]，一位面容冷峻的年轻男性，黑色长发如瀑布般披散，发顶戴着白银镂空发冠与坠有珠饰 的额饰。他身穿交领米白色内袍，外罩一件黑色半透明纱质大袖长袍，袍身上绣有精美的金色星象与流云纹 样，腰间系着镶嵌青玉的束腰，整体气质高贵且神秘）正静立于玄台正中心的金色光柱之中。字幕无。 0-3s ：随着镜头缓慢而坚定地向玄台中心推进，原本垂直降下的金色光束开始微微震颤，玄台四周的水面映照着摇 曳的灯火。黑衣金纹长袍男子双手缓缓抬至胸前，指尖灵动地翻转，开始结出复杂的施法手印，宽大的衣袖 随之轻轻晃动。 [说话音频 ] 为成年男性低沉且富有磁性的尊贵嗓音： “沉睡于深渊的古老契约，终将在这一 刻，随金芒破晓而重生。 ”< 视频 BGM> 为低沉压抑的管弦乐伴随空灵的钟声，营造出仪式感。 「音效」沉 闷的地底风声，以及灯笼内火焰燃烧的细微噼啪声。 分镜 2，3-5s ：胸像特写固定镜头。镜头跨越空间距离，直接锁定角色的上半身。背景中洞穴的石柱与灯火 已化为虚化的深蓝色光斑。黑衣金纹长袍男子（参考 Image-1[ 半身 ]，近距离下可见其皮肤白皙如玉，眉间 神情肃穆，双唇紧闭，透出一种不容置疑的威严。黑色长袍上的金色丝线在微弱的光线下闪烁着金属质感， 胸前的结印手势稳健而有力） 。字幕无。 3-5s ：黑衣金纹长袍男子双手的结印动作进入最后阶段，指尖交错间 隐约有透明的气流旋涡产生。他的双眼蓦然睁大，瞳孔深处由内而外迸发出幽蓝色的深邃光芒，光芒逐渐覆 盖整个虹膜并向眼角溢出细微的蓝色电光。随着法力的涌动，他额前的碎发被无形的压力吹起，整个人散发 出强大的灵压。 [说话音频 ] 为成年男性低沉且富有磁性的冷冽嗓音： ” 我们苦等千年的盟约要现世了吗？ ”< 
+
+视频 BGM> 音乐节奏瞬间拔高，加入沉重的大鼓敲击声，象征力量的爆发。 「音效」尖锐的法术能量汇聚 声，伴随着类似雷电轰鸣的低频震动声。 
+
+Instruction (English translation): Overall Description This video features cinematic-grade 3D xianxia fantasy style with intricate artwork and grand epic vibes. The overall palette is dominated by the dark deep blue of the underground caverns and the crimson red of magic arrays. Stark visual contrast is created by holy golden radiance and icy blue spiritual power glowing in the character ’s eyes, building a solemn, mysterious and charged atmosphere of spellcasting. Shot 1, 0 –3s: Slow Forward Push Wide Shot The opening frame seamlessly connects to Image-3, revealing a vast, profound secret underground cavern. At the cavern ’s center lies a massive circular mystic platform (full-scene reference: Image-2), constructed from multiple concentric rings. Dark red blood-like energy fluid flows between the rings, and the outermost ring is carved densely with ancient runes. Eight giant stone dragon pillars stand around the platform. Chains hanging from each pillar suspend several lanterns glowing with warm orange flame, whose light casts faint halos in the damp air. A man robed in black embroidered with golden patterns (full-body reference: Image-1, positioning reference: Image-3) stands motionless within a vertical golden light pillar right at the platform ’s heart. He is a stern-faced young man with cascading long black hair, adorned with an openwork silver hair crown and a pearl-dangling forehead ornament atop his head. Under an overlapping-collar off-white inner robe, he wears a sheer black wide-sleeve outer gown embroidered with exquisite golden constellation and cloud patterns, cinched by a jade-inlaid waist sash, exuding noble, enigmatic bearing. No subtitles. 0 –3s: As the camera glides steadily and resolutely toward the platform ’s center, the vertical golden light pillar begins to tremble faintly. Flickering lantern flames reflect on the water surrounding the platform. The man slowly lifts both hands to his chest, twisting his fingertips nimbly to form intricate spell mudras, his broad sleeves swaying gently with the motion. Voice Audio: Deep, magnetic, dignified adult male voice: “The ancient covenant slumbering in the abyss shall at last be reborn with the golden dawn ’s radiance at this moment. ”Video BGM: Somber, restrained orchestral score layered with ethereal bell chimes to establish ritual gravitas. Sound Effects: Muffled underground wind, faint crackling of burning lantern flames. Shot 2, 3 –5s: Fixed Bust Close-Up The camera cuts across spatial distance to lock tightly onto the character ’
+
+s upper body. The cavern stone pillars and lantern lights in the background blur into soft dark blue bokeh. The robed man (half-body reference: Image-1) has jade-pale skin up close, a solemn, tight-lipped expression 22 Vorch-Omni: Multi-Task Orchestration of Sight and Sound radiating unassailable authority. The golden threads woven into his black gown glint with metallic luster under dim light, and his spell mudra held before his chest is steady and powerful. No subtitles. 3 –5s: The man ’s hand mudras reach their final sequence; faint transparent swirls of air form between his interlaced fingertips. His eyes snap wide open, profound indigo light bursting outward from deep within his pupils, spreading across his irises and spilling tiny blue electric sparks toward the outer corners of his eyes. Surge of magical force lifts the stray strands on his forehead with invisible pressure, and overwhelming spiritual aura emanates from his entire figure. Voice Audio: Cold, deep, magnetic adult male voice: “Shall the covenant we ’ve endured a thousand years waiting for finally manifest? ”Video BGM: The music surges sharply in tempo, bolstered by heavy drum beats signifying an outburst of power. Sound Effects: Sharp whistling of converging magical energy, paired with low-frequency rumbling akin to thunderclaps. Ref. image Output video Output audio 
+
+Figure 9: Subject-referenced joint audio-video generation in a cinematic 3D fantasy setting. The generated shots retain the referenced man’s facial, hairstyle, and costume attributes while realizing the requested cavern, spell-casting motion, and shot transition. Speech, orchestral music, fire, underground ambience, and magical effects are synthesized jointly with the video; the bottom strip visualizes the output audio. 23 Vorch-Omni: Multi-Task Orchestration of Sight and Sound 
+
+A.2.2 Video Transformation with Identity Preservation 
+
+These examples combine a source video with an independent subject image. The model introduces the referenced subject while preserving the relevant source scene and interaction, and can adapt realistic or stylized identity cues to the visual domain of the source. The second example additionally tests jointly generated Mandarin dialogue and ambient sound. 
+
+Instruction (given to the model): 保留 Video-1 中坐在会议桌前的白发女性与黑衣眼镜男性，场景仍在 明亮的会议室内。在画面右侧，引入一个三维卡通科学家（参考 Image-1 中的卡通科学家形象，其头顶覆盖 有黄色粘稠的液体状头发，拥有红色的圆大鼻子，身穿沾满黑色污渍的白色实验服） 。科学家手持一块发光 的黑色平板（参考 Image-1 中手持的黑色平板电脑）从右侧踱步走入镜头，停在会议桌旁。桌前的白发女性 和黑衣男性转头看向他，科学家用手指着平板屏幕，神色认真地与他们交谈讨论。镜头稍微向右移动并保持 固定，将三人纳在同一个中景画面中。无语音，背景伴有轻微的会议室环境音。 
+
+Instruction (English translation): Retain the white-haired woman and bespectacled man in black seated at the conference table from Video-1, with the scene set in the same bright meeting room. Introduce a 3D cartoon scientist on the right side of the frame (modelled after the cartoon scientist in Image-1: he has thick, viscous yellow liquid-like hair covering his head, a large round red nose, and wears a white lab coat stained all over with black smudges). The scientist walks slowly into the frame from the right, holding a glowing black tablet (matching the black tablet computer held by the character in Image-1), and stops beside the conference table. The white-haired woman and the bespectacled man in black at the table turn their heads to look at him. The scientist points at the tablet screen and engages in a serious discussion with them. The camera pans slightly to the right then stays static, framing all three characters within a single medium shot. No dialogue; faint ambient background noise of a meeting room plays throughout. Ref. image Ref.  video Output video 
+
+Figure 10: Video transformation with an identity reference. From left to right, the figure shows the reference image, representative frames from the source video, and frames from the generated output. The model introduces the referenced stylized scientist into the meeting while retaining the source setting and its existing participants, and integrates the new subject naturally into the interaction. 24 Vorch-Omni: Multi-Task Orchestration of Sight and Sound 
+
+Instruction (given to the model): 保留 Video-1 中穿着企鹅连体服的小女孩形象及其身后的森林水车场 景，并在小女孩右侧增加一名神秘男子。该男子参考 Image-1 中的清秀面容、黑色长发束起并佩戴珍珠发冠 的形象，其身着的服饰参考 Image-1 中的带有浅蓝色云纹装饰的白色古风绸缎长袍。将景别切换为中全景， 画面中小女孩站在石块旁，面带惊讶地仰头看向身侧，男子（参考 Image-1 中的身形姿态）双手背在身后， 神情平静且温和地低头与她对视。小女孩说： ’ 大哥哥，你是神仙吗？ ’（中文） ，声音稚嫩且充满好奇；男子 随后回答： ’ 小姑娘，请问此处是何地？ ’（中文） ，声音清澈温润，是富有磁性的青年男声。画面底部出现白 色字幕，内容分别为 ’ 大哥哥，你是神仙吗？ ’ 和’ 小姑娘，请问此处是何地？ ’。背景伴有轻微的水车转动声 和森林中的鸟鸣。 
+
+Instruction (English translation): Retain the image of the little girl in a penguin onesie from Video-1 as well as the forest water mill scene behind her, and add a mysterious man to the girl ’s right side. The man shall feature the delicate facial features, tied-up long black hair and pearl hair crown seen in Image-1, and wear an ancient-style white silk robe decorated with pale blue cloud patterns as shown in Image-1. Switch to a medium full shot. In the frame, the little girl stands beside a stone block, looking up sideways in surprise. The man (with body posture referenced from Image-1) stands with both hands clasped behind his back, gazing down at her calmly and gently. The little girl speaks in a childish, curious voice in Chinese: “Big brother, are you an immortal? ”The man then replies in a clear, warm, magnetic young male voice, also in Chinese: “Little girl, may I ask where this place is? ”White subtitles corresponding to the two lines of dialogue appear at the bottom of the frame. Faint sounds of the turning water mill and forest birds chirping play in the background. Ref. image Ref. video Output video Output audio 
+
+Figure 11: Identity-preserving video transformation across visual domains. From left to right are the realistic character reference, the animated source video, and the generated output. The model translates the refer-enced man’s facial, hairstyle, and clothing cues into the animation style while retaining the girl and forest environment. The output also contains the requested Mandarin dialogue and ambient sound, visualized by the bottom audio strip. 25 Vorch-Omni: Multi-Task Orchestration of Sight and Sound 
+
+A.3 Video Editing A.3.1 Semantic Editing 
+
+The two examples test localized instruction-based editing: inserting an igloo and changing a leaf’s color. In both cases, the intended edit is applied while the surrounding content, motion, framing, and illumination remain unchanged. 
+
+Instruction (given to the model): 保持 Video-1 中的极地荒野场景、远处的山脉轮廓以及夜空中舞动的 绿色极光完全一致。保留原有的繁星夜空、广角景别、固定的运镜方式和清冷的冷色调光影。在画面中部的 积雪地面上新增一个圆顶的小冰屋，冰屋由整齐的白色雪砖堆砌而成，其材质纹理与周围的皑皑白雪自然融 合，并在极光的映照下呈现出淡淡的绿色反光。除新增的冰屋外，其他所有景观元素与 Video-1 保持完全一 致。 
+
+Instruction (English translation): Keep the polar wilderness scene, distant mountain silhouettes and swirling green auroras in the night sky identical to those in Video-1. Retain the original star-strewn night sky, wide-angle framing, fixed camera movement and cool, frigid-toned lighting. Add a small domed igloo on the snow-covered ground in the middle of the frame. The igloo is built from neatly stacked white snow bricks, with material textures blending naturally into the surrounding vast snow, casting faint green reflections under the glow of the auroras. All landscape elements other than the newly added igloo shall remain completely consistent with Video-1. Source video Output video 
+
+Figure 12: Localized semantic insertion. Representative source frames are shown on the left and edited output frames on the right. The model adds the requested igloo to the snowy foreground while retaining the aurora, mountains, camera motion, and overall illumination of the source video. 26 Vorch-Omni: Multi-Task Orchestration of Sight and Sound 
+
+Instruction (given to the model): 保留 Video-1 中的场景、布局、景别和运镜完全一致，维持水面上细 微的波纹以及水底清晰可见的各色鹅卵石。仅将画面中心那片硕大的褐色枯叶颜色修改为纯白色，保持叶片 的边缘轮廓、叶脉纹理和在水中的漂浮状态与 Video-1 完全一致。整体画面的自然光影与色调均不做改动， 除了叶片色相的改变外，其他所有视觉元素均保持不变。 
+
+Instruction (English translation): Keep the scene, composition, shot size and camera movement identical to those in Video-1, and preserve the subtle ripples on the water surface as well as the various colored pebbles clearly visible beneath the water. Only change the color of the large brown dead leaf at the center of the frame to pure white, while keeping the leaf ’s edge outline, vein texture and floating state in the water exactly the same as in Video-1. No adjustments shall be made to the natural lighting and color palette of the overall frame; all other visual elements remain unchanged except for the hue modification of the leaf. Source video Output video 
+
+Figure 13: Attribute-level semantic editing. The model changes only the floating leaf from brown to white, while preserving its outline, veins, motion, water ripples, visible pebbles, framing, and natural lighting from the source video. 27 Vorch-Omni: Multi-Task Orchestration of Sight and Sound 
+
+A.3.2 Style Editing 
+
+These examples transform a complete source video into oil-painting and cyberpunk styles. They emphasize global appearance changes while retaining the subjects, actions, scene layout, and camera trajectory of the source. 
+
+Instruction (given to the model): 保留 Video-1 中棕色卷毛小狗奔跑的动态过程，以及背景中红砖墙建 筑和坐在木质长椅上的三名女性形象。将视频整体视觉风格转化为油画风格，画面笔触质感明显，色彩呈现 出油画特有的丰富层次与厚重感。光影效果修改为柔和的艺术化光感，色调更加浓郁温暖。保持原有的运镜 方式，即镜头跟随小狗奔跑方向平移，确保小狗的动作姿态与 Video-1 完全一致。 
+
+Instruction (English translation): Retain the running motion sequence of the brown curly-haired puppy from Video-1, as well as the red brick buildings in the background and the three women seated on the wooden bench. Convert the overall visual style of the video to an oil painting aesthetic with distinct brushstroke textures, delivering the rich layering and thick impasto unique to oil paintings. Revise the lighting to soft artistic illumination with richer, warmer color tones. Maintain the original camera movement: the camera pans following the puppy ’s running direction, ensuring the puppy ’s movements and poses remain exactly identical to those in Video-1. Source video Output video 
+
+Figure 14: Video style editing from a photographic source to an oil-painting appearance. The generated output applies visible brushwork and warmer, painterly color rendering while preserving the running dog, background people, scene layout, and tracking motion. 28 Vorch-Omni: Multi-Task Orchestration of Sight and Sound 
+
+Instruction (given to the model): 保留 Video-1 中戴着遮阳帽、背着黑色登山包、身穿浅色衬衫和深色 长裤的男性徒步者的形象及其行走动作姿态。将整体画风修改为赛博朋克风格，场景背景中的山脉和碎石地 表添加霓虹灯光元素，色调调整为赛博朋克标志性的蓝紫色调与冷暖光影对比。天空背景增加高科技质感的 数字化浮动信息或全息投影效果。保持视频的景别、运镜方式以及人物在画面中的位置与 Video-1 完全一致。 
+
+Instruction (English translation): Retain the image and walking movements of the male hiker from Video-1, who wears a sun hat, carries a black hiking backpack, and is dressed in a light-colored shirt and dark trousers. Transform the overall art style into cyberpunk. Add neon lighting elements to the mountain range and gravel ground in the background, and adjust the color palette to the signature blue-purple tones and contrasting cool-warm light and shadow of cyberpunk. Add high-tech digital floating information or holographic projection effects to the sky backdrop. Keep the shot size, camera movement, and the character ’
+
+s position within the frame entirely consistent with Video-1. Source video Output video 
+
+Figure 15: Video style editing from an outdoor hiking scene to a cyberpunk aesthetic. The output introduces blue–purple neon illumination and holographic elements while retaining the hiker’s identity, walking motion, framing, and camera trajectory from the source video. 29 Vorch-Omni: Multi-Task Orchestration of Sight and Sound 
+
+A.3.3 Image-Referenced Editing 
+
+The examples use an image reference to specify either a local attribute replacement or a new subject inser-tion. The referenced jacket and penguin are transferred into their respective source videos without altering unrelated characters, interactions, or scene structure. 
+
+Instruction (given to the model): 保留 Video-1 中的室内楼梯场景、人物布局及所有人物的动作姿态， 特别是男主与右侧女性牵手行走的细节。保持左右两位女性的服饰、发型和神情完全不变。将中间男性的原 有服装替换为参考图中的哑光黑色机能风战术夹克，该夹克具有明显的织带、搭扣和多口袋设计，材质呈现 出细腻的哑光质感。除男性服饰外，画面的景别、运镜、光影色调及其他所有元素均与 Video-1 保持完全一 致。 
+
+Instruction (English translation): Retain the indoor staircase scene, character layout and all characters ’
+
+movements and poses from Video-1, especially the detail of the male protagonist walking hand in hand with the woman on his right. Keep the outfits, hairstyles and expressions of the two women on the left and right completely unchanged. Replace the original clothing of the man in the middle with a matte black techwear tactical jacket as shown in the reference image. The jacket features prominent webbing, buckles and multi-pocket designs, with fine matte texture on the material. Except for the man ’s outfit, the shot size, camera movement, lighting, color palette and all other elements in the frame shall remain fully consistent with Video-1. Ref. image Ref.  video Output video 
+
+Figure 16: Reference-guided local clothing edit. From left to right are the tactical-jacket reference, source-video frames, and edited output frames. The model transfers the jacket’s matte material, webbing, buckles, and pocket design to the central man while preserving the staircase, the other characters, their interactions, and the camera motion. 30 Vorch-Omni: Multi-Task Orchestration of Sight and Sound 
+
+Instruction (given to the model): 保留 Video-1 中的场景布局，包括白色皮质沙发、带有灯串的白砖墙 背景以及地面上的粉色装饰物。保持原有的景别、运镜和室内明亮的光影效果。在视频画面中添加一只戴着 黄色围巾的企鹅，企鹅的外观特征与参考图保持一致，拥有黑白色的羽毛和颈部的橘黄色斑块，脖子上系着 一条明黄色的针织长围巾。新增的企鹅与环境融合自然，除此之外，其他所有元素与 Video-1 完全一致。 
+
+Instruction (English translation): Retain the scene layout from Video-1, including the white leather sofa, white brick wall backdrop decorated with string lights, and pink ornaments on the floor. Preserve the original shot size, camera movement, and bright indoor lighting effects. Add a penguin wearing a yellow scarf to the frame. The penguin ’s appearance shall match the reference image: it has black-and-white plumage with orange patches on its neck, and a bright yellow long knitted scarf tied around its neck. The newly added penguin blends naturally into the environment; all other elements remain identical to those in Video-1. Ref. image Ref.  video Output video 
+
+Figure 17: Reference-guided subject insertion. From left to right are the penguin reference, source-video frames, and edited output frames. The model inserts the scarf-wearing penguin into the room while retaining the sofa, illuminated brick wall, floor decorations, framing, and indoor lighting. 31 Vorch-Omni: Multi-Task Orchestration of Sight and Sound 
+
+A.4 Audio-Driven Generation 
+
+We include a realistic two-speaker conversation and a stylized single-character performance. Together, they test identity and style preservation, active-speaker handling, and facial and body motion synchronized with the driving audio. 
+
+Instruction (given to the model): 视频展现了一个写实风格的摄影棚幕后场景。一名金发女子穿着白 色无袖 V 领衫，配戴精致的金色项链，她手中拿着一支黑金外壳的红色口红展示在镜头中心，面对镜头 侃侃而谈： ”But that has to be balanced with softer, more pliable waxes, like beeswax, which also acts as an emollient and improves the glide factor. It’s this constant negotiation between being rock solid in the container and then spreading smoothly when you apply it.” 她在讲解时表情灵动，展现出专业而友好的气 质。紧接着，站在她身侧、穿着黑色衬衫的英俊男子微笑着补充道： ”So the texture, you know, matte versus creamy or sheer versus opaque, that’s all dictated by the ratio of these waxes and oils.” 整个片段采用固定 的中景镜头，构图稳定。背景中闪烁的蓝色点阵光源和摄影设备衬托出专业拍摄的氛围。视频中无动态字幕， 通过两位主体流畅的英语对话，生动地介绍了口红质感背后的科学原理。 
+
+Instruction (English translation): The video depicts a behind-the-scenes studio scene rendered in a realistic photographic style. A blonde woman wearing a white sleeveless V-neck top and an exquisite gold necklace holds a red lipstick with a black-and-gold casing, presenting it at the center of the frame as she speaks confidently to the camera: ”But that has to be balanced with softer, more pliable waxes, like beeswax, which also acts as an emollient and improves the glide factor. It’s this constant negotiation between being rock solid in the container and then spreading smoothly when you apply it.” She wears vivid, animated expressions throughout her explanation, exuding a professional and approachable demeanor. Right after her, a handsome man standing beside her in a black shirt smiles and adds: ”So the texture, you know, matte versus creamy or sheer versus opaque, that’s all dictated by the ratio of these waxes and oils.” The entire clip uses a fixed medium shot with steady framing. Flickering blue dot matrix light panels and photographic equipment in the background set a professional filming atmosphere. No on-screen captions appear in the video. Through the natural, fluent English dialogue between the two speakers, the clip vividly explains the scientific principles behind lipstick textures. Ref. image Ref. audio Output video 
+
+Figure 18: Multi-speaker audio-driven generation. The reference image specifies the two speakers and studio composition, while the driving audio contains their alternating English utterances. The generated frames preserve both identities and align the active speaker’s facial motion with the corresponding portion of the audio. 32 Vorch-Omni: Multi-Task Orchestration of Sight and Sound 
+
+Instruction (given to the model): 这部视频呈现了一个具有中式美学风格的 3D 动画场景。一只身着精 美蓝色中式绣花长袍、有着大耳朵的灰色小老鼠站在装饰有红金祥云图案的背景前，自信满满地进行着表演。 小老鼠神采飞扬，随着节奏不断做出各种生动的肢体动作，并大声喊出： “A clam eating a telephone. ”、“APersian chandelier! ”、“A lamp! ”、“A soup factory! ”、“A continental breakfast! ”。当它喊道“ A chicken! ”并听到一声尖细的鸟鸣回应后，它露出极度满意的神情，摊开双手自豪地感慨： “Oh, I am so good at this. ”。画面底部全程显示着对应的英文字幕，每段语音之后都伴随着清脆的魔法音效。摄像机始终以静止的中景机 位捕捉小老鼠灵动的神态和表演，整体叙事像是一个小魔术师在展示自己的才华，氛围欢快且富有童趣。 
+
+Instruction (English translation): This video features a 3D animation scene infused with traditional Chinese aesthetic style. A small grey mouse with large ears, dressed in an exquisite blue Chinese robe embroidered with intricate patterns, stands before a backdrop decorated with red-and-gold auspicious cloud motifs and performs with full confidence. The mouse looks vibrant and animated, striking a variety of lively body movements in time with the rhythm while exclaiming loudly: “A clam eating a telephone. ”, “APersian chandelier! ”, “A lamp! ”, “A soup factory! ”, “A continental breakfast! ”. When it shouts “Achicken! ”, a shrill bird chirp echoes in response. The mouse then wears an expression of immense satisfaction, spreads its hands wide, and declares proudly: “Oh, I am so good at this. ”Matching English subtitles run continuously along the bottom of the frame, and crisp magical sound effects play after each line of speech. The camera remains locked in a stationary medium shot, capturing the mouse ’s vivid facial expressions and lively performance throughout. The overall narrative evokes the vibe of a young magician showing off his talents, creating a cheerful, childlike atmosphere. Ref. image Ref. audio Output video 
+
+Figure 19: Single-character audio-driven animation. Conditioned on the character image and driving audio, the model generates a temporally coherent performance with expressive gestures and lip motion aligned to the sequence of English utterances. The visual style and traditional Chinese decorative setting remain consistent throughout the clip. 
+
+A.5 Detailed Evaluation Rubric 
+
+Tables 2 and 3 list the secondary criteria used by the human-evaluation protocol in Sec. 5.2. Criteria are applied only when relevant to a sample; consequently, the number of judgments per sample varies with its task and available conditions. 33 Vorch-Omni: Multi-Task Orchestration of Sight and Sound Table 2: Evaluation dimensions shared by the T2AV and R2V tasks. Each capability is organized as a 
+
+primary dimension decomposed into fine-grained secondary dimensions , and every secondary dimension is typed by its basis of judgment: P (Prompt) assesses adherence to textual instructions and V (Video) assesses the intrinsic quality of the generated content. The T2AV task centers on these P- and V-type dimensions. 
+
+Primary Dimension Type Secondary Dimension Description Motion Quality 
+
+V Human Structural Accuracy Detecting structural anomalies such as extra limbs, missing limbs, truncation, unnatural bending, or subject–object clipping. V Object Structural Accuracy Detecting object defects, redundancy, or deformation during motion, as well as clipping between objects or between subjects and objects. V Motion Plausibility Assessing whether the motion of humans and objects conforms to physical laws and common sense, identifying implausible trajectories and behavioral logic. V Motion Stability (Artifacts) Detecting generation artifacts such as deformation, ghosting, spurious shadows, blurring, and fluctuation arising during subject motion or camera movement. 
+
+Prompt Following 
+
+P Action Responsiveness Whether humans and objects in the video perform the actions described in the prompt. P Subject Description Fidelity Whether the generated subject remains consistent with the prompt description, including attributes such as gender, appearance, color, and quantity. P Stylistic Consistency Whether the video is generated in the live-action or animated style specified by the prompt and maintains that style temporally. P Temporal and Logical Ordering Whether events occur in the specified order, covering action sequencing, causal relationships, narrative logic, and temporal relations. P Camera Language Whether camera movement and on-screen content conform to the prompt, identifying omitted or added shots and erroneous shot sequences. P Environmental Accuracy Whether the scene conforms to the prompt’s description of season, weather, location, time, and background elements. P Relative Position Compliance Whether the spatial relationships between subjects and objects described in the prompt are correctly generated. P Editing Accuracy (R2V) Whether the specified content of the reference material is modified accurately per the prompt—i.e., whether the intended edit is applied correctly. 
+
+Audio Prompt Following 
+
+P Audio Instruction Adherence Whether dialogue is accurate, whether the sound effects and background music mentioned in the prompt are present, and whether the generated audio characteristics match the subject’s attributes. 
+
+Audio Quality V Audio Fidelity Whether the voice, sound effects, and music exhibit defects such as distortion, harshness, mid-stream truncation, or slurred articulation. 
+
+Audio-Visual Synchroniza-tion 
+
+V Lip-Audio Synchronization Whether, during monologue or dialogue, the subject’s lip motion remains temporally aligned with the vocal track. V Sound-Event Alignment Whether action and event sound effects remain temporally consistent with, and matched to, the corresponding actions and events. 
+
+34 Vorch-Omni: Multi-Task Orchestration of Sight and Sound Table 3: R2V-specific evaluation dimensions. In addition to the shared dimensions of Table 2, the R2V task introduces R (Reference) dimensions that assess the inheritance and fidelity of the reference material; V
+
+(Video) again denotes intrinsic-quality points and R/V a point judged on both bases. 
+
+Primary Dimension Type Secondary Dimension Description Spatial Persistence 
+
+R Scene Structure Inheritance Whether the spatial relationships in the reference material are correctly inherited, identifying scene fusion or superimposition between reference material and adjacent shots. R/V Subject Persistence Whether subjects already present in the frame remain without sudden disappearance, addition, or substitution, and without change of identity. V Subject Feature Inheritance Whether subject characteristics remain consistent across the video. 
+
+Reference Alignment 
+
+R Subject Consistency Whether the reference subject’s appearance features—face, hairstyle, clothing, accessories—remain consistent, and whether IP binding is correct. R Motion Consistency Whether the reference subject’s motion trajectory, lip movement, and pose changes remain consistent with the reference material. R Camera-Movement Consistency Whether the camera language remains consistent with the reference material. R Audio Consistency Whether the voice, music, and sound effects remain consistent with the reference, and whether the subject’s timbre, volume, tone, tempo, intonation, and accent are preserved. 
+
+Local Editing R Edit-Scope Control When modifying one element of the reference material, whether the other elements that should remain unchanged are preserved. V Subject-Scene Integration Whether the layer containing the subject integrates naturally with the overall environment, and whether fusion between the reference scene and the generated scene occurs. 
+
+35

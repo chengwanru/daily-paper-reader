@@ -1,0 +1,449 @@
+Title: Distilling Physical Priors into Streaming World Models
+
+URL Source: https://arxiv.org/pdf/2608.07981v1
+
+Published Time: Tue, 11 Aug 2026 00:37:20 GMT
+
+Number of Pages: 9
+
+Markdown Content:
+# Distilling Physical Priors into Streaming World Models 
+
+## Liangliang Zhao 1,2 , Junying Wang 1,2 , Danni Yang 1,2 , Yifan Chang 2,Bin Fu 2, Yu Qiao 2, Bowen Zhou 2, Yihao Liu 2†
+
+> 1
+
+Fudan University, Shanghai, China 
+
+> 2
+
+Shanghai AI Laboratory, Shanghai, China {zhaoliangliang, liuyihao}@pjlab.org.cn 
+
+Abstract 
+
+Streaming world models predict future visual states through online rollouts while maintaining physically coherent dynam-ics over long horizons. However, their rollouts often violate basic physical constraints. A common approach builds such models by distilling pretrained bidirectional DiTs into few-step causal generators. However, this paradigm suffers from two fundamental limitations: generic bidirectional teachers acquire limited physical priors from visually oriented pretraining, and the limited priors suffer further loss during bidirectional-to-causal distillation. We present PhyS, a three-stage framework for distilling physical priors into streaming world models. To acquire physical priors from real-world interactions, we construct PhyS-120K, a dataset of 120K real-world physical-interaction videos spanning rigid-body dynamics, soft-body deformation, fluid phenomena, and phase transitions. Each video is annotated with structured descriptions of object prop-erties and causal state transitions. Physics-aware supervised fine-tuning injects the physical priors into a bidirectional 14B DiT teacher, which we then distill into a lightweight 1.3B causal DiT for few-step autoregressive streaming generation. Finally, we use online reinforcement learning to incentivize the distilled model to generate physically plausible rollouts and further propose Temporal Credit Routing (TCR) to ad-dress temporal credit assignment. TCR evaluates physical consistency over overlapping temporal windows and routes the resulting group-relative advantages to temporally aligned denoising actions. On PhysicsIQ, PhyS improves the Wan2.1-14B teacher by 18.2% and the Self Forcing, Rolling Forcing, and Causal Forcing by 23.7%, 14.8%, and 31.4%, respectively. The results further show improvements on the physics-aware video generation benchmarks of VideoPhy, VideoPhy2, and PhyGenBench. The dataset, code, and more sample videos are available on our Project Page. 
+
+## 1 Introduction 
+
+In recent years, video generation models (Brooks et al. 2024; Polyak et al. 2024; Ma et al. 2025; Team Wan et al. 2025) have made significant progress and can now synthesize videos with high visual fidelity and temporal coherence. Large-scale video pre-training enables these models to learn rich spatiotem-poral representations, motion patterns, and scene dynamics, laying a crucial foundation for building video world models. Building on these learned priors, streaming world models can 
+
+> †
+
+Corresponding author. 10   
+
+> 15
+> 20
+> 25
+> 30
+> 35
+> +18.2%
+> +23.7%
+> +14.8%
+> +31.4%
+> Score(%)
+> 15
+> 25
+> 35
+> 45
+> 55
+> +16.0%
+> PC
+> +1.5%
+> SA
+> +18.5%
+> PC
+> +7.4%
+> SA
+> +6.9%
+> PC
+> +8.8%
+> SA
+> +21.4%
+> PC
+> +12.7%
+> SA
+> 15
+> 30
+> 45
+> 60
+> 75
+> PC
+> +3.3%
+> SA
+> +11.1%
+> Joint
+> +14.6%
+> PC
+> +19.9%
+> SA
+> +10.2%
+> Joint
+> +13.2%
+> PC
+> +10.3%
+> SA
+> +7.4%
+> Joint
+> +24.3%
+> PC
+> +6.2%
+> SA
+> +23.2%
+> Joint
+> Wan2.1-14B Self Forcing
+> Rolling Forcing Causal Forcing
+> Score(%) Score(%)
+> +7.5%
+
+Figure 1: Representative gains of PhyS on three physics-aware video generation benchmarks. predict future visual states from initial observations, thereby representing world dynamics in video form. Given observed context frames and an optional text condition, they generate future frames block by block, conditioning each block on the previously generated history. This causal formulation enables continuous streaming rollout without regenerating the complete video sequence. Existing methods commonly adopt a Forcing-based train-ing paradigm that distills a pretrained bidirectional DiT into a few-step causal generator (Huang et al. 2025; Liu et al. 2025b; Zhu et al. 2026). This paradigm enables streaming world models to perform long-horizon rollouts, yet their pre-dictions frequently violate fundamental physical constraints, causal relationships, and commonsense world knowledge. This problem arises from two fundamental limitations of the paradigm. First, generic bidirectional teachers acquire limited physical priors from visually oriented pretraining. Second, these limited priors suffer further loss during bidirectional-to-causal distillation, making it difficult for the causal student to preserve the long-range dependencies essential to physical causality. The resulting errors accumulate throughout autore-gressive rollouts, exacerbating physical and causal deviations over long horizons. To address these limitations, we propose PhyS , a training framework for physical streaming world models. We first de-sign a data pipeline and use it to collect and curate PhyS-120K, a dataset of 120,804 real-world physical-interaction videos covering representative physical processes such as rigid-body dynamics, soft-body deformation, fluid dynamics, and phase arXiv:2608.07981v1 [cs.CV] 8 Aug 2026 transitions. We then employ a vision-language model (Bai et al. 2025) to annotate each clip with a structured physical description, providing fine-grained supervisory signals for learning how physical dynamics evolve in real-world scenar-ios. Using this dataset, we perform physics-aware supervised fine-tuning with a bidirectional 14B DiT video generator as the backbone, yielding a teacher model that captures prior knowledge of real-world physical dynamics. We then distill this 14B teacher into a lightweight 1.3B causal DiT that sup-ports few-step inference, enabling streaming video generation conditioned on contextual frames. Finally, we introduce an online policy optimization stage, in which a reward model assesses the physical consistency of the generated video and provides a signal to align the causal DiT’s generation behavior. The final stage aligns the causal generator through Temporal Credit Routing (TCR). Instead of broadcasting a single video-level advantage, TCR routes rewards across overlapping temporal windows to aligned denoising actions. This overlap-routed signal localizes physical feedback. As summarized in Fig. 1, physics-aware SFT improves the bidirectional teacher by 18.2% on PhysicsIQ. TCR further improves Self Forcing, Rolling Forcing, and Causal Forcing by 23.7%, 14.8%, and 31.4%, respectively, and produces consistent gains across the physical-consistency metrics of VideoPhy and VideoPhy2. Our contributions are summarized as follows: 
+
+• Dataset: We construct PhyS-120K , a dataset of 120K real-world physical-interaction videos with structured an-notations of object properties and causal state transitions. 
+
+• Framework: We introduce PhyS , a three-stage frame-work that learns physical priors with a bidirectional DiT teacher and transfers them to a lightweight, few-step causal generator for streaming rollout. 
+
+• Optimization Strategy: We propose Temporal Credit Routing (TCR) , which aggregates window-level physical rewards into overlap-routed advantages for causal denois-ing actions and improves multiple causal video generators across four physics-aware benchmarks. 
+
+## 2 Related Work 
+
+Autoregressive Video Generation. Modern video diffusion models denoise complete sequences with bidirectional tempo-ral context, whereas streaming world models require causal, low-latency generation; autoregressive (AR) approaches meet this requirement by conditioning each frame or chunk on previously generated content. Early AR methods represent videos as discrete spatiotemporal tokens (Yan et al. 2021; Kondratyuk et al. 2024; Bruce et al. 2024), while recent causal diffusion and flow-matching models operate in latent space using few-step denoising or blockwise generation (Chen et al. 2024; Yin et al. 2025; Huang et al. 2025; Teng et al. 2025; Gu, Mao, and Shou 2025; Jin et al. 2025). They are trained with causal-teacher or diffusion-forcing objectives (Hu et al. 2024; Gao et al. 2024; Song et al. 2025), or distilled from bidirectional teachers through distribution matching (Yin et al. 2024, 2025; Huang et al. 2025); rolling-window and history-aware training further improve rollout stability (Ruhe et al. 2024; Chen et al. 2025b; Liu et al. 2025b). 
+
+Physics-aware Video Generation. Physics-aware video generation incorporates physical knowledge through simulation-based, language-guided, and learned-prior ap-proaches. Explicit-model approaches impose dynamics using physical solvers, reconstructed states, or programmatic ani-mation (Stomakhin et al. 2013; Jiang et al. 2016; Liu et al. 2024; Li et al. 2023; Chen et al. 2025a; Lv et al. 2024; Li et al. 2025b; Xie et al. 2025; Liu et al. 2026), but depend on accurate reconstruction, hand-specified dynamics, or costly simulation. Language-guided methods use LLMs or VLMs to produce physical descriptions or causal rationales (Xue et al. 2025; Zhang et al. 2025a; Hao et al. 2025; Wang et al. 2026b), but their global signals remain too coarse for frame-level state changes. Learned-prior methods internalize physical knowledge through fine-tuning, representation distillation, local conditioning, expert modules, or feedback-based opti-mization (Wang et al. 2025; Zhang et al. 2025b; Gillman et al. 2026; Lu et al. 2026; Pathak et al. 2026; Wang et al. 2026a; Ji et al. 2025; Lin et al. 2025; Zhang et al. 2026). 
+
+## 3 PhyS-120K Dataset 
+
+We design a process-centric data construction pipeline that automatically curates, organizes, and annotates video clips rich in visible physical processes from large-scale real-world videos. Using this pipeline, we construct PhyS-120K, a large-scale real-world physical video dataset comprising 120,804 video clips. Prior physics-related video datasets and bench-marks mainly rely on synthetic environments, generated prompts, controlled motion patterns, or real-world settings with limited process diversity and scale (Yi et al. 2020; Bear et al. 2021; Tung et al. 2023; Bansal et al. 2025a; Wang et al. 2025; Li et al. 2025a; Zhou et al. 2026). PhyS-120K improves over these resources in real-scene grounding, process diver-sity, and scale, providing observation-grounded dynamics supervision for physically consistent video world models. 
+
+A process-centric taxonomy. Current video generation models can synthesize visually realistic frames, yet they often produce physically implausible results in scenes involving physical processes, in large part because they are not fine-tuned on datasets that specifically capture real-world physical dynamics. To this end, PhyS-120K organizes clips accord-ing to observable state evolution and interaction patterns into four physical-process categories (Fig. 3): fluid dynam-ics (pouring, splashing, diffusion), soft-body deformation (compression, stretching, tearing), phase transitions (melting, boiling, combustion), and rigid-body mechanics (collision, rolling, balancing); the partition is grounded in the physical process itself rather than object identity or isolated physical laws. As shown in Fig. 2(b), the four categories account for 45.9%, 23.6%, 18.9%, and 11.6% of the clips, respectively, and are further divided into finer-grained scenarios. 
+
+Data curation and annotation pipeline. Fig. 2(a) summa-rizes the automated construction pipeline. We collect can-didate videos from public video platforms and open-source datasets, including YouTube, Pexels, and WISA (Wang et al. 2025), using process-oriented queries, and segment long videos into single-shot clips with TransNetV2 (Soucek and Lokoc 2024). We then apply near-duplicate removal and (a) Data Filtering and Classification Pipeline (b) Distribution of Categories and Scenarios (c) Distribution of Video Durations 
+
+> { "id": "obj_1", "name": "yellow ball", "category": "soft" "properties": [ "stiffness": "soft", "yield_behavior": "mostly-elastic", "lateral_expansion": "minimal-lateral-expansion", "damping": "slow-rebound", "reflectance": "glossy", "opacity: opaque", "mass_density": "light," "stability": "stable"] },
+
+Qwen3-VL-235B-A22B 
+
+> {"event_id": "evt_1", "onset_frame": "frame_01", "end_frame": "frame_01", "key_objects": ["obj_1", "obj_2", "obj_3", "obj_4"], "physical_process": "static", "causal_link": null, "event_caption": "The yellow ball is initially at rest, positioned on the green base under the press head."}, {"event_id": "evt_2", "onset_frame": "frame_02", "end_frame": "frame_03", "key_objects": [obj_1", "obj_3"], "physical_process": "compression", "causal_link": "The heavy press head exerts a downward force on the soft ball, which yields under the pressure, causing it to flatten and deform.", "event_caption": "The press head compresses the yellow ball, flattening it into a disc shape." },
+
+(d) Physics-Aware Video Captioning 
+
+> Physical Properties Causal Sequence
+
+Figure 2: Overview of the PhyS-120K construction pipeline and dataset. (a) Raw clips from YouTube, Pexels, and WISA are filtered, classified, and subsequently rebalanced to limit the largest category share. (b) Distribution of physical-process categories and scenarios. (c) Most clips fall between 3–10 s, with the largest bin at 5–10 s. (d) Structured physical properties and causal event sequences are generated by Qwen3-VL and refined through random human inspection. (a) Fluid Dynamics Phenomena (b) Soft Body Deformation 
+
+(c) Phase Transition Processes (d) Rigid Body Mechanics 
+
+Figure 3: Representative scenarios from PhyS-120K. multi-stage filtering for motion quality, camera artifacts, vis-ible text, unsafe content, clarity, and aesthetics, using tools such as RAFT (Teed and Deng 2020), OpenNSFW2 (Beik-Mohammadi 2021), and DOVER (Wu et al. 2023). The retained clips are classified into the four physical-process cat-egories and rebalanced to reduce category dominance while preserving observable state evolution. Finally, Qwen3-VL-235B-A22B (Bai et al. 2025) produces structured annotations that describe object properties, state changes, and causal event sequences rather than only surface-level captions. To ensure annotation quality, we employ a team of trained professional data annotators to randomly audit the VLM-generated anno-tations against the source videos and annotation requirements. Annotations that are inconsistent with the observed video content or fail to satisfy the annotation requirements are manually reviewed and refined. 
+
+Duration distribution and training use. After the above process, PhyS-120K contains 120,804 clips with broad cover-age across temporal scales. As shown in Fig. 2(c), most clips fall within 3–10 s, with the largest bin at 5–10 s, which suits learning local physical responses such as impacts, splashes, deformation, and recovery; at the same time, the dataset re-tains a portion of longer clips to cover slower processes such as melting, burning, diffusion, and mixing. This balance in duration allows PhyS-120K to supervise both short-horizon physical responses and multi-stage process evolution. In our framework, the dataset serves as the real-world physical prior for supervised fine-tuning: the teacher model internalizes how physical states evolve, after which these priors are distilled into the few-step causal generator and further aligned during causal rollout generation. 
+
+## 4 Method 
+
+4.1 Overview and Problem Setup 
+
+We develop PhyS as a three-stage framework for adapting a pretrained video generator to physically plausible streaming generation. First, we fine-tune a bidirectional video DiT on PhyS-120K to acquire priors over real physical processes. Second, we distill this teacher into a few-step causal generator that produces future frames block by block. Third, we optimize the causal generator with Temporal Credit Routing (TCR), which routes overlapping-window feedback to temporally aligned denoising actions. Fig. 4 summarizes the framework. Let xc denote the observed context frames and c denote the text condition. The model generates a future video x1: N
+
+containing N frames. We partition these frames into M con-secutive causal blocks {Bm}Mm=1 , where Bm ⊆ { 1, . . . , N }
+
+is the frame-index set of block m, SMm=1 Bm = {1, . . . , N },and B<m = S
+
+q<m Bq . The causal generator Gθ induces the blockwise distribution 
+
+pθ
+
+ x1: N | xc, c =
+
+MY
+
+m=1 
+
+pθ
+
+ xBm | xc, xB<m , c . (1) Each block is produced through a small number of stochas-tic denoising transitions. We use πθ to denote the transition policy induced by Gθ . Standard video-level policy optimiza-tion assigns the same group-relative advantage to all transi-tions in all blocks. Such a uniform signal cannot distinguish a locally implausible event from otherwise plausible portions of the rollout. TCR addresses this temporal coarseness by aggregating overlapping-window advantages for each aligned denoising action. 
+
+4.2 From Physical Priors to a Streaming Policy 
+
+Physics-aware supervised fine-tuning. We first adapt the bidirectional Wan2.1-14B to real physical processes. Each clip in PhyS-120K is paired with a physics-aware caption describing observable object attributes, state changes, and temporal relations among events. We retain the teacher’s original flow-matching objective and fine-tune it with LoRA on these video–caption pairs. This stage yields a physics-aware bidirectional teacher θtea , which provides the target distribution for the subsequent causal distillation stage. 
+
+Few-step causal distillation. We distill the physics-aware teacher θtea into a few-step causal generator Gθ using DMD (Yin et al. 2024). Following Self Forcing (Huang et al. 2025), the student performs an autoregressive self-rollout under Eq. (1), such that each generated block ˆxBm
+
+> 0
+
+is conditioned on its own history ˆxB<m  
+
+> 0
+
+. Thus, the complete rollout ˆx0 is sampled from the same causal distribution used at inference. We sample a diffusion timestep τ and perturb the rollout as ˆxτ = ατ ˆx0 + στ η, where η ∼ N (0, I).Let pθ,τ and ptea ,τ denote the noised student-rollout and teacher distributions, respectively, with conditioning omitted for brevity. We optimize the holistic distribution-matching objective 
+
+LDMD (θ) = Eτ [DKL (pθ,τ ∥ ptea ,τ )] . (2) The frozen teacher score sθtea and the online generator score 
+
+sgen ,ξ correspond to the Real Score and Fake Score in Fig. 4, respectively, while sgen ,ξ is updated using the standard flow-matching objective. 
+
+4.3 Temporal Credit Routing 
+
+Physical violations often occupy only a short interval of a generated video. A global rollout reward can indicate whether the complete video is plausible, but it does not reveal where a violation occurs. TCR constructs a temporally local learn-ing signal through three operations: window-level physical scoring, per-window group normalization, and overlap-based routing. 
+
+Window-level physical feedback. For each condition 
+
+(xc, c), the behavior policy πθold samples a group of G
+
+future rollouts {ˆxi}G−1 
+
+> i=0
+
+. We cover the generated frames with J overlapping temporal windows {Wj }J−1 
+
+> j=0
+
+, where 
+
+Wj ⊆ { 1, . . . , N } and SJ−1 
+
+> j=0
+
+Wj = {1, . . . , N }.TCR is agnostic to the particular window-level reward model. Let Rϕ denote a frozen scorer that evaluates the physical consistency of a generated window given the context window Cj shown in Fig. 4: 
+
+Ri,j = Rϕ
+
+
+
+ˆxiWj | C j , c
+
+
+
+, Ai,j = Ri,j − μj
+
+σj + ϵ , (3) where 
+
+μj = 1
+
+G
+
+> G−1
+
+X
+
+> i=0
+
+Ri,j , σj =
+
+vuut 1
+
+G
+
+> G−1
+
+X
+
+> i=0
+
+(Ri,j − μj )2. (4) Here, ϵ > 0 is a numerical stabilizer. Normalizing rewards across the G rollouts separately for each window prevents in-trinsically easy or difficult temporal regions from dominating the policy update. In our implementation, Rϕ uses a frozen V-JEPA2 predic-tor (Assran et al. 2025) to compare the future representation predicted from Cj with that encoded from Wj . To encourage sufficient motion in generated videos, we introduce an optical-flow reward computed by RAFT (Teed and Deng 2020), whose contribution is controlled by λflow . The composite reward is Ri,j = RVJ  
+
+> i,j
+
++ λflow RFlow  
+
+> i,j
+
+.
+
+Weighted Credit Routing. Reward windows {Wj }J−1
+
+> j=0
+
+slide over the generated frame sequence. For each causal block 
+
+Bm, we aggregate the advantages of all reward windows that overlap its generated frames: 
+
+Om,j = |Bm ∩ Wj |
+
+PJ−1 
+
+> k=0
+
+|Bm ∩ Wk| , bAmi =
+
+> J−1
+
+X
+
+> j=0
+
+Om,j Ai,j .
+
+(5) The normalized weights satisfy P 
+
+> j
+
+Om,j = 1 . The resulting block-level advantage bAmi is shared by all denoising transitions that generate block Bm.
+
+Policy optimization. We optimize the causal generator using the stochastic transition policy introduced by Flow-GRPO (Liu et al. 2025a). Let m ∈ { 1, . . . , M } index causal blocks and s ∈ { 1, . . . , S } index the denoising transitions within each block. For rollout i, block m, and transition s,let ui,m,s collect the current noisy state, generated history, observed context, and text condition. Let ai,m,s denote the sampled transition. The importance ratio is 
+
+ri,m,s (θ) = πθ (ai,m,s | ui,m,s )
+
+πθold (ai,m,s | ui,m,s ) . (6) We replace the global rollout advantage with the overlap-routed advantage bAmi . The resulting per-transition surrogate is 
+
+¯ri,m,s (θ) = clip( ri,m,s (θ), 1 − εclip , 1 + εclip ) ,ℓTCR 
+
+> i,m,s
+
+(θ) = min 
+
+n
+
+ri,m,s (θ) bAmi , ¯ri,m,s (θ) bAmi
+
+o
+
+. (7) where εclip is the clipping threshold. We define the corre-sponding per-transition KL penalty as 
+
+Ki,m,s (θ) = DKL (πθ (· | ui,m,s ) ∥ πref (· | ui,m,s )) , (8) where πref is the frozen reference policy. The final objective is     
+
+> θ⋆= arg max
+> θE
+> "
+> 1
+> GM
+> G−1X
+> i=0
+> MX
+> m=1
+> 1
+> S
+> SX
+> s=1
+>  ℓTCR
+> i,m,s (θ)−βKi,m,s (θ)#
+
+(9) where β controls KL regularization. Stage 3: Temporal Credit Routing for Online Policy Optimization Stage 1: Physics-Aware SFT with PhyS-120K       
+
+> Video-Text PhyS-120K Real Score Few-step generator
+> Bidirectional DiT Fake Score
+> Add Noise
+> backward
+> simulation
+> computed gradient
+> Causal DiT
+> V-JEPA2
+> Policy Optimization
+> context window j
+> i=0 i=G-1 i=1
+> predicted frames
+> Credit Routing
+> Online RL
+> update
+> GRPO/PPO
+> Windows Advantage
+> Stage 2: Bidirectional-to-Causal DMD Distillation
+> ... ...
+> Group-relative normalization
+> with each window j
+> :Reward score
+> :Advantage
+> :Sliding windows
+> :Overlap weights
+> :Denoising action
+
+Figure 4: Overview of PhyS. Stages 1 and 2 transfer physical priors from a bidirectional teacher to a few-step causal generator. Stage 3 computes advantages Ai,j over overlapping windows Wj and routes them to the denoising actions. 
+
+## 5 Experiments 
+
+5.1 Experimental Setup 
+
+Implementation Details. We fine-tune the T2V and I2V Wan2.1-14B models (Team Wan et al. 2025) on PhyS-120K and distill the resulting teachers into few-step Wan2.1-1.3B causal students using DMD (Yin et al. 2024) and the official Self, Rolling, and Causal Forcing configurations. During TCR, we freeze the base model and optimize LoRA adapters with 
+
+r = α = 256 , rollout group size G = 8 , and KL coefficient 
+
+β = 0 .015 . The reward combines V-JEPA2 consistency with RAFT-based optical-flow reward weighted by 0.4; its window length matches the causal block size, with a half-window stride. Additional training details are provided in the supplementary material. 
+
+Evaluation Protocols. We evaluate 5-second bidirectional-teacher generations at 40 NFE and 10-second causal rollouts at 4–5 NFE. PhysicsIQ (Motamed et al. 2026) evaluates context-conditioned I2V physics. For T2V generation, Video-Phy (Bansal et al. 2025a) reports physical commonsense (PC) and semantic adherence (SA), VideoPhy2 (Bansal et al. 2025b) additionally reports their joint success rate, and Phy-GenBench (Meng et al. 2024) covers mechanics, optics, thermal phenomena, and material interactions. 
+
+5.2 Main Results 
+
+Injecting physical priors into the bidirectional teacher. Un-der the 5 seconds video-generation protocol for bidirectional DiTs, Table 1 shows that SFT on PhyS-120K improves Wan2.1-14B across all reported metrics at the same 40 NFE, with gains of 18.2% on PhysicsIQ, 16.0% on VideoPhy PC, 11.1% on VideoPhy2 Joint, and 18.5% on PhyGenBench Average. These improvements show that real-world physical interac-tions and structured annotations successfully inject stronger physical priors into the bidirectional teacher. Fig. 5 further shows that PhyS better preserves momentum transfer, defor-mation, phase separation, and melting, while WISA (Wang et al. 2025) and VideoREPA (Zhang et al. 2025b) generate content that violates physical constraints. 
+
+Transferring physical priors to causal students. Under the 10 seconds streaming-rollout protocol for few-step causal DiTs, distillation from the SFT teacher improves PhysicsIQ from 16.9 to 17.4 for Self Forcing, 16.2 to 17.9 for Rolling Forcing, and 10.2 to 11.8 for Causal Forcing. Most VideoPhy and VideoPhy2 PC and SA metrics also improve, confirming that the acquired physical priors transfer across causal distil-lation strategies. However, several regressions indicate that causal distillation does not preserve these priors uniformly. 
+
+Online alignment with physical rewards. The full PhyS configurations improve all three causal baselines without in-creasing their 4–5 NFE. PhysicsIQ improves by 23.7%, 14.8%, and 31.4% for Self, Rolling, and Causal Forcing, respectively, with additional gains on VideoPhy PC, VideoPhy2 Joint, and PhyGenBench Average. The joint RAFT–V-JEPA2 reward A block slides down, hits a metal cube .
+
+> PhyS (stage 1) WISA VideoREPA PhyS (stage 1) WISA VideoREPA
+> A clay cube flattens and bulges under pressure.
+> Oil droplets rise and form a floating layer.
+> PhyS (stage 1) WISA VideoREPA PhyS (stage 1) WISA VideoREPA
+> An ice cube melts into a widening puddle.
+
+Figure 5: Stage-1 qualitative comparison. Method NFE PhysicsIQ VideoPhy VideoPhy2 PhyGenBench Score ↑ PC ↑ SA ↑ PC ↑ SA ↑ Joint ↑ Mechanics ↑ Optics ↑ Thermal ↑ Material ↑ Average ↑                                                                                                                                                                                    
+
+> Wan2.1-1.3B 40 –24.1 53.8 55.0 29.1 23.9 0.383 0.473 0.300 0.325 0.381 Wan2.1-14B 40 26.9 24.4 54.7 74.2 54.4 46.0 0.383 0.513 0.367 0.300 0.399
+> + PhyS-120K SFT 40 31.8 28.3 55.5 79.8 56.2 51.1 0.439 0.515 0.382 0.331 0.473
+> Self Forcing 416.9 18.9 50.0 54.7 23.7 24.4 0.347 0.451 0.316 0.319 0.368 + SFT Teacher 417.4 20.6 52.7 56.8 24.9 23.6 0.377 0.434 0.328 0.302 0.365 + Flow-GRPO 418.2 20.1 45.5 52.7 21.0 19.3 0.383 0.409 0.311 0.310 0.340 + TCR (Ours) 420.9 22.4 53.7 62.7 33.8 26.9 0.394 0.402 0.368 0.322 0.389
+> Rolling Forcing 516.2 26.2 48.0 67.5 26.2 23.0 0.350 0.487 0.333 0.305 0.373 + SFT Teacher 517.9 27.0 49.6 69.7 27.5 23.9 0.371 0.493 0.346 0.314 0.382 + Flow-GRPO 517.1 26.3 47.3 71.7 24.9 22.8 0.377 0.498 0.352 0.320 0.389 + TCR (Ours) 518.6 28.0 52.2 76.4 28.9 24.7 0.382 0.440 0.374 0.197 0.405
+> Causal Forcing 410.2 21.5 42.4 54.8 24.2 19.8 0.349 0.433 0.322 0.317 0.362 + SFT Teacher 411.8 22.6 44.0 58.1 25.3 20.7 0.357 0.445 0.331 0.320 0.368 + Flow-GRPO 411.4 20.4 39.1 60.5 22.1 18.5 0.363 0.423 0.339 0.324 0.325 + TCR (Ours) 413.4 26.1 47.8 68.1 25.7 24.4 0.376 0.446 0.361 0.328 0.397
+
+Table 1: Main results across four physics-aware video generation benchmarks. The upper block reports 5-second bidirectional generations, while the lower forcing-baseline blocks report 10-second generations. therefore provides an effective feedback signal, while TCR further outperforms the corresponding Flow-GRPO variants by 8.8%–17.5% on PhysicsIQ and 8.3%–39.4% on Video-Phy2 Joint. These gains indicate that temporally localized credit assignment produces more precise optimization sig-nals than video-level reward broadcasting. On PhyGenBench, category-level gains remain uneven, with regressions for Self and Rolling Forcing on Optics and for Rolling Forcing on Material. This pattern likely reflects the comparatively limited coverage of optics and material interactions in PhyS-120K, while these category-specific physical priors are also more difficult to preserve during few-step causal distillation. 
+
+5.3 Long-Horizon Streaming Rollout 
+
+Table 2 reports VBench-Long (Huang et al. 2024) results for Temporal Quality (Temp.), Dynamic Degree (Dyn.), and Visual Stability (Stab.), together with VideoPhy results for 15-and 20-second rollouts. Adding PhyS consistently improves all five metrics for both Self and Rolling Forcing at both Rollouts. At 15 seconds, PhyS raises Dynamic Degree by 6.88 and 8.14 points and VideoPhy PC by 2.0 and 2.6 points for Self and Rolling Forcing, respectively. At the longer 20-second Rollout, PhyS continues to outperform both baselines across all reported metrics. Fig. 6 compares PhyS with forcing-based baselines on long-horizon causal rollouts across six physical processes. As rollout proceeds, the baselines frequently violate physical constraints and causal relationships by failing to propagate the consequences of collisions, compression, tipping, cloth twisting, domino impacts, and fog diffusion across causal blocks. In contrast, PhyS better follows physical constraints and causal dependencies, preserving both immediate phys-ical responses and downstream state transitions. Together, the quantitative results and visual comparisons demonstrate that PhyS provides more physically plausible and causally consistent long-horizon streaming rollouts.                                               
+
+> Method VBench-Long VideoPhy Temp. ↑Dyn. ↑Stab. ↑PC ↑SA ↑
+> Results on 15s
+> Self Forcing 89.75 46.37 53.61 18.4 47.3
+> + PhyS 94.41 53.25 58.93 20.4 49.2
+> Rolling Forcing 92.91 57.39 56.83 23.7 43.4
+> + PhyS 94.07 65.53 60.71 26.3 49.8
+> Results on 20s
+> Self Forcing 89.30 37.92 43.56 16.6 43.8
+> + PhyS 91.82 48.29 47.01 19.7 47.8
+> Rolling Forcing 90.47 46.39 52.63 21.7 38.6
+> + PhyS 92.36 58.23 52.71 25.9 47.4
+
+Table 2: Long-horizon rollout results at 15 and 20 seconds. 
+
+5.4 Ablation Studies 
+
+Dataset and annotation effectiveness. Table 3 compares how data sources and annotation types affect physical-prior injection under a matched scale. All SFT variants use the same Wan2.1-14B backbone and training recipe with ap-proximately 80K clips, so the observed differences do not arise simply from additional training data. General Data uses generic descriptions (Desc.) for 80K videos sampled from open-source video datasets. WISA-80K covers 80K videos over 17 physical laws and augments descriptions with phys-ical properties (Desc.+Prop.). Our PhyS-80K variants use the same process-centric videos but differ in annotation type: the generic version uses descriptions only (Desc.), while the full structured version (Full) additionally includes physical properties, temporally ordered state changes, and causal rela-tions. General Data provides no consistent improvement over the pretrained baseline, while WISA-80K improves Qual-ity, Semantic, and PhysicsIQ, demonstrating the benefit of physics-oriented data and explicit physical attributes. Replac-A blue ball strikes a red ball, which rolls forward and knocks over the right cup.  
+
+> Self-Forcing +PhyS
+> Grabbers twist a soaked cloth; the cloth coils and shortens, and drips water.
+> Causal-Forcing +PhyS
+> A board crushes a plastic bottle, popping its cap; the bottle rebounds upon release.
+> Self-Forcing +PhyS
+> A sliding block strikes a plush toy, squashing and tipping it over before stopping.
+> Rolling-Forcing +PhyS
+> Dry ice in warm water produces dense fog spreading across the table.
+> Causal-Forcing +PhyS
+> A tennis ball rolls down the ramp , hits the first domino
+> +PhyS  Rolling-Forcing
+
+Figure 6: Long-horizon causal rollout comparison. Compared with forcing-based baselines, PhyS better preserves physical plausibility and causal relationships during streaming inference. 
+
+Setting Annotation Type VBench PhysicsIQ Score ↑
+
+Qual. Sem. Total 
+
+Wan2.1-14B – 78.6 79.5 82.4 26.9 General Data Desc. 79.4 77.1 82.1 25.2 WISA-80K Desc.+Prop. 80.7 80.6 81.3 27.9 PhyS-80K Desc. 81.2 80.9 83.5 27.3 
+
+PhyS-80K Full 81.8 82.7 86.2 31.4 
+
+Table 3: Data and annotation ablation. 
+
+Variant Routing VBench-Long VideoPhy Temp. ↑ Dyn. ↑ Stab. ↑ PC ↑ SA ↑
+
+Self Forcing – 90.26 46.49 53.92 20.6 52.7 Flow-GRPO Global 82.37 43.20 54.24 20.1 45.5 Window reward Uniform 89.34 44.35 56.26 21.3 48.6 RAFT Overlap 91.89 50.28 44.31 18.2 47.6 V-JEPA2 Overlap 92.52 49.14 57.37 22.1 52.6 
+
+TCR Full Overlap 96.83 56.73 62.86 22.4 53.7 
+
+Table 4: Reward and routing ablations on 10-second rollouts. ing generic descriptions with Full annotations on the same PhyS-80K videos improves all four metrics, demonstrating the benefit of structured physical supervision. 
+
+Temporal credit routing and reward models. Fig. 7(a) evaluates pairwise ranking agreement on 1,000 training prompts by comparing reward-model rankings with human pairwise preferences. Among VideoScore2 (He et al. 2025), VideoPhy2 (Bansal et al. 2025b), PhyDetEx (Wang, Wang, and Zhang 2025), and V-JEPA2 (Assran et al. 2025), V-JEPA2 achieves the highest agreement of 0.65 and is used as the semantic physical-consistency component of the reward. Fig. 7(b) shows that TCR attains higher rewards by routing window-level feedback to the corresponding denoising steps, (a) Pairwise Preference Agreement with Human Ratings (b) Reward vs. Training Time with and without TCR 
+
+Figure 7: Reward-model agreement with human pairwise rankings and training reward with and without TCR. thereby providing more targeted optimization signals than training without routed credit. Table 4 compares routing and reward choices: global rout-ing hurts several metrics, uniform windows partly recover performance, and TCR Full performs best across all five metrics. The reward rows further show complementarity be-tween RAFT and V-JEPA2, whose combination provides the strongest overall signal. 
+
+## 6 Conclusion 
+
+In this paper, we introduce PhyS, a framework for distilling physical priors into streaming world models to improve the physical plausibility of long-horizon rollouts. First, we con-struct PhyS-120K, a real-world physical-interaction video dataset with structured annotations of object properties and causal state transitions, providing physics-aware supervision. Second, we design a three-stage training pipeline that injects these priors into a bidirectional 14B DiT teacher and transfers them to a lightweight few-step causal generator for stream-ing generation. Third, we propose Temporal Credit Routing to address temporal credit assignment by evaluating over-lapping temporal windows and routing physical rewards to aligned denoising actions. Experiments on physics-aware and long-horizon benchmarks demonstrate PhyS’s effectiveness. References 
+
+Assran, M.; Bardes, A.; Fan, D.; Garrido, Q.; Howes, R.; Komeili, M.; et al. 2025. V-JEPA 2: Self-Supervised Video Models Enable Understanding, Prediction and Planning. arXiv:2506.09985. Bai, S.; Cai, Y.; Chen, R.; Chen, K.; Chen, X.; Cheng, Z.; Deng, L.; Ding, W.; Gao, C.; Ge, C.; et al. 2025. Qwen3-VL Technical Report. arXiv:2511.21631. Bansal, H.; Lin, Z.; Xie, T.; Zong, Z.; Yarom, M.; Bitton, Y.; Jiang, C.; Sun, Y.; Chang, K.-W.; and Grover, A. 2025a. VideoPhy: Evaluating Physical Commonsense for Video Generation. In International Conference on Learning Representations .Bansal, H.; Peng, C.; Bitton, Y.; Goldenberg, R.; Grover, A.; and Chang, K.-W. 2025b. VideoPhy-2: A challenging action-centric physical commonsense evaluation in video generation. arXiv:2503.06800. Bear, D. M.; Wang, E.; Mrowca, D.; Binder, F.; Tung, H.-Y. F.; Pramod, R. T.; Holdaway, C.; Tao, S.; Smith, K.; Sun, F.-Y.; Fei-Fei, L.; Kanwisher, N.; Tenenbaum, J. B.; Yamins, D. L. K.; and Fan, J. 2021. Physion: Evaluating Physical Prediction from Vision in Humans and Machines. In Advances in Neural Information Processing Systems .Beik-Mohammadi, H. 2021. OpenNSFW2: A Keras Implementation of Yahoo’s Open NSFW Model. https://github.com/bhky/opennsfw2. GitHub repository, accessed 2026-07-27. Brooks, T.; Peebles, B.; Holmes, C.; DePue, W.; Guo, Y.; Jing, L.; Schnurr, D.; Taylor, J.; Luhman, T.; Luhman, E.; Ng, C.; Wang, R.; and Ramesh, A. 2024. Video generation models as world simulators. OpenAI Technical Report. Bruce, J.; Dennis, M. D.; Edwards, A.; Parker-Holder, J.; Shi, Y.; Hughes, E.; Lai, M.; Mavalankar, A.; Steigerwald, R.; Apps, C.; et al. 2024. Genie: Generative Interactive Environments. In Forty-first International Conference on Machine Learning .Chen, B.; Monsó, D. M.; Du, Y.; Simchowitz, M.; Tedrake, R.; and Sitzmann, V. 2024. Diffusion Forcing: Next-Token Prediction Meets Full-Sequence Diffusion. In Advances in Neural Information Processing Systems .Chen, C.; Dou, Z.; Wang, C.; Huang, Y.; Chen, A.; Feng, Q.; Gu, J.; and Liu, L. 2025a. Vid2Sim: Generalizable, Video-Based Reconstruction of Appearance, Geometry and Physics for Mesh-Free Simulation. In Proceedings of the Computer Vision and Pattern Recognition Conference , 26545–26555. Chen, G.; Lin, D.; Yang, J.; Lin, C.; Liu, J.; Fan, M.; Zhang, H.; Chen, S.; Chen, Z.; Ma, C.; et al. 2025b. SkyReels-V2: Infinite-Length Film Generative Model. arXiv:2504.13074. Gao, K.; Shi, J.; Zhang, H.; Wang, C.; Xiao, J.; and Chen, L. 2024. Ca2-VDM: Efficient Autoregressive Video Diffusion Model with Causal Generation and Cache Sharing. arXiv:2411.16375. Gillman, N.; Zhou, Y.; Tang, Z.; Luo, E.; Chakravarthy, A.; Aggarwal, D.; Freeman, M.; and Sun, C. 2026. Goal Force: Teaching Video Models to Accomplish Physics-Conditioned Goals. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , 20077–20087. Gu, Y.; Mao, W.; and Shou, M. Z. 2025. Long-Context Autoregressive Video Modeling with Next-Frame Prediction. arXiv:2503.19325. Hao, Y.; Chen, C.; Mian, A. S.; Xu, C.; and Liu, D. 2025. En-hancing physical plausibility in video generation by reasoning the implausibility. arXiv:2509.24702. He, X.; Jiang, D.; Nie, P.; Liu, M.; Jiang, Z.; Su, M.; Ma, W.; Lin, J.; Ye, C.; Lu, Y.; Wu, K.; Schneider, B.; Do, Q. D.; Li, Z.; Jia, Y.; Zhang, Y.; Cheng, G.; Wang, H.; Zhou, W.; Lin, Q.; Zhang, Y.; Zhang, G.; Huang, W.; and Chen, W. 2025. VideoScore2: Think before You Score in Generative Video Evaluation. arXiv:2509.22799. Hu, J.; Hu, S.; Song, Y.; Huang, Y.; Wang, M.; Zhou, H.; Liu, Z.; Ma, W.-Y.; and Sun, M. 2024. ACDiT: Interpolating Autoregressive Con-ditional Modeling and Diffusion Transformer. arXiv:2412.07720. Huang, X.; Li, Z.; He, G.; Zhou, M.; and Shechtman, E. 2025. Self Forcing: Bridging the Train-Test Gap in Autoregressive Video Diffusion. arXiv:2506.08009. Huang, Z.; He, Y.; Yu, J.; Zhang, F.; Si, C.; Jiang, Y.; Zhang, Y.; Wu, T.; Jin, Q.; Chanpaisit, N.; Wang, Y.; Chen, X.; Wang, L.; Lin, D.; Qiao, Y.; and Liu, Z. 2024. VBench: Comprehensive Benchmark Suite for Video Generative Models. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , 21807–21818. Ji, S.; Chen, X.; Tao, X.; Wan, P.; and Zhao, H. 2025. PhysMas-ter: Mastering Physical Representation for Video Generation via Reinforcement Learning. arXiv:2510.13809. Jiang, C.; Schroeder, C.; Teran, J.; Stomakhin, A.; and Selle, A. 2016. The material point method for simulating continuum materials. In Acm siggraph 2016 courses , 1–52. Association for Computing Machinery. Jin, Y.; Sun, Z.; Li, N.; Xu, K.; Jiang, H.; Zhuang, N.; Huang, Q.; Song, Y.; Mu, Y.; and Lin, Z. 2025. Pyramidal Flow Matching for Efficient Video Generative Modeling. In International Conference on Learning Representations .Kondratyuk, D.; Yu, L.; Gu, X.; Lezama, J.; Huang, J.; Schindler, G.; Hornung, R.; Birodkar, V.; Yan, J.; Chiu, M.-C.; et al. 2024. VideoPoet: A Large Language Model for Zero-Shot Video Gen-eration. In Proceedings of the 41st International Conference on Machine Learning .Li, C.; Michel, O.; Pan, X.; Liu, S.; Roberts, M.; and Xie, S. 2025a. PISA Experiments: Exploring Physics Post-Training for Video Diffusion Models by Watching Stuff Drop. In International Conference on Machine Learning .Li, X.; Qiao, Y.-L.; Chen, P. Y.; Jatavallabhula, K. M.; Lin, M.; Jiang, C.; and Gan, C. 2023. PAC-NeRF: Physics-Augmented Continuum Neural Radiance Fields for Geometry-Agnostic System Identification. arXiv:2303.05512. Li, Z.; Yu, H.-X.; Liu, W.; Yang, Y.; Herrmann, C.; Wetzstein, G.; and Wu, J. 2025b. WonderPlay: Dynamic 3D Scene Generation from a Single Image and Actions. In Proceedings of the IEEE/CVF International Conference on Computer Vision , 9080–9090. Lin, W.; Jia, L.; Hu, W.; Pan, K.; Yue, Z.; Zhao, W.; Chen, J.; Wu, F.; and Zhang, H. 2025. Reasoning physical video generation with diffu-sion timestep tokens via reinforcement learning. arXiv:2504.15932. Liu, J.; Liu, G.; Liang, J.; Li, Y.; Liu, J.; Wang, X.; Wan, P.; Zhang, D.; and Ouyang, W. 2025a. Flow-GRPO: Training Flow Matching Models via Online RL. arXiv:2505.05470. Liu, K.; Hu, W.; Xu, J.; Shan, Y.; and Lu, S. 2025b. Rolling Forcing: Autoregressive Long Video Diffusion in Real Time. arXiv:2509.25161. Liu, S.; Ren, Z.; Gupta, S.; and Wang, S. 2024. PhysGen: Rigid-Body Physics-Grounded Image-to-Video Generation. In European Conference on Computer Vision , 360–378. Springer. Liu, W.; Chen, Z.; Li, Z.; Wang, Y.; Yu, H.-X.; and Wu, J. 2026. Real-Wonder: Real-Time Physical Action-Conditioned Video Generation. arXiv:2603.05449. Lu, H.; Wu, S.; Liu, S.; Zhang, J.; Su, M.; Ye, G.; et al. 2026. Phys4D: Fine-Grained Physics-Consistent 4D Modeling from Video Diffusion. arXiv:2603.03485. Lv, J.; Huang, Y.; Yan, M.; Huang, J.; Liu, J.; Liu, Y.; Wen, Y.; Chen, X.; and Chen, S. 2024. GPT4Motion: Scripting Physical Motions in Text-to-Video Generation via Blender-Oriented GPT Planning. In 
+
+Proceedings of the IEEE/CVF conference on computer vision and pattern recognition , 1430–1440. Ma, G.; Huang, H.; Yan, K.; Chen, L.; Duan, N.; Yin, S.; Wan, C.; Ming, R.; Song, X.; Chen, X.; et al. 2025. Step-Video-T2V Technical Report: The Practice, Challenges, and Future of Video Foundation Models. arXiv:2502.10248. Meng, F.; Liao, J.; Tan, X.; Shao, W.; Lu, Q.; Zhang, K.; Cheng, Y.; Li, D.; Qiao, Y.; and Luo, P. 2024. Towards world simulator: Craft-ing physical commonsense-based benchmark for video generation. arXiv:2410.05363. Motamed, S.; Culp, L.; Swersky, K.; Jaini, P.; and Geirhos, R. 2026. Do generative video models understand physical principles? In 
+
+Proceedings of the IEEE/CVF Winter Conference on Applications of Computer Vision , 948–958. Pathak, S.; Arani, E.; Pechenizkiy, M.; and Zonooz, B. 2026. PhysVid: Physics-Aware Local Conditioning for Generative Video Models. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , 41847–41858. Polyak, A.; Zohar, A.; Brown, A.; Tjandra, A.; Sinha, A.; Lee, A.; Vyas, A.; Shi, B.; Ma, C.-Y.; Chuang, C.-Y.; et al. 2024. Movie Gen: A Cast of Media Foundation Models. arXiv:2410.13720. Ruhe, D.; Heek, J.; Salimans, T.; and Hoogeboom, E. 2024. Rolling diffusion models. In Proceedings of the 41st International Confer-ence on Machine Learning , 42818–42835. Song, K.; Chen, B.; Simchowitz, M.; Du, Y.; Tedrake, R.; and Sitzmann, V. 2025. History-Guided Video Diffusion. In Proceedings of the 42nd International Conference on Machine Learning , volume 267 of Proceedings of Machine Learning Research , 56242–56280. PMLR. Soucek, T.; and Lokoc, J. 2024. TransNet V2: An Effective Deep Network Architecture for Fast Shot Transition Detection. In Pro-ceedings of the 32nd ACM International Conference on Multimedia ,11218–11221. Stomakhin, A.; Schroeder, C.; Chai, L.; Teran, J.; and Selle, A. 2013. A material point method for snow simulation. ACM Transactions on Graphics (TOG) , 32(4): 1–10. Team Wan; Wang, A.; Ai, B.; Wen, B.; Mao, C.; Xie, C.-W.; Chen, D.; Yu, F.; Zhao, H.; Yang, J.; et al. 2025. Wan: Open and Advanced Large-Scale Video Generative Models. arXiv:2503.20314. Teed, Z.; and Deng, J. 2020. RAFT: Recurrent all-pairs field transforms for optical flow. In European Conference on Computer Vision , 402–419. Springer. Teng, H.; et al. 2025. MAGI-1: Autoregressive Video Generation at Scale. arXiv:2505.13211. Tung, H.-Y.; Ding, M.; Chen, Z.; Bear, D.; Gan, C.; Tenenbaum, J. B.; Yamins, D. L. K.; Fan, J. E.; and Smith, K. A. 2023. Physion++: Evaluating Physical Scene Understanding that Requires Online Inference of Different Physical Properties. In Advances in Neural Information Processing Systems .Wang, J.; Ma, A.; Cao, K.; Zheng, J.; Zhang, Z.; Feng, J.; Liu, S.; Ma, Y.; Cheng, B.; Leng, D.; et al. 2025. WISA: World Simulator Assis-tant for Physics-Aware Text-to-Video Generation. arXiv:2503.08153. Wang, Z.; Hu, P.; Wang, J.; Zhang, T. J.; Cheng, Y.; Chen, L.; et al. 2026a. ProPhy: Progressive Physical Alignment for Dynamic World Simulation. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , 14492–14501. Wang, Z.; Hu, Y.; Wang, H.; Chen, F.; Liu, Y.; Li, W.; and Lei, Y. 2026b. Chain of Event-Centric Causal Thought for Physically Plausible Video Generation. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , 38122– 38131. Wang, Z.; Wang, K.; and Zhang, L. 2025. PhyDetEx: Detect-ing and Explaining the Physical Plausibility of T2V Models. arXiv:2512.01843. Wu, H.; Zhang, E.; Liao, L.; Chen, C.; Hou, J.; Wang, A.; Sun, W.; Yan, Q.; and Lin, W. 2023. Exploring video quality assessment on user generated contents from aesthetic and technical perspec-tives. In Proceedings of the IEEE/CVF International Conference on Computer Vision , 20144–20154. Xie, T.; Zhao, Y.; Jiang, Y.; and Jiang, C. 2025. PhysAnimator: Physics-Guided Generative Cartoon Animation. In Proceedings of the Computer Vision and Pattern Recognition Conference , 10793– 10804. Xue, Q.; Yin, X.; Yang, B.; and Gao, W. 2025. PhyT2V: LLM-Guided Iterative Self-Refinement for Physics-Grounded Text-to-Video Generation. In Proceedings of the Computer Vision and Pattern Recognition Conference , 18826–18836. Yan, W.; Zhang, Y.; Abbeel, P.; and Srinivas, A. 2021. VideoGPT: Video Generation Using VQ-VAE and Transformers. arXiv:2104.10157. Yi, K.; Gan, C.; Li, Y.; Kohli, P.; Wu, J.; Torralba, A.; and Tenenbaum, J. B. 2020. CLEVRER: Collision Events for Video Representation and Reasoning. In International Conference on Learning Represen-tations .Yin, T.; Gharbi, M.; Zhang, R.; Shechtman, E.; Durand, F.; Freeman, W. T.; and Park, T. 2024. One-step diffusion with distribution matching distillation. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , 6613–6623. Yin, T.; Zhang, Q.; Zhang, R.; Freeman, W. T.; Durand, F.; Shecht-man, E.; and Huang, X. 2025. From slow bidirectional to fast autore-gressive video diffusion models. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition .Zhang, K.; Xiao, C.; Xu, J.; Mei, Y.; and Patel, V. M. 2025a. Think Before You Diffuse: Infusing Physical Rules into Video Diffusion. arXiv:2505.21653. Zhang, Q.; Gong, B.; Tan, S.; Zhang, Z.; Shen, Y.; Zhu, X.; Li, Y.; Yao, K.; Shen, C.; and Zou, C. 2026. PhysRVG: Physics-Aware Unified Reinforcement Learning for Video Generative Models. arXiv:2601.11087. Zhang, X.; Liao, J.; Zhang, S.; Meng, F.; Wan, X.; Yan, J.; and Cheng, Y. 2025b. VideoREPA: Learning Physics for Video Generation through Relational Alignment with Foundation Models. In Advances in Neural Information Processing Systems , volume 38. Zhou, S.; Wang, H.; Cheng, H.; Li, J.; Wang, D.; Jiang, J.; Jin, Y.; Huang, J.; Mao, S.; Liu, S.; et al. 2026. PhysInOne: Visual Physics Learning and Reasoning in One Suite. arXiv:2604.09415. Zhu, H.; Zhao, M.; He, G.; Su, H.; Li, C.; and Zhu, J. 2026. Causal Forcing: Autoregressive Diffusion Distillation Done Right for High-Quality Real-Time Interactive Video Generation. In International Conference on Machine Learning .

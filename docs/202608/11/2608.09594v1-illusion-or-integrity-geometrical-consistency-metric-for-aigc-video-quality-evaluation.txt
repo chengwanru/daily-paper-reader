@@ -1,0 +1,836 @@
+Title: Illusion or Integrity? Geometrical Consistency Metric for AIGC Video Quality Evaluation
+
+URL Source: https://arxiv.org/pdf/2608.09594v1
+
+Published Time: Tue, 11 Aug 2026 02:43:08 GMT
+
+Number of Pages: 35
+
+Markdown Content:
+# Illusion or Integrity? Geometrical Consistency Metric for AIGC Video Quality Evaluation 
+
+## YIFEI XUE ∗, Hunan University, China 
+
+## YUANCHEN FEI †, Hunan University, China 
+
+## HAO ZHANG, Hunan University, China 
+
+## CHENZHI NIE, Hunan University, China 
+
+## TIE JI, Hunan University, China 
+
+## YIZHEN LAO, Hunan University, China 
+
+Fig. 1. To quantify how well AIGC-generated videos preserve physical-world geometry, we introduce GeoCon-Bench, a model-agnostic evaluation framework grounded in multiview geometry and optical-flow analysis. The figure shows (top) a generated camera sweep; (right) representative failure modes; and (bottom) the theoretical cornerstones we use. GeoCon-Bench scores clips via homography/fundamental-matrix metrics for rigid backgrounds and flow-based tests for dynamic regions, enabling reproducible auditing of geometric consistency. 
+
+> ∗
+
+Both authors contributed equally to this research. 
+
+> †
+
+Both authors contributed equally to this research. Authors’ Contact Information: Yifei Xue, Hunan University, China; Yuanchen Fei, Hunan University, China; Hao Zhang, Hunan University, China; Chenzhi Nie, Hunan University, China; Tie Ji, Hunan University, China; Yizhen Lao, Hunan University, China. Permission to make digital or hard copies of all or part of this work for personal or classroom use is granted without fee provided that copies are not made or distributed for profit or commercial advantage and that copies bear this notice and the full citation on the first page. Copyrights for components of this work owned by others than the author(s) must be honored. Abstracting with credit is permitted. To copy otherwise, or republish, to post on servers or to redistribute to lists, requires prior specific permission and/or a fee. Request permissions from permissions@acm.org. Manuscript submitted to ACM 1arXiv:2608.09594v1 [cs.CV] 10 Aug 2026 2 Trovato et al. 
+
+Recently, AI-driven video generation has attracted considerable attention. This surge increases demand for reliable video quality assessment ( VQA ) metrics to assess AI-generated content ( AIGC ) videos and guide model optimization. Existing work examines VQA via visual harmony, video–text consistency, and domain-specific alignment, yet lacks quantitative metrics for fidelity to physical laws. To address this limitation, we present a novel benchmark that evaluates the quality of AIGC videos through their compliance with physical principles, achieved by quantitatively measuring the geometrical consistency across frames extracted from the generated sequences, thus as a proxy to gauge the extent to which the generated videos conform to real-world physics rules. Specifically, GeoCon-Bench gates global motion via translation estimates, fits a homography or fundamental matrix to background correspondences, and reports complementary metrics (inlier ratio, geometric error). We also release a dataset of 20 scenes across six motion categories. Experiments on state-of-the-art AIGC models demonstrate GeoCon-Bench’s reliability as a video quality metric. CCS Concepts: • Do Not Use This Code → Generate the Correct Terms for Your Paper ; Generate the Correct Terms for Your Paper ; Generate the Correct Terms for Your Paper; Generate the Correct Terms for Your Paper. Additional Key Words and Phrases: T2V, AIGC, multi-view geometry, 3D reconstruction 
+
+ACM Reference Format: 
+
+Yifei Xue, Yuanchen Fei, Hao Zhang, Chenzhi Nie, Tie Ji, and Yizhen Lao. 2018. Illusion or Integrity? Geometrical Consistency Metric for AIGC Video Quality Evaluation. In Proceedings of Make sure to enter the correct conference title from your rights confirmation email (Conference acronym ’XX). ACM, New York, NY, USA, 35 pages. https://doi.org/XXXXXXX.XXXXXXX 
+
+1 Introduction 
+
+Generative video offers a tantalizing pathway to lower the cost and latency of 3D asset creation [20, 28]. Rather than capturing calibrated footage and running bespoke reconstruction pipelines, practitioners could in principle feed an idealized video to a reconstruction system and obtain geometry ready for downstream use. Yet this promise is ultimately gated by photogrammetry and multi-view geometry [11]: usable parallax, consistency with either homography or epipolar structure, and coherent occlusion handling are prerequisites , not niceties. When those prerequisites fail, error cascades are immediate and practical—point clouds fragment or rubber-sheet, camera poses drift, novel views shear, and AR overlays refuse to lock—even though the sequence may still look plausible to the eye [17, 19]. Recent progress in diffusion/transformer generators [1, 5, 14, 21, 43] increases perceptual quality but does not guarantee photogrammetric validity [2, 13, 32, 41, 49]. Accordingly, the value proposition of video-to-3D is determined not by aesthetics or prompt adherence, but by geometric reliability [37]. 
+
+Perceptual plausibility ≠ photogrammetric correctness. [15, 16, 47]. Contemporary systems can score well on perceptual or distributional metrics while systematically violating multi-view constraints. Typical failure modes that matter for reconstruction include: (i) background slide where planar regions move inconsistently with the camera; (ii) rubber-sheet warps that break the assumption of a single rigid background model; and (iii) inconsistent scale–depth relations across time that a bundle adjuster cannot reconcile. These violations have been documented both qualitatively and quantitatively in generative pipelines [36], and they are fatal for multi-view reconstruction, pose estimation, and novel-view synthesis (NVS). Mainstream evaluation emphasizes pixel fidelity, learned perceptual similarity, distributional distances, semantics, or composite leaderboards [6, 8, 15, 16, 24, 25, 33, 50]. While valuable for breadth, such axes are insensitive to multi-view geometric validity , especially in real-data settings where ground truth (GT) is unavailable. In practical platform 
+
+> © 2018 Copyright held by the owner/author(s). Publication rights licensed to ACM. Manuscript submitted to ACM Manuscript submitted to ACM
+
+Illusion or Integrity? Geometrical Consistency Metric for AIGC Video Quality Evaluation 3comparisons, GT is usually absent : real camera trajectories and scene geometry are proprietary or intractable to share; generated videos often have no physical camera at all; and synthetic GT, while useful scientifically, can misalign with deployment distributions and sensors , confounding cross-platform conclusions. Therefore, the community lacks a GT-free, photogrammetry-aligned, auditable protocol that can be reproduced across generators and data regimes. Hence, we derive four design requirements for a practical geometry-consistency protocol: R1 Regime awareness :background modeling must switch between homography and fundamental descriptions based on translation evidence ;
+
+R2 Background–dynamic disentanglement : rigid backgrounds and moving/non-rigid regions obey different assump-tions and must be scored against different objectives ; R3 GT-free feasibility : every stage must operate without GT, so that results are reproducible across platforms and datasets; R4 Auditability and comparability : decisions and scores must be traceable (with gate rationales, inlier diagnostics, and threshold sensitivity) so platform-level comparisons are defensible. We propose a unified, GT-free protocol that (i) extracts translation evidence from pose logs to gate the background model, (ii) fits the model with calibrated dual thresholds tailored to each residual family, (iii) scores dynamic regions separately via an optical-flow-guided measure, and (iv) logs diagnostics for auditability. Concretely, a gate variable 
+
+𝛾 𝑡 ∈ { H, F} selects a homography when translation is negligible and a fundamental model otherwise. For background matches, we compute IR 𝐻 , GE 𝐻 under a homography residual with threshold 𝜏 𝐻 and IR 𝐹 , GE 𝐹 under an epipolar/Sampson residual with threshold 𝜏 𝐹 , explicitly allowing 𝜏 𝐻 ≠𝜏 𝐹 because the two residual families have different statistical scales .We accompany indicators with threshold–score sensitivity scans and percentile alignment to ensure cross-platform interpretability. Dynamic/non-rigid pixels are evaluated with a flow-guided measure (e.g., AdaDFRC-W2): forcing them into H/F would pollute inlier sets, destabilize robust fitting, and render IR/GE less diagnostic of background validity. The protocol logs gate rationales, inlier maps, threshold–score curves, and pose-log vs. fit sanity checks to support reproducible, inspector-friendly audits. To our knowledge, this is the first GT-free, regime-aware, photogrammetry-aligned evaluation protocol for AIGC videos that is auditable across platforms. To summarize, our contributions are threefold: 
+
+• We introduce the first GT-free, regime-aware, and photogrammetry-aligned evaluation framework GeoCon-Bench for AIGC videos that supports auditable, cross-platform assessments. 
+
+• We design a translation-gated framework that adaptively selects between homography and fundamental modeling, proposes calibrated dual-threshold indicators for background consistency, and introduces AdaDFRC-W2, a Wasserstein-2 regional flow-consistency metric for robust evaluation of dynamic content. 
+
+• We release auditing assets including lightweight logs, coverage statistics, score curves, and a dedicated benchmark dataset that spans diverse scenes and motion regimes, enabling reproducible and inspector-friendly audits. 
+
+GeoCon-Bench will be publicly available after acceptance .
+
+2 Related Works 
+
+Mainstream evaluation families—pixel fidelity (PSNR/SSIM) [47], learned perceptual similarity (LPIPS) [49], distributional distances (FID/FVD) [42], semantic/prompt alignment (CLIP) [12, 34], and composite leaderboards—provide breadth but are largely insensitive to multi-view geometric validity , particularly under GT-free conditions [15, 16]. Their objectives emphasize local textures, global feature statistics, or text–image agreement, not whether homography/epipolar relations hold across viewpoints. As diffusion/transformer generators improve perceptual quality [2, 27, 32, 46], such blind spots become consequential: videos may look convincing yet remain unusable for 3D reconstruction, degrading pose 
+
+> Manuscript submitted to ACM
+
+4 Trovato et al. estimation, bundle adjustment, and novel-view synthesis. Recent multi-objective video benchmarks broaden axes (aesthetics, prompt adherence, temporal smoothness), but typically do not enforce photogrammetric constraints on real data without ground truth [15, 16, 18]. Our work complements this breadth with explicit, photogrammetry-aligned checks that are feasible and auditable in GT-free settings. Photogrammetry and multi-view geometry formalize how scene structure and camera motion are recovered from image correspondences; practical pipelines rely on correspondence quality (inlier ratios), geometric residuals (reprojec-tion or epipolar/Sampson) [9, 11], robust model fitting, and bundle adjustment [3, 4, 10, 22, 40]. However, thresholds inside these systems are typically tuned for optimization stability on particular datasets rather than for cross-platform comparability and auditability . Crucially, the appropriate background model depends on camera motion: negligible translation [30] supports a homography on planar/parallax-free backgrounds, whereas observable translation calls for epipolar geometry on backgrounds with depth variation. Modern monocular multi-view methods (e.g., DUSt3R) expose 
+
+pose logs that can be repurposed as translation evidence to inform such regime choices [45]. We build on these signals but reframe them as comparable indicators by (i) tying regime selection to translation evidence and (ii) calibrating dual thresholds (𝜏 𝐻 , 𝜏 𝐹 ) for model-appropriate residual families with sensitivity analyses, so reported IR/GE are interpretable across generators and datasets. Moving or deforming content violates rigid-background assumptions; if dynamic pixels are forced into homogra-phy/fundamental fitting, they pollute inlier sets, destabilize robust estimation, and reduce the diagnostic power of IR/GE for the background. Optical flow and occlusion reasoning directly probe motion plausibility , deformation continuity ,and disocclusion behavior [38, 39, 48], properties that matter for structure-from-motion [31] and view synthesis. In the generative setting, dynamics can be perceptually plausible while geometrically inconsistent across frames (e.g., flow fields that ignore parallax or violate occlusion ordering) [36]. We therefore separate background rigidity from dynamic coherence: H/F-based indicators summarize whether a single rigid model explains the background, while a flow-guided score targets non-rigid and occlusion dynamics. This separation is methodological rather than cosmetic, preserving interpretability and avoiding mixed-objective confounds. GT-free or weakly supervised evaluations are standard in perceptual quality assessment, but GT-free geometry-aware 
+
+protocols remain scarce for platform-level comparisons. Two challenges recur: defensibility of decisions (e.g., why a particular regime/threshold) and traceability of results (e.g., whether scores are stable across thresholds/unseen scenes). In practice, GT is usually unavailable because real camera trajectories and scene geometry are proprietary, intractable to share, or nonexistent for generated videos. Synthetic GT, while scientifically useful, often misaligns with deployment distributions and sensor data. We address these challenges by (i) grounding regime selection in pose-log translation evidence with sanity checks against fitted geometry, (ii) releasing threshold–score sensitivity scans and percentile-aligned 
+
+summaries to ensure comparability, and (iii) logging inlier coverage and robust clip-level aggregation to make audits reproducible across systems. Recent studies document how generative pipelines can violate physical/geometric constraints despite high perceptual scores [36], while multi-objective benchmarks emphasize user-perceived axes over explicit multi-view validity [15, 16]. We bridge these trajectories: retaining GT-free feasibility and breadth, but injecting photogrammetry-aligned checks that are auditable and reproducible. This reframes evaluation around practitioner questions: Will this video support reconstruction? If not, where does geometry fail, and are failures systematic across content and generators? 
+
+Prior work provides broad perceptual/semantic coverage and mature geometric estimators, but stops short of an integrated, GT-free standard that enforces multi-view validity while preserving auditability. We next formalize the latent construct and observable indicators in a concept layer, then instantiate the protocol and diagnostics in §4. 
+
+> Manuscript submitted to ACM
+
+Illusion or Integrity? Geometrical Consistency Metric for AIGC Video Quality Evaluation 5
+
+3 Concept 3.1 Construct, scope, and contextual factors 
+
+We treat geometry consistency as a latent construct with two facets: background rigidity and dynamic-region coherence . Perceived salience of a specific residual depends on contextual factors, including scene depth span, planarity, edge density, motion spectrum, and occlusion complexity [38, 39, 48]. Consequently, indicators must be interpretable under diverse conditions and aggregated robustly over time. The construct is operationalized without ground truth (GT-free) [15, 16] by checking self-consistency with photogrammetric constraints and by leveraging pose logs [45] as auxiliary evidence. 
+
+3.2 Regime-aware prior 
+
+Let 𝐼 𝑡 , 𝐼 𝑡 +1 be consecutive frames with background matches {( x𝑖 , y𝑖 )} 𝑁 𝑏  
+
+> 𝑖 =1
+
+and a background mask M𝑏 . From pose logs (e.g., DUSt3R) we obtain a translation proxy 𝜏 𝑡 [45] and define a gate 
+
+𝛾 𝑡 ∈ { H, F}, 𝛾 𝑡 =
+
+
+
+H if 𝜏 𝑡 < 𝜏 gate ,
+
+F otherwise. (1) When 𝛾 𝑡 = H we fit a homography matrix H𝑡 to background correspondences; when 𝛾 𝑡 = F we fit a fundamental matrix [11] F𝑡 . This prior encodes standard photogrammetric practice: homographies capture planar or parallax-free backgrounds under negligible translation, whereas epipolar geometry governs backgrounds with depth variation under translation. 
+
+3.3 Dual-threshold indicators for background rigidity 
+
+For a candidate model 𝑔 𝑡 ∈ { H𝑡 , F𝑡 }, let 𝑒 (𝑔 ) 
+
+> 𝑖
+
+denote a model-appropriate residual. In our research, we utilize symmetric transfer error for H𝑡 , and Sampson/epipolar approximation for F𝑡 . Because these residual families have different statistical scales and tails , we calibrate dual thresholds (𝜏 𝐻 , 𝜏 𝐹 ) rather than forcing a single cutoff. Define the inlier set 
+
+S (𝑔 ) 
+
+> 𝜏
+
+=  𝑖 ∈ M 𝑏 𝑒 (𝑔 ) 
+
+> 𝑖
+
+≤ 𝜏 , (2) and report two indicators [3, 40]: IR 𝐻 = |S (H) 
+
+> 𝜏 𝐻
+
+|
+
+𝑁 𝑏 
+
+, GE 𝐻 = median { 𝑒 (H) 
+
+> 𝑖
+
+: 𝑖 ∈ S (H) 
+
+> 𝜏 𝐻
+
+}; IR 𝐹 = |S (F) 
+
+> 𝜏 𝐹
+
+|
+
+𝑁 𝑏 
+
+, GE 𝐹 = median { 𝑒 (F) 
+
+> 𝑖
+
+: 𝑖 ∈ S (F) 
+
+> 𝜏 𝐹
+
+}. (3) IR answers whether a single rigid model explains the background at step 𝑡 ; GE answers how tightly the consistent matches align when it does. To ensure cross-platform interpretability, we accompany each report with threshold–score sensitivity scans over a grid of (𝜏 𝐻 , 𝜏 𝐹 ) and with percentile-aligned summaries, mitigating absolute-scale differences across residual families and datasets. See §6.2 for threshold–score sensitivity scans, stability bands, and coverage definitions. 
+
+3.4 Why dynamics require a separate metric 
+
+Dynamic or non-rigid pixels on a moving object always violate the rigid-scene assumptions. That’s why including them in H/F fitting (i) corrupts inlier sets, (ii) destabilizes robust estimation, and (iii) degrades the diagnostic value of IR/GE for the background. Conversely, judging dynamics by background residuals rewards trivial solutions (e.g., shrinking inlier sets) and unfairly penalizes scenes with legitimate motion. We therefore adopt a flow-guided dynamic score to 
+
+> Manuscript submitted to ACM
+
+6 Trovato et al. capture motion plausibility, deformation continuity, and occlusion ordering: Dyn 𝑡 = RobAgg 
+
+
+
+𝑤 𝑖 bu𝑖 − u𝑖 2 ; 𝑖 ∈ M 𝑑 
+
+
+
+, (4) where M𝑑 is the dynamic-region mask, u𝑖 is measured optical flow, bu𝑖 is expected motion under consistency priors, 
+
+𝑤 𝑖 down-weights unreliable/occluded pixels, and RobAgg denotes a robust aggregator. We instantiate this metric with an adaptive Wasserstein-2 [7] regional formulation (AdaDFRC-W2) in §4, which aggregates local motion-pattern discrepancies with occlusion-aware weighting. This score is complementary to background indicators: H/F-based IR/GE certify rigid-scene adequacy, while Dyn certifies that moving/occluding content evolves plausibly. 
+
+3.5 Intended use, GT-free positioning, and boundaries 
+
+Our protocol is an engineering QA baseline for model comparison, regression testing, and content-side risk triage under GT-free conditions. It complements human-subject studies rather than replacing them by enforcing photogrammetric validity without GT [23, 29]. It provides a reproducible floor upon which subjective evaluation can build. Beyond the practical unavailability of GT in platform settings, GT-free protocols allow cross-platform comparisons on real data without disclosing proprietary trajectories or geometry and avoid mismatches introduced by synthetic GT. By aligning to photogrammetric self-consistency and releasing audit artifacts, we retain a hard, reproducible constraint that generalizes across devices, content, and generators. Typical uses include (i) cross-generator comparisons with regime-stratified breakdowns; (ii) pipeline regression tests where gate agreement and sensitivity curves act as sentinels; and (iii) dataset curation by filtering clips with unstable regimes or insufficient background support. Known limitations include specularities, rolling-shutter distortions, extreme motions with low-SNR correspondences, and non-pinhole optics. 
+
+4 Methodology 
+
+Our methodology is designed to quantitatively answer a fundamental question: whether a generated video adheres to the geometric principles of a rigid 3D world observed by a moving camera. The framework operates without ground truth and is built on a core principle we term mask-first, regime-aware geometry . This principle dictates that we must first isolate independently moving objects from the static background (mask-first), and then apply the geometrically appropriate motion model to the background based on the nature of the camera’s movement (regime-aware). 
+
+4.1 Overall Framework 
+
+Given a generated video sequence {𝐼 𝑡 }𝑇 𝑡 =0, our evaluation proceeds in three main stages, as illustrated in Fig. 2: (1) Global Motion Regime Gating: We first determine the dominant camera motion of the input video stream. Specifically, we distinguish between motion that is purely rotational (or static) and motion that includes a translational component. This decision is critical as it dictates which geometric model is appropriate for the background. (2) Foreground/Background Separation: We segment any objects that are moving independently of the camera’s ego-motion. This creates a clean background mask, ensuring that our analysis of the static scene’s rigidity is not contaminated by foreground motion. 
+
+> Manuscript submitted to ACM
+
+Illusion or Integrity? Geometrical Consistency Metric for AIGC Video Quality Evaluation 7(3) Consistency Evaluation: We apply distinct, specialized metrics to the separated background and foreground regions. The background is evaluated for rigid-body consistency using classical geometric models, while each moving foreground object is evaluated for its internal geometric integrity. 
+
+> Fig. 2. Our evaluation workflow. A pose estimator (DUSt3R) determines the camera motion regime to select between a Fundamental Matrix ( F) or Homography ( H) model. A segmentation model (SAM-2) [35] isolates moving objects. Background consistency is then evaluated on the static regions only, while foreground objects are scored for internal rigidity using AdaDFRC-W2.
+
+4.2 Pose estimation and translation-aware gating 
+
+In photogrammetry, negligible translation justifies a single-plane/parallax-free background (homography), whereas observable translation requires epipolar geometry (fundamental). We therefore route by a translation-evidence proxy 𝑠 𝑡 
+
+from pose logs, with a hysteresis band [𝜏 𝜌 − 𝜀, 𝜏 𝜌 + 𝜀 ] to avoid flip–flop: 𝛾 𝑡 =H if 𝑠 𝑡 < 𝜏 𝜌 − 𝜀 , 𝛾 𝑡 =F if 𝑠 𝑡 > 𝜏 𝜌 + 𝜀 , and otherwise we keep 𝛾 𝑡 −1.To select the correct geometric model for the background, we must first characterize the camera’s ego-motion. We estimate the relative camera pose (R𝑡 , t𝑡 ) ∈ 𝑆𝐸 (3) between frames. Let 𝐼 𝑡 , 𝐼 𝑡 +1 be adjacent frames. From deep matches 
+
+M𝑡,𝑡 +1 = {( 𝑥 𝑖 , 𝑥 ′ 
+
+> 𝑖
+
+)} 𝑁 𝑖 =1 (pixel coordinates in homogeneous form), we estimate the relative pose (R, t) ∈ SE (3) using DUSt3R or a PnP solver on the same correspondences [45]. Under DUSt3R’s convention, the scene is normalized to unit scale along principal axes. We declare the pair non-translation-dominant (behaves like pure rotation) when 
+
+∥t∥∞ ≜ max {| 𝑡 𝑥 |, |𝑡 𝑦 |, |𝑡 𝑧 |} ≤ 𝜏 𝑡 , 𝜏 𝑡 = 0.04 , (5) and translation-dominant otherwise. The choice of 𝜏 𝑡 follows a first-order pinhole analysis: for a 3D point P = (𝑋, 𝑌, 𝑍 )𝑇 
+
+the translation-induced image displacement satisfies 
+
+∥𝛿 x∥ ≲ 𝑓 𝑍 ∥t⊥ ∥, (6) with focal length 𝑓 (in pixels) and translation component t⊥ orthogonal to the view. Requiring ∥𝛿 x∥ ≤ 𝜏 𝐻 (the inlier tolerance of homography fitting, typically ∼ 1 px at our working resolution) yields ∥t⊥ ∥ ≤ ( 𝜏 𝐻 /𝑓 ) 𝑍 . With median 𝑍 ≈ 1in DUSt3R units and calibrated 𝑓 , the practical bound ∥t∥∞ ≤ 0.04 keeps ∥𝛿 x∥ at the noise floor, so a single homography provides an adequate approximation. To stabilize decisions near the boundary, we adopt a narrow hysteresis in implementation ( ≤ 0.03: homography branch; ≥ 0.05: fundamental branch); in the gray zone, both models are evaluated, and the one with higher support is selected downstream. Section §6.2 empirically calibrates this gate by a threshold sweep. 
+
+> Manuscript submitted to ACM
+
+8 Trovato et al. 
+
+4.3 Foreground/Background Separation 
+
+A core tenet of our method is that the geometric model for camera ego-motion applies only to the static parts of the scene. Therefore, we must first identify and mask out any independently moving objects. Using a video object segmentation model, we generate a set of masks {𝑀 𝑘 𝑡 } for each moving object 𝑘 at frame 𝑡 . The static background mask 
+
+𝐵 𝑡 is then defined as the complement of the union of all foreground masks: 𝐵 𝑡 = 1 − Ð𝑘 𝑀 𝑘 𝑡 . All subsequent analysis of the background’s geometric consistency is performed exclusively on feature correspondences found within the regions defined by 𝐵 𝑡 . This "mask-first" approach is crucial as it prevents moving objects from corrupting the estimation of the global camera motion model, which would otherwise lead to incorrect evaluations of background stability. 
+
+4.4 Background Consistency: IR and GE 
+
+We assess the behavior of the static background as a single rigid body across consecutive frames by fitting a global geometric model. Specifically, we utilize either a homography H for the planar/rotation regime or a fundamental matrix 
+
+F for the translation/parallax regime. The analysis is conducted on background-only correspondences, employing a robust estimator. Models are estimated in normalized coordinates for numerical stability and denormalized to pixels for residual evaluation. All residuals are computed on the content mask (letterboxed padding ignored). Unless otherwise specified, frames are 1024 ×720 with letterboxing. Inlier Ratio (IR) is the fraction of background correspondences whose geometric residual falls below the inlier test used by the robust estimator. A high IR indicates that a single rigid transformation explains the majority of the background motion, as expected for static scenes (cf. Fig. 3). Geometric Error (GE) summarizes the accuracy of alignment among the inliers only, reported as the median residual. Thus IR answers “does a single global model hold?”, while GE answers “how tightly do the consistent matches align?”. In our implementation, the same inlier test used during robust estimation is reused to define the inlier set for reporting. 
+
+> Fig. 3. Each panel shows two adjacent frames with matched feature correspondences. Left: high IR—most matches are inliers, indicating a rigid background. Right: low IR—many outliers, revealing background inconsistency.
+
+Homography and epipolar residuals differ in scale and tail behavior; we therefore calibrate dual thresholds (𝜏 𝐻 , 𝜏 𝐹 )
+
+rather than forcing a single cutoff. To make platform-level rankings defensible, we accompany per-clip IR/GE with (i) threshold–score sensitivity scans over (𝜏 𝐻 , 𝜏 𝐹 ) and (ii) percentile-aligned summaries (e.g., reporting GE 𝐻 at matched IR 𝐻 percentiles), which mitigate absolute-scale differences across datasets and generators. 
+
+Homography case (non-translation regime). In the non-translation regime, we model background motion with a homography H𝑡 . The error for each correspondence pair (x1, x2) is evaluated using the symmetric transfer error , which 
+
+> Manuscript submitted to ACM
+
+Illusion or Integrity? Geometrical Consistency Metric for AIGC Video Quality Evaluation 9averages the forward and backward projection errors in the pixel domain: ˆx2 = 𝜋 (H𝑡 x1), ˆx1 = 𝜋 (H−1 
+
+> 𝑡
+
+x2), 𝑟 sym  
+
+> 𝐻
+
+= 12 x2 − ˆx2 2 + 12 x1 − ˆx1 2, (7) where 𝜋 ([ 𝑎, 𝑏, 𝑐 ]⊤) = [𝑎 /𝑐, 𝑏 /𝑐 ]⊤ converts from homogeneous to Cartesian coordinates. Using this error metric, the two key consistency scores can be derived. We robustly estimate H𝑡 (e.g., via PROSAC sampling) by finding the largest set of correspondences that satisfy the inlier condition 
+
+𝑟 sym  
+
+> 𝐻
+
+≤ 𝜏 𝐻 , with 𝜏 𝐻 = 2.0, px . (8) The IR is the fraction of correspondences classified as inliers, and the GE is the median symmetric transfer error among these inliers. 
+
+Fundamental case (translation/parallax regime). The estimation of the fundamental matrix F𝑡 is highly sensitive to the scale and origin of pixel coordinates. To ensure numerical stability, we follow the standard practice of coordinate normalization. For a given set of 𝑁 points {x𝑖 = [𝑢 𝑖 , 𝑣 𝑖 , 1]⊤ }, we first compute their centroid c = [ ¯𝑢, ¯𝑣 ]⊤ and a scaling factor 𝑠 = √2/ ¯𝑑 , where ¯𝑑 = 1
+
+> 𝑁
+
+Í𝑖 ∥ [ 𝑢 𝑖 − ¯𝑢, 𝑣 𝑖 − ¯𝑣 ]⊤ ∥2 is the average distance from the centroid. The normalization matrix T is then constructed as: 
+
+T =
+
+
+
+𝑠 0 −𝑠 ¯𝑢 
+
+0 𝑠 −𝑠 ¯𝑣 
+
+0 0 1
+
+
+
+. (9) We compute T1 and T2 for the point sets in each image respectively, yielding normalized coordinates ˆ x1 = T1x1 and ˆx2 = T2x2.In this normalized space, we fit ˆ F𝑡 using a robust estimator (again, PROSAC can be used) exclusively in this normalized space. It finds an optimal normalized fundamental matrix ˆ F𝑡 by classifying a correspondence as an inlier if its Sampson distance, computed on normalized data, is below the unitless threshold 𝜏 𝐹 = 0.1. The Inlier Ratio (IR) is the fraction of correspondences in this final inlier set [9, 11]. Once the inlier set is identified, ˆ F𝑡 is transformed back to the original pixel domain via denormalization: 
+
+F𝑡 = T⊤ 
+
+> 2
+
+ˆF𝑡 T1. (10) Finally, the Geometric Error (GE) is defined as the median of the Sampson distances computed for all inlier pairs. This computation uses their original pixel coordinates (x1, x2) and the denormalized matrix F𝑡 :GE = median  
+
+> (x1,x2) ∈ Inliers
+
+
+
+|x⊤ 
+
+> 2
+
+F𝑡 x1 |√︃ 
+
+(a)21 + ( a)22 + ( b)21 + ( b)22
+
+
+
+, (11) where a = F𝑡 x1 and b = F⊤ 
+
+> 𝑡
+
+x2. This two-stage process ensures that the inlier selection is robust and independent of image resolution, while the final reported GE remains interpretable in the context of pixel-level deviations. For H we use symmetric transfer error in pixels with threshold 𝜏 𝐻 ; for F we use the normalized Sampson error with threshold 𝜏 𝐹 (unitless). The dual-threshold design reflects fundamentally different residual scales and avoids ill-posed single-threshold comparisons. IR is the fraction of correspondences within the relevant threshold; GE is the median residual over inliers. Both metrics use the same per-family threshold to avoid moving standards. For brevity, in (12) we write a generic cutoff 𝛿 which denotes 𝜏 𝐻 when 𝛾 𝑡 = H and 𝜏 𝐹 when 𝛾 𝑡 = F. 
+
+> Manuscript submitted to ACM
+
+10 Trovato et al. Let Cbg  
+
+> 𝑡
+
+be the background correspondences for pair (𝐼 𝑡 , 𝐼 𝑡 +1). We dispatch to F (translation) or H (non-translation) using a translation surrogate ˜ 𝜌 𝑡 with threshold 𝜏 𝜌 (§4.2). Denote the residual of a match by 𝑟 𝑖 (either 𝑟 sym  
+
+> 𝐻
+
+or 𝑟 𝐹 ). With a 
+
+single global inlier threshold 𝛿 (pixels), the inlier set and the per-pair metrics are 
+
+I𝑡 = { 𝑖 ∈ C bg  
+
+> 𝑡
+
+| 𝑟 𝑖 ≤ 𝛿 }, IR BG (𝑡 ) = |I 𝑡 ||C bg  
+
+> 𝑡
+
+| , GE BG (𝑡 ) = median { 𝑟 𝑖 | 𝑖 ∈ I 𝑡 }. (12) Pairs with too few inliers (e.g., |I 𝑡 | < 30 due to extreme blur/low texture) are marked invalid and excluded from aggregation. For a clip, we summarize background consistency by robust medians over valid pairs: IR clip BG = median 𝑡 
+
+ IR BG (𝑡 ), GE clip BG = median 𝑡 
+
+ GE BG (𝑡 ). (13) Scene-balanced medians and 95% bootstrap CIs are reported across seeds within each category. Within each category ( 𝐶 1– 𝐶 6), we aggregate per-seed clip scores by a scene-balanced median, i.e., each seed (scene) contributes one score with equal weight: ˜ 𝑚 𝐶𝑘 = median 𝑠 (𝑚 𝑠 ). To quantify uncertainty around the median, we report 
+
+95% nonparametric bootstrap confidence intervals by resampling seeds with replacement ( 𝐵 =10 ,000 replicates) and taking the 2.5/97.5 percentiles of the bootstrap distribution of ˜𝑚 𝐶𝑘 . This avoids distributional assumptions and prevents categories or seeds with more regenerations from dominating the estimate. We use a family-specific inlier gate during robust fitting. Specifically, we use symmetric transfer error with 𝜏 𝐻 =2 px for a homography situation, and normalized Sampson with 𝜏 𝐹 =0.1 at the fundamental case. At report time, we apply a pixel-domain gate on GE fixed at 𝛿 =3.5 px. A geometrically consistent background exhibits high IR BG and low GE BG . Drops in IR indicate that a single global model cannot explain the pair (global inconsistency), while increases in GE at stable IR indicate imprecise alignment among otherwise consistent matches. 
+
+4.5 Foreground Consistency: AdaDFRC-W2 
+
+Dynamic/non-rigid pixels violate rigid-background assumptions. Including them in H/F fitting (i) pollutes inlier sets, (ii) destabilizes robust estimation, and (iii) degrades the diagnostic value of IR/GE for the background. Conversely, judging dynamics by background residuals rewards trivial solutions (shrinking inlier sets) and unfairly penalizes legitimate motion. A flow-guided score such as AdaDFRC-W2 directly targets motion plausibility, deformation continuity, and occlusion ordering, complementing IR/GE rather than conflating objectives. To assess the geometric integrity of an individual moving object, which standard metrics fail to capture, we introduce the Adaptive Dense Flow Regional Consistency (AdaDFRC-W2) metric. This metric quantifies how well the internal motion of an object adheres to a rigid or near-rigid transformation, a key property of real-world objects. 
+
+Theoretical Foundation. The core principle of AdaDFRC-W2 is derived from the observation that the motion of a rigid object, when projected onto a 2D image plane under perspective projection, can be locally approximated by a 2D affine transformation. This approximation holds particularly well for objects that are relatively small in the field of view or distant from the camera. Consequently, for a geometrically consistent, rigid moving object, we expect its internal motion field—as captured by dense optical flow—to be highly structured and conform well to a single, dominant affine motion model. Any significant deviation from this model indicates non-rigid deformation, which in the context of AIGC, often manifests as generative artifacts like shearing, tearing, or texture "boiling." AdaDFRC-W2 is designed to measure the magnitude of this deviation precisely. 
+
+> Manuscript submitted to ACM
+
+Illusion or Integrity? Geometrical Consistency Metric for AIGC Video Quality Evaluation 11 
+
+Derivation and Methodology. For each independently moving object 𝑘 , identified by its mask 𝑀 𝑘 𝑡 at time 𝑡 , we compute its AdaDFRC-W2 score through a systematic, multi-step process detailed below. This process is designed to be robust and invariant to the object’s on-screen size and position. (1) Adaptive Grid Normalization: To standardize the analysis regardless of the object’s scale, we first define a bounding box around the mask 𝑀 𝑘 𝑡 . This bounding box is then partitioned into a uniform 𝑁 × 𝑁 grid of cells. This adaptive grid ensures that our analysis has a consistent spatial resolution relative to the object itself. (2) Robust Local Motion Summarization: We compute a dense optical flow field from frame 𝐼 𝑡 to 𝐼 𝑡 +1 within the object’s bounding box. For each grid cell (𝑖, 𝑗 ), we identify all the object pixels (as defined by 𝑀 𝑘 𝑡 ) that fall within it. A single, robust motion vector v𝑖,𝑗 ∈ R2 is then computed for this cell by taking the median of the flow vectors of all its constituent pixels. The median is chosen for its robustness to outliers, effectively filtering out minor noise in the flow estimation. If a cell contains no object pixels, it is excluded from further analysis. (3) Optimal Affine Model Fitting via Weighted Least-Squares: The central step is to find the single affine transformation that best describes the collection of local motion vectors {v𝑖,𝑗 }. An affine transformation models the motion of a point p as p′ = Ap + b, where A is a 2 × 2 matrix representing rotation, scaling, and shear, and b
+
+is a 2 × 1 translation vector. The motion vector is thus predicted as vpred (p) = p′ − p = (A − I)p + b.We formulate this as a weighted least-squares problem. We seek the optimal affine parameters (A∗, b∗) that minimize the sum of squared differences between the predicted motion and the observed local motion vectors 
+
+{v𝑖,𝑗 }. To give more importance to denser parts of the object, each cell (𝑖, 𝑗 ) is assigned a weight 𝑤 𝑖,𝑗 equal to the number of object pixels it contains. The optimization problem is thus: 
+
+(A∗, b∗) = arg min 
+
+> A,b
+
+∑︁ 𝑖,𝑗 
+
+𝑤 𝑖,𝑗 ∥ ( Ap 𝑖,𝑗 + b) − v𝑖,𝑗 ∥22 (14) where p𝑖,𝑗 is the geometric centroid of the grid cell (𝑖, 𝑗 ). This is a standard linear least-squares problem that can be solved efficiently in closed form. (4) Score Calculation as Weighted Mean Squared Error (WMSE): The AdaDFRC-W2 score for the object 𝑘 
+
+at time 𝑡 , denoted D (𝑘 ) 
+
+> 𝑡
+
+, is defined as the weighted mean squared error (WMSE) of this optimal fit. This value represents the residual, non-affine component of the motion field—the part that cannot be explained by a single rigid transformation. 
+
+D (𝑘 ) 
+
+> 𝑡
+
+=
+
+Í𝑖,𝑗 𝑤 𝑖,𝑗 ∥ ( A∗p𝑖,𝑗 + b∗) − v𝑖,𝑗 ∥22
+
+Í𝑖,𝑗 𝑤 𝑖,𝑗 
+
+(15) A low D (𝑘 ) 
+
+> 𝑡
+
+score signifies high internal consistency, indicating that the object’s motion is well-described by a single affine model, which is characteristic of a rigid body. Conversely, a high score points to significant non-rigid deformation or other structural inconsistencies symptomatic of generative artifacts. The final consistency score for an object instance, 
+
+S (𝑘 ) , is computed by averaging D (𝑘 ) 
+
+> 𝑡
+
+over its entire visible trajectory. 
+
+5 GeoCon-Bench Dataset: A Sophisticated Collection for Geometric Consistency 
+
+To transition geometric consistency from a qualitative afterthought to a first-class, quantitative evaluation target, we construct GeoCon-Bench , a standard, reusable, and expandable benchmark explicitly tailored to the challenges of geometry consistency among various prompt situations in AIGC videos. It is the first benchmark of its kind to systematically factorize geometric stressors, providing a controlled environment to probe model capabilities beyond semantic and aesthetic appeal. The dataset is designed to (i) rigorously test whether a single rigid motion model can 
+
+> Manuscript submitted to ACM
+
+12 Trovato et al. explain frame-to-frame changes, (ii) isolate independently moving objects for granular, per-object consistency analysis, and (iii) directly align with and validate our translation-aware gating mechanism. 
+
+5.1 Design Principles 
+
+Our benchmark is built on five core principles to ensure fairness, rigor, and utility: 
+
+• Geometry-first, not aesthetics: Prompts and scenes are constructed to emphasize camera motion, scene structure, and object rigidity over complex textures or artistic styles. This prevents models from hiding geometric flaws behind stylistic appeal and focuses the evaluation on structural integrity. 
+
+• Orthogonal stressors: Scenarios are carefully factored along controllable geometric axes (e.g., planarity of the background, presence of parallax, number of independent motion fields). This allows for targeted analysis of specific model weaknesses, such as a failure to model epipolar geometry while succeeding at projective transforms. 
+
+• Model-agnostic generation: To ensure a fair comparison, identical prompts and random seeds are used across all tested models (Sora [26], Runway, Wan [44]). Technical parameters such as resolution, frames per second (fps), and clip duration are also held constant. 
+
+• Reproducibility: Every generated sequence is accompanied by a detailed metadata record (prompt, seed, model version, resolution, fps, duration) and the scripts used for generation. This commitment to transparency allows for full verification and extension of our results. 
+
+• Replaceable components: The tools used in our evaluation pipeline (segmentation, feature matching, optical flow) are treated as default choices, not fixed requirements. The benchmark is structured to allow for drop-in alternatives (e.g., swapping RAFT for a future optical flow model), ensuring its long-term relevance as underlying technologies evolve. 
+
+5.2 Scenario Taxonomy 
+
+The dataset is partitioned into six distinct scenarios. We first include the Static Scene as a negative-control baseline. Its purpose is not to test complex 3D understanding but to evaluate temporal stability and the fidelity of executing a zero-motion command. It reveals texture flicker, unintended camera drift, and minor object instability. For a perfect static video, camera motion should be zero and appearance-consistency between frames should approach zero; any deviation directly quantifies inherent instability. Failing this simplest case indicates that errors in more complex scenarios likely stem from a lack of temporal coherence rather than motion understanding. 1) Static Scene (Temporal Stability Baseline): see above. 2) Pure Camera Rotation (Homography-dominant): A static 3D scene where the camera rotates around its optical center. This is a foundational test of projective consistency. Expected Behavior: The motion should be classified as non-translation-dominant . A single homography ( 𝐻 ) should explain nearly all background feature matches, resulting in an Inlier Ratio (IR) approaching 100% and a very low Geometric Error (GE). 3) Pure Camera Translation (Epipolar-dominant): A static scene with significant depth variations (e.g., near and far objects) where the camera translates laterally or forward. This is a critical test of a model’s ability to synthesize motion parallax. Expected Behavior: The motion must be classified as translation-dominant . A single fundamental matrix ( 𝐹 ) should model the epipolar geometry, yielding a high IR and low GE. Failure often manifests as scene "breathing" or warping, where distant objects do not remain stable relative to near ones. 
+
+> Manuscript submitted to ACM
+
+Illusion or Integrity? Geometrical Consistency Metric for AIGC Video Quality Evaluation 13 4) Static Background + Single Moving Object: A static camera observes a scene where a single foreground object moves independently. This scenario tests the model’s ability to disentangle different motion fields. Expected Behavior: The background should remain perfectly rigid, passing the 𝐻 /𝐹 test with high scores. The foreground object is evaluated for internal rigidity using AdaDFRC-W2 (Eq. (15)); a low score indicates a rigid object, while a high score reveals non-rigid deformations like stretching or shearing. 5) Complex Camera Motion (Rotation+Translation): Realistic, combined camera movements such as a dolly-zoom or arc shot. This probes the model’s ability to maintain a coherent 3D representation under more challenging, free-form motion. Expected Behavior: The motion should be classified as translation-dominant . The evaluation checks if a single fundamental matrix ( 𝐹 ) can still robustly model the background motion, despite its complexity, and if foreground objects (if any) can be stably decomposed and tracked. 6) Geometric Stress Tests: Adversarial but physically-plausible setups designed to push models to their limits. This includes scenes with thin, detailed structures (prone to disappearing), reflective or transparent surfaces (challenging for feature matching), and occlusions. Expected Behavior: We anticipate a significant drop in performance across all metrics. These scenarios are diagnostic, designed to reveal failure modes like structural "breathing," object wobble, or non-rigid drift that might not be apparent in simpler scenes. 
+
+5.3 Prompt Templates and Lexicon 
+
+To ensure precise control over the generated geometry and minimize semantic ambiguity, we adopt a structured, modular prompt system. This forces the models to contend with the geometric request directly, rather than relying on semantic shortcuts. Each prompt uses four slots: Motion Command + Scene Composition + Object Specification +
+
+Qualitative Style . A comprehensive prompt lexicon, detailing the allowed vocabulary for each slot, is provided in an appendix (cf. Appendix A) to standardize wording. 
+
+Examples (abbrev.). 
+
+• Pure Rotation: “Single static shot. The camera rotates in place around the building facade. No translation. Back-ground absolutely fixed.” 
+
+• Pure Translation: “Single static shot. Camera dollies right past trees and a building, revealing parallax (near vs far).” 
+
+• Static BG + Object: “Static camera. A red car drives a circular path in front of a fixed building. Background must stay rigid.” 
+
+5.4 Generation Protocol and Dataset Statistics 
+
+All clips in GeoCon-Bench are generated under a strict protocol. In addition to the released seed-image scenes, we include standardized videos from three representative AIGC models, including Sora (commercial), Runway (industry-leading), and Wan (open-source). Each clip is generated at a fixed resolution and 24 fps, with a duration of 5 seconds (120 frames). For each of the 20 unique prompts, we generate 3 clips per model using different seeds. We advocate for scene-balanced 
+
+reporting, where metrics are first averaged within each scenario before being averaged across scenarios. This prevents a model’s high performance on an easy category from masking its failures on more challenging ones. 
+
+> Manuscript submitted to ACM
+
+14 Trovato et al. 
+
+5.5 Metadata and Release Format 
+
+To maximize the benchmark’s utility and promote reproducible science, each clip is accompanied by a JSON metadata file containing: {prompt, model, model_version, seed, resolution, fps, duration, clip_id, masks_path} .We will publicly release (i) all prompts, (ii) all generated videos, (iii) all extracted foreground masks, (iv) evaluation configurations, and (v) scripts to reproduce all tables and figures in this paper. 
+
+5.6 Grounded Validation 
+
+To anchor our metrics and calibrate key thresholds, the benchmark includes a small subset of "grounded" scenarios where the intended geometry is unambiguous. These include textured planar surfaces for rotation checks (which should yield a perfect homography with IR=100%) and scenes with clearly separated near/far layers for translation checks. These anchors provide a sanity check for the entire evaluation pipeline and are used to calibrate the gating threshold 𝜏 𝜌 
+
+by observing the IR saturation across these known scenarios. 
+
+6 Experimental Validation 
+
+We conducted a comprehensive set of experiments to validate our proposed framework and evaluate the geometric consistency of state-of-the-art video generation models using a custom benchmark, GeoCon-Bench. The goal is not merely to rank models but to establish a standardized, interpretable procedure for judging geometric fidelity. We investigate: RQ1 (Gate validity) : Does translation-evidence gating agree with photogrammetric fits across scenes and platforms? RQ2 (Background rigidity) : Are IR 𝐻 /𝐹 and GE 𝐻 /𝐹 stable under dual-threshold scanning and informative for cross-platform comparison? RQ3 (Dynamic coherence) : Does the flow-guided dynamic score (AdaDFRC-W2) capture complementary failures that background indicators cannot? RQ4 (Comparability & auditing) :Do percentile-aligned summaries and audit cards yield stable platform rankings and reproducible diagnostics? 
+
+6.1 Implementation Details 
+
+This section details the specific choices of algorithms and parameters used to implement our framework, clearly separating the practical implementation (cf. pseudocode Algorithm 1) from the theoretical methodology of Section 4. The abstract components of our framework were realized with the following state-of-the-art models: 
+
+• Pose Estimation: We used the official implementation of DUSt3R for pairwise relative pose estimation. Its ability to handle uncalibrated images makes it robust for AIGC evaluation. 
+
+• Video Segmentation: Foreground object masks were generated using SAM-2 , leveraging its streaming archi-tecture for efficient video processing. 
+
+• Optical Flow: Dense flow fields for the AdaDFRC-W2 metric were computed with Recurrent All-Pairs Field Transforms ( RAFT-small ), chosen for its balance of accuracy and efficiency. 
+
+6.2 DUSt3R Translation-Gate Calibration 
+
+Given the DUSt3R relative pose between the first/last frames, we declare a pair translation-dominant (F) if ∥t∥∞ > 𝜏 𝑡 
+
+and rotation/planar-like (H) otherwise, where 𝑡 ∞ ≜ ∥t∥∞ =max (| 𝑡 𝑥 |, |𝑡 𝑦 |, |𝑡 𝑧 |) . Throughout the paper, background inlier gates are kept fixed to empirically chosen constants and are not ablated: 𝜏 𝐻 =2 px (homography reprojection) and 𝜏 𝐹 =0.1(Sampson residual); when background consistency is required we use IR ≥ 0.97 and GE ≤ 3.5 px on the content mask (pixels, after denormalization). 
+
+> Manuscript submitted to ACM
+
+Illusion or Integrity? Geometrical Consistency Metric for AIGC Video Quality Evaluation 15 
+
+Algorithm 1: Mask-first, translation-aware evaluation. Residuals are evaluated in pixels on the content mask; the background model (H or F) is chosen once from the DUSt3R decision on (𝐼 0, 𝐼 𝑇 ).
+
+Input : Seed 𝐼 0; generated frames 𝐼 1: 𝑇 ; scales 𝑆 = {1/4, 1/2, 1};DUSt3R translation gate 𝜏 𝑡 (default 0.04 ); fixed background gates 𝜏 𝐻 =2 px, 𝜏 𝐹 =0.1. 
+
+Output : IR BG , GE BG ; per-object S (𝑂 ) ; detected category. 
+
+A. DUSt3R translation decision (first–last) 
+
+estimate pose T = (R, t) between (𝐼 0, 𝐼 𝑇 );
+
+if pose available then set 𝑡 ∞ ← ∥ t∥∞, translation_flag ← ( 𝑡 ∞ > 𝜏 𝑡 )
+
+else translation_flag ←F (present-only policy) 
+
+B. SAM-2 segmentation (mask-first) 
+
+run SAM-2 → { 𝑀 𝑘 𝑡 }; define content mask (remove letterbox) and background 𝐵 𝑡 = content (𝐼 𝑡 ) \ ∪ 𝑘 𝑀 𝑘 𝑡 ;build background-only correspondences Cbg  
+
+> 𝑡,𝑠
+
+on 𝐵 𝑡 ∩ 𝐵 𝑡 +1 for all 𝑡 and 𝑠 ∈ 𝑆 .
+
+C. Background geometry on masks-outside for 𝑡 = 0 to 𝑇 − 1 do for 𝑠 ∈ 𝑆 do if translation_flag then 
+
+fit F𝑡,𝑠 on Cbg  
+
+> 𝑡,𝑠
+
+(robust, gate 𝜏 𝐹 ); compute IR 𝐹 and median Sampson residual GE 𝐹 (pixels); 
+
+else 
+
+fit H𝑡,𝑠 on Cbg  
+
+> 𝑡,𝑠
+
+(robust, gate 𝜏 𝐻 ); compute IR 𝐻 and median symmetric reprojection GE 𝐻 (pixels); aggregate over time/scales by robust medians to obtain IR BG , GE BG ;
+
+(optional) also record best-of(H/F) per pair for analysis, without affecting the main scores. 
+
+D. Movers: AdaDFRC-W2 for each object 𝑂 and 𝑠 ∈ 𝑆 do 
+
+estimate dense flow and occlusion inside 𝑂 ; grid the bbox, take per-cell median flow 𝑣 𝑖,𝑗 ;fit affine (A, b) and compute weighted MSE per frame D (𝑂 ) 
+
+> 𝑡
+
+; average over the track → S (𝑂 ) .
+
+E. Post-hoc categorization 
+
+combine translation_flag with (IR BG , GE BG ) under fixed report gates (IR ≥ 0.97, GE ≤ 3.5 px) to assign one of {Static , Rotation-dominant , Translation-dominant , StaticCam+MovingObjs , Complex , Stress }. 
+
+return IR BG , GE BG , { S (𝑂 ) }.
+
+For the calibration of 𝜏 𝑡 we use present-only pairs (i.e., DUSt3R poses available; “fail” pairs have undefined 𝑡 ∞), across all three platforms and all six prompt families. The sampling unit is a (seed, platform, family) triplet, yielding 𝑁 =300 observations with valid 𝑡 ∞ (146 F-expected: C3/C5/C6; 154 H-expected: C1/C2/C4). This analysis is purely geometric and independent of semantic scores. Fig. 4(a) shows smoothed densities of 𝑡 ∞ for H-expected (C1/2/4) and F-expected (C3/5/6) families. Densities are reported as equal-width histograms over the central 99% range with a mild Gaussian smoothing (for visualization only; no decision is made on smoothed values). A clear valley emerges around 𝑡 ∞ ≈ 0.04, indicating a natural separation between the two regimes; choosing 𝜏 𝑡 in that valley minimizes overlap of the class-conditional distributions. To quantify the separation without assuming parametric forms, we estimate the empirical calibration curve 𝑃 (F | 𝑡 ∞)
+
+using equal-count binning and Wilson 95% confidence intervals (CIs): for each bin 𝑏 with 𝑚 𝑏 samples and ˆ 𝑝 𝑏 the observed F fraction, we report 
+
+ ˆ𝑝 𝑏 + 𝑧 2 
+
+> 2𝑚 𝑏
+> 1+𝑧 2
+> 𝑚 𝑏
+
+± 𝑧  
+
+> 1+𝑧 2
+> 𝑚 𝑏
+
+√︂     
+
+> ˆ𝑝 𝑏 (1−ˆ𝑝 𝑏 )
+> 𝑚 𝑏
+
++ 𝑧 2
+
+> 4𝑚 2
+> 𝑏
+
+, 𝑧 =1.96 . (16) Fig. 4(b) exhibits a smooth transition from H-like to F-like regimes. With 𝐾 =12 equal-count bins (about 25 samples per bin), the 0.5 crossing lies in the interval 𝑡 ∞ ∈ [ 0.04 , 0.07 ]; notably, the bin centered at 𝑡 ∞ ≈ 0.043 has ˆ 𝑝 =0.40 with a 
+
+> Manuscript submitted to ACM
+
+16 Trovato et al.                   
+
+> (a) 𝑡 ∞density for H-expected (C1/2/4) vs. F-expected (C3/5/6). A valley appears near 𝑡 ∞≈0.04 , indicating a natural split for 𝜏 𝑡 .
+> (b) Empirical calibration 𝑃 (F|𝑡 ∞)with Wilson 95% CIs (equal-count bins; ≈25 samples/bin). The 0.5 crossing occurs within
+> [0.04 ,0.07 ];𝜏 𝑡 =0.04 lies inside this transition band. Fig. 4. Translation-gate calibration for pose estimation.
+
+Wilson CI that contains 0.5, while the next bin centered at ≈ 0.073 has ˆ 𝑝 =0.52 (CI also overlapping 0.5). Hence, 𝜏 𝑡 =0.04 
+
+lies inside the statistically identified transition band, on the conservative side of the equiprobable boundary. We therefore adopt 𝜏 𝑡 =0.04 as the default translation gate: (i) it falls in the density valley separating the H/F families, thereby reducing class overlap; and (ii) it lies within the empirical calibration band where 𝑃 (F | 𝑡 ∞) ≈ 0.5, providing a principled knee-point that balances recall on F-expected cases (C3/5/6) against false positives on H-expected ones (C1/2/4). Complementary analyses in the Appendix B show that 𝜏 𝑡 ∈ [ 0.04 , 0.06 ] forms a broad performance plateau, and that 𝜏 𝑡 =0.04 is either at or statistically indistinguishable from the maxima while being slightly more conservative on spurious F. 
+
+6.3 GeoCon Benchmark 
+
+We evaluate whether camera translation is dominant (“F”) or not (“H”) across three video-generation platforms (Runway, Sora, Wan) and six prompt categories. For each clip, we feed the first and last frames to DUSt3R and extract the 4 ×4relative pose; we compute Eq. 5 from the translation column and declare translation-dominant (”F”) iff ∥𝑡 ∥∞ > 𝜏 
+
+with 𝜏 =0.04; otherwise we label ”H”. Unless otherwise stated, all descriptive statistics below are computed over the 
+
+available clip–pairs (i.e., no imputation), while some visualizations additionally show a conservative variant that treats missing pairs as F. For reporting raw coverage, we count a pair as “present” only if DUSt3R returns a valid pose. Thus, the Sora split exhibits fewer “present” pairs not because videos were absent, but because DUSt3R could not reconstruct a larger fraction of first/last-frame pairs. In all downstream analyses that depend on semantic consistency, these non-reconstructed pairs are treated as F by construction. Unless stated, statistics are computed over present-only 
+
+pairs (DUSt3R pose available). For robustness audits, we also report a conservative variant that treats missing pairs as F,reflecting that large endpoint displacement often prevents pose recovery. We evaluate three platforms (Runway, Sora, Wan) over six categories and multiple seeds. DUSt3R returns valid poses for 108 pairs on Runway, 92 on Sora, and 100 on Wan. The number of distinct seeds with at least one valid pair is 20 (Runway), 19 (Sora), and 20 (Wan), so the maximum possible pairs per platform are 120 /114 /120, leaving 
+
+> Manuscript submitted to ACM
+
+Illusion or Integrity? Geometrical Consistency Metric for AIGC Video Quality Evaluation 17 12 /22 /20 missing (failure) pairs, respectively. Per-category coverage (present pairs divided by #seeds) is: Runway 
+
+{100 , 85 , 95 , 85 , 95 , 80 }% for C1–C6; Sora {84 .2, 84 .2, 78 .9, 78 .9, 78 .9, 78 .9}%; Wan {90 , 80 , 80 , 95 , 85 , 70 }%. On present pairs, the distributions are: Runway (count 108): mean 0 .093, median 0 .042, max 0 .580; Sora (count 92): mean 0 .129, median 0 .050, max 0 .691; Wan (count 100): mean 0 .125, median 0 .076, max 0 .548. Overall, 21 /300 = 7.0% of decisions lie within ±0.01 of the threshold 𝜏 =0.04 (Runway 8 .3%, Sora 5 .4%, Wan 7 .0%), indicating a non-negligible band of near-threshold cases. DUSt3R failures indicate excessive translation and are treated as translation-present; such pairs are excluded from present-only aggregation but counted in all-pairs coverage. As expected, semantics intended to contain translation (C3, C5, C6) yield higher F-rates, while C1/C2/C4 lean toward H. Per-platform F-rates (fraction of F among present pairs) are: 
+
+• Runway : C1 30 .0%, C2 58 .8%, C3 84 .2%, C4 11 .8%, C5 68 .4%, C6 56 .2%; overall 51 .9%. 
+
+• Sora : C1 25 .0%, C2 50 .0%, C3 46 .7%, C4 46 .7%, C5 66 .7%, C6 80 .0%; overall 52 .2%. 
+
+• Wan : C1 33 .3%, C2 62 .5%, C3 87 .5%, C4 26 .3%, C5 94 .1%, C6 64 .3%; overall 60 .0%. Notably, Sora’s C3 is closer to the decision boundary (only 46 .7% F), whereas Wan is extremely translation-heavy on C5 (94 .1% F). 
+
+By design , categories C1 (Static), C2 (Rotation-dominant), and C4 (Static camera + moving object) are expected to be 
+
+H-majority (translation-free at the first/last endpoints), whereas C3/C5/C6 are expected to be F-majority. Empirically, we observe C1 and C4 behave as expected (H-majority). F-rates for C1 are 30 .0%/ 25 .0%/ 33 .3% (Runway/Sora/Wan); for C4 they are 11 .8%/ 46 .7%/ 26 .3%. Thus, C1 is consistently H-majority; C4 is H-majority on Runway/Wan and borderline on Sora. C2 deviates from expectation. Despite the rotation-only intent, C2 shows elevated F: 58 .8%/ 50 .0%/ 62 .5% (Runway/Sora/Wan), i.e., not H-majority on Runway/Wan and exactly balanced on Sora. This suggests either resid-ual translation between endpoints, moving content that induces effective parallax, or reconstruction biases on low-parallax/rotation-heavy pairs. C3 and C5 are strongly F-majority, as intended: C3 has 84 .2%/ 46 .7%/ 87 .5% F; C5 has 68 .4%/ 66 .7%/ 94 .1% F (Runway/Sora/Wan). C6 (stress) is also F-leaning: 56 .2%/ 80 .0%/ 64 .3% F. Using the expected rule (C1/C2/C4 → H; C3/C5/C6 → F), an anomaly occurs when the DUSt3R gate disagrees with the expectation. Present-only anomaly rates are: 
+
+• Runway : C1 30 .0%, C2 58 .8%, C3 15 .8%, C4 11 .8%, C5 31 .6%, C6 43 .8%; overall 31 .5%. 
+
+• Sora : C1 25 .0%, C2 50 .0%, C3 53 .3%, C4 46 .7%, C5 33 .3%, C6 20 .0%; overall 38 .0%. 
+
+• Wan : C1 33 .3%, C2 62 .5%, C3 12 .5%, C4 26 .3%, C5 5 .9%, C6 35 .7%; overall 29 .0%. Thus, C2 is systematically difficult (anomaly ≥ 50% on Runway/Wan), while C1/C4 largely conform to expectations (lower anomalies, aside from Sora’s borderline C4). When reconstruction failures are set to F prior to the check (our default protocol), overall anomaly rates be-come 33 .3% (Runway), 39 .5% (Sora), and 30 .0% (Wan). By category: Runway {30 .0, 65 .0, 15 .0, 25 .0, 30 .0, 35 .0}%; Sora 
+
+{36 .8, 57 .9, 42 .1, 57 .9, 26 .3, 15 .8}%; Wan {40 .0, 70 .0, 10 .0, 30 .0, 5.0, 25 .0}% (C1–C6). These increases concentrate in H-expected categories (C1/C2/C4), reflecting that failures are interpreted as large-displacement F. Fig. 5 merges cross-platform alignment and semantic consistency into a single panel. Each cell is color-coded by the DUSt3R-derived ∥𝑡 ∥∞ and overlaid with the H/F gate; orange borders denote anomalies under the expected rule (C1/C2/C4 → H; C3/C5/C6 → F), while gray borders indicate agreement. Rows list seeds in the fixed order 1–20; columns enumerate category (C1–C6) × platform (R/S/W for Runway/Sora/Wan). Missing pairs follow our default convention (treated as F and colored with the global maximum ∥𝑡 ∥∞ to preserve a common scale). Under this convention, 46 .7% of seed–category triplets are unanimous across platforms; of those, 76 .8% are all-F, reflecting translation-dominant or 
+
+> Manuscript submitted to ACM
+
+18 Trovato et al. failure-inferred cases. The combined view highlights three trends: (i) C3 and C5 align with translation dominance across platforms; (ii) C1 and C4 are mostly H with scattered mismatches; (iii) C2 departs from its H expectation, showing noticeable F decisions and borderline behavior near the threshold. 
+
+Fig. 5. Combined cross-platform alignment and semantic consistency. Color encodes ∥𝑡 ∥∞ from the DUSt3R first–last pose; overlaid labels show the H/F decision. Orange borders mark anomalies under the expected rule (C1/C2/C4 → H; C3/C5/C6 → F), gray borders indicate matches. Missing pairs are treated as F and colored with the global maximum to keep a common scale. Rows follow the seed order 1–20 ; columns are category (C1–C6) × platform (R/S/W). 
+
+6.4 Sanity checks and gate–support agreement 
+
+For each clip, we read the DUSt3R first–last pose T =
+
+"R t0 1
+
+#
+
+, compute 𝑡 ∞ = max (| 𝑡 𝑥 |, |𝑡 𝑦 |, |𝑡 𝑧 |) , and apply a hysteresis gate: 𝑡 ∞ ≤ 0.03 ⇒ H, 𝑡 ∞ ≥ 0.05 ⇒ F, and 0 .03 < 𝑡 ∞ < 0.05 is a tolerance band (”U”). Unless stated, Sankey plots drop U to avoid three-way clutter, whereas diagnostics report it explicitly. 
+
+> Manuscript submitted to ACM
+
+Illusion or Integrity? Geometrical Consistency Metric for AIGC Video Quality Evaluation 19 Across all available tuples (platform × seed × prompt) we obtain F = 156 (52%), H = 123 (41%), and U = 21 (7%). Fig. 6a shows the global histogram of 𝑡 ∞ with the two thresholds overlaid. The tolerance band [0.03 , 0.05 ] is sparsely occupied, supporting the defensibility of the gate. We also visualize the full distributions with a violin plot in Fig. 6b. C1 (static scene) and C4 (static camera + moving objects) concentrate below 0 .03 (H regime), C3 (translation-dominant) and C5 (complex camera motion) shift mass above 0 .05 (F regime), while C2 (rotation-dominant) spans both sides, indicating that even small translations or scale drift can flip the decision. C6 (geometric stress tests) is intentionally unconstrained and shows an F-skewed but mixed distribution: 28 /45 F, 14 /45 H, 3 /45 U(62 .2% F, 31 .1% H, 6 .7% U), consistent with stress conditions that elicit both regimes. We define gate margins as 𝑚 𝐻 = 0.03 − 𝑡 ∞ for H-gated tuples and 𝑚 𝐹 = 𝑡 ∞ − 0.05 for F-gated tuples. Fig. 6c shows the margin histograms for H and F, respectively: both concentrate away from zero, indicating decisions are not brittle. Fig. 6d expose platform effects(left: 𝑚 𝐻 , right: 𝑚 𝐹 ). Margins remain comfortably positive overall, but distributions differ across platforms, reflecting platform-specific motion priors under identical prompts. On (seed, prompt) tuples where at least two platforms are non-U, 55/103 are unanimous (consensus) and 48/103 are split (F vs. H), yielding a 53.4% consensus rate. These differences are visible directly in the platform-conditioned margin violins in Fig. 6d. For H-gated tuples, the distributions of 𝑚 𝐻 = 0.03 − 𝑡 ∞ differ by platform, and for F-gated tuples, the distributions of 𝑚 𝐹 = 𝑡 ∞ − 0.05 likewise separate across platforms. Margins remain largely positive, indicating decisions are not brittle, yet their platform-specific shifts corroborate the presence of distinct motion/rendering biases under identical prompts. 
+
+6.5 Background rigidity: distributional behavior, cross-model gaps, and effect sizes 
+
+We evaluate background rigidity using two complementary scalars computed per tuple: IR (image-space rigidity consistency; larger is better) and GE (background geometry error; smaller is better). We report both the H family (thresholded at 𝜏 𝐻 = 2px) and the F family (gate near 𝜏 𝐹 ≈ 0.10), and we summarize per-prompt distributions (C1–C6) for each platform (Runway, Sora, Wan). Distributions are visualized with ridgelines (per prompt) and cross-family gaps are quantified with Gardner–Altman style effect-size panels (median differences with bootstrap 95% CIs). Fig. 7 shows that IR concentrates in a high-rigidity regime with visibly broader right tails under the stress prompts 
+
+C4 (static camera + moving objects) and C6 (geometric stress tests) across all three platforms. The corresponding GE 
+
+ridgelines in Fig. 8 reveal rightward shifts (i.e., larger errors) for H relative to F, and again heavier upper tails in C4 /C6 .Together, the ridgelines indicate (i) background remains mostly rigid, but (ii) stress prompts inject a non-negligible fraction of difficult cases whose mass accumulates in the upper tails (higher GE / slightly lower effective IR). To make platform-wise comparisons commensurate, we use median differences with bootstrap uncertainty. Fig. 9 reports Median (GE 𝐻 )− Median (GE 𝐹 ): the effect is consistently positive on all platforms, meaning F has lower background geometry error than H. The magnitude is small on Runway (on the order of a few 10 −2), medium on Sora (peaking in C5/C6), and largest on Wan (systematically the highest across C1–C6). This ranking matches the qualitative right-shift in the GE ridgelines for C4/C6 on Wan. Fig. 10 reports Median (IR 𝐻 ) − Median (IR 𝐹 ): the effect is consistently negative 
+
+(i.e., F yields slightly higher rigidity) with the strongest gaps on Sora/Wan and milder gaps on Runway. Across platforms, the signs are stable, the CIs are tight, and the ordering by prompt mirrors the stress semantics: C4 and C6 show the most significant gaps, while C1–C3/C5 remain smaller and often overlap. The F family, which enforces epipolar-consistent background structure, systematically reduces GE and increases IR (higher rigidity), with effects most pronounced under stress prompts (C4/C6)—see the rightward density mass in Fig. 8 
+
+> Manuscript submitted to ACM
+
+20 Trovato et al.                                              
+
+> (a) 𝑡 ∞histogram.
+> (b) 𝑡 ∞distribution by prompt (C1–C6). Violins show the full distribution with medians.
+> (c) Gate margins (H/F panels).
+> (d) Gate margins by platform. Left: 𝑚 𝐻 =0.03 −𝑡 ∞for H-gated tuples; Right: 𝑚 𝐹 =𝑡 ∞−0.05 for F-gated tuples. Fig. 6. Gate–support diagnostics with the hysteresis rule ( 𝑡 ∞≤0.03 ⇒H,𝑡 ∞≥0.05 ⇒F). (a) 𝑡 ∞histogram with thresholds, showing low occupancy of the tolerance band. (b) Prompt-wise 𝑡 ∞distributions (C1–C6; violins with medians): C1/C4 concentrate below 0.03, C3/C5 shift above 0.05, and C2 spans both regimes. (c) Gate margins 𝑚 𝐻 =0.03 −𝑡 ∞and 𝑚 𝐹 =𝑡 ∞−0.05 (two panels) are largely positive, indicating stable decisions away from thresholds. (d) Platform-conditioned margin violins (left: 𝑚 𝐻 , right: 𝑚 𝐹 ) reveal cross-platform differences while remaining comfortably above zero.
+
+and the positive GE gaps in Fig. 9, together with the negative IR gaps in Fig. 10. Wan exhibits the largest GE gaps (H worse than F) across nearly all prompts; Sora shows medium gaps concentrated in C5/C6; Runway shows the smallest gaps. The same ranking is echoed in IR , supporting a consistent story across both metrics. (3) Stress prompts magnify tails rather than medians. Ridgelines show that medians stay near the high-rigidity regime, while the upper tail mass expands in C4/C6 (Fig. 7, Fig. 8). Consequently, the effect-size panels capture meaningful, prompt-aligned differences even when central tendency moves only slightly. The Gardner–Altman representation in Fig. 9–10 (half-violin density + CI + point estimate) provides (i) robust ranking immune to outliers from stress cases; (ii) cross-platform comparability via a common horizontal scale; and (iii) visually verifiable uncertainty. These properties are crucial because stress prompts primarily affect the tails, which can mislead mean-based summaries but are faithfully captured by medians and their sampling distribution. Across three datasets and six prompts, the evidence is consistent and convergent: the F family dominates the H family for background rigidity , reducing GE and improving IR, with the largest wins under C4/C6 and the strongest overall gaps on Wan, followed by Sora, then Runway. This agrees with the qualitative mass shifts in the ridgelines and the quantitative, uncertainty-aware effect sizes. 
+
+> Manuscript submitted to ACM
+
+Illusion or Integrity? Geometrical Consistency Metric for AIGC Video Quality Evaluation 21 
+
+(a) Runway. (b) Sora. (c) Wan. Fig. 7. IR distribution ridgelines per prompt (C1–C6). Each panel overlays H (solid, filled) vs. F (dashed) for a given platform. Stress prompts C4/C6 widen the upper tails across all platforms. 
+
+(a) Runway. (b) Sora. (c) Wan. Fig. 8. GE distribution ridgelines per prompt (C1–C6). H shows right-shifted densities relative to F, with the largest gaps on Wan and pronounced tail mass in C4/C6. 
+
+Fig. 9. Prompt-wise effect size with 95% CI — GE. Median difference Median (GE 𝐻 ) − Median (GE 𝐹 ) per prompt and platform. Effects are positive across the board (F <H), smallest on Runway, medium on Sora, largest on Wan, and amplified for C4/C6. 
+
+6.6 Dynamic coherence: flow-guided plausibility and occlusion ordering 
+
+We assess dynamic plausibility with the per-frame AdaDFRC-W2 score, designed to increase when occlusion ordering or flow consistency becomes implausible. For each object track within a clip we summarize its temporal severity by the robust upper-tail statistic AdaPninety = quantile 0.9
+
+
+
+{AdaDFRC-W2 𝑡 }𝑇 𝑡 =1
+
+
+
+, (17) 
+
+> Manuscript submitted to ACM
+
+22 Trovato et al.      
+
+> Fig. 10. Prompt-wise effect size with 95% CI — IR. Median difference Median (IR 𝐻 ) − Median (IR 𝐹 )per prompt and platform. Effects are negative (F >H) with the strongest gaps on Sora/Wan and the mildest on Runway; the ordering by prompt mirrors C4/C6 stress.
+
+which captures the magnitude of the worst 10% frames while being insensitive to isolated spikes. We rely on four complementary views. (i) Beeswarm panels group every object by prompt (C1–C6) and model, and overlay the per-prompt, per-model P80 thresholds (dashed ticks) and median markers (short bars), see Figs. 11a–11c. (ii) Empirical Cumulative Distribution Function (ECDF) panels show full distributions with the same P80 thresholds, exposing tail heaviness (right-shifts). (iii) Anomaly-rate bars report the fraction of objects above the per-prompt P80; these rates are primarily descriptive (they are near 20% by construction and not used for cross-prompt ranking). (iv) 
+
+Top-𝑁 sparkline sheets plot the per-frame trajectories for the hardest objects in each model with summary statistics (P50/P90/ 𝑛 ), revealing whether failures are bursty or persistent (Figs. 12a–12c). Dynamic coherence is only defined when detectable objects exist. Across our data, the object counts per model are comparable, providing sufficient support for model- and prompt-conditioned analyses. Prompts C4 (static camera + moving objects) and C6 (geometric stress tests) contain the richest dynamic evidence, consistent with our protocol design. We report consistent, model-agnostic evidence that dynamic coherence is most fragile under prompts C4 (static camera + moving objects) and C6 (geometric stress tests). Across all three models, the beeswarm panels reveal visibly taller stacks for C4/C6 while the medians remain comparatively stable, and the ECDFs shift to the right with fatter upper tails. This pattern indicates that failures concentrate in the worst part of the distribution rather than uniformly raising central tendency—exactly the behavior one would expect when motion- or geometry-induced occlusion ordering becomes implausible. Although all models exhibit heavier tails for C4/C6, the magnitude of the extremes differs across models. The largest AdaPninety objects—and thus the most severe dynamic inconsistencies—are most pronounced on Runway and Sora, with Wan displaying comparatively lower maxima. This cross-model ordering is independently corroborated by the Top-𝑁 sparkline sheets: the largest-amplitude trajectories cluster in (Runway, C6) and (Sora, C6/C4), whereas Wan’s top traces remain lower in amplitude, albeit still clearly abnormal. The temporal shapes of these failures are mechanistically distinct. The Top-𝑁 trajectories expose (i) brief burst spikes aligned with object enter/exit events or edge flicker; (ii) quasi-periodic rise–fall patterns consistent with recurrent 
+
+> Manuscript submitted to ACM
+
+Illusion or Integrity? Geometrical Consistency Metric for AIGC Video Quality Evaluation 23 depth/flow flips; and (iii) long segments of persistent elevation indicative of sustained layer mis-ordering or non-rigid flow leakage. Notably, these dynamic signatures often arise without commensurate increases in background photogrammetric residuals, underscoring that they are genuinely dynamic (flow/ordering) failures rather than artifacts of the static fit. We also clarify how prevalence is interpreted in our diagnostics. Because thresholds are defined per prompt and per model at the P80 level, the within-prompt anomaly fractions are expected to be near 20% by construction and are therefore not used to rank prompts. Instead, our conclusions rest on severity (how far the upper tail extends) and tail shape (ECDF right-shift), which together yield a clear and stable ordering in upper-tail mass: C4 > C6 > (C1, C2, C3, C5). Joint checks with gate–support agreement (Sec. 6.4) further show a non-trivial subset of clips in which dynamic anomalies coexist with strong background fits (”dynamic-anomaly & background-good”), amounting to roughly a tenth of cases. This complementarity motivates including an explicit, object-aware dynamic score such as AdaDFRC-W2 alongside background rigidity fits in any holistic geo-consistency audit. Two robustness choices make the conclusions stable: (i) summarizing per-object with AdaPninety instead of maxima prevents overreaction to isolated spikes, yet keeps genuine tail mass visible; (ii) auditing with model- and prompt-specific P80 thresholds prevents cross-model scale confounding while preserving comparability of shapes and extremes .Empirically, Top-𝑁 membership is stable under small changes in 𝑁 (8–12) and under ±2 percentile changes in the per-prompt thresholds. Dynamic coherence is the dominant failure axis under motion- and geometry-stress prompts. It manifests as heavy-tailed AdaPninety distributions with clear bursty or persistent temporal signatures, and it is not predictable from background photogrammetric residuals alone. Therefore, any holistic geo-consistency audit must include an object-aware, flow-guided dynamic term like AdaDFRC-W2 in addition to background rigidity fits. 
+
+6.7 Quantitative Results 
+
+We present the scene-balanced average scores for each generative model across all categories of GeoCon-Bench in Table 1. Higher IR is better, while lower GE and AdaDFRC-W2 are better. We report scene-balanced averages over all seeds and categories of GeoCon-Bench. For each seed–category pair we first average frame-wise scores within a clip and then average equally across scenes. Background scores use H/F-based metrics (IR and GE) on the static layer, while foreground scores report AdaDFRC-W2 on moving objects. Higher IR is better; lower GE and AdaDFRC-W2 are better. 
+
+> Table 1. Scene-balanced average results on GeoCon-Bench
+
+Background Foreground Model IR (%) ↑ GE (norm) ↓ AdaDFRC-W2 ↓
+
+Runway 97.0 0.274 18.54 Sora 96.6 0.398 21.79 Wan 96.2 0.394 12.76 
+
+Background geometry is consistently strong across models (IR ≈ 96–97%), with sub-pixel GE magnitudes on average. Foreground coherence (AdaDFRC-W2) varies more: Wan attains the lowest deformation on average (12.76), Runway is moderate (18.54), and Sora is the highest (21.79). A category-wise breakdown reveals model-specific weaknesses: Runway exhibits elevated foreground deformation in C4 (Static camera + moving object, 31.69) and C6 (Stress, 23.91); 
+
+> Manuscript submitted to ACM
+
+24 Trovato et al. 
+
+(a) 
+
+(b) 
+
+(c) Fig. 11. Foreground rigidity via AdaDFRC-W2 across prompt families and platforms. Each row shows one platform— (a) Runway, (b) 
+
+Sora, (c) Wan. Left: per–object AdaDFRC-W2 scores grouped by prompt family (C1–C6; lower is better). Each marker corresponds to one tracked object; points are horizontally jittered for visibility. Grey horizontal guidelines indicate the platform’s R80 robustness threshold, used to summarize the heavy-tail portion of the distribution. Right: Rate bars report, per family, the fraction of objects whose score exceeds R80 (higher bars imply more non-rigid/unstable motion). The ECDF inset shows the empirical cumulative distribution of AdaDFRC-W2 for that platform, with the vertical dashed line marking R80. 
+
+Sora peaks in C6 (36.84) and is also high in C3/C4 (22.83/22.36); Wan is most challenged in C2 (Rotation-dominant, 24.42) and C4 (18.94), while remaining low in C1/C5 (2.30/4.86). These patterns are consistent with the combined 
+
+> Manuscript submitted to ACM
+
+Illusion or Integrity? Geometrical Consistency Metric for AIGC Video Quality Evaluation 25   
+
+> (a) Runway (b) Sora
+> (c) Wan Fig. 12. Top-𝑁 hardest objects per model. Each sparkline shows per-frame AdaDFRC-W2 for one object; the page-level x/y labels indicate frame index (temporal order) and AdaDFRC-W2, respectively. Dashed lines mark the model-wise median of per-prompt P80. Right-side annotations report P50, P90, and the number of frames (n).
+
+alignment/consistency map in Fig. 5, where translation-dominant or failure-inferred cells tend to coincide with larger foreground deformation. Across scenes, the 95% confidence intervals (CI) for background IR are Runway [96 .35 , 97 .55 ], Sora [95 .91 , 97 .29 ],Wan [95 .41 , 97 .06 ] (in %); for GE (px): Runway [1.90 ×10 −4, 2.48 ×10 −4], Sora [2.70 ×10 −4, 3.65 ×10 −4], Wan [2.78 ×
+
+10 −4, 3.52 ×10 −4]; for AdaDFRC-W2: Runway [12 .32 , 24 .76 ] (63 scenes), Sora [12 .74 , 30 .84 ] (64), Wan [6.57 , 18 .95 ] (66). The results indicate clear differences in the geometric consistency of the evaluated models. A more detailed breakdown by scenario reveals specific strengths and weaknesses. For instance, most models perform well on pure rotation scenarios, achieving high IR with the homography model, but struggle with pure translation, where maintaining epipolar constraints for parallax is more challenging. The AdaDFRC-W2 scores are particularly revealing in categories with moving objects, quantifying the degree of unnatural deformation. 
+
+> Manuscript submitted to ACM
+
+26 Trovato et al. 
+
+6.8 Analysis: Decoupling Geometric and Semantic Quality 
+
+We investigate whether semantic alignment, measured by CLIP, predicts geometric coherence of the generated videos. For each scene (seed–category) and platform, we robustly fit a single background motion model on background-only correspondences, using either a homography H (planar/rotation regime) or a fundamental matrix F (translation/parallax regime). Models are estimated in normalized coordinates for numerical stability, and residuals are denormalized to pixels before scoring on the content mask (letterboxing excluded). Under either family 𝑔 ∈ { H, F} we report two model-agnostic indicators: Inlier Ratio (IR) —the fraction of correspondences passing the family-specific inlier test—and 
+
+Geometric Error (GE) —the median pixel residual among those inliers. Hence IR answers whether a single global model sufficiently explains the background motion, while GE quantifies how tightly the consistent matches align, both defined for either H or F.We analyze the coupling of CLIP with geometry from: (i) an auto-selected view, where each scene adopts the better-fitting family, IR best = max (IR 𝐻 , IR 𝐹 ) and GE best = min (GE 𝐻 , GE 𝐹 ); and (ii) a per-family view that keeps H and 
+
+F separate to avoid bias toward either residual family. Fig. 13-(a,b) plot overall CLIP against IR best (higher is better) and GE best in pixels (lower is better), respectively, pooling Sora, Runway, and Wan. Across platforms, the scatter shows no strong monotonic trend; the decile medians overlaid in each panel remain flat or erratic. Practically, we observe numerous clips with high CLIP but low IR best or elevated GE best (px), as well as the converse. This directly illustrates that semantic fidelity is not a reliable proxy for geometric consistency. Fig. 13-(c) reports reliability by CLIP deciles : for each CLIP bin we plot the proportion of scenes meeting a pixel-domain geometry criterion, with 95% Wilson confidence bands. We consider two thresholds: (1) IR best ≥ 0.97; and (2) IR best ≥ 0.97 
+
+and GE best ≤ 3.5 px. If CLIP were predictive of geometry, the curves should increase monotonically with CLIP. Instead, both curves remain flat or mildly non-monotonic, indicating that higher CLIP bins do not consistently translate into better geometry. Fig. 13-(c) reports reliability by CLIP deciles : for each CLIP bin we plot the proportion of scenes meeting a pixel-domain geometry criterion, with 95% Wilson confidence bands. Fig. 13-(d) overlays the same decile analysis for the two residual families (solid: IR-only; dashed: IR+GE). The shapes of the H and F curves are similar and remain weakly dependent on CLIP. Thus the decoupling phenomenon is not an artifact of favoring one family: whether a scene is better explained by a homography or a fundamental matrix, CLIP still fails to predict geometric coherence. The findings, which are consistent across various platforms and resilient to the selection of residual family, indicate a significant decoupling between semantic and geometric quality. Therefore, evaluating video generators as ”world simulators” requires reporting geometry-oriented metrics (IR/GE in the pixel domain) in addition to semantic scores. In our supplementary material, we provide counterexample lists (high-CLIP with poor geometry and vice versa) and per-family rank correlations, further corroborating this conclusion. Across three generators and all six categories, CLIP is a poor predictor of geometry: both scatter views (CLIP vs. IR best , CLIP vs. GE best in pixels) and reliability-by-CLIP deciles remain flat or mildly non-monotonic. All residuals are evaluated in the pixel domain on the content mask (letterboxing excluded) with a single gate fixed at 𝛿 = 3.5 px and a stringent rigidity criterion IR best ≥ 0.97. Per-family overlays (H/F) behave similarly, ruling out residual-family bias; higher CLIP does not reliably imply better geometry. 
+
+> Manuscript submitted to ACM
+
+Illusion or Integrity? Geometrical Consistency Metric for AIGC Video Quality Evaluation 27                    
+
+> (a) CLIP vs. IR best (auto-selected; higher is better). Decile medians are overlaid.
+> (b) CLIP vs. GE best in pixels (auto-selected; lower is better). Decile medians are overlaid.
+> (c) Reliability by CLIP deciles (auto-selected). Criteria: IR best ≥
+> 0.97 (solid) and IR best ≥0.97 &GE best ≤3.5px (dashed), with 95% Wilson bands.
+> (d) Per-family reliability overlays (H/F). Solid: IR-only; dashed: IR+GE with 𝛿 =3.5px. Curves remain flat or weakly non-monotonic with CLIP. Fig. 13. Semantic vs. geometric decoupling. All residuals are evaluated in the pixel domain on the content mask (letterboxing excluded). Points aggregate Sora, Runway, and Wan over all seed–category scenes.
+
+6.9 Perceptual Evaluation 
+
+Fig. 14 assembles row-wise exemplars. The leftmost cell of each row shows the seed image for context; the three cells to its right visualize the background geometry obtained from adjacent-frame matches on the content mask (letterboxing ignored) for three platforms. For each cell, we report the Inlier Ratio (IR) and the Geometric Error (GE, median residual in pixels after de-normalization). Two visual regularities are consistent across rows. Scenes that are visually rigid to a human—e.g., static rooms or static landscapes viewed with small camera motion—systematically present high IR (most background correspondences agree with one global model) and low GE (aligned inliers are tight). The reconstructed point clouds look compact with clean planes and straight edges; tiny reprojection jitter is perceptually negligible. When humans perceive background instability—e.g., subtle "breathing" of buildings, bending railings, or tearing near depth discontinuities—the geometry mirrors that: IR drops (more outliers against a single model) and/or GE rises (inlier alignment loosens). In rows where DUSt3R fails to return a pose for the first–last pair (because the displacement is too large or the texture is degenerate), the reconstruction is sparse or absent. By our evaluation policy, those cases are labeled 𝐹 , and they correlate with visible large parallax or scene changes. Overall, the qualitative impressions match the 
+
+> Manuscript submitted to ACM
+
+28 Trovato et al.   
+
+> Fig. 14. Background geometry in practice. For each row, the left cell shows the seed image; the three cells on the right visualize background reconstructions and report IR/GE per platform. Missing or extremely sparse reconstructions are treated as 𝐹 under our DUSt3R gate and also exhibit poor visual stability.
+
+quantitative trend: visually cleaner reconstructions coincide with 𝐼𝑅 ≥ 0.97 and 𝐺𝐸 ≤ 3.5, whereas visually degraded ones violate one or both. Fig. 15 presents object-centric optical-flow slices used by our foreground metric. Horizontally, we sample repre-sentative seeds; vertically, we juxtapose platforms. For each object mask and frame pair, hue encodes the direction 
+
+of the per-cell median flow (magnitude is normalized for visualization only). When an object undergoes near-rigid motion (e.g., a pedestrian translating without limb swing emphasis, or a car with minimal rolling artifacts), the flow direction is coherent within the mask and stable over time. Our AdaDFRC-W2—computed by fitting an affine flow on the object support and measuring a Wasserstein-2 transport cost from that rigid prediction to the observed per-cell medians with adaptive reliability weights—stays low. Non-rigid behavior (articulated limbs, fluttering texture, rolling shutter–like distortions) and occlusion events create sharp direction changes within the mask. The hue then varies within a single frame or flips between frames; these spatio-temporal inconsistencies raise the transport needed from the rigid hypothesis to the observed distribution, yielding a higher AdaDFRC-W2. Cross-platform differences in these hue patterns align with our quantitative ranking of foreground consistency. The two visual panels ground our metrics in human perception: high IR/low GE tracks "background feels rigid," while low/high signals "background looks wrong"; low AdaDFRC-W2 matches "object moves as a solid," while high values expose non-rigid or unstable motion. These qualitative correspondences validate that our thresholds produce behavior that is not merely numerical but perceptually meaningful. 
+
+> Manuscript submitted to ACM
+
+Illusion or Integrity? Geometrical Consistency Metric for AIGC Video Quality Evaluation 29   
+
+> Fig. 15. Foreground motion slices used by AdaDFRC-W2. Columns pick representative seeds; rows juxtapose platforms. Within each object mask and time step, color encodes the direction of the per-cell median optical flow. Directional coherence across the mask indicates near-rigid motion and leads to low AdaDFRC-W2; intra-mask direction changes or flips expose non-rigid/unstable dynamics and increase AdaDFRC-W2.
+
+7 Discussion 7.1 What GeoCon-Bench Measures—and What It Does Not 
+
+GeoCon-Bench operationalizes geometric consistency in AIGC video along two complementary, model-agnostic axes. For the background , we test whether a single global transformation explains adjacent-frame motion: either a homography (𝐻 ) or a fundamental matrix ( 𝐹 ), with the model routed by a DUSt3R translation gate on the first/last frames. For both 
+
+models, we report (i) the inlier ratio (IR), defined as the fraction of background correspondences that fit the chosen model under a family-specific inlier gate, and (ii) the geometric error (GE), defined as the median residual among those inliers. Inliers are defined with family-specific gates, while all GEs are evaluated and reported in the pixel domain after denormalization on the content mask . At the clip level, a background is called geometrically consistent when IR ≥0.97 and GE ≤3.5 px. For the foreground , AdaDFRC-W2 regresses the best affine motion inside each object mask and summarizes non-rigid residuals, exposing elastic artifacts and layer slippage that a rigid-background test cannot see. This decomposition yields interpretable diagnostics: low IR or high GE indicates camera–scene inconsistency (violations of projective/epipolar geometry), whereas high AdaDFRC-W2 flags dynamic incoherence of movers. Crucially, GeoCon-Bench does not measure semantic fidelity; it is designed to complement, not replace, semantic metrics. The dissociation we observe between semantics and geometry underscores why a dedicated geometric axis is necessary. 
+
+7.2 Cross-Platform Trends and Where Models Diverge 
+
+Because prompts are categorized into six families (C1–C6), the benchmark supports per-regime comparisons rather than a single pooled score. Three regularities emerge. First , families intended to be H-majority— C1 (static), C2 (rotation-dominant), and C4 (static camera + moving objects)—concentrate mass at high IR and low GE under the homography model; when discrepancies arise, they typically reflect (i) small end-to-end translational drift that pushes a minority of seeds into the F branch, or (ii) segmentation leakage admitting moving edges into the background set, both surfaced as mild but systematic penalties. Second , families expected to be F-majority— C3 (translation-dominant), C5 (complex 
+
+> Manuscript submitted to ACM
+
+30 Trovato et al. camera motion), and C6 (geometric stress)—exhibit broader dispersion and a higher rate of F decisions; platforms diverge most in how parallax is realized (amount of depth-induced motion, stabilization priors), which manifests as different balances of IR versus GE. Third , failure handling matters: present-only results isolate pure geometry where DUSt3R succeeds, whereas a conservative fail →F view additionally counts first/last configurations whose displacement prevents pose recovery—an informative signal under stress conditions. At the seed-aligned level (same seed across platforms), two divergence types are actionable. One is routing disagreement : the same seed–family pair routes to H on one platform but to F on another, indicating distinct camera priors or depth realism; such cases dominate off-diagonal cells in cross-platform alignment maps and co-occur with GE shifts. The other is agreement with different margins : all platforms agree on H (or F), yet one sits closer to the IR/GE boundary—these “near-fail” seeds are highly sensitive to training or decoding changes and thus serve as high-yield regression tests. Finally, the anomaly distribution separates families where dispersion is intrinsic ( C6 ) from those where instability is a warning sign ( C2 , C4 ). Together, these trends motivate reporting per-family, seed-aligned summaries in addition to pooled scores: they are diagnostic, reproducible, and immediately actionable for model development. 
+
+7.3 Semantic–Geometric Dissociation and Why It Matters 
+
+High semantic alignment (e.g., CLIP) does not guarantee geometric correctness. We substantiate this with two indepen-dent lenses. (i) Thresholded reliability. Under a fixed, pixel-domain reporting gate (IR ≥0.97, GE ≤3.5 px), a substantial fraction of clips that score highly on CLIP fail the background rigidity check or exhibit elevated AdaDFRC-W2. This persists whether the background model is auto-selected by DUSt3R or forced per-family (H for C1/2/4, F for C3/5/6), indicating that the dissociation is not a routing artifact (see Fig. 13). (ii) Distributional stability. Across CLIP deciles, both the pass rate for background consistency and the distribution of foreground residuals change weakly, if at all, despite large semantic swings—again pointing to orthogonality. Mechanistically, text–vision alignment systems reward object/texture plausibility and global style, whereas our geometry axis constrains camera–scene relations and rigidity. Video generators inherit stabilization or motion-style priors that visually improve coherence yet can suppress or mis-shape parallax, and they often synthesize movers with elastic shortcuts that evade semantic penalties but are penalized by AdaDFRC-W2. The implication is practical: leaderboards and ablations should report semantics and geometry as 
+
+two orthogonal axes . GeoCon-Bench provides a drop-in geometric axis—background IR/GE in the pixel domain, plus object-level AdaDFRC-W2—so that model builders can diagnose failure modes that semantic metrics systematically miss. Releasing per-clip pose logs, masks, and fixed gates is essential for reproducibility and actionable debugging .
+
+7.4 Limitations and Future Work 
+
+Our study is deliberately scoped to geometric behaviors that are most consequential for perception-centric use. We evaluate static or near-rigid backgrounds with a single global model and summarize foreground motion with an affine proxy and distributional residuals, routed by DUSt3R into either planar/rotation or translation/parallax regimes. This design prioritizes interpretability and reproducibility, and within that operating regime, our metrics exhibit stable behavior and align with human judgments. Several methodological boundaries remain. First, the routing currently relies on a two-frame statistic; clip length, baseline, or near-degenerate configurations can bias this decision. Second, residuals are computed in the pixel domain and are mildly sensitive to sensor- or codec-induced artifacts such as rolling shutter and heavy compression. Third, background–foreground separation inherits any errors in segmentation, so boundary perturbations may affect marginal cases even when coverage is reported and failure cases are handled consistently. Finally, our prompt families emphasize common scene regimes rather than exhaustive coverage. These caveats point to 
+
+> Manuscript submitted to ACM
+
+Illusion or Integrity? Geometrical Consistency Metric for AIGC Video Quality Evaluation 31 concrete extensions: multi-window or temporally smoothed routing that is invariant to clip length; degeneracy-aware estimation with explicit parallax and conditioning checks; residual models that account for sensor-domain effects; uncertainty- and occlusion-aware masks with consistency checks between pose and segmentation; and layered or depth-harmonized background models that retain the current interpretability while broadening applicability. Expanding the dataset with calibrated trajectories and controlled synthetic scenes will further enable stress testing and fine-grained calibration, moving the framework toward a more comprehensive standard for assessing generative video as a geometric process. 
+
+Acknowledgments 
+
+To Robert, for the bagels and explaining CMYK and color spaces. 
+
+References 
+
+[1] Omer Bar-Tal, Hila Chefer, Omer Tov, Charles Herrmann, Roni Paiss, Shiran Zada, Ariel Ephrat, Junhwa Hur, Guanghui Liu, Amit Raj, et al. 2024. Lumiere: A space-time diffusion model for video generation. In SIGGRAPH Asia 2024 Conference Papers . 1–11. [2] Mengyu Chu, You Xie, Jonas Mayer, Laura Leal-Taixé, and Nils Thuerey. 2020. Learning temporal coherence via self-supervision for GAN-based video generation. ACM Trans. Graph. 39, 4, Article 75 (Aug. 2020), 13 pages. doi:10.1145/3386569.3392457 [3] Ondrej Chum and Jiri Matas. 2005. Matching with PROSAC-progressive sample consensus. In 2005 IEEE computer society conference on computer vision and pattern recognition (CVPR’05) , Vol. 1. IEEE, 220–226. [4] Ondřej Chum, Jiří Matas, and Josef Kittler. 2003. Locally optimized RANSAC. In Joint pattern recognition symposium . Springer, 236–243. [5] Alexey Dosovitskiy, Lucas Beyer, Alexander Kolesnikov, Dirk Weissenborn, Xiaohua Zhai, Thomas Unterthiner, Mostafa Dehghani, Matthias Minderer, Georg Heigold, Sylvain Gelly, et al. 2020. An image is worth 16x16 words: Transformers for image recognition at scale. arXiv preprint arXiv:2010.11929 (2020). [6] Haoyi Duan, Hong-Xing Yu, Sirui Chen, Li Fei-Fei, and Jiajun Wu. 2025. Worldscore: A unified evaluation benchmark for world generation. arXiv preprint arXiv:2504.00983 (2025). [7] Yonatan Dukler, Wuchen Li, Alex Lin, and Guido Montufar. 2019. Wasserstein of Wasserstein Loss for Learning Generative Models. In Proceedings of the 36th International Conference on Machine Learning (Proceedings of Machine Learning Research, Vol. 97) , Kamalika Chaudhuri and Ruslan Salakhutdinov (Eds.). PMLR, 1716–1725. https://proceedings.mlr.press/v97/dukler19a.html [8] Fanda Fan, Chunjie Luo, Wanling Gao, and Jianfeng Zhan. 2023. Aigcbench: Comprehensive evaluation of image-to-video content generated by ai. 
+
+BenchCouncil Transactions on Benchmarks, Standards and Evaluations 3, 4 (2023), 100152. [9] Mohammed E Fathy, Ashraf S Hussein, and Mohammed F Tolba. 2011. Fundamental matrix estimation: A study of error criteria. Pattern Recognition Letters 32, 2 (2011), 383–391. [10] Martin A Fischler and Robert C Bolles. 1981. Random sample consensus: a paradigm for model fitting with applications to image analysis and automated cartography. Commun. ACM 24, 6 (1981), 381–395. [11] Richard Hartley and Andrew Zisserman. 2004. Multiple View Geometry in Computer Vision . Cambridge University Press. [12] Jack Hessel, Ari Holtzman, Maxwell Forbes, Ronan Le Bras, and Yejin Choi. 2021. Clipscore: A reference-free evaluation metric for image captioning. 
+
+arXiv preprint arXiv:2104.08718 (2021). [13] Martin Heusel, Hubert Ramsauer, Thomas Unterthiner, Bernhard Nessler, and Sepp Hochreiter. 2017. Gans trained by a two time-scale update rule converge to a local nash equilibrium. Advances in neural information processing systems 30 (2017). [14] Jonathan Ho, Ajay Jain, and Pieter Abbeel. 2020. Denoising diffusion probabilistic models. Advances in neural information processing systems 33 (2020), 6840–6851. [15] Ziqi Huang, Yinan He, Jiashuo Yu, Fan Zhang, Chenyang Si, Yuming Jiang, Yuanhan Zhang, Tianxing Wu, Qingyang Jin, Nattapol Chanpaisit, et al. 2024. Vbench: Comprehensive benchmark suite for video generative models. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition . 21807–21818. [16] Ziqi Huang, Fan Zhang, Xiaojie Xu, Yinan He, Jiashuo Yu, Ziyue Dong, Qianli Ma, Nattapol Chanpaisit, Chenyang Si, Yuming Jiang, et al. 2024. Vbench++: Comprehensive and versatile benchmark suite for video generative models. arXiv preprint arXiv:2411.13503 (2024). [17] Eunchae Jang, Hui Min Lee, Sangwook Lee, Yongnam Jung, and S. Shyam Sundar. 2025. Too Good to be False: How Photorealism Promotes Susceptibility to Misinformation. In Proceedings of the Extended Abstracts of the CHI Conference on Human Factors in Computing Systems (CHI EA ’25) .Association for Computing Machinery, New York, NY, USA, Article 531, 8 pages. doi:10.1145/3706599.3719796 [18] Dongfu Jiang, Max Ku, Tianle Li, Yuansheng Ni, Shizhuo Sun, Rongqi Fan, and Wenhu Chen. 2024. Genai arena: An open evaluation platform for generative models. Advances in Neural Information Processing Systems 37 (2024), 79889–79908. Manuscript submitted to ACM 32 Trovato et al. 
+
+[19] Negar Kamali, Karyn Nakamura, Aakriti Kumar, Angelos Chatzimparmpas, Jessica Hullman, and Matthew Groh. 2025. Characterizing Photorealism and Artifacts in Diffusion Model-Generated Images. In Proceedings of the 2025 CHI Conference on Human Factors in Computing Systems . 1–26. [20] Bernhard Kerbl, Georgios Kopanas, Thomas Leimkühler, and George Drettakis. 2023. 3D Gaussian splatting for real-time radiance field rendering. 
+
+ACM Trans. Graph. 42, 4 (2023), 139–1. [21] Dan Kondratyuk, Lijun Yu, Xiuye Gu, José Lezama, Jonathan Huang, Grant Schindler, Rachel Hornung, Vighnesh Birodkar, Jimmy Yan, Ming-Chang Chiu, et al. 2023. Videopoet: A large language model for zero-shot video generation. arXiv preprint arXiv:2312.14125 (2023). [22] Karel Lebeda, Jirı Matas, and Ondrej Chum. 2012. Fixing the locally optimized ransac–full experimental evaluation. In British machine vision conference , Vol. 2. Citeseer Princeton, NJ, USA. [23] Yan Li, Yingdan Wu, Yang Ming, Yong Zhang, and Zhesheng Cheng. 2025. GeoAT: Geometry-Aware Attention Feature Matching Network. IEEE Access (2025). [24] Xiao Liu, Xinhao Xiang, Zizhong Li, Yongheng Wang, Zhuoheng Li, Zhuosheng Liu, Weidi Zhang, Weiqi Ye, and Jiawei Zhang. 2024. A survey of ai-generated video evaluation. arXiv preprint arXiv:2410.19884 (2024). [25] Yaofang Liu, Xiaodong Cun, Xuebo Liu, Xintao Wang, Yong Zhang, Haoxin Chen, Yang Liu, Tieyong Zeng, Raymond Chan, and Ying Shan. 2024. Evalcrafter: Benchmarking and evaluating large video generation models. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition . 22139–22149. [26] Yixin Liu, Kai Zhang, Yuan Li, Zhiling Yan, Chujie Gao, Ruoxi Chen, Zhengqing Yuan, Yue Huang, Hanchi Sun, Jianfeng Gao, et al. 2024. Sora: A review on background, technology, limitations, and opportunities of large vision models. arXiv preprint arXiv:2402.17177 (2024). [27] Xin Ma, Yaohui Wang, Gengyun Jia, Xinyuan Chen, Ziwei Liu, Yuan-Fang Li, Cunjian Chen, and Yu Qiao. 2024. Latte: Latent diffusion transformer for video generation. arXiv preprint arXiv:2401.03048 (2024). [28] Ben Mildenhall, Pratul P Srinivasan, Matthew Tancik, Jonathan T Barron, Ravi Ramamoorthi, and Ren Ng. 2021. Nerf: Representing scenes as neural radiance fields for view synthesis. Commun. ACM 65, 1 (2021), 99–106. [29] Riku Murai, Eric Dexheimer, and Andrew J Davison. 2025. MASt3R-SLAM: Real-time dense SLAM with 3D reconstruction priors. In Proceedings of the Computer Vision and Pattern Recognition Conference . 16695–16705. [30] David Nistér. 2004. An efficient solution to the five-point relative pose problem. IEEE transactions on pattern analysis and machine intelligence 26, 6 (2004), 756–770. [31] Onur Özyeşil, Vladislav Voroninski, Ronen Basri, and Amit Singer. 2017. A survey of structure from motion*. Acta Numerica 26 (2017), 305–364. [32] William Peebles and Saining Xie. 2023. Scalable diffusion models with transformers. In Proceedings of the IEEE/CVF international conference on computer vision . 4195–4205. [33] Bowen Qu, Xiaoyu Liang, Shangkun Sun, and Wei Gao. 2024. Exploring aigc video quality: A focus on visual harmony video-text consistency and domain distribution gap. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition . 6652–6660. [34] Alec Radford, Jong Wook Kim, Chris Hallacy, Aditya Ramesh, Gabriel Goh, Sandhini Agarwal, Girish Sastry, Amanda Askell, Pamela Mishkin, Jack Clark, et al. 2021. Learning transferable visual models from natural language supervision. In International conference on machine learning . PmLR, 8748–8763. [35] Nikhila Ravi, Valentin Gabeur, Yuan-Ting Hu, Ronghang Hu, Chaitanya Ryali, Tengyu Ma, Haitham Khedr, Roman Rädle, Chloe Rolland, Laura Gustafson, Eric Mintun, Junting Pan, Kalyan Vasudev Alwala, Nicolas Carion, Chao-Yuan Wu, Ross Girshick, Piotr Dollár, and Christoph Feichtenhofer. 2024. SAM 2: Segment Anything in Images and Videos. arXiv preprint arXiv:2408.00714 (2024). https://arxiv.org/abs/2408.00714 [36] Ayush Sarkar, Hanlin Mai, Amitabh Mahapatra, Svetlana Lazebnik, David A Forsyth, and Anand Bhattad. 2024. Shadows Don’t Lie and Lines Can’t Bend! Generative Models don’t know Projective Geometry... for now. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition . 28140–28149. [37] Johannes L Schonberger and Jan-Michael Frahm. 2016. Structure-from-motion revisited. In Proceedings of the IEEE conference on computer vision and pattern recognition . 4104–4113. [38] Deqing Sun, Xiaodong Yang, Ming-Yu Liu, and Jan Kautz. 2018. Pwc-net: Cnns for optical flow using pyramid, warping, and cost volume. In 
+
+Proceedings of the IEEE conference on computer vision and pattern recognition . 8934–8943. [39] Zachary Teed and Jia Deng. 2020. Raft: Recurrent all-pairs field transforms for optical flow. In European conference on computer vision . Springer, 402–419. [40] Philip HS Torr and Andrew Zisserman. 2000. MLESAC: A new robust estimator with application to estimating image geometry. Computer vision and image understanding 78, 1 (2000), 138–156. [41] Thomas Unterthiner, Sjoerd Van Steenkiste, Karol Kurach, Raphael Marinier, Marcin Michalski, and Sylvain Gelly. 2018. Towards accurate generative models of video: A new metric & challenges. arXiv preprint arXiv:1812.01717 (2018). [42] Thomas Unterthiner, Sjoerd Van Steenkiste, Karol Kurach, Raphaël Marinier, Marcin Michalski, and Sylvain Gelly. 2019. FVD: A new metric for video generation. (2019). [43] Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszkoreit, Llion Jones, Aidan N Gomez, Łukasz Kaiser, and Illia Polosukhin. 2017. Attention is all you need. Advances in neural information processing systems 30 (2017). [44] Team Wan, Ang Wang, Baole Ai, Bin Wen, Chaojie Mao, Chen-Wei Xie, Di Chen, Feiwu Yu, Haiming Zhao, Jianxiao Yang, Jianyuan Zeng, Jiayu Wang, Jingfeng Zhang, Jingren Zhou, Jinkai Wang, Jixuan Chen, Kai Zhu, Kang Zhao, Keyu Yan, Lianghua Huang, Mengyang Feng, Ningyi Zhang, Pandeng Li, Pingyu Wu, Ruihang Chu, Ruili Feng, Shiwei Zhang, Siyang Sun, Tao Fang, Tianxing Wang, Tianyi Gui, Tingyu Weng, Tong Shen, Wei Manuscript submitted to ACM Illusion or Integrity? Geometrical Consistency Metric for AIGC Video Quality Evaluation 33 
+
+Lin, Wei Wang, Wei Wang, Wenmeng Zhou, Wente Wang, Wenting Shen, Wenyuan Yu, Xianzhong Shi, Xiaoming Huang, Xin Xu, Yan Kou, Yangyu Lv, Yifei Li, Yijing Liu, Yiming Wang, Yingya Zhang, Yitong Huang, Yong Li, You Wu, Yu Liu, Yulin Pan, Yun Zheng, Yuntao Hong, Yupeng Shi, Yutong Feng, Zeyinzi Jiang, Zhen Han, Zhi-Fan Wu, and Ziyu Liu. 2025. Wan: Open and Advanced Large-Scale Video Generative Models. arXiv preprint arXiv:2503.20314 (2025). [45] Shuzhe Wang, Vincent Leroy, Yohann Cabon, Boris Chidlovskii, and Jerome Revaud. 2024. Dust3r: Geometric 3d vision made easy. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition . 20697–20709. [46] Yaohui Wang, Xinyuan Chen, Xin Ma, Shangchen Zhou, Ziqi Huang, Yi Wang, Ceyuan Yang, Yinan He, Jiashuo Yu, Peiqing Yang, et al. 2025. Lavie: High-quality video generation with cascaded latent diffusion models. International Journal of Computer Vision 133, 5 (2025), 3059–3078. [47] Zhou Wang, Alan C Bovik, Hamid R Sheikh, and Eero P Simoncelli. 2004. Image quality assessment: from error visibility to structural similarity. 
+
+IEEE transactions on image processing 13, 4 (2004), 600–612. [48] Haofei Xu, Jing Zhang, Jianfei Cai, Hamid Rezatofighi, and Dacheng Tao. 2022. Gmflow: Learning optical flow via global matching. In Proceedings of the IEEE/CVF conference on computer vision and pattern recognition . 8121–8130. [49] Richard Zhang, Phillip Isola, Alexei A Efros, Eli Shechtman, and Oliver Wang. 2018. The unreasonable effectiveness of deep features as a perceptual metric. In Proceedings of the IEEE conference on computer vision and pattern recognition . 586–595. [50] Zicheng Zhang, Ziheng Jia, Haoning Wu, Chunyi Li, Zijian Chen, Yingjie Zhou, Wei Sun, Xiaohong Liu, Xiongkuo Min, Weisi Lin, et al. 2025. Q-Bench-Video: Benchmark the Video Quality Understanding of LMMs. In Proceedings of the Computer Vision and Pattern Recognition Conference .3229–3239. 
+
+A Prompt Component Lexicon 
+
+This appendix provides an expanded vocabulary for the prompt components defined in our framework. 
+
+Table 2. Expanded Prompt Component Lexicon 
+
+Component Category Vocabulary Examples 
+
+Motion Command Foundational “This is a single continuous shot”, “The camera is locked down” Camera Rotation “pans left”, “tilts up”, “rolls clockwise”, “orbits around” Camera Translation “dollies in”, “trucks left”, “cranes up”, “moves in a straight line” Figurative & Phenomenological “as if on a cinematic dolly track”; “creating true motion parallax”; “as if mounted on a heavy concrete pillar”; “shadows stretch realistically”; “reflections move accurately across the surface” 
+
+Qualitative Style Realism/Fidelity “hyper-realistic”, “photorealistic”, “8K resolution”, “sharp focus”, “deep depth of field”, “shot on IMAX film”, “documentary style” Lighting “cinematic lighting”, “golden hour”, “dramatic lighting”, “studio lighting”, “neon glow”, “volumetric lighting” Artistic Medium “in the style of a vintage film”, “black and white film noir”, “impressionist painting”, “stop-motion animation” 
+
+Scene Composition Environment “a bustling city street”, “a serene forest path”, “a minimalist interior”, “a futuristic laboratory”, “a Victorian-era room” Geometric Structure “a long corridor with repeating arches”, “a skyscraper with a grid of windows”, “a spiral staircase”, “a checkerboard floor” 
+
+Object Specification Material/Texture “reflective chrome”, “matte black finish”, “rough stone texture”, “smooth glass” Object State “a pristine new car”, “a rusted, abandoned vehicle”, “a blooming flower” 
+
+B Additional Evidence for DUSt3R Translation-Gate Calibration 
+
+We reassess the DUSt3R translation gate using only pairs with available poses (present-only), across all platforms and prompt families. This analysis is geometric and independent of semantic scores; background inlier gates remain 
+
+Manuscript submitted to ACM 34 Trovato et al.               
+
+> Fig. 16. Decision-curve analysis (present-only): net benefit (TP −𝑐 ·FP )/ 𝑁 across 𝑐 ∈ { 0.5,1,2}. The choice 𝜏 𝑡 =0.04 lies near the maxima and remains robust to 𝑐 .
+
+fixed throughout the paper ( 𝜏 𝐻 =2 px, 𝜏 𝐹 =0.1, with IR ≥ 0.97 and GE ≤ 3.5 px when background consistency is evaluated elsewhere). We quantify the operating trade-off between recall on F-expected scenes (C3/5/6) and spurious F on H-expected ones (C1/2/4) via the net benefit NB (𝜏 𝑡 ) = TP − 𝑐 · FP 
+
+𝑁 , (18) for false-positive cost ratios 𝑐 ∈ { 0.5, 1, 2}. Fig. 16 shows that 𝜏 𝑡 =0.04 sits close to the maxima simultaneously for all 𝑐 
+
+and is thus robust to reasonable changes in cost. We perform 𝐵 =400 bootstrap resamples over the observation set (sampling units are (seed, platform, family) ), compute balanced accuracy for each 𝜏 𝑡 ∈ { 0.02 , 0.03 , 0.04 , 0.06 , 0.08 }, and record both the mean ±95% CI and the best threshold per resample. Fig. 17 (left) reveals a broad performance plateau over [0.04 , 0.06 ] where confidence bands strongly overlap; the histogram (right) concentrates the best-threshold selections in the same interval, with a visible mode at 0 .04–0 .06. Hence 𝜏 𝑡 =0.04 is either at or statistically indistinguishable from the maxima while being slightly more conservative on false positives. 
+
+> Received 20 February 2007; revised 12 March 2009; accepted 5 June 2009
+> Manuscript submitted to ACM
+
+Illusion or Integrity? Geometrical Consistency Metric for AIGC Video Quality Evaluation 35 
+
+(a) Balanced accuracy vs. 𝜏 𝑡 (bootstrap mean ±95% CI, 𝐵 =400 ). A broad plateau spans [0.04 , 0.06 ].
+
+(b) Distribution of arg max 𝜏 𝑡 over bootstraps; modes concentrate at 0.04 –0.06 .Fig. 17

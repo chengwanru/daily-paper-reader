@@ -1,0 +1,298 @@
+Title: CosmosAlign: Adapting a World Foundation Model for Generative Traffic Video Forecasting
+
+URL Source: https://arxiv.org/pdf/2608.07693v1
+
+Published Time: Tue, 11 Aug 2026 00:09:49 GMT
+
+Number of Pages: 19
+
+Markdown Content:
+# CosmosAlign: Adapting a World Foundation Model for Generative Traffic Video Forecasting 
+
+Quang Minh Dinh 1 and Tuan Kiet Doan 2 
+
+> 1
+
+Simon Fraser University, Burnaby, BC, Canada 
+
+qmd@sfu.ca  
+
+> 2
+
+Institut Polytechnique de Paris, Palaiseau, France 
+
+tuan.doan@ip-paris.fr 
+
+Abstract. Generative traffic video forecasting aims to synthesize long-horizon, temporally coherent future videos of traffic scenes from a short observation history and textual descriptions. In this paper, we present CosmosAlign, a generative traffic video forecasting framework built upon the pretrained Cosmos3-Nano world foundation model. Our approach is motivated by the observation that successfully adapting large pretrained world models to downstream forecasting tasks depends primarily on dis-tribution alignment rather than increased model capacity. To this end, we propose a two-stage LoRA adaptation strategy that first aligns the conditioning-mode distribution with the target forecasting task, and then aligns the training captions with the model’s native structured prompt-ing interface through an LLM-based re-captioning pipeline. During in-ference, we further improve prediction quality using a fully training-free procedure consisting of consensus-based medoid sample selection and motion-adaptive blending of static scene regions. CosmosAlign achieves a final score of 76.49 on the AI City Challenge 2026 Track 5 benchmark, ranking first on the final leaderboard. Our code is publicly available at 
+
+https://quangminhdinh.github.io/CosmosAlign/ 
+
+Keywords: Traffic Video Forecasting · World Models · Autonomous Driving · Parameter-Efficient Fine-Tuning 
+
+## 1 Introduction 
+
+The goal of generative video forecasting (GVF) is to generate future video frames from a sequence of observed context frames [42], optionally guided by control signals such as text prompts or camera motion [20,37]. A key advantage of GVF lies in its ability to capture complex spatio-temporal dynamics, making it an essential step toward building internal world models. Thanks to this predictive capability, GVF has been successfully applied across a wide range of applications such as robotic control [11], planning [58], and anomaly detection [32]. In autonomous driving, GVF has evolved beyond simple frame prediction into driving world models [21, 66]. Given an initial observation and conditioning signals, these models predict not only the future movement of the ego vehicle but arXiv:2608.07693v1 [cs.CV] 7 Aug 2026 2 Q. M. Dinh and T. K. Doan 
+
+also the dynamic behavior of the surrounding traffic participants. By supporting simulation and generating diverse synthetic data, they reduce the dependence on real-world data collection and provide a safe way to test rare scenarios [13,17,38]. However, since these simulators feed end-to-end autonomous driving sys-tems, inaccuracies in the predicted scenes and trajectories can propagate di-rectly into real-world driving safety [45, 46, 52]. Improving the physical plausi-bility, long-range temporal consistency, and lifelike behavior of generated traffic scenarios therefore remains a critical problem. In response to this challenge, the AI City Challenge 2026 [48] establishes a benchmark for text-conditioned traffic video forecasting. Given a short history of observed frames and textual descriptions of the scene, participants are required to generate the future frames of pedestrian-vehicle interaction scenarios. Built on the Woven Traffic Safety (WTS) dataset [25], this setting directly tests whether generative models can synthesize futures that are not only visually faithful but also temporally coher-ent and consistent with the described behavior in safety-critical situations. Recent large-scale foundation world models, such as the GAIA [21,44], Drive-Dreamer [53,62], DrivingWorld [23], Genie [6], and Cosmos [1,3] families, offer a promising foundation for traffic video forecasting. By scaling model capacity and training data, they simulate complex physical dynamics and maintain temporal coherence under text conditioning. Yet our study reveals that adapting such generalist world models to a specific forecasting benchmark is less a question of capacity than of alignment. To address this, we present CosmosAlign, a frame-work built on the Cosmos3-Nano world model. CosmosAlign aligns both the task conditioning distribution and prompt formatting using a two-stage parameter-efficient adaptation strategy, complemented by a training-free inference proce-dure for robust frame generation. Our contributions are summarized as follows: 
+
+– We identify distribution alignment, rather than model capacity, as the pri-mary challenge in adapting large pretrained world models to traffic video forecasting. Based on this insight, we propose a two-stage LoRA adaptation strategy that aligns both the conditioning-mode distribution and the prompt representation with the target forecasting task. 
+
+– We introduce an inference pipeline consisting of consensus-based sample se-lection and motion-adaptive blending, improving robustness and visual fi-delity without requiring auxiliary models or ground-truth. 
+
+– We conduct extensive ablation studies across fine-tuning, prompting, sam-pling, and post-processing, demonstrating that alignment-oriented design choices consistently yield larger gains than increasing model capacity or mod-ifying the generation process. 
+
+– Our approach achieves a final score of 76.49 on the AI City Challenge 2026 Track 5 benchmark, ranking first on the final leaderboard while achieving the best PSNR and LPIPS and the joint-highest SSIM. CosmosAlign for Generative Traffic Video Forecasting 3
+
+## 2 Related Work 
+
+World Models for Autonomous Driving. A world model [14] is an internal simulator of environmental dynamics that supports predictive and counterfac-tual rollouts for sensory understanding, trajectory forecasting, and autonomous decision-making [29]. Two main research directions have emerged [3]. On the one hand, predictive models in latent representation spaces [15,16], including JEPA-style architectures [4, 5, 27], compress high-dimensional inputs into compact la-tents that align well with perception, prediction, and planning while offering high efficiency. On the other hand, pixel-space world models frame environment sim-ulation as a generative video modeling task [1, 2, 6]. By preserving high-fidelity detail, such models double as synthetic data generators for downstream policies. In autonomous driving, world models must further satisfy strict requirements, including the complex dynamics of traffic participants, ego-motion control, and cross-view consistency [44]. Early works such as GAIA-1 [21] and CommaVQ [8] are often restricted to a single camera view and limited text- or action-based control, while later works like Drive-WM [56] and UniMLVG [7] enable multi-view generation conditioned on a wide range of inputs, and MaskGWM [41] and Vista [13] focus on long-duration, high-resolution generation. Beyond 2D video, DriveDreamer4D [62] and DreamDrive [34] combine generative models with real-world videos to construct interactive 4D environments for closed-loop testing. More recently, general-purpose physical AI foundation models such as Cosmos 3 [1] and Genie [6] have shown remarkable effectiveness on driving tasks, motivating our choice of adapting such a model in this work. 
+
+Multimodal Learning for Driving. Together with the advancements of vision-language pre-training [28, 30, 43], recent works are moving toward adapt-ing multimodal foundation models to the driving domain, grounding visual observations in natural language to gain the interpretability that traditional perception-control pipelines lack [57]. Early efforts repurpose general vision-language models for driving scene understanding, visual question answering, and captioning [33, 57], while later works move toward interpretable decision-making, such as DriveGPT4 [59], which jointly predicts control signals and lan-guage explanations, and DriveLM [47], which casts driving reasoning as graph visual question answering. Closest to our setting, a line of research focuses on fine-grained traffic-safety analysis in critical pedestrian-vehicle interactions. For instance, TrafficVLM [9] reformulates safety modeling as joint temporal local-ization and dense captioning. CityLLaVA [10] and TrafficInternVL [24] further refine visual prompting and structured fine-tuning on the WTS benchmark. 
+
+Foundation Model Fine-Tuning. While large-scale foundation models generalize remarkably well, fully fine-tuning them under the strict hardware budgets of autonomous driving is computationally impractical and risks catas-trophic forgetting of the pretrained physical priors. To reduce the memory foot-print of fine-tuning, a range of methods have been proposed, spanning activation compression [36,40], optimizer compression [39,63], and parameter-efficient fine-tuning (PEFT) [55, 65]. Among them, LoRA and its variants [22, 31, 35] have become the most widely adopted: by freezing the pretrained weights and train-4 Q. M. Dinh and T. K. Doan 
+
+ing only two additional low-rank matrices, they strike a favorable balance be-tween computational efficiency and model capability. Given its robust empirical success, we adopt LoRA to efficiently adapt the foundation model in this work. 
+
+## 3 Method 
+
+Generative Traffic Video Forecasting is a challenging task which involves synthe-sizing a long future continuation of a traffic safety scenario, given only a short clip of observed history frames and textual descriptions of the scene. The gener-ated frames must remain faithful to the observed scene layout, exhibit realistic pedestrian and vehicle motion, and stay on the ground-truth timeline for up to 120 frames. In this section, we present our solution, which adapts the Cosmos3-Nano world model to this task with a two-stage LoRA fine-tuning procedure and a carefully aligned inference pipeline, followed by a test-time sample selection and blending step. In Sec. 3.2, we describe the two fine-tuning stages. We detail the construction of our structured prompts and negative prompts in Sec. 3.3, and present the full inference and test-time procedure in Sec. 3.4. 
+
+Problem Formulation. Given a history clip H = {x−n, . . . , x 0} of n observed frames at resolution 1280 × 720 , a pair of captions (cp, c v ) describing the pedes-trian and the vehicle, and a target horizon N ∈ [51 , 120] , the goal is to generate 
+
+ˆY = {ˆx1, . . . , ˆxN }, the next N frames of the same scene at the same resolu-tion and frame rate. We adapt the task to the pre-training and mid-training paradigms of Cosmos3-Nano by limiting the history clip H to the last 5 frames. 
+
+3.1 Cosmos 3 World Foundation Models 
+
+Cosmos 3 is a family of omnimodal world foundation models built on a Mixture-of-Transformers architecture with two coupled towers: a Reasoner , an autore-gressive vision-language model that ingests the text prompt and the condition-ing frames, and a Generator , a diffusion transformer that denoises future frames conditioned on the Reasoner’s latents. We use the 16B Cosmos3-Nano variant, whose native resolution 720p at scale 16:9 matches the WTS resolution exactly. Video is processed by the VAE encoder from Wan2.2-TI2V5B [51] with 4 times temporal compression, and generation is trained with a rectified-flow objective: the first k latent frames of a clip are kept clean as conditioning while the re-maining frames are noised, and the velocity-prediction loss is applied to the non-conditioning frames only. The conditioning length k is drawn per training sample from a categorical distribution over k ∈ { 0, 1, 2}, where k = 0 implies that the model infer the frames purely from text, and k = 2 corresponds to the first five conditional pixel frames. Sampling uses a 35-step UniPC solver [64] with classifier-free guidance. The model is frame-rate aware: the fps field of the inference payload conditions generation through the prompt template and the temporal position encodings. CosmosAlign for Generative Traffic Video Forecasting 5(a) Two-stage fi ne-tuning (b) Aligned inference (c) Test-time selection  
+
+> WTS + BDD windows
+> 2,817 videos 9,175 windows, 30 fps offi cial captions
+> Stage 1: forecast LoRA
+> Generator attn, r=32 mode weights k: {0,1,2} = {0.1, 0.2, 0.7}
+> Stage 2: caption align
+> WTS 3,107 windows structured captions +750 iterations
+> LLM re-captioning
+> frames + captions -> structured temporal caption (JSON)
+> Adapted
+> Cosmos 3 Nano (16B, frozen base + LoRA)
+> Test payload (per clip)
+> 5 history frames structured prompt (LLM) extended negative prompt fps 30, N+5 frames
+> Adapted Cosmos 3 Nano
+> Reasoner -> Generator UniPC 35 steps guidance 3
+> 4 samples
+> seeds 0..3 (frames 5..N+5)
+> Medoid selection
+> min mean pairwise distance (no GT)
+> Motion-adaptive
+> blend w = 0.9 (static regions only) -> submission
+
+Fig. 1: Overview of our method. (a) Cosmos3-Nano is adapted in two LoRA stages: Stage 1 fine-tunes the Generator tower on WTS and BDD forecasting windows with the reweighted conditioning-mode distribution, and Stage 2 continues training on the WTS windows only, using the structured temporal-caption format the model natively expects. (b) At test time, each clip is encoded into a payload holding the five history frames, an LLM-generated structured prompt, an extended negative prompt, and the native frame rate, from which the adapted model generates the full horizon in a single pass; four samples are drawn with different seeds. (c) The final prediction is the medoid of the four samples, blended toward the last observed frame in static regions only. 
+
+3.2 Two-Stage Fine-Tuning Stage 1: Forecasting Adaptation. We convert the WTS training pool and the provided BDD external pool into 2,817 videos (635 multi-view WTS videos and 2,182 BDD dashcam videos), segmented by the annotated scenario phases into 9,175 training windows. Windows keep the native frame rate, and each window carries the concatenated pedestrian and vehicle captions of its clip as the text prompt. We capped the packed sequences at 10,240 tokens, which fits training of the 16B model on a single A100-80GB GPU with full activation checkpointing. The conditioning-mode distribution of {k = 0 , k = 1 , k = 2 } are reweighted from the default {0.7, 0.2, 0.1} to {0.1, 0.2, 0.7}, so that 70% of the gradient steps supervise the five-frame video-conditioned forecasting mode that the track evaluates, while a small amount of text-only and single-image conditioning is retained. We train LoRA adapters of rank 32 ( α = 64 ) on the query, key, value, and output projections of the Generator tower attention layers, keeping the base model and the Reasoner frozen. 
+
+Stage 2: Structured Caption Alignment. Cosmos3-Nano is post-trained to expect structured prompts, a JSON payload with a multi-sentence temporal caption narrative plus duration, frame-rate, and resolution fields, rather than free-form caption strings. To align the adapter with this interface, we re-caption all 3,107 WTS training windows with the LLM pipeline in Sec. 3.3 and serialize each caption identically to the inference payload format. We continue training on this WTS-only structured corpus starting from the Stage 1 checkpoint. 6 Q. M. Dinh and T. K. Doan 
+
+You caption traffic-safety video clips for a video generation model. In each request you receive: the camera type (overhead surveillance camera or vehicle-mounted dashboard camera), the clip duration in seconds, the official pedestrian and vehicle captions of the scenario, and frames sampled from the clip in temporal order. Write one temporal caption of five to eight sentences, in present tense, that narrates the clip from its first frame to its last: 1. Open by establishing the viewpoint and the scene. For overhead cameras, describe the scene as seen from above; for vehicle cameras, open with “From inside a vehicle, . . . ” or “From a forward-facing dashboard camera mounted in a moving car, . . . ”. 2. Introduce the visible agents with their appearance and positions (clothing, approximate age, vehicle color and type), exactly as visible in the frames. 3. Describe how the scene evolves in temporal order (“As time passes, . . . ”). Take the agents’ behavior over time from the official captions; take every visual detail (lighting, weather, road surface, markings, signage, camera stillness or motion) from the frames. 4. Ground every statement in the provided frames or captions. Never invent objects, agents, events, or camera motion that they do not support. If the captions and the frames disagree, trust the frames. 5. Use no meta-language (“in this video”), do not mention the captions or the frames, and do not address the viewer. Return only the caption text, with no preamble and no formatting. 
+
+Fig. 2: System prompt of our caption-generation pipeline. 
+
+{"temporal_caption": "A broad asphalt driving course is seen from above, lined with black-and-yellow cones and edged by grass strips, distant parked cars, and trees under bright, clear daylight. A man in his twenties in a brown jacket and navy-blue slacks walks across the open pavement with a dark car standing close behind him, both facing the same direction. As time passes, the car eases straight forward at a steady speed while the man continues ahead at a slow, even walk, holding his heading. [...]", "duration": "2.9", "fps": "30", "resolution": {"H": 720, "W": 1280}, "aspect_ratio": "16,9"} 
+
+Fig. 3: Example structured prompt of a test clip (overhead view, horizon N = 87 ). 
+
+3.3 Prompt Construction Structured Prompt Generation. We generate all structured prompts for the 3,107 Stage 2 training windows and the 71 test clips using Claude Opus 4.8 API, which can be replaced by any Visual Language Model (VLM) of equivalent capability. For each video, the VLM receives the camera type, the clip duration, the official pedestrian and vehicle captions, and conditional frames sampled in temporal order, taken from the training window itself for Stage-2 data and the provided history frames for test clips. The system prompt, shown in Fig. 2, limits the output to 5-8 sentences in the temporal_caption field of the base model’s native captioning format, constrains every visual detail to be grounded in the frames and every behavioral statement in the official captions, and for-bids inventing unsupported content. The returned caption is serialized together with the clip’s duration, frame-rate, resolution, and aspect-ratio fields (Fig. 3), matching the training-side serialization. 
+
+Negative Prompt. We keep the full default structured negative prompt that ships with Cosmos3-Nano, which lists generic generation defects (blurry subjects, compression artifacts, broken physics), and append the four sentences shown in CosmosAlign for Generative Traffic Video Forecasting 7
+
+> Pedestrians and vehicles that should move remain frozen in place like statues for the entire duration. Moving figures slowly melt, smear, and morph, limbs dissolving with ghost duplicates lingering. The color grade drifts steadily toward a warm sepia wash, and halos around streetlights bloom progressively larger. The fixed surveillance camera drifts and creeps when it should be perfectly still.
+
+Fig. 4: The four sentences appended to the default Cosmos3-Nano negative prompt. 
+
+Fig. 4, which target the failure modes we observed in generated traffic video: frozen agents, melting and morphing figures, drifting color grade, blooming light halos, and camera creep on fixed cameras. The same extended negative prompt is used for every clip in both views. 
+
+3.4 Inference and Test-Time Procedure Generation. Each test clip is encoded into a payload holding the last five con-ditional history frames, the structured prompt, the extended negative prompt, 
+
+num_frames = N +5 , and fps = 30 , the native frame rate of both the fine-tuning windows and the provided test histories. The adapted model generates the whole clip in a single pass with the 35-step UniPC solver and guidance scale g = 3 . We draw four samples per clip with seeds 0 to 3. 
+
+Medoid Sample Selection. Inspired by Minimum Bayes Risk decoding in text generation [12,26] and self-consistency in language-model reasoning [54], we employ a consensus-based selection rule. From the four samples { ˆY (1) , . . . , ˆY (4) }
+
+of a clip, we select the medoid, the sample with the minimum mean distance to the other samples: 
+
+ˆY ∗ = arg min 
+
+> i
+
+13
+
+X 
+
+> j̸=i
+
+d
+
+ ˆY (i), ˆY (j)
+
+, (1) where d is the mean absolute difference between temporally aligned frames on a spatially downsampled grid. The selection uses no ground-truth information 
+
+Motion-Adaptive Blending. Finally, each selected prediction is blended to-ward the last conditional frame x0 in the regions where the generation itself is static. We compute a per-pixel motion map 
+
+m(u) = 1
+
+N
+
+> N
+
+X
+
+> t=1
+
+¯ˆxt(u) − ¯x0(u) , (2) where ¯x denotes grayscale intensity, and map it to a blending weight 
+
+w(u) = 0 .9 · clip 
+
+ mhi − m(u)
+
+mhi − mlo 
+
+, 0, 1
+
+
+
+, mlo = 3 , m hi = 20 , (3) 8 Q. M. Dinh and T. K. Doan 
+
+smoothed with a Gaussian kernel ( σ = 8 ) to avoid seams. The final frames are: 
+
+ˆx′
+
+> t
+
+(u) =  1 − w(u) ˆxt(u) + w(u) x0(u) (4) The weight is high only where the generated clip stays close to the last condi-tional frame for its whole duration, so moving agents are left untouched, and on dashcam clips with ego-motion the weight vanishes everywhere. The blending is therefore self-regulating across the two camera types. 
+
+Temporal Deflickering. As a lighter alternative to the blending step, we also evaluate a motion-compensated temporal low-pass against flicker, the high-frequency temporal noise in which fine textures and colors change slightly from frame to frame even where the scene is static. We estimate the optical flow between frame t and each of its neighbors with RAFT [49] and warp the neigh-bors onto frame t, so that corresponding pixels coincide before averaging. Each interior frame is then replaced by 
+
+ˆx′ 
+
+> t
+
+= (1 − 2β) ˆ xt + β Wt−1→t(ˆ xt−1) + β Wt+1 →t(ˆ xt+1 ), β = 0 .2, (5) where Ws→t denotes warping frame s onto frame t along the estimated flow. Static regions are thus averaged over three aligned observations of the same con-tent, which cancels the temporal noise, while moving content is realigned before averaging and stays sharp. Stacked on best-of-3 selection, this filter produced our second-best submission. Our final submission uses the motion-adaptive blend in-stead, and we did not combine the two. 
+
+## 4 Experiments 
+
+4.1 Experimental Setup Datasets. We use a subset of the WTS dataset provided by the Track 5 of the AI City Challenge 2026, which contains staged traffic safety scenarios recorded simultaneously from fixed overhead cameras and vehicle cameras at resolution 1280 × 720 , along with external vehicle camera videos extracted from the BDD100K dataset [60]. Our Stage 1 corpus holds 2,817 videos (635 WTS, 2,182 BDD) segmented into 9,175 phase-aligned windows at the native frame rate. The Stage 2 corpus is the WTS subset (3,107 windows) with re-generated structured captions. The test set contains 71 clips with 10 to 224 provided his-tory frames each, requested horizons of 51 to 120 frames (mean 73), and roughly 38% overhead views. For local model selection we hold out a validation set of 36 WTS clips (14 overhead, 22 vehicle, matching the test view ratio), built to mirror the test protocol exactly: histories of five consecutive native-rate frames and per-clip horizons drawn from the empirical test horizon distribution, with payloads identical to test payloads in every field except the one under study. CosmosAlign for Generative Traffic Video Forecasting 9
+
+Table 1: Ablation studies on our validation set. The capacity and post-processing blocks use plain prompts at default guidance, and the remaining blocks use the full single-seed inference recipe. LoRA α is twice the rank. “MA” denotes motion-adaptive. In the Stage 1 block, the fidelity metrics differ only at noise level and are not high-lighted.                                                                                                                           
+
+> Config PSNR SSIM LPIPS CLIP-S FVD
+> History
+> 5 frames 24.40 0.793 0.163 28.12 17.64
+> 9 frames 23.76 0.777 0.177 28.09 19.73 13 frames 23.25 0.775 0.184 28.08 20.69
+> Stage 1
+> 2,000 iter 23.92 0.791 0.173 27.81 17.76 3,000 iter 23.92 0.793 0.171 27.72 17.15
+> 4,000 iter 23.92 0.793 0.170 27.58 17.56
+> Stage 2
+> Base 23.92 0.791 0.173 27.81 17.76 +250 24.19 0.796 0.167 27.81 16.94 +500 24.27 0.798 0.166 27.87 16.31 +750 24.25 0.798 0.166 27.92 15.98
+> +1,000 24.25 0.798 0.166 27.90 16.19 Config PSNR SSIM LPIPS CLIP-S FVD
+> Guidance
+> g= 1 23.52 0.780 0.184 27.71 19.98
+> g= 2 23.94 0.791 0.173 27.80 18.22
+> g= 3 23.92 0.791 0.173 27.81 17.76
+> g= 6 23.24 0.780 0.190 27.83 20.48
+> Adapter
+> rank 32 22.88 0.761 0.193 27.53 20.84
+> rank 128 21.81 0.716 0.214 27.58 23.06
+> Post-proc.
+> none 22.88 0.761 0.193 27.53 20.84 deflickering 22.93 0.765 0.193 27.57 20.57
+> color match 23.07 0.763 0.193 27.60 21.10 global blend 23.86 0.793 0.192 27.67 22.71 MA blend 23.94 0.808 0.185 27.39 23.44
+
+Evaluation Metrics. Following the evaluation setup of Track 5, we adopt PSNR, SSIM, LPIPS [61], CLIP score [18], FID [19], and FVD [50] as the eval-uation metrics, normalized and averaged with equal weights by the AI City Challenge’s evaluation system into a single final score. Our local harness com-putes PSNR, SSIM, LPIPS, CLIP-S, and FVD over the 36 validation clips. The local CLIP-S is on a 0 to 100 scale while the server reports 0 to 1. 
+
+Implementation Details. All fine-tuning and inference run on a single NVIDIA A100-80GB GPU. Stage 1 runs for 2,000 iterations in about 14 hours with AdamW (learning rate 5×10 −4, cosine decay, 100 warmup steps, gradient accu-mulation 4) in bfloat16, full activation checkpointing. Stage 2 adds up to 1,000 iterations in about 8 hours, using the same optimizer settings and an extended cosine schedule. Inference uses the framework’s native pipeline, which shares the training conditioning path, with 35-step UniPC sampling and guidance 3. A sin-gle 71-clip test sweep takes about 8 hours per seed, and all configuration sweeps are validated at seed 0. The fps field of every payload is set to 30 to match the native frame rate of the fine-tuning windows and of the provided test histories. 
+
+4.2 Ablation Studies Classifier-free Guidance. Tab. 1 sweeps the classifier-free guidance scale on the validation set with all other settings fixed to the final recipe. The quality curve is U-shaped: g = 1 washes out conditioning adherence and degrades every metric, g = 2 ties g = 3 on the fidelity metrics while losing 0.46 FVD, and the framework default g = 6 loses on four of five metrics. We select g = 3 ; on the test set this contributed +1 .45 with all six metrics improving (Tab. 2). 10 Q. M. Dinh and T. K. Doan                                                                                          
+
+> Table 2: Progression of our experiments on the Track 5 test set. “MA” denotes motion-adaptive blending. Same indentation denotes different options stack separatedly on top of the previous configuration. Configuration Final ↑PSNR ↑SSIM ↑LPIPS ↓CLIP ↑FID ↓FVD ↓
+> Stage 1 (rank 32, α= 64 )73.31 18.60 0.576 0.278 0.938 25.19 24.83 + chunked rollout 71.33 18.04 0.573 0.323 0.936 30.67 24.96 + view-balanced data 73.05 18.25 0.567 0.283 0.937 24.52 24.36 + guidance g= 3 74.76 19.18 0.593 0.260 0.941 22.34 22.27 + struct. 74.68 19.06 0.595 0.264 0.941 22.36 22.32 + extended neg. 74.76 19.09 0.596 0.263 0.942 22.28 22.02 + Stage 2 75.00 19.19 0.598 0.260 0.942 21.75 21.04 + deflickering 75.03 19.26 0.603 0.260 0.941 22.19 21.09 + best-of-3 75.32 19.35 0.605 0.254 0.941 21.51 20.57
+> + deflickering 75.35 19.42 0.610 0.254 0.940 21.96 20.66 + best-of-4 + MA 76.49 20.12 0.650 0.246 0.950 22.41 21.79
+
+Stage 2 Fine-Tuning. Tab. 1 evaluates the Stage 2 checkpoints at the full inference recipe. Every checkpoint beats the Stage 1 adapter on all five metrics. Fidelity plateaus after 500 additional iterations while CLIP-S keeps rising, which is the opposite of the CLIP decay we observe when simply training Stage 1 longer (see the longer-training ablation below), indicating adaptation to the prompt format rather than memorization. We select the checkpoint at iteration 750, which attains the best FVD. 
+
+Best-of-N Selection. Tab. 3 quantifies sampling stochasticity on the valida-tion set. The mean per-clip PSNR spread across three seeds is 2.07 dB and no single seed dominates. The ground-truth-free medoid of Eq. (1) beats every in-dividual seed on four of five metrics and recovers most of the gap to the per-clip oracle. On the test set, best-of-3 selection adds +0 .32 on the Stage 2 recipe (75.00 to 75.32), improving the fidelity and the distributional metrics. 
+
+Prompting and Negative Prompting. Tab. 4 stacks the prompt-side changes on the validation set. Structured temporal-caption prompts outperform the plain challenge captions at either guidance setting, and the extended negative prompt adds a further improvement on all five metrics. The test set (Tab. 2) shows that with the Stage 1 adapter alone, which is fine-tuned on plain captions, structured prompting regressed from 74.76 to 74.68, and the extended negative prompt only recovered the combination back to the level of the guidance-only configuration (74.76). Stage 2, which aligns the training-side captions to the same format, boosts the score to 75.00 and makes test FVD improves by 0.98, demonstrating the effectiveness of our design. CosmosAlign for Generative Traffic Video Forecasting 11 
+
+Table 3: Ablation study on best-of-N
+
+seed selection. The oracle selects the best sample per clip using ground truth, the medoid uses no ground truth.                              
+
+> Set PSNR SSIM LPIPS CLIP-S FVD Seed 0 23.92 0.791 0.173 27.81 17.76 Seed 1 23.50 0.780 0.186 27.94 21.17 Seed 2 23.10 0.771 0.185 27.70 19.15 Medoid 23.98 0.792 0.169 27.90 17.12
+> Oracle 24.22 0.796 0.166 28.03 17.26
+
+Table 4: Ablation study on prompting. “struct.” denotes the structured temporal-caption prompt and “neg.” the extended negative prompt.                                    
+
+> Prompt gPSNR SSIM LPIPS CLIP-S FVD plain 622.88 0.761 0.193 27.53 20.84 struct. 623.24 0.780 0.190 27.83 20.48
+> plain 323.38 0.774 0.179 27.47 19.51 struct. 323.86 0.791 0.174 27.76 18.29 + neg. 323.92 0.791 0.173 27.81 17.76
+
+Global Blending and Color Matching. Before adopting the motion-adaptive blend, we evaluated its global counterparts on validation. A uniform static blend toward the last observed frame raises PSNR by a full point (22.88 to 23.86) but adds 1.87 FVD. Matching the color statistics of the generated frames to the history is a wash (FVD +0 .26 ). These variants suppress or recolor the moving foreground together with the background, which is what the motion mask of Eq. (3) avoids. 
+
+Motion-Adaptive Blending. On validation, the blend yields the largest fi-delity gains of all post-processing variants we screened, improving PSNR, SSIM, and LPIPS simultaneously (Tab. 1). On the test set, a combination with a fourth seed lifted PSNR by 0.77 , SSIM by 0.045 , LPIPS by 0.008 , and CLIP by 0.009 
+
+at a cost of 0.89 FID and 1.22 FVD, a net gain of +1 .17 final points compared to the previous best-of-3 version. 
+
+Temporal Deflickering. We also evaluate the deflickering filter of Eq. (5). On validation this improves FVD by 0.27 with all fidelity metrics held (Tab. 1), and on the test set it adds a consistent +0 .035 final points both on the single-seed Stage-2 configuration (75.00 to 75.03) and stacked on top of best-of-3 selection (75.32 to 75.35), gaining PSNR and SSIM at a small FID cost, which is an order of magnitude smaller than the other components. 
+
+Chunked Autoregressive Rollout. Since the fine-tuning windows are capped at about 45 frames while test horizons reach 120 frames, we implemented a chunked autoregressive rollout that generates 32 future frames per pass and re-conditions each subsequent pass on the last five generated frames. Despite the training-horizon mismatch it is meant to address, the rollout scored 71.33 on the test set against 73.31 for the otherwise identical single-pass configura-tion (Tab. 2). The damage concentrates in FID (30.67 vs. 25.19) and per-frame fidelity (PSNR 18.04 vs. 18.60), while FVD is roughly unchanged. Errors accu-mulate across chunks because later passes condition on generated rather than observed frames, and chunk boundaries introduce visible seams, while Cosmos 3 12 Q. M. Dinh and T. K. Doan 
+
+Nano natively supports single-pass generation of up to 200 frames at 720p. We therefore generate every clip in a single pass. 
+
+Longer Conditioning History. The test set provides 10 to 224 history frames per clip while our recipe conditions on the last five. Tab. 1 extends the condi-tioning history at inference to 9 and 13 frames (3 and 4 latent frames), with the history extended backward in time so that the predicted frame range is un-changed. Quality degrades monotonically in the history length on every metric. As feeding additional latents at inference departs from its training distribution, exploiting the longer available histories would require retraining with a larger conditioning length. 
+
+Higher LoRA Rank. Raising the adapter rank from 32 to 128 ( α from 64 to 256) with an otherwise identical Stage-1 recipe degrades four of the five validation metrics, with CLIP-S essentially unchanged (Tab. 1). With 9,175 windows the regime is data-limited rather than capacity-limited, and the larger adapter only overfits. 
+
+Longer Stage 1 Training. Continuing Stage 1 from 2,000 to 3,000 and 4,000 iterations produces only noise-level fidelity changes, while CLIP-S decays mono-tonically with training and FVD is non-monotone across the two extra check-points (Tab. 1). We treat the monotone CLIP-S decay as an overfitting signature, where the adapter drifts away from prompt alignment as it memorizes the train-ing pool. 
+
+Data Mixes. Rebalancing the training mix to 40% overhead views to match the test-set ratio (the unbalanced mix contains 16%) is slightly negative on the test set (73.05 vs. 73.31, Tab. 2). It improves the distributional metrics (FID 24.52 vs. 25.19, FVD 24.36 vs. 24.83) but loses more on per-frame fidelity (PSNR 18.25 vs. 18.60, SSIM 0.567 vs. 0.576). 
+
+4.3 Qualitative Analysis 
+
+Fig. 5 shows representative predictions of our final model on held-out clips, com-paring the ground-truth continuation (top rows) with our generation (bottom rows) at four future offsets. On the overhead clip (a), a pedestrian walks across the crosswalk over the 51-frame horizon. Our prediction advances him along the ground-truth trajectory, keeping his position close to the reference at every off-set while the camera stays perfectly static and the road markings remain sharp, although his gait and arm pose drift out of phase by the end of the horizon. On the dusk vehicle clip (b), the model continues the approach toward the lead car with its brake lights and the surrounding light sources rendered stably over time; the street lamps neither bloom nor drift in color, the failure modes ex-plicitly targeted by our extended negative prompt. Clip (c) illustrates the main CosmosAlign for Generative Traffic Video Forecasting 13  
+
+> Fig. 5: Qualitative results of our final model on held-out clips, ground truth (top) against our prediction (bottom). (a) Overhead view: the pedestrian is advanced along the ground-truth trajectory across the crosswalk, with the static camera and the road markings preserved. (b) Vehicle view at dusk: the lead vehicle, brake lights, and light sources are continued stably. (c) Behavioral divergence: the generation stays sharp and realistic, but the predicted pedestrian behavior differs from the ground truth.
+
+remaining error source: behavioral divergence. The generation is sharp and phys-ically plausible throughout, but the model predicts that the nearby pedestrian keeps standing while in the ground truth he leans down toward the camera, so the per-frame fidelity metrics penalize the clip heavily even though the video itself is realistic. Divergence of this kind is exactly the stochasticity that our medoid selection exploits: futures on which independent samples agree are much less likely to contain such idiosyncratic behavior errors. Beyond these cases, we observe two systematic behaviors. First, prediction quality is consistently higher on overhead clips than on vehicle clips, since ego-motion makes the whole frame non-static and leaves no anchor for the back-ground, which also makes the motion-adaptive blend self-deactivate on vehicle clips as intended. Second, when the visual history conflicts with the textual de-scription, the visual conditioning dominates. Fig. 6 shows the clearest instance: the clip opens on a close-up of a dashboard clock before cutting to the road, and although the prompt describes only the road scene, the model carries the glow-ing digits into the generated continuation and keeps them superimposed for the 14 Q. M. Dinh and T. K. Doan                                                   
+
+> Fig. 6: Visual conditioning dominates the prompt. The history frames of this validation clip show a dashboard clock; the ground truth (top) cuts to the road scene, whereas our prediction (bottom) carries the glowing digits into the generated road scene and holds them for the whole horizon. The prompt describes only the road scene.
+> Table 5: Final AI City Challenge Track 5 public leaderboard (top 5 only). Rank Team Final ↑PSNR ↑SSIM ↑LPIPS ↓CLIP ↑FID ↓FVD ↓
+> 1Qyn (ours) 76.49 20.12 0.650 0.246 0.950 22.41 21.79 2SSUPER 76.04 19.73 0.630 0.249 0.938 21.16 19.46
+> 3Latent Painter 75.13 19.72 0.650 0.266 0.945 26.52 24.79 4CHTTL_A30 74.05 18.86 0.597 0.281 0.942 23.78 24.11 5VGU_ai_lab 73.28 19.74 0.647 0.294 0.945 33.61 29.35
+
+entire horizon, while the ground truth cuts away cleanly. This behavior indicates that the five conditioning frames, not the prompt, anchor the generated scene. 
+
+4.4 Performance in the Challenge 
+
+Tab. 2 reports the progression of our submissions on the official test set. Guidance tuning, Stage 2 caption alignment, medoid selection, and the final blending step each improve the final score, and the last step is the largest ( +1 .17 ). Tab. 5 shows the final public leaderboard of the AI City Challenge 2026 Track 5. Our solution (Qyn) ranks first with 76.49, 0.45 points ahead of the second-ranked team. The metric profile reflects the design of our pipeline: we attain the best PSNR, LPIPS, CLIP, and (up to 10 −4) SSIM of all teams, while the second-ranked team leads the distributional metrics FID and FVD. 
+
+## 5 Conclusion 
+
+In this paper, we presented CosmosAlign, the first-place solution to Track 5 of the AI City Challenge 2026. Starting from the pretrained Cosmos3-Nano world model, we adapt it with a two-stage LoRA recipe that aligns the conditioning-mode distribution and the caption format with the evaluated task, complemented by a training-free test-time procedure of consensus-based medoid selection and motion-adaptive blending. Future works can strengthen the text-conditioning pathway, for example through explicit behavior controls or caption-conditioned CosmosAlign for Generative Traffic Video Forecasting 15 
+
+selection among sampled futures, since the remaining errors stem from generated agent behavior diverging from the description and from the visual conditioning dominating the prompt. Another direction is to retrain with longer conditioning lengths to exploit the full provided history, which our ablations show cannot be used by an adapter trained on five frames, and to verify that our alignment-oriented recipe generalizes beyond a single backbone by applying it to larger variants such as Cosmos3-Super, and other world model families. 
+
+## References 
+
+1. Agarwal, N., Ali, A., Allen, J., Antolini, M., Aubame, A., Azzolini, A., Bai, J., Bala, M., Balaji, Y., Bapst, J., et al.: Cosmos 3: Omnimodal world models for physical ai. arXiv preprint arXiv:2606.02800 (2026) 2. Agarwal, N., Ali, A., Bala, M., Balaji, Y., Barker, E., Cai, T., Chattopadhyay, P., Chen, Y., Cui, Y., Ding, Y., et al.: Cosmos world foundation model platform for physical ai. arXiv preprint arXiv:2501.03575 (2025) 3. Ali, A., Bai, J., Bala, M., Balaji, Y., Blakeman, A., Cai, T., Cao, J., Cao, T., Cha, E., Chao, Y.W., et al.: World simulation with video foundation models for physical ai. arXiv preprint arXiv:2511.00062 (2025) 4. Assran, M., Bardes, A., Fan, D., Garrido, Q., Howes, R., Muckley, M., Rizvi, A., Roberts, C., Sinha, K., Zholus, A., et al.: V-jepa 2: Self-supervised video models enable understanding, prediction and planning. arXiv preprint arXiv:2506.09985 (2025) 5. Bardes, A., Garrido, Q., Ponce, J., Chen, X., Rabbat, M., LeCun, Y., Assran, M., Ballas, N.: Revisiting feature prediction for learning visual representations from video. arXiv preprint arXiv:2404.08471 (2024) 6. Bruce, J., Dennis, M.D., Edwards, A., Parker-Holder, J., Shi, Y., Hughes, E., Lai, M., Mavalankar, A., Steigerwald, R., Apps, C., et al.: Genie: Generative interactive environments. In: Forty-first International Conference on Machine Learning (2024) 7. Chen, R., Wu, Z., Liu, Y., Guo, Y., Ni, J., Xia, H., Xia, S.: Unimlvg: Unified framework for multi-view long video generation with comprehensive control capa-bilities for autonomous driving. In: 2025 IEEE/CVF International Conference on Computer Vision (ICCV). pp. 25453–25463. IEEE (2025) 8. comma.ai: commavq. https://github.com/commaai/commavq (2023) 9. Dinh, Q.M., Ho, M.K., Dang, A.Q., Tran, H.P.: TrafficVLM: A controllable visual language model for traffic video captioning. In: Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) Workshops. pp. 7134–7143 (2024) 10. Duan, Z., Cheng, H., Xu, D., Wu, X., Zhang, X., Ye, X., Xie, Z.: CityLLaVA: Effi-cient fine-tuning for vlms in city scenario. In: Proceedings of the IEEE/CVF Con-ference on Computer Vision and Pattern Recognition (CVPR) Workshops (2024) 11. Ebert, F., Finn, C., Dasari, S., Xie, A., Lee, A., Levine, S.: Visual foresight: Model-based deep reinforcement learning for vision-based robotic control. arXiv preprint arXiv:1812.00568 (2018) 12. Eikema, B., Aziz, W.: Is MAP decoding all you need? the inadequacy of the mode in neural machine translation. In: Scott, D., Bel, N., Zong, C. (eds.) Proceedings of the 28th International Conference on Computational Linguistics. pp. 4506–4520. International Committee on Computational Linguistics, Barcelona, Spain (Online) 16 Q. M. Dinh and T. K. Doan (Dec 2020). https://doi.org/10.18653/v1/2020.coling-main.398 , https:// aclanthology.org/2020.coling-main.398/ 
+
+13. Gao, S., Yang, J., Chen, L., Chitta, K., Qiu, Y., Geiger, A., Zhang, J., Li, H.: Vista: A generalizable driving world model with high fidelity and versatile controllability. Advances in Neural Information Processing Systems 37 , 91560–91596 (2024) 14. Ha, D., Schmidhuber, J.: World models. arXiv preprint arXiv:1803.10122 2(3), 440 (2018) 15. Hafner, D., Lillicrap, T., Ba, J., Norouzi, M.: Dream to control: Learning behaviors by latent imagination. arXiv preprint arXiv:1912.01603 (2019) 16. Hafner, D., Lillicrap, T., Fischer, I., Villegas, R., Ha, D., Lee, H., Davidson, J.: Learning latent dynamics for planning from pixels. In: International conference on machine learning. pp. 2555–2565. PMLR (2019) 17. Hassan, M., Stapf, S., Rahimi, A., Rezende, P., Haghighi, Y., Brüggemann, D., Katircioglu, I., Zhang, L., Chen, X., Saha, S., et al.: Gem: A generalizable ego-vision multimodal world model for fine-grained ego-motion, object dynamics, and scene composition control. In: Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition. pp. 22404–22415 (2025) 18. Hessel, J., Holtzman, A., Forbes, M., Bras, R.L., Choi, Y.: Clipscore: A reference-free evaluation metric for image captioning. ArXiv abs/2104.08718 (2021) 19. Heusel, M., Ramsauer, H., Unterthiner, T., Nessler, B., Klambauer, G., Hochreiter, S.: Gans trained by a two time-scale update rule converge to a nash equilibrium. ArXiv abs/1706.08500 (2017) 20. Ho, J., Salimans, T., Gritsenko, A., Chan, W., Norouzi, M., Fleet, D.J.: Video diffusion models. In: NeurIPS (2022) 21. Hu, A., Russell, L., Yeo, H., Murez, Z., Fedoseev, G., Kendall, A., Shotton, J., Corrado, G.: Gaia-1: a generative world model for autonomous driving (2023). URL https://arxiv. org/abs/2309.17080 3
+
+22. Hu, E.J., Shen, Y., Wallis, P., Allen-Zhu, Z., Li, Y., Wang, S., Wang, L., Chen, W.: LoRA: Low-rank adaptation of large language models. In: ICLR (2022) 23. Hu, X., Yin, W., Jia, M., Deng, J., Guo, X., Zhang, Q., Long, X., Tan, P.: Driv-ingworld: Constructing world model for autonomous driving via video gpt. arXiv preprint arXiv:2412.19505 (2024) 24. fill author list from the ICCVW 2025 paper, T.: TrafficInternVL: Understanding traffic scenarios with vision-language models. In: Proceedings of the IEEE/CVF International Conference on Computer Vision (ICCV) Workshops (2025) 25. Kong, Q., Kawana, Y., Saini, R., Kumar, A., Pan, J., Gu, T., Ozao, Y., Opra, B., Anastasiu, D.C., Sato, Y., Kobori, N.: WTS: A pedestrian-centric traffic video dataset for fine-grained spatial-temporal understanding. In: ECCV. pp. 1–18 (2024). https://doi.org/10.1007/978-3-031-73116-7_1 
+
+26. Kumar, S., Byrne, W.: Minimum Bayes-risk decoding for statistical machine trans-lation. In: Proceedings of the Human Language Technology Conference of the North American Chapter of the Association for Computational Linguistics: HLT-NAACL 2004. pp. 169–176. Association for Computational Linguistics, Boston, Massachusetts, USA (May 2 - May 7 2004), https://aclanthology.org/N04-1022/ 
+
+27. LeCun, Y., et al.: A path towards autonomous machine intelligence version 0.9. 2, 2022-06-27. Open Review 62 (1), 1–62 (2022) 28. Li, J., Li, D., Savarese, S., Hoi, S.: BLIP-2: Bootstrapping language-image pre-training with frozen image encoders and large language models. In: International Conference on Machine Learning (ICML) (2023) CosmosAlign for Generative Traffic Video Forecasting 17 29. Li, X., He, X., Zhang, L., Wu, M., Li, X., Liu, Y.: A comprehensive survey on world models for embodied ai. arXiv preprint arXiv:2510.16732 (2025) 30. Liu, H., Li, C., Wu, Q., Lee, Y.J.: Visual instruction tuning. In: Advances in Neural Information Processing Systems (NeurIPS) (2023) 31. Liu, S.Y., Wang, C.Y., Yin, H., Molchanov, P., Wang, Y.C.F., Cheng, K.T., Chen, M.H.: Dora: Weight-decomposed low-rank adaptation. In: Forty-first International Conference on Machine Learning (2024) 32. Liu, W., Luo, W., Lian, D., Gao, S.: Future frame prediction for anomaly detection– a new baseline. In: Proceedings of the IEEE conference on computer vision and pattern recognition. pp. 6536–6545 (2018) 33. Ma, Y., Cao, Y., Sun, J., Pavone, M., Xiao, C.: Dolphins: Multimodal language model for driving. arXiv preprint arXiv:2312.00438 (2023) 34. Mao, J., Li, B., Ivanovic, B., Chen, Y., Wang, Y., You, Y., Xiao, C., Xu, D., Pavone, M., Wang, Y.: Dreamdrive: Generative 4d scene modeling from street view images. In: 2025 IEEE International Conference on Robotics and Automation (ICRA). pp. 367–374. IEEE (2025) 35. Meng, F., Wang, Z., Zhang, M.: Pissa: Principal singular values and singular vectors adaptation of large language models. Advances in Neural Information Processing Systems 37 , 121038–121072 (2024) 36. Miles, R., Reddy, P., Elezi, I., Deng, J.: Velora: Memory efficient training using rank-1 sub-token projections. Advances in Neural Information Processing Systems 
+
+37 , 42292–42310 (2024) 37. Ming, R., Huang, Z., Wu, J., Ju, Z., Jiang, D., Hu, J., Peng, L., Zhou, S.: A survey on future frame synthesis: Bridging deterministic and generative approaches. arXiv preprint arXiv:2401.14718 (2024) 38. Mousakhan, A., Mittal, S., Galesso, S., Farid, K., Brox, T.: Overcoming challenges of long-horizon prediction in driving world models. Advances in Neural Information Processing Systems 38 , 4741–4770 (2026) 39. Muhamed, A., Li, O., Woodruff, D., Diab, M., Smith, V.: Grass: Compute effi-cient low-memory llm training with structured sparse gradients. In: Proceedings of the 2024 Conference on Empirical Methods in Natural Language Processing. pp. 14978–15003 (2024) 40. Nguyen, L.T., Quélennec, A., Nguyen, V.T., Tartaglione, E.: Beyond low-rank decomposition: A shortcut approach for efficient on-device learning. arXiv preprint arXiv:2505.05086 (2025) 41. Ni, J., Guo, Y., Liu, Y., Chen, R., Lu, L., Wu, Z.: Maskgwm: A generalizable driv-ing world model with video mask reconstruction. In: Proceedings of the Computer Vision and Pattern Recognition Conference. pp. 22381–22391 (2025) 42. Oprea, S., Martinez-Gonzalez, P., Garcia-Garcia, A., Castro-Vargas, J.A., Orts-Escolano, S., Garcia-Rodriguez, J., Argyros, A.: A review on deep learning tech-niques for video prediction. IEEE Transactions on Pattern Analysis and Machine Intelligence 44 (6), 2806–2826 (2020) 43. Radford, A., Kim, J.W., Hallacy, C., Ramesh, A., Goh, G., Agarwal, S., Sastry, G., Askell, A., Mishkin, P., Clark, J., Krueger, G., Sutskever, I.: Learning transferable visual models from natural language supervision. In: ICML. pp. 8748–8763 (2021) 44. Russell, L., Hu, A., Bertoni, L., Fedoseev, G., Shotton, J., Arani, E., Corrado, G.: Gaia-2: A controllable multi-view generative world model for autonomous driving. arXiv preprint arXiv:2503.20523 (2025) 45. Shao, H., Hu, Y., Wang, L., Song, G., Waslander, S.L., Liu, Y., Li, H.: Lmdrive: Closed-loop end-to-end driving with large language models. In: Proceedings of the 18 Q. M. Dinh and T. K. Doan IEEE/CVF conference on computer vision and pattern recognition. pp. 15120– 15130 (2024) 46. Shao, H., Wang, L., Chen, R., Li, H., Liu, Y.: Safety-enhanced autonomous driving using interpretable sensor fusion transformer. In: Conference on Robot Learning. pp. 726–737. PMLR (2023) 47. Sima, C., Renz, K., Chitta, K., Chen, L., Zhang, H., Xie, C., Beißwenger, J., Luo, P., Geiger, A., Li, H.: DriveLM: Driving with graph visual question answering. In: European Conference on Computer Vision (ECCV) (2024) 48. Tang, Z., Wang, S., Anastasiu, D.C., Chang, M.C., et al.: The 10th AI City Chal-lenge. In: ECCV Workshops. Malm"o, Sweden (2026) 49. Teed, Z., Deng, J.: Raft: Recurrent all-pairs field transforms for optical flow. ArXiv abs/2003.12039 (2020), https://api.semanticscholar.org/CorpusID: 214667893 
+
+50. Unterthiner, T., van Steenkiste, S., Kurach, K., Marinier, R., Michalski, M., Gelly, S.: Towards accurate generative models of video: A new metric and challenges. In: International Conference on Learning Representations Workshop (2019) 51. Wang, A., Ai, B., Wen, B., Mao, C., Xie, C.W., Chen, D., Yu, F., Zhao, H., Yang, J., Zeng, J., Wang, J., Zhang, J., Zhou, J., Wang, J., Chen, J., Zhu, K., Zhao, K., Yan, K., Huang, L., Meng, X., Zhang, N., Li, P., Wu, P., Chu, R., Feng, R., Zhang, S., Sun, S., Fang, T., Wang, T., Gui, T., Weng, T., Shen, T., Lin, W., Wang, W., Wang, W., Zhou, W.C., Wang, W., Shen, W., Yu, W., Shi, X., Huang, X., Xu, X., Kou, Y., Lv, Y.M., Li, Y., Liu, Y., Wang, Y., Zhang, Y., Huang, Y., Li, Y., Wu, Y., Liu, Y., Pan, Y., Zheng, Y., Hong, Y., Shi, Y., Feng, Y., Jiang, Z., Han, Z., Wu, Z., Liu, Z.: Wan: Open and advanced large-scale video generative models. ArXiv abs/2503.20314 (2025) 52. Wang, L., Liu, J., Shao, H., Wang, W., Chen, R., Liu, Y., Waslander, S.L.: Efficient reinforcement learning for autonomous driving with parameterized skills and priors. arXiv preprint arXiv:2305.04412 (2023) 53. Wang, X., Zhu, Z., Huang, G., Chen, X., Zhu, J., Lu, J.: Drivedreamer: Towards real-world-drive world models for autonomous driving. In: European conference on computer vision. pp. 55–72. Springer (2024) 54. Wang, X., Wei, J., Schuurmans, D., Le, Q., Chi, E.H., Zhou, D.: Self-consistency improves chain of thought reasoning in language models. ArXiv abs/2203.11171 
+
+(2022) 55. Wang, Y., Agarwal, S., Mukherjee, S., Liu, X., Gao, J., Hassan, A., Gao, J.: Adamix: Mixture-of-adaptations for parameter-efficient model tuning. In: Proceed-ings of the 2022 Conference on Empirical Methods in Natural Language Processing. pp. 5744–5760 (2022) 56. Wang, Y., He, J., Fan, L., Li, H., Chen, Y., Zhang, Z.: Driving into the future: Mul-tiview visual forecasting and planning with world model for autonomous driving. In: Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition. pp. 14749–14759 (2024) 57. Wen, L., Yang, X., Fu, D., Wang, X., Cai, P., Li, X., Ma, T., Li, Y., Xu, L., Shang, D., Li, Z., Sun, L., Li, Y., Xu, Q., Zhao, Z., Wang, B., Liu, Y., Qiao, Y., Shao, J., Chi, C., Zhang, W.: On the road with GPT-4V(ision): Early explorations of visual-language model on autonomous driving. arXiv preprint arXiv:2311.05332 (2023) 58. Xie, A., Ebert, F., Levine, S., Finn, C.: Improvisation through physical un-derstanding: Using novel objects as tools with visual foresight. arXiv preprint arXiv:1904.05538 (2019) CosmosAlign for Generative Traffic Video Forecasting 19 59. Xu, Z., Zhang, Y., Xie, E., Zhao, Z., Guo, Y., Wong, K.K.Y., Li, Z., Zhao, H.: DriveGPT4: Interpretable end-to-end autonomous driving via large language model. IEEE Robotics and Automation Letters (2024) 60. Yu, F., Chen, H., Wang, X., Xian, W., Chen, Y., Liu, F., Madhavan, V., Dar-rell, T.: Bdd100k: A diverse driving dataset for heterogeneous multitask learning. In: Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) (June 2020) 61. Zhang, R., Isola, P., Efros, A.A., Shechtman, E., Wang, O.: The unreasonable effectiveness of deep features as a perceptual metric. In: CVPR. pp. 586–595 (2018) 62. Zhao, G., Wang, X., Zhu, Z., Chen, X., Huang, G., Bao, X., Wang, X.: Drivedreamer-2: Llm-enhanced world models for diverse driving video generation. In: Proceedings of the AAAI Conference on Artificial Intelligence. vol. 39, pp. 10412–10420 (2025) 63. Zhao, J., Zhang, Z., Chen, B., Wang, Z., Anandkumar, A., Tian, Y.: Galore: Memory-efficient llm training by gradient low-rank projection. arXiv preprint arXiv:2403.03507 (2024) 64. Zhao, W., Bai, L., Rao, Y., Zhou, J., Lu, J.: UniPC: A unified predictor-corrector framework for fast sampling of diffusion models. In: Thirty-seventh Conference on Neural Information Processing Systems (2023), https://openreview.net/forum? id=hrkmlPhp1u 
+
+65. Zhou, H., Wan, X., Vulić, I., Korhonen, A.: Autopeft: Automatic configuration search for parameter-efficient fine-tuning. Transactions of the Association for Com-putational Linguistics 12 , 525–542 (2024) 66. Zhou, Y., Shao, H., Wang, L., Zong, Z., Li, H., Waslander, S.L.: Drivinggen: A com-prehensive benchmark for generative video world models in autonomous driving. arXiv preprint arXiv:2601.01528 (2026)
