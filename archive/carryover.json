@@ -1,104 +1,12 @@
 {
-  "generated_at": "2026-08-11T19:53:50.966358+00:00",
-  "updated_date": "20260811",
+  "generated_at": "2026-08-12T20:06:49.175105+00:00",
+  "updated_date": "20260812",
   "carryover_days": 9,
   "tag_states": {
     "video-wam": {
-      "updated_date": "20260811",
+      "updated_date": "20260812",
       "carryover_days": 9,
-      "items": [
-        {
-          "id": "2608.09771v1",
-          "source": "arxiv",
-          "title": "SLIM-0.5B: Learning Action-Grounded Predictive Latents for Robot Manipulation",
-          "abstract": "Vision-language-action policies rely on large multimodal backbones to jointly perform perception, language conditioning, and action generation at every control step. Much of this capacity supports open-domain semantics, whereas continuous robot manipulation primarily requires compact representations of observations, actions, and the transitions induced by actions. Pixel-level world models provide another route, but predicting visual details irrelevant to control can be unnecessarily expensive. We propose SLIM (Self-supervised Latent Interaction Model), a compact 0.5B-parameter latent interaction policy. SLIM learns action-grounded predictive latents that capture both action-conditioned future transitions and the actions that explain observed changes. SLIM learns these representations through self-supervised masked trajectory prediction, combining action reconstruction with future-latent prediction. A compact Mixture-of-Transformers (MoT) backbone models interactions between observation latents and action tokens. The resulting policy is trained with flow matching for language-conditioned action generation. Across simulation benchmarks and real-world evaluation, SLIM matches or exceeds representative large-scale VLA and world-action-model baselines with fewer parameters, no additional embodied pretraining, lower inference latency, and substantially lower GPU memory usage.",
-          "authors": [
-            "Jingkai Wang",
-            "Zihan Tang",
-            "Gu Zhang",
-            "Mingyu Cao",
-            "Jiapeng Chen",
-            "Jingjiao Zhao",
-            "Xiansheng Chen",
-            "Pengwei Wang",
-            "Lemao Liu",
-            "Dejing Dou"
-          ],
-          "primary_category": "cs.RO",
-          "categories": [
-            "cs.RO"
-          ],
-          "published": "2026-08-10T15:58:39+00:00",
-          "link": "https://arxiv.org/pdf/2608.09771v1",
-          "tags": [
-            "keyword:video-wam",
-            "query:video-wam"
-          ],
-          "llm_score": 8.0,
-          "llm_evidence_en": "SLIM model learns action-grounded predictive latents for robot manipulation",
-          "llm_evidence_cn": "SLIM模型学习面向动作的预测隐变量用于机器人操控",
-          "llm_evidence": "SLIM模型学习面向动作的预测隐变量用于机器人操控",
-          "canonical_evidence": "SLIM模型学习面向动作的预测隐变量用于机器人操控",
-          "llm_tldr_en": "SLIM is a compact interaction model that uses predictive latents conditioned on actions to represent transitions efficiently; eliminating expensive decoder thereby sustainable for continuous robot control.",
-          "llm_tldr_cn": "视觉语言动作策略虽能整合感知与控制，但庞大的骨干计算量造成在线延迟瓶颈。本文提出SLIM模型，通过自动推导动作条件化的预测隐变量，兼具动作控制与未来状态预测的紧凑表征能力。相比像素级世界模型舍弃无关细节的渲染节省计算开销。0.5B参数显著减轻计算负载，实验证实在真实操作任务中高效可行。",
-          "llm_tldr": "视觉语言动作策略虽能整合感知与控制，但庞大的骨干计算量造成在线延迟瓶颈。本文提出SLIM模型，通过自动推导动作条件化的预测隐变量，兼具动作控制与未来状态预测的紧凑表征能力。相比像素级世界模型舍弃无关细节的渲染节省计算开销。0.5B参数显著减轻计算负载，实验证实在真实操作任务中高效可行。",
-          "llm_tags": [
-            "query:video-wam"
-          ],
-          "matched_query_tag": "query:video-wam",
-          "matched_query_text": "video based world action prediction",
-          "matched_requirement_id": "req-7",
-          "selection_source": "carryover_cache",
-          "paper_id": "2608.09771v1",
-          "carry_days": 1
-        },
-        {
-          "id": "2608.09516v1",
-          "source": "arxiv",
-          "title": "HarnessWAM: Bridging Prediction and Deliberation in World Action Models",
-          "abstract": "World Action Models (WAMs) jointly learn environmental dynamics and robot actions, introducing priors over physical evolution into embodied control. However, finite-horizon prediction and action generation are insufficient for complex embodied tasks that require global planning, cross-stage state maintenance, execution verification, and failure recovery. We refer to this mismatch as the prediction-deliberation gap of WAMs. To address this gap, we propose HarnessWAM, an agentic framework for WAMs. HarnessWAM employs a vision-language-model-based Task Manager to maintain an evidence-grounded scene belief and a structured task graph. A capability-conditioned executable-space projection further constrains open-ended semantic plans into sequences of atomic skills that satisfy task dependencies, embodiment-state constraints, and the capability boundary of the underlying WAM. During execution, HarnessWAM operates through an event-driven, dual-timescale feedback loop: a lightweight progress estimator continuously provides high-frequency execution evidence, while the Task Manager deliberates at salient milestones by jointly considering the current observation, task state, and interaction history to determine whether to advance the task, acquire additional observations, revise the plan, or initiate local recovery. This mechanism enables the robot to recover its state after a subtask failure and resume execution without discarding previously acquired scene knowledge. HarnessWAM achieves state-of-the-art full-task and subtask success rates of 59.6% and 69.9% on RoboMemArena, and an SR of 23.7% on RoboCerebra Ideal. These results demonstrate that model-external structured state maintenance and closed-loop agentic decision making can effectively extend the local control capabilities of WAMs into embodied task execution that is plannable, verifiable, and recoverable.",
-          "authors": [
-            "Zhaopeng Gu",
-            "Bingke Zhu",
-            "Tianxi Lin",
-            "Guibo Zhu",
-            "Yingying Chen",
-            "Kai Wang",
-            "Tingyu Yuan",
-            "Chaoyang Zhao",
-            "Zhaowen Li",
-            "Peng Su",
-            "Jinqiao Wang"
-          ],
-          "primary_category": "cs.RO",
-          "categories": [
-            "cs.RO"
-          ],
-          "published": "2026-08-10T12:15:59+00:00",
-          "link": "https://arxiv.org/pdf/2608.09516v1",
-          "tags": [
-            "keyword:video-wam",
-            "query:video-wam"
-          ],
-          "llm_score": 8.0,
-          "llm_evidence_en": "Agentic framework for World Action Models",
-          "llm_evidence_cn": "世界动作模型的代理框架",
-          "llm_evidence": "世界动作模型的代理框架",
-          "canonical_evidence": "世界动作模型的代理框架",
-          "llm_tldr_en": "HarnessWAM bridges prediction-deliberation gap in WAMs by integrating VLM-based task manager and structured task graph.",
-          "llm_tldr_cn": "针对世界动作模型（WAMs）有限视野的预测策略难以应对复杂具身任务的全局规划问题，本文提出HarnessWAM代理框架。利用视觉语言模型（VLM）的任务管理器维护场景信念结构化任务图，并通过能力条件可执行空间投影将开放式语义规划约束为原子动作序列。在具身任务中展现出更强的全局协调和容错能力。",
-          "llm_tldr": "针对世界动作模型（WAMs）有限视野的预测策略难以应对复杂具身任务的全局规划问题，本文提出HarnessWAM代理框架。利用视觉语言模型（VLM）的任务管理器维护场景信念结构化任务图，并通过能力条件可执行空间投影将开放式语义规划约束为原子动作序列。在具身任务中展现出更强的全局协调和容错能力。",
-          "llm_tags": [
-            "query:video-wam"
-          ],
-          "matched_query_tag": "query:video-wam",
-          "matched_query_text": "world action model",
-          "matched_requirement_id": "req-1",
-          "selection_source": "carryover_cache",
-          "paper_id": "2608.09516v1",
-          "carry_days": 1
-        }
-      ]
+      "items": []
     }
   }
 }

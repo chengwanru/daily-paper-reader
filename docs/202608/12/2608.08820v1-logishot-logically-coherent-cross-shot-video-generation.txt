@@ -1,0 +1,492 @@
+Title: LogiShot: Logically Coherent Cross-Shot Video Generation
+
+URL Source: https://arxiv.org/pdf/2608.08820v1
+
+Published Time: Tue, 11 Aug 2026 01:53:06 GMT
+
+Number of Pages: 16
+
+Markdown Content:
+# LogiShot: Logically Coherent Cross-Shot Video Generation 
+
+## Shuai Guo 1, Yuhang Yang 1, Zeyu Zhang 1, Pengfei Yu 2,Wei Zhai 1, Yang Cao 1, Zheng-Jun Zha 1
+
+> 1
+
+University of Science and Technology of China 
+
+> 2
+
+Li Auto Inc. 
+
+Abstract 
+
+Generating cross-shot videos that are logically connected is essential for content creation. Currently, most cross-shot video-generation workflows, such as short-drama production, still rely on isolated textual scripts or explicit reference images to specify the generated content. Consequently, when user in-structions are underspecified or ambiguous, a generated clip may appear visually plausible on its own but fail to align with the overall narrative, leading to disjointed content. We argue that achieving cross-shot logical coherence in video gener-ation requires establishing logical connections across shots and maintaining visual consistency. To this end, we propose LogiShot, which incorporates information through two com-plementary paths: 1) LogiShot jointly encodes the context video and other conditioning signals, yielding dense multi-modal cues that provide visual-semantic evidence for cross-shot generation; 2) the model maintains a visual memory of the context video throughout generation to preserve visual consistency across shots. Additionally, we construct a dataset with 110 K samples and a dedicated benchmark for evaluating cross-shot logical coherence. Experiments demonstrate that LogiShot consistently outperforms existing baselines in terms of logical coherence across multiple shots. Model and data will be made publicly available. 
+
+## 1 Introduction 
+
+Video content creation often involves merging multiple seg-ments to form a coherent narrative. The events depicted in these segments are not independent but are often linked by logical relations (e.g., causal or parallel). Maintaining logi-cal coherence across segments during the creative process is therefore essential for such downstream applications. Recent video generation models can produce high-fidelity individual clips (Wan et al. 2025; Kong et al. 2024; Yang et al. 2025c; Polyak et al. 2024; Teng et al. 2025; Zeng et al. 2024; Yang et al. 2025b). This independent clip-generation paradigm requires users to specify how the content of each clip should relate to other segments or shots. Thus, exist-ing multi-shot and story-generation methods produce mul-tiple shots from detailed user-provided descriptions, includ-ing per-shot captions or scripts (An et al. 2026; Zhang et al. 2025). Some methods also use explicit reference images to maintain logical coherence and visual consistency across shots (Yuan et al. 2025; Liu et al. 2025; Jiang et al. 2024; Ma et al. 2024; Yang et al. 2026; Zeng et al. 2026; Chen et al. 2025; Li et al. 2024). However, these methods still depend on isolated descriptions provided in advance. When user instruc-tions are underspecified or ambiguous, it becomes difficult to determine how multiple video clips should be logically connected and which details should remain consistent across them. Consequently, the generated clips may appear visually plausible but fail to align with the overall narrative. In this paper, we argue that achieving cross-shot logical coherence in video generation requires establishing logical connections across shots and maintaining visual consistency. To this end, we propose LogiShot , which takes the context video, the prompt instruction, and a starting frame as inputs to generate logically related video clips (Fig. 1). The key insight behind LogiShot is that cross-shot video generation should account for the intended logical relation between the target and context videos rather than proceed in isolation. Accordingly, the context video provides visual and semantic evidence for generating content that follows the intended log-ical relation. The prompt instruction specifies the intended relation between the context video and the target video. The starting frame establishes the initial visual state of the gen-erated video without specifying how the event unfolds. Realizing this insight hinges on a core challenge: how to effectively fuse the three inputs so that cross-shot generation explicitly accounts for the intended logical relation while preserving context-relevant visual details. To address this challenge, we introduce two complementary mechanisms: 1) Multimodal Cue Guidance (MCG) uses a frozen VLM to jointly process the context video, the prompt instruction, and the starting frame. MCG then augments the decoded target-event description with dense multimodal cues that re-tain visual-semantic information not fully captured by text alone. 2) Visual Memory (VM) retains context-video latents accessible to the DiT throughout generation, allowing target-video tokens to retrieve relevant visual details at every layer. Moreover, we construct a dataset with 110K samples and a dedicated benchmark for evaluating cross-shot logical coher-ence. Our main contributions are summarized as follows: 
+
+• We emphasize that establishing logical connections across shots and maintaining visual consistency are key to achieving cross-shot logical coherence, and propose 
+
+LogiShot , a video generation method that integrates the context video and other conditioning signals throughout generation to meet both requirements. arXiv:2608.08820v1 [cs.CV] 9 Aug 2026 [Input Prompt] Based on the detective's reasoning, have him point to the most likely culprit.   
+
+> Input: Context Video Input: Context Video Output: Target Video Output: Target Video Input: Starting Frame Input: Starting Frame
+> Earlier-Shot Generation
+> [Input Prompt] If this employee packed the package opened by the woman in the video, what item would the employee bring in from off-screen …
+> Later-Shot Generation
+> Key Visual Cues Key Visual Cues Key Visual Cues
+
+Figure 1: Logically coherent cross-shot generation. Given the context video, the input prompt, and a starting frame, our model generates a logically coherent video. In the top example, it generates a video in which the detective points to the likely culprit, following the causal relation implied by the context video. In the bottom example, it generates a video in which an employee brings in the same toy shown in the context video, preserving visual consistency across shots. 
+
+• We introduce two complementary mechanisms, Multi-modal Cue Guidance (MCG) and Visual Memory (VM), which respectively use dense multimodal cues to guide the generation of logically related content and context-video latents to preserve visual consistency across shots. 
+
+• We construct a dataset with 110K cross-shot logically co-herent samples and a dedicated benchmark for evaluating cross-shot logical coherence. Experiments show that Lo-giShot outperforms existing baselines across all metrics. 
+
+Project page: https://guoshuaigo.github.io/LogiShot/. 
+
+## 2 Related Work 
+
+Cross-Shot Video Generation. Cross-shot video gener-ation includes multi-shot systems, which organize long-form content into a sequence of planned shots, and story-generation systems, which expand a story idea or script into detailed shot descriptions and use storyboards or reference assets to guide the generation of individual shots (Long et al. 2024; Lin et al. 2023; Zhuang et al. 2024; Wu, Zhu, and Shou 2025; Zheng et al. 2024; Xiao et al. 2025). In addition, to maintain visual consistency across shots, they employ joint generation or cross-shot conditioning (Meng et al. 2026; Guo et al. 2025; He et al. 2025; An et al. 2026; Zhang et al. 2026; Luo et al. 2026). However, their generation process relies primarily on predefined descriptions or references, making it difficult to determine how a generated shot should be log-ically connected to the context video when user instructions are underspecified or ambiguous. In contrast, LogiShot uses the context video to guide the generation of content that fol-lows the intended logical relation while maintaining visual consistency across shots. 
+
+Reasoning in Video Generation. Recent video reasoning models have shown strong capabilities in analyzing causal and temporal relations among events (Feng et al. 2026; Fei et al. 2024; Min et al. 2024; Yang et al. 2023, 2024a,b; Shao et al. 2025). Transferring these reasoning capabilities to video generation remains challenging because video rea-soning models typically express their predictions as discrete labels, structured event representations, or textual descrip-tions (Yi et al. 2019; Xiao et al. 2021; Wu et al. 2024; Li et al. 2023a; Lei et al. 2020; Wang et al. 2026; Chen et al. 2024; Ayyubi et al. 2025). Recent approaches bridge this gap through next-event prediction and reasoning-guided gener-ation (Li et al. 2026; Huang et al. 2025; Shen et al. 2025; Spyrou et al. 2025; Yu et al. 2025; Han et al. 2026). For instance, VANS (Cheng et al. 2026) conditions its generator on a predicted event caption and sampled VAE tokens. How-ever, in such frameworks, the VLM conveys its event-level interpretation to the generator primarily through the decoded caption; contextual details not verbalized in the caption are absent from the generator’s semantic condition. Although unified video models connect MLLMs to diffusion gener-ators through continuous visual representations (Tan et al. 2025; Wei et al. 2026; Luo et al. 2025), they focus on general-purpose video understanding and generation rather than ex-plicitly using these representations to generate content that is logically connected to the context video. In contrast, Lo-Video Pairing & Prompt Generation Prompt Verification      
+
+> Dataset
+> The input and output videos take place on the same street. Show the man with long dreadlocks crossing toward the parked car…
+> Fail Pass Pair Regeneration
+> Pass
+> Sample Classification
+> Context Video Target Video
+> Discard … He leans in and taps on the glass to get the driver's attention…
+> Context Video
+> Prompt Starting Frame
+> Shot Extraction & Quality Filtering STEP 1 STEP 2 STEP 3
+> Prompt
+> Target Video Description
+> Target Video Fail Human Check
+> Human Check
+> Distribution of Task Categories in the Dataset Distribution of Cross-Shot Relation Types in the Dataset
+> Raw Data Pool …
+> Crafts Cooking Medical Outdoor Maintenance
+> Judge
+> Infer Infer
+
+Figure 2: Data construction pipeline. Left: The three-stage pipeline that constructs the dataset from raw videos: Shot Extraction and Quality Filtering, Video Pairing and Prompt Generation, and Prompt Verification. Human audits are conducted after pair generation and prompt verification. Right: Distribution of the resulting dataset with 110K samples across task categories and cross-shot relation types. giShot conditions the DiT on both the decoded target-event description and dense multimodal cues from the VLM, al-lowing context-specific visual-semantic information beyond the decoded description to guide the generation of logically related content. 
+
+## 3 Data Construction 
+
+Training LogiShot requires samples in which the target event can be inferred only from the context video, the prompt instruction, and the starting frame jointly—a format unavail-able in existing public corpora. Each sample includes these three inputs together with a target video as supervision. We construct this dataset through a three-stage pipeline (Fig. 2). This pipeline extracts clips from public sources, generates candidate pairs, and filters them to retain only those meet-ing this criterion. Two human audits serve as independent quality gates at different stages of the pipeline: one after pair generation and another after prompt verification. 
+
+Shot Extraction, Video Pairing, and Prompt Generation. 
+
+Raw videos come from public event-centric datasets (Liang et al. 2024; Chen et al. 2024; Liang et al. 2025). Each source video is segmented into event-level clips via shot-boundary detection, and a rule-based visual filter removes low-quality clips. Each retained clip is then processed by a VLM to extract a structured description of the actor, salient objects, action, and resulting state. Two clips from the same source video are paired: one serves as the context video and the other as the target video, with the target’s first frame designated as the starting frame. Finally, each pair is annotated with a prompt instruction that captures the logical relation connecting them without explicitly detailing the target event. 
+
+Prompt Verification and Human Audits. A candidate pair is retained only if its target event is deducible from the three inputs taken together, rather than from any sub-set of them. To verify this, a VLM is given the three inputs and predicts a target-event description. A judge then com-pares this prediction with the ground-truth target video using a five-point rubric. The rubric evaluates whether the pre-diction and target video depict the same event and whether inferring that event requires the full context. Pairs scoring below the acceptable threshold undergo pair regeneration to resolve ambiguities or remove overly explicit cues and are then re-evaluated. Those still below the threshold are discarded. Accepted pairs are assigned a quality score by the judge. To prevent data leakage across splits, we apply near-duplicate filtering and hold out an evaluation subset at the raw-source-video level. The resulting dataset comprises 110K samples, with relation and task-category distributions detailed in Fig. 2. A human audit of 1,000 pairs from the final dataset yields a composite pass rate of 89.3%. On a separate 500-pair validation set, the prompt-verification judge agrees with the three-annotator consensus in 91.6% of cases. 
+
+## 4 Method 
+
+Given the context video V ∈ RTc×3×H×W , the prompt in-struction p, and a starting frame I0 ∈ R3×H×W , LogiShot generates a target video ˆV ∈ RTt×3×H×W , where Tc and Tt
+
+denote the context and target frame counts, and H × W is the spatial resolution. The generated video begins with I0, is logically related to V according to p, and maintains visual consistency with V .Achieving this hinges on a core challenge: how to effec-tively fuse V , p, and I0 so that the generated video both realizes the intended relation and preserves context-relevant visual details. To address this challenge, we introduce two complementary mechanisms that fuse the inputs along dif-ferent paths into a video DiT backbone (Peebles and Xie 2023) (Fig. 3). Our first mechanism, Multimodal Cue Guid-ance (MCG), uses a frozen VLM to jointly process V , p,and I0 and augments its decoded target-event description with dense multimodal cues that retain visual-semantic in-formation beyond text alone. Our second mechanism, Visual VLM 
+
+> … what item would the employee bring in …
+> … bring …
+> Adapter  Encoder
+> Context Video Starting Frame Input Prompt
+> Multimodal Cue Guidance ViT Tokenizer Text Tokenizer ViT Tokenizer
+
+… … 
+
+> Noise Context Video Starting Frame
+
+Visual Memory    
+
+> Zero Padding Zero Padding
+> CLIP DiT Block ×N
+> Text Token DiT Condition Hidden State Mask FFN
+> Self-Attention
+> Cross-Attention
+
+Figure 3: LogiShot architecture. Multimodal Cue Guidance (MCG; Sec. 4.1) augments a target-event description with dense multimodal cues, while Visual Memory (VM; Sec. 4.2) allows target-video tokens to retrieve context-video information through self-attention. The starting frame provides the initial visual state for the generated video. Memory (VM), retains context-video latents accessible to the DiT throughout generation, allowing target-video tokens to retrieve relevant visual information from V at every layer. The starting frame I0 serves as the fixed initial visual state of the generated video. The rest of this section describes MCG (Sec. 4.1), VM and starting-frame conditioning (Sec. 4.2), and the training and inference procedures (Sec. 4.3). 
+
+4.1 Multimodal Cue Guidance 
+
+p indicates the intended logical relation but may leave the corresponding target event underspecified. A frozen VLM Ψ
+
+jointly processes V , p, and I0 and autoregressively decodes an explicit target-event description e. This description pro-vides explicit semantic guidance, but may not fully capture the visual-semantic information retained in Ψ’s internal com-putation. MCG therefore augments the decoded description with dense multimodal cues extracted from the same VLM forward pass. We tokenize e and encode it with the DiT’s text encoder 
+
+τ to obtain text-conditioning tokens τ (e) ∈ RLe×dt , where 
+
+Le is the number of text tokens and dt=4096 .From the same VLM forward pass over (V, p, I 0), we ex-tract Ψ’s final-layer hidden states, H ∈ RLH ×dv , where LH
+
+is the sequence length and dv =3584 , and map them to the DiT’s text dimension using a learned projector P : Rdv →
+
+Rdt , implemented as a two-layer MLP with GELU. We re-fer to the projected hidden states P (H) as dense multimodal cues and concatenate them with the text-conditioning tokens: 
+
+c =  P (H); τ (e)  ∈ R(LH +Le)×dt . (1) The resulting c is the complete conditioning sequence for the DiT. Each cross-attention block attends to c, allowing the decoded description and dense multimodal cues to jointly guide target-video generation. 
+
+4.2 Visual Memory 
+
+To maintain visual consistency, VM retains a prefix of context-video latent slots that remains accessible to the DiT throughout generation. Through self-attention in every trans-former block, target-video tokens can retrieve relevant visual information from this prefix. The starting frame is incorpo-rated separately through latent and CLIP conditioning paths to establish the initial visual state. 
+
+Latent-Slot Construction. We cast frames sampled from the context video and the starting frame as temporal condi-tioning slots in the same latent space as the target video. Each slot is formed by concatenating a presence mask with a VAE latent along the channel dimension: 
+
+Si =  Mi; E(xi)  ∈ R(dM +dZ )×h×w, (2) where E denotes the video VAE and Mi is a presence mask that is nonzero only for the provided conditioning slots. We uniformly sample K frames from V to form a context-video prefix. The latent of I0 is placed at the first target-video slot, while the remaining target-video slots are zero-filled in both their masks and latents: 
+
+S =  Sv 
+
+> 1
+
+, . . . , S vK , S 0, 0, . . . , 0 . (3) The target-video noise sequence is left-padded with K empty slots to align it with S. The aligned noise and conditioning sequences are then concatenated along the channel dimen-sion before patch embedding. 
+
+Attention over Visual Memory. The starting frame is ad-ditionally encoded by CLIP, whose features Φ( I0) are in-jected through a parallel cross-attention path alongside c.Within the DiT, the context-video prefix, the starting-frame slot, and the noisy target-video slots interact through unified bidirectional self-attention. We apply 3D rotary positional [Input Prompt] They are about to go home. Based on the video, which person is most likely to walk up and unlock the door? 
+
+> MLLM+I2V VANS StoryMem LogiShot
+> …
+> MLLM+I2V VANS StoryMem LogiShot
+> Starting Frame
+> [Input Prompt] After preparing the wire in the context video, use it to pick the lock.
+> Starting Frame
+> …
+> Context Video Context Video
+
+Figure 4: Qualitative comparison against baselines. Red boxes mark baseline failures. On the left, the baselines send the wrong actor to unlock the door or misread the spatial relation between the context video and the target video; on the right, they replace or distort the wire or the lock from the context video. Blue boxes mark LogiShot’s correct behavior: the key holder unlocks the door (left), and the same wire is used to pick the same lock (right).                                  
+
+> Logical Correctness ↑Visual Consistency ↑
+> Method EvMt RelMt Comp PartMt RoleMt StMt MLLM+I2V 0.798 0.840 0.791 0.853 0.850 0.835 VANS 0.825 0.858 0.819 0.876 0.870 0.867 StoryMem 0.790 0.790 0.789 0.893 0.892 0.891
+> LogiShot 0.901 0.939 0.887 0.938 0.931 0.931
+
+Table 1: Main results on the 800 -sample held-out evaluation set. Logical Correctness (LC) and Visual Consistency (VC) are reported separately through the three sub-metrics defined in Sec. 5.1; higher is better. encoding over the (frame , height , width ) axes to preserve their spatiotemporal positions within the joint sequence. Through self-attention, target-video tokens can retrieve rel-evant visual information from the context-video prefix in every transformer block. The prefix therefore serves as a vi-sual memory rather than a set of frames to be copied directly. Meanwhile, the starting-frame latent and CLIP features pro-vide the initial visual state for the generated video without determining how the subsequent event unfolds. 
+
+4.3 Training Objective and Inference 
+
+We train the denoiser using a rectified-flow objective. Given the target-video latents z0 = E(V ⋆) of the ground-truth tar-get video V ⋆ and a noise level σ ∈ [0 , 1] drawn from a shifted flow-matching schedule, we formulate the noisy la-tents as zσ = (1 −σ)z0 +σϵ , where ϵ ∼ N (0, I), and regress the corresponding velocity field at that noise level: 
+
+L = Eσ, z 0, ϵ Dθ
+
+ zσ , σ | c, Φ( I0), S  − uσ
+
+> 22
+
+, (4) where the target velocity is uσ = ϵ − z0. Since the context-video prefix and the starting-frame slot serve as conditioning inputs rather than reconstruction targets, the loss is evaluated only on the target-video slots. During inference, we first compute the conditioning rep-resentations c, Φ( I0), and S from the inputs (V, p, I 0). The denoiser then iteratively denoises the target-video slots under classifier-free guidance to generate the final video ˆV .
+
+## 5 Experiments 
+
+Implementation. We initialize our generator with a 14 B-parameter image-to-video DiT and update only its denoiser and conditioning projections during training. All videos are generated as 49 -frame clips at 16 fps with a resolution of 
+
+480 ×832 . Additional implementation details, including opti-mizer settings, frozen encoders, and data preprocessing steps, are provided in Appendix B.1. 
+
+5.1 Benchmark and Evaluation Protocol 
+
+Evaluation Protocol. We evaluate all methods on the 800 -sample held-out evaluation set, generating one video per [Input Prompt] They are about to go home. Based on the video, which person is most likely to walk up and unlock the door? 
+
+> LogiShot  W/O MCG
+> …
+> Starting Frame
+> LogiShot  W/O VM
+> [Input Prompt] If this employee packed the package opened by the woman in the video, what item would the employee bring in …
+> …
+> Starting Frame Context Video Context Video
+
+Figure 5: Qualitative ablation of MCG and VM. The W/O MCG variant assigns the unlock action to the wrong actor (left), while the W/O VM variant fails to preserve the teddy bear’s appearance (right).                                    
+
+> Mechanism Logical Correctness ↑Visual Consistency ↑
+> MCG VM EvMt RelMt Comp PartMt RoleMt StMt 0.790 0.804 0.791 0.850 0.845 0.830
+> ✓0.833 0.849 0.828 0.882 0.879 0.875
+> ✓0.792 0.810 0.786 0.900 0.900 0.894
+> ✓✓0.901 0.939 0.887 0.938 0.931 0.931
+
+Table 2: Ablation of MCG and VM. The decoded target-event description and starting frame are retained in all variants. The reported sub-metrics follow Tab. 1; higher is better. sample. Anonymized outputs are scored by a VLM judge along two primary dimensions, each computed as the aver-age of three sub-metrics. Logical Correctness (LC) evaluates whether the generated video depicts the event implied by the inputs, follows the intended logical relation to the context video, and completes the event. It comprises Event Match (EvMt), Relation Match (RelMt), and Completion (Comp). 
+
+Visual Consistency (VC) evaluates whether context-relevant participants, their roles, and their states remain consistent between the context and generated videos. It comprises Par-ticipant Match (PartMt), Role Match (RoleMt), and State Match (StMt). The evaluation judge is validated against hu-man ratings on a 150 -case validation subset, showing strong agreement, with a quadratic-weighted Cohen’s κ of 0.84 for LC. Across the three baseline comparisons, all 18 sub-metric differences are statistically significant under paired random-ization tests after Holm correction ( p < 0.01 in all cases). 
+
+Baselines. We compare LogiShot against three baselines, adapting each to use the same inputs: the context video, the prompt instruction, and a starting frame. The baselines cover the main design axes for cross-shot generation: no con-text conditioning, reasoning-generated text conditioning, and frame-memory conditioning. For every baseline, the VLM jointly processes all three inputs when producing the target-event description. MLLM+I2V feeds the resulting descrip-tion and starting frame to a standard image-to-video genera-tor. VANS (Cheng et al. 2026) conditions its generator on the VLM-produced description and sampled context-video VAE tokens; we adapt it to use the starting frame and match our parameter budget for a fair comparison. StoryMem (Zhang et al. 2025) stores selected context-video frames in its mem-ory bank and uses the VLM-produced target-event descrip-tion together with the starting frame for generation. 
+
+User Study. To complement the automated evaluation with human judgments, we conduct a blind pairwise A/B study with 20 annotators, with pairs drawn from the same eval-uation set. Each annotator evaluates 90 anonymized video pairs ( 30 pairs comparing LogiShot against each of the three baselines). For each pair, the annotator provides separate judgments for Logical Correctness, Visual Consistency, and overall preference, with ties scored as 0.5.
+
+5.2 Main Comparison 
+
+Tab. 1 reports the quantitative results. LogiShot outperforms all three baselines on every sub-metric, yielding gains of 
+
+0.075 –0.119 in Logical Correctness and 0.041 –0.087 in Visual Consistency. The blind pairwise user study further corroborates this advantage: human raters prefer LogiShot over each baseline in 73 .0–76 .3% of pairwise comparisons for overall preference. Detailed results are provided in Ap-pendix C.1. Together, these results demonstrate LogiShot’s advan-tage in both Logical Correctness and Visual Consistency. In particular, along the text-conditioning axis, LogiShot im-proves Relation Match by 0.082 –0.100 over MLLM+I2V and VANS, suggesting that conditioning on MCG’s dense mul-timodal cues provides the generator with relation-relevant information that may not be captured in the decoded event description when the prompt instruction is underspecified. Compared with StoryMem, LogiShot improves Logical Cor-rectness by 0.119 while further increasing Visual Consis-tency by 0.041 , highlighting the benefit of combining MCG Method Subj. ↑ Mot. ↑ Tmp. ↑ Avg. ↑
+
+MLLM+I2V 0.892 0.977 0.963 0.944 VANS (Cheng et al. 2026) 0.889 0.976 0.961 0.942 StoryMem (Zhang et al. 2025) 0.886 0.978 0.963 0.942 
+
+LogiShot 0.926 0.985 0.976 0.962 
+
+Table 3: Visual-quality diagnostics on the 800 -sample eval-uation set. 0 +0.04 +0.08 +0.12           
+
+> LC +0.109 vs. VANS VC +0.073 vs. MLLM+I2V LC +0.092 vs. MLLM+I2V VC +0.041 vs. StoryMem LC +0.058 vs. StoryMem VC +0.016 vs. StoryMem LC +0.042 vs. VANS VC +0.017 vs. StoryMem LC +0.012 vs. VANS VC +0.020 vs. MLLM+I2V
+> Conditional
+> (n=162)
+> Parallel
+> (n=162)
+> Causal
+> (n=138)
+> Overview/Detail
+> (n=215)
+> Progression
+> (n=123)
+> Logical Correctness (LC) Visual Consistency (VC)
+
+Figure 6: Per-relation-type gap. The gap between LogiShot and the strongest baseline for each relation type and eval-uation dimension. Bars report Logical Correctness (LC) and Visual Consistency (VC) separately; the corresponding strongest baseline is annotated on each bar, and the sample count for each relation type is shown on the left. with VM. These quantitative trends are also reflected in Fig. 4. In these examples, the baselines assign actions to the wrong actor or alter context-relevant objects, whereas LogiShot generates the relation-consistent event while pre-serving the relevant participants and object appearances. 
+
+5.3 Ablations 
+
+Tab. 2 evaluates the contributions of MCG and VM. In this ablation, W/O MCG retains the decoded target-event descrip-tion but removes the dense multimodal cues P (H). W/O VM removes only the context-video latent prefix, while the starting-frame latent and CLIP features remain available in all settings. The first row disables both MCG and VM, serv-ing as the base variant conditioned only on the decoded description and the starting frame. Enabling MCG alone im-proves Logical Correctness by +0 .042 (with the most pro-nounced gain in Relation Match, ∆=0 .045 ), showing the benefit of the additional visual-semantic information retained by the dense cues. Conversely, enabling VM alone boosts Visual Consistency by +0 .056 , a gain consistent across all three sub-metrics ( ∆∈[0 .050 , 0.064] ). Enabling both mech-anisms yields the highest overall performance ( +0 .114 LC and +0 .092 VC over the baseline), demonstrating that they are highly complementary rather than redundant. Fig. 5 visu-alizes the failure modes when either mechanism is disabled. 
+
+5.4 Analysis [Input Prompt] If this employee packed the package opened by the woman in the video, what item would the employee bring in from off-screen …   
+
+> [Input Prompt] Show how the person in black catches the thrown ball.
+> Input: Context Video Output: Target Video Input: Context Video Output: Target Video
+
+Figure 7: Attention over the context-video prefix. Pink over-lays highlight the context-video regions receiving the highest attention weights from target-video tokens. 
+
+Performance Analysis. We conduct two diagnostic analy-ses to assess LogiShot’s visual quality and determine whether its gains extend beyond temporal continuation. First, we com-pute three VBench diagnostics (Huang et al. 2024; Yang et al. 2025a) on the 800 samples: subject consistency (Subj.), motion smoothness (Mot.), and temporal flickering (Tmp.); Avg. is their unweighted mean. LogiShot achieves the high-est score on every diagnostic, indicating that our gains do not come at the expense of perceptual quality (Tab. 3). Sec-ond, the relation-wise breakdown (Fig. 6) shows that Lo-giShot’s Logical Correctness advantage is largest on Con-ditional (+0 .109 ) and Parallel (+0 .092 ) relations. These relations link context and target videos logically rather than chronologically, requiring robust cross-shot reasoning. 
+
+Mechanism Analysis. To understand how LogiShot lever-ages the context video during generation, we visualize the self-attention weights from target-video tokens to the context-video prefix latents (Fig. 7). In both cases, the peak attention lands on the participant that carries the cross-shot relation: the thrown ball in the top row, and the teddy bear that is transferred into the target video in the bottom row. Quan-titatively, during early denoising, 56 .9–68 .8% of the top-1
+
+attention peaks from target-video tokens fall within the top 
+
+5% most-attended spatial regions of the context-video across the two analyzed cases. This concentration decreases during the final denoising steps. This attention pattern suggests that the model first focuses on relation-relevant context regions to establish coherence and then distributes its attention more broadly during fine-grained generation. Together, these cases provide qualitative evidence that LogiShot uses the context video as a dense visual memory rather than relying solely on abstract text summaries. 
+
+## 6 Conclusion 
+
+In this work, we argue that achieving cross-shot logical coherence in video generation requires establishing logi-cal connections across shots and maintaining visual con-sistency. To achieve this, we propose LogiShot , which in-troduces two complementary mechanisms, Multimodal Cue Guidance (MCG) and Visual Memory (VM), into a video DiT. MCG augments a decoded target-event description with dense multimodal cues to guide the generation of logically related content, while VM maintains context-video latents as a visual memory throughout generation to preserve vi-sual consistency. We further construct a dataset with 110K samples and a dedicated benchmark for evaluating cross-shot logical coherence. Experiments demonstrate that LogiShot outperforms existing baselines across all metrics. LogiShot represents a step toward generating logically related video clips with less reliance on exhaustive per-shot descriptions. 
+
+## References 
+
+An, Z.; Jia, M.; Qiu, H.; Zhou, Z.; Huang, X.; Liu, Z.; Ren, W.; Kahatapitiya, K.; Liu, D.; He, S.; et al. 2026. Onestory: Coherent multi-shot video generation with adaptive memory. In Proceedings of the IEEE/CVF conference on computer vision and pattern recognition , 16173–16184. Ayyubi, H.; Liu, J.; Asgarov, A.; Hakim, Z. I. A.; Sarker, N. H.; Wang, Z.; Tang, C.-W.; Alomari, H.; Atabuzzaman, M.; Lin, X.; et al. 2025. Enter: Event based interpretable reasoning for videoqa. arXiv preprint arXiv:2501.14194 .Bai, S.; Chen, K.; Liu, X.; Wang, J.; Ge, W.; Song, S.; Dang, K.; Wang, P.; Wang, S.; Tang, J.; et al. 2025. Qwen2.5-VL Technical Report. arXiv preprint arXiv:2502.13923 .Caron, M.; Touvron, H.; Misra, I.; Jégou, H.; Mairal, J.; Bojanowski, P.; and Joulin, A. 2021. Emerging properties in self-supervised vision transformers. In 2021 IEEE/CVF international conference on computer vision (ICCV) , 9630– 9640. IEEE. Chen, J.; Chen, M.; Xu, J.; Li, X.; Dong, J.; Sun, M.; Jiang, P.; Li, H.; Yang, Y.; Zhao, H.; et al. 2025. Dancetogether! identity-preserving multi-person interactive video genera-tion. arXiv preprint arXiv:2505.18078 .Chen, T.; Liu, H.; He, T.; Chen, Y.; Gan, C.; Ma, X.; Zhong, C.; Zhang, Y.; Wang, Y.; Lin, H.; et al. 2024. MECD: Un-locking multi-event causal discovery in video reasoning. Ad-vances in neural information processing systems , 37: 92554– 92580. Cheng, J.; Hou, L.; Tao, X.; and Liao, J. 2026. Video-as-answer: Predict and generate next video event with joint-grpo. In Proceedings of the IEEE/CVF Conference on Com-puter Vision and Pattern Recognition , 38915–38925. Fei, H.; Wu, S.; Ji, W.; Zhang, H.; Zhang, M.; Lee, M.-L.; and Hsu, W. 2024. Video-of-thought: Step-by-step video reasoning from perception to cognition. arXiv preprint arXiv:2501.03230 .Feng, K.; Gong, K.; Li, B.; Guo, Z.; Wang, Y.; Peng, T.; Wu, J.; Zhang, X.; Wang, B.; and Yue, X. 2026. Video-r1: Reinforcing video reasoning in mllms. Advances in Neural Information Processing Systems , 38: 99114–99137. Guo, Y.; Yang, C.; Yang, Z.; Ma, Z.; Lin, Z.; Yang, Z.; Lin, D.; and Jiang, L. 2025. Long context tuning for video generation. In Proceedings of the IEEE/CVF International Conference on Computer Vision , 17281–17291. Han, G.; Zhai, W.; Yang, Y.; Cao, Y.; and Zha, Z.-J. 2026. Touch: Text-guided controllable generation of free-form hand-object interactions. In International Conference on Learning Representations , volume 2026, 79185–79210. He, J.; Liu, H.; Li, J.; Huang, Z.; Yu, Q.; Ouyang, W.; and Liu, Z. 2025. Cut2next: Generating next shot via in-context tuning. In Proceedings of the SIGGRAPH Asia 2025 Con-ference Papers , 1–11. Hendrycks, D.; and Gimpel, K. 2016. Gaussian error linear units (gelus). arXiv preprint arXiv:1606.08415 .Huang, Z.; He, Y.; Yu, J.; Zhang, F.; Si, C.; Jiang, Y.; Zhang, Y.; Wu, T.; Jin, Q.; Chanpaisit, N.; et al. 2024. Vbench: Comprehensive benchmark suite for video generative mod-els. In 2024 IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , 21807–21818. IEEE. Huang, Z.; Yu, N.; Chen, G.; Qiu, H.; Debevec, P.; and Liu, Z. 2025. Vchain: Chain-of-visual-thought for reasoning in video generation. arXiv preprint arXiv:2510.05094 .Jiang, Y.; Wu, T.; Yang, S.; Si, C.; Lin, D.; Qiao, Y.; Loy, C. C.; and Liu, Z. 2024. Videobooth: Diffusion-based video generation with image prompts. In 2024 IEEE/CVF Confer-ence on Computer Vision and Pattern Recognition (CVPR) ,6689–6700. IEEE. Kingma, D. P.; and Ba, J. 2014. Adam: A method for stochas-tic optimization. arXiv preprint arXiv:1412.6980 .Kong, W.; Tian, Q.; Zhang, Z.; Min, R.; Dai, Z.; Zhou, J.; Xiong, J.; Li, X.; Wu, B.; Zhang, J.; et al. 2024. Hunyuan-video: A systematic framework for large video generative models. arXiv preprint arXiv:2412.03603 .Lei, J.; Yu, L.; Berg, T.; and Bansal, M. 2020. What is more likely to happen next? video-and-language future event prediction. In Proceedings of the 2020 conference on em-pirical methods in natural language processing (EMNLP) ,8769–8784. Li, H.; Li, Y.; Yang, Y.; Cao, J.; Zhu, Z.; Cheng, X.; and Chen, L. 2024. Dispose: Disentangling pose guidance for controllable human image animation. arXiv preprint arXiv:2412.09349 .Li, J.; Wei, P.; Han, W.; and Fan, L. 2023a. Intentqa: Context-aware video intent reasoning. In 2023 IEEE/CVF Inter-national Conference on Computer Vision (ICCV) , 11929– 11940. IEEE. Li, X.; Chen, Z.; Zhao, R.; Schiffers, F.; Liao, Z.; and Bhat, V. 2026. What happens next? next scene prediction with a unified video model. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition ,5693–5703. Li, Z.; Zhu, Z.-L.; Han, L.-H.; Hou, Q.; Guo, C.-L.; and Cheng, M.-M. 2023b. Amt: All-pairs multi-field transforms for efficient frame interpolation. In 2023 IEEE/CVF Confer-ence on Computer Vision and Pattern Recognition (CVPR) ,9801–9810. IEEE. Liang, B.; Su, Q.; Zhu, S.; Liang, Y.; and Tong, C. 2025. VidEvent: A Large Dataset for Understanding Dynamic Evo-lution of Events in Videos. Proceedings of the AAAI Confer-ence on Artificial Intelligence , 39(5): 5128–5136. Liang, J.; Jiang, S.; Wang, Z.; Pan, H.; Chen, Z.; Chu, Z.; Liu, M.; Fu, R.; Wang, Z.; and Qin, B. 2024. GUIDE: a guideline-guided dataset for instructional video comprehension. arXiv preprint arXiv:2406.18227 .Lin, H.; Zala, A.; Cho, J.; and Bansal, M. 2023. Videodi-rectorgpt: Consistent multi-scene video generation via llm-guided planning. arXiv preprint arXiv:2309.15091 .Lipman, Y.; Chen, R. T.; Ben-Hamu, H.; Nickel, M.; and Le, M. 2022. Flow matching for generative modeling. arXiv preprint arXiv:2210.02747 .Liu, L.; Ma, T.; Li, B.; Chen, Z.; Liu, J.; Li, G.; Zhou, S.; He, Q.; and Wu, X. 2025. Phantom: Subject-consistent video gen-eration via cross-modal alignment. In 2025 IEEE/CVF In-ternational Conference on Computer Vision (ICCV) , 14951– 14961. IEEE. Liu, X.; Gong, C.; and Liu, Q. 2022. Flow straight and fast: Learning to generate and transfer data with rectified flow. 
+
+arXiv preprint arXiv:2209.03003 .Long, F.; Qiu, Z.; Yao, T.; and Mei, T. 2024. Videostudio: Generating consistent-content and multi-scene videos. In Eu-ropean Conference on Computer Vision , 468–485. Springer. Luo, J.; Lin, J.; Zhang, Z.; Wu, B.; Fang, M.; Chen, L.; and Tang, H. 2025. Univid: The open-source unified video model. arXiv preprint arXiv:2509.24200 .Luo, Y.; Shi, X.; Zhuang, J.; Chen, Y.; Liu, Q.; Wang, X.; Wan, P.; and Xue, T. 2026. Shotstream: Streaming multi-shot video generation for interactive storytelling. arXiv preprint arXiv:2603.25746 .Ma, Y.; Wu, X.; Sun, K.; and Li, H. 2025. Hpsv3: To-wards wide-spectrum human preference score. In 2025 IEEE/CVF International Conference on Computer Vision (ICCV) , 15086–15095. IEEE. Ma, Z.; Zhou, D.; Wang, X.-S.; Yeh, C.-H.; Li, X.; Yang, H.; Dong, Z.; Keutzer, K.; and Feng, J. 2024. Magic-me: Identity-specific video customized diffusion. In European Conference on Computer Vision , 19–37. Springer. Meng, Y.; Ouyang, H.; Yu, Y.; Wang, Q.; Wang, W.; Cheng, K. L.; Wang, H.; Ma, S.; Li, Y.; Chen, C.; et al. 2026. Holocine: Holistic generation of cinematic multi-shot long video narratives. In Proceedings of the IEEE/CVF confer-ence on computer vision and pattern recognition , 461–471. Min, J.; Buch, S.; Nagrani, A.; Cho, M.; and Schmid, C. 2024. Morevqa: Exploring modular reasoning models for video question answering. In 2024 IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , 13235– 13245. IEEE. Peebles, W.; and Xie, S. 2023. Scalable diffusion models with transformers. In 2023 IEEE/CVF International Conference on Computer Vision (ICCV) , 4172–4182. IEEE. Polyak, A.; Zohar, A.; Brown, A.; Tjandra, A.; Sinha, A.; Lee, A.; Vyas, A.; Shi, B.; Ma, C.-Y.; Chuang, C.-Y.; et al. 2024. Movie gen: A cast of media foundation models. arXiv preprint arXiv:2410.13720 .Radford, A.; Kim, J. W.; Hallacy, C.; Ramesh, A.; Goh, G.; Agarwal, S.; Sastry, G.; Askell, A.; Mishkin, P.; Clark, J.; et al. 2021. Learning transferable visual models from natural language supervision. In International conference on machine learning , 8748–8763. PmLR. Shao, Y.; Zhai, W.; Yang, Y.; Luo, H.; Cao, Y.; and Zha, Z.-J. 2025. Great: Geometry-intention collaborative infer-ence for open-vocabulary 3d object affordance grounding. In 
+
+2025 IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , 17326–17336. IEEE. Shen, Y.; Maksutova, A.; Li, C.; and Unberath, M. 2025. Counterfactual world models via digital twin-conditioned video diffusion. arXiv preprint arXiv:2511.17481 .Spyrou, N.; Vlontzos, A.; Pegios, P.; Melistas, T.; Gkouti, N.; Panagakis, Y.; Papanastasiou, G.; and Tsaftaris, S. A. 2025. Causally steered diffusion for automated video counterfac-tual generation. arXiv preprint arXiv:2506.14404 .Tan, Z.; Yang, H.; Qin, L.; Gong, J.; Yang, M.; and Li, H. 2025. Omni-video: Democratizing unified video understand-ing and generation. arXiv preprint arXiv:2507.06119 .Teng, H.; Jia, H.; Sun, L.; Li, L.; Li, M.; Tang, M.; Han, S.; Zhang, T.; Zhang, W.; Luo, W.; et al. 2025. Magi-1: Autoregressive video generation at scale. arXiv preprint arXiv:2505.13211 .Wan, T.; Wang, A.; Ai, B.; Wen, B.; Mao, C.; Xie, C.-W.; Chen, D.; Yu, F.; Zhao, H.; Yang, J.; et al. 2025. Wan: Open and advanced large-scale video generative models. arXiv preprint arXiv:2503.20314 .Wang, H.; Liu, H.; Liu, X.; Du, C.; Kawaguchi, K.; Wang, Y.; and Pang, T. 2026. Fostering video reasoning via next-event prediction. In International Conference on Learning Representations , volume 2026, 31524–31570. Wei, C.; Liu, Q.; Ye, Z.; Wang, Q.; Wang, X.; Wan, P.; Gai, K.; and Chen, W. 2026. Univideo: Unified understanding, gener-ation, and editing for videos. In International Conference on Learning Representations , volume 2026, 113905–113933. Wu, B.; Yu, S.; Chen, Z.; Tenenbaum, J. B.; and Gan, C. 2024. Star: A benchmark for situated reasoning in real-world videos. arXiv preprint arXiv:2405.09711 .Wu, W.; Zhu, Z.; and Shou, M. Z. 2025. Automated movie generation via multi-agent cot planning. arXiv preprint arXiv:2503.07314 .Xiao, J.; Cheng, F.; Qi, L.; Gui, L.; Zhao, Y.; Lin, S.; Cen, J.; Ma, Z.; Yuille, A.; and Jiang, L. 2025. Videoauteur: Towards long narrative video generation. In 2025 IEEE/CVF Inter-national Conference on Computer Vision (ICCV) , 19163– 19173. IEEE. Xiao, J.; Shang, X.; Yao, A.; and Chua, T.-S. 2021. Next-qa: Next phase of question-answering to explaining temporal actions. In 2021 IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , 9772–9781. IEEE. Yang, Y.; Fan, K.; Sun, S.; Li, H.; Zeng, A.; Han, F.; Zhai, W.; Liu, W.; Cao, Y.; and Zha, Z.-J. 2025a. Videogen-eval: Agent-based system for video generation evaluation. arXiv preprint arXiv:2503.23452 .Yang, Y.; Liu, F.; Lu, Y.; Zhao, Q.; Wu, P.; Zhai, W.; Yi, R.; Cao, Y.; Ma, L.; Zha, Z.-J.; et al. 2025b. Sigman: Scaling 3d human gaussian generation with millions of assets. In 2025 IEEE/CVF International Conference on Computer Vision (ICCV) , 5122–5133. IEEE. Yang, Y.; Zhai, W.; Luo, H.; Cao, Y.; Luo, J.; and Zha, Z.-J. 2023. Grounding 3d object affordance from 2d interactions in images. In Proceedings of the IEEE/CVF International Conference on Computer Vision , 10905–10915. Yang, Y.; Zhai, W.; Luo, H.; Cao, Y.; and Zha, Z.-J. 2024a. Lemon: Learning 3d human-object interaction relation from 2d images. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , 16284–16295. Yang, Y.; Zhai, W.; Wang, C.; Yu, C.; Cao, Y.; and Zha, Z.-J. 2024b. Egochoir: Capturing 3d human-object inter-action regions from egocentric views. Advances in Neural Information Processing Systems , 37: 54529–54557. Yang, Y.; Zhang, F.; Pi, H.; Zeng, A.; Guo, S.; Xu, G.; Zhai, W.; Cao, Y.; and Zha, Z.-J. 2026. Gloria: Consistent Charac-ter Video Generation via Content Anchors. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , 36724–36735. Yang, Z.; Teng, J.; Zheng, W.; Ding, M.; Huang, S.; Xu, J.; Yang, Y.; Hong, W.; Zhang, X.; Feng, G.; et al. 2025c. Cogvideox: Text-to-video diffusion models with an expert transformer. In International Conference on Learning Rep-resentations , volume 2025, 83048–83077. Yi, K.; Gan, C.; Li, Y.; Kohli, P.; Wu, J.; Torralba, A.; and Tenenbaum, J. B. 2019. Clevrer: Collision events for video representation and reasoning. arXiv preprint arXiv:1910.01442 .Yu, C.; Zhai, W.; Yang, Y.; Cao, Y.; and Zha, Z.-J. 2025. Hero: Human reaction generation from videos. In 2025 IEEE/CVF International Conference on Computer Vision (ICCV) , 10262–10274. IEEE. Yuan, S.; Huang, J.; He, X.; Ge, Y.; Shi, Y.; Chen, L.; Luo, J.; and Yuan, L. 2025. Identity-preserving text-to-video gen-eration by frequency decomposition. In 2025 IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , 12978–12988. IEEE. Zeng, A.; Yang, C.; Ge, C.; Zhang, E.; Xu, G.; Lin, G.; Gu, G.; Pi, J.; Li, L.; Shi, M.; et al. 2026. Lpm 1.0: Video-based char-acter performance model. arXiv preprint arXiv:2604.07823 .Zeng, A.; Yang, Y.; Chen, W.; and Liu, W. 2024. The dawn of video generation: Preliminary explorations with sora-like models. arXiv preprint arXiv:2410.05227 .Zhang, K.; Jiang, L.; Wang, A.; Fang, J. Z.; Zhi, T.; Yan, Q.; Kang, H.; Lu, X.; and Pan, X. 2025. Storymem: Multi-shot long video storytelling with memory. arXiv preprint arXiv:2512.19539 .Zhang, P.; Jia, Z.; Liu, K.; Weng, S.; Li, S.; and Shi, B. 2026. Stage: Storyboard-anchored generation for cinematic multi-shot narrative. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , 659–669. Zheng, M.; Xu, Y.; Huang, H.; Ma, X.; Liu, Y.; Shu, W.; Pang, Y.; Tang, F.; Chen, Q.; Yang, H.; et al. 2024. Videogen-of-thought: Step-by-step generating multi-shot video with min-imal manual intervention. arXiv preprint arXiv:2412.02259 .Zhuang, S.; Li, K.; Chen, X.; Wang, Y.; Liu, Z.; Qiao, Y.; and Wang, Y. 2024. Vlogger: Make your dream a vlog. In 
+
+2024 IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) , 8806–8817. IEEE. A Data Construction, Composition, and Quality 
+
+This section presents the prompt-verification protocol, the composition of the resulting dataset, and the human audits and judge validation used to assess data quality. 
+
+A.1 Prompt-Verification Protocol 
+
+The prompt-verification judge evaluates whether the pre-dicted target-event description matches the event depicted in the ground-truth target video. The judge further verifies that the target event can be accurately inferred only by jointly considering the context video, the prompt instruction, and the starting frame—penalizing cases in which the event can be deduced from any subset of these inputs. This evaluation uses the following five-point rubric: 
+
+5 Semantically identical target event and outcome, with the inference strictly relying on all three inputs jointly. 
+
+4 Same target event with minor differences in detail, pro-vided the inference still requires all three inputs jointly. 
+
+3 Partially related event with significant differences, or the inference relies too heavily on a single input (e.g., the prompt instruction alone reveals the action). 
+
+2 Shares the broad theme but predicts a clearly incorrect event, or the target event is completely deducible without considering all three inputs jointly. 
+
+1 Completely unrelated event or outcome. A pair passes prompt verification only if it receives a score of at least 4; otherwise, it undergoes pair regeneration to resolve ambiguities or remove overly explicit cues before being re-evaluated. Pairs that remain below the threshold after regeneration and re-evaluation are discarded, whereas accepted pairs are assigned a quality score by the judge. 
+
+A.2 Dataset Composition 
+
+The final dataset contains 110K samples. Each sample in-cludes three generation inputs—a context video, a prompt in-struction, and a starting frame—together with a target video used as supervision. We characterize the dataset composi-tion using two hierarchical taxonomies: task categories and cross-shot relations. In the sunburst charts in Fig. 2, the in-ner rings represent the primary task categories and relation types, while the outer rings represent their fine-grained sub-categories and subtypes. Tables 4 and 5 report the exact counts and percentages corresponding to all sectors. The for-mer lists task categories and subcategories, while the latter lists cross-shot relation types and subtypes. Bold rows re-port primary-category or relation-type totals, and indented rows report their fine-grained subdivisions. Percentages are computed over the full dataset and rounded independently. The five primary relation types characterize how the con-text and target videos are logically connected. Progression 
+
+covers transitions between stages, steps, locations, or tools in a broader process. Parallel describes analogous or alternative actions or events. Causal captures cause–effect links, state changes, and action–result relations. Conditional associates the target action with a prerequisite or trigger established in                                                                        
+
+> Task category / subcategory # Samples % of dataset
+> Cooking & Beverages 26,009 23.02
+> Recipes & Tutorials 10,323 9.14 Savory Mains 5,398 4.78 Drinks, Coffee & Cocktails 4,604 4.07 Desserts & Sweets 3,498 3.10 Prep, Pickling & Sides 2,186 1.93
+> Device Setup & Operation 11,196 9.91
+> Office & Consumer Electronics 6,119 5.42 Imaging Equipment 5,077 4.49
+> Furniture & Large Assembly 26,086 23.09
+> Bedside & Lounge Furniture 9,572 8.47 Storage, Shelving & Cages 8,882 7.86 Tables, Chairs & Small Furniture 7,632 6.75
+> Household, Crafts & Personal Care 6,244 5.53
+> Cleaning & Household 2,354 2.08 Crafts & DIY 2,119 1.88 Personal Care & Styling 1,771 1.57
+> Mechanical, Parts & Model Assembly 14,720 13.03
+> Mechanical & Model Assembly 12,558 11.11 Parts & Structural Assembly 2,162 1.91
+> Medical, Lab & Safety 1,344 1.19
+> Medical Care 762 0.67 Lab Work & Instruments 463 0.41 Safety Procedures 119 0.11
+> Narrative & Scene Progression 16,238 14.37
+> Film & Event Progression 12,316 10.90 General Scene Progression 3,922 3.47
+> Repair & Replacement 8,280 7.33
+> Home & General Maintenance 4,407 3.90 Automotive & Mechanical Maintenance 2,808 2.49 Electronics & Device Repair 1,065 0.94
+> Sports, Outdoors & Gardening 2,866 2.54
+> Sports Skills & Activities 1,619 1.43 Gardening & Planting 844 0.75 Outdoors, Survival & Camping 403 0.36
+
+Table 4: Fine-grained task-category distribution in the dataset. the context. Overview/Detail connects an overall scene or process with one of its components or details. 
+
+A.3 Data-Pipeline Human Audits and Judge Validation 
+
+We assess the data pipeline through two independent hu-man audits and a separate judge-validation study: a post-pair-generation audit of candidate pairs, a post-prompt-verification audit of the final dataset, and a validation study comparing the judge with a three-annotator consensus. This section details the sampling designs, rubrics, and resulting statistics for each evaluation. 
+
+Post-Pair-Generation Audit. A uniform random sample of 1,500 candidate pairs, drawn between Prompt Generation and Prompt Verification, is audited by five annotators. Each annotator labels a disjoint set of 250 pairs; an additional set of 250 pairs is independently labeled by three of the five an-notators to estimate Fleiss’ κ. We apply two binary rubrics: 
+
+video quality (valid shot boundaries and the absence of com-pression artifacts, HDR encoding, incomplete clips, or text and logos that occlude salient regions) and prompt validity Relation type / subtype # Samples % of dataset                                                         
+
+> Progression 32,444 28.72
+> Spatial Transition 11,912 10.54 Object/Tool Shift 8,611 7.62 Process Continuation 8,388 7.42 Step Continuation 2,487 2.20 Post-Completion Step 1,046 0.93
+> Parallel 24,128 21.36
+> Action Analogy 18,720 16.57 Object Substitution 2,845 2.52 Event Restatement 18 0.02 Action Variant 2,545 2.25
+> Causal 22,605 20.01
+> Preparation-to-Action 15,794 13.98 Cause-to-Effect 1,842 1.63 State Change 3,337 2.95 Action-to-Result 1,632 1.44
+> Conditional 18,027 15.96
+> Preparation Condition 11,401 10.09 Post-Action Inspection 4,326 3.83 Conditional Response 138 0.12 Trigger-to-Action 2,162 1.91
+> Overview/Detail 15,779 13.97
+> Whole-Part 85 0.08 Component Expansion 4,155 3.68 Component Parallelism 3,279 2.90 Component Transition 6,337 5.61 Whole-to-Part Focus 793 0.70 Whole-to-Part Progression 1,130 1.00
+
+Table 5: Fine-grained cross-shot relation distribution in the dataset. (the prompt instruction accurately describes the cross-shot relation, and the target event is inferable only by jointly con-sidering the context video, the prompt instruction, and the starting frame). A pair passes only when both rubrics are satisfied. Per-rubric and composite pass rates, together with Fleiss’ κ on the overlap subset, are reported in Tab. 6. 
+
+Post-Prompt-Verification Audit. A uniform random sam-ple of 1,000 pairs from the final dataset is audited by four annotators after prompt verification. Each annotator labels a disjoint set of 200 pairs; an additional set of 200 pairs is independently labeled by three of the four annotators to es-timate Fleiss’ κ. We apply two binary rubrics: target-event inferability (the target event can be reliably inferred only by jointly considering the context video, the prompt instruction, and the starting frame, not from any subset of these inputs) and target-video faithfulness (the target video faithfully de-picts the annotated target event). Per-rubric and composite pass rates, together with Fleiss’ κ, are reported in Tab. 6. 
+
+Prompt-Verification Judge Validation. To validate the prompt-verification judge as an automatic quality gate, we draw a stratified 500 -pair validation set: 250 judge-accepted and 250 judge-rejected pairs, uniformly sampled within each stratum. Three annotators independently label every pair us-ing the inferability rubric. Their majority vote defines the human consensus, which is then compared with the judge’s decision. Results are reported in Tab. 6. 
+
+## B Experimental Setup 
+
+This section outlines the model configuration, the baseline adaptations, and the detailed metric definitions used through-out our experiments. 
+
+B.1 Implementation Details 
+
+This section extends the backbone and generation specifica-tions in Sec. 4 with details on the encoders, projection layers, optimization, and data preprocessing. 
+
+Encoders and Projectors. The CLIP image encoder 
+
+Φ (Radford et al. 2021) extracts Lc=257 tokens of dimension 
+
+dc=1280 from the penultimate layer to prioritize semantic content over classification-specific activations; a two-layer MLP projects these tokens into the DiT conditioning space. The MCG projector maps the VLM hidden states H into the dense multimodal cues P (H) using a two-layer MLP with a GELU non-linearity (Hendrycks and Gimpel 2016). VM encodes K=4 frames uniformly sampled from V as VAE latent slots and prepends them as a context-video prefix. 
+
+Frozen Components. The video VAE E, the DiT text en-coder τ , the CLIP image encoder Φ, and the VLM Ψ are kept frozen throughout training. 
+
+Optimization. We use the Adam optimizer (Kingma and Ba 2014) ( β1=0 .9, β2=0 .999 , ϵ=10 −8) with a constant learning rate of 10 −5, no warmup, a weight decay of 5×10 −3,and a maximum gradient norm of 1.0. The rectified-flow noise level σ is sampled from a shifted flow-matching sched-ule (Liu, Gong, and Liu 2022; Lipman et al. 2022) with a shift factor of 5. For reproducibility, we use a fixed random seed of 42 throughout the experiments. 
+
+Input Preprocessing. We apply cover-resize followed by center cropping to match the training resolution. HDR-encoded clips are excluded during data construction to main-tain visual compatibility. 
+
+Compute and Sampling Configuration. LogiShot uses the 14 B Wan-family DiT backbone (Wan et al. 2025). Be-cause Ψ, Φ, E, and τ remain frozen, gradients are computed only for the DiT denoiser and conditioning projectors. Train-ing is conducted on 32 H800 GPUs. During inference, all methods produce 49 -frame clips at 480 ×832 resolution and 
+
+16 fps. 
+
+B.2 Baseline Adaptation Details 
+
+Each baseline is adapted to use the same three inputs: the context video, the prompt instruction, and a starting frame. In all three adaptations, the VLM jointly processes these inputs when producing the target-event description. 
+
+MLLM+I2V. This baseline serves as our caption-based reference: Qwen2.5-VL (Bai et al. 2025) generates a de-tailed target-event description from the three inputs; a stan-dard Wan2.1-14B image-to-video generator (Wan et al. 2025) then produces the target video conditioned on the resulting description and the starting frame. For MLLM+I2V, context-video information reaches the generator only through the decoded description, without direct access to context-video Stage n Annotators Rubric A Rubric B Composite / Agreement κ                  
+
+> Post-pair generation 1,500 50.936 0.752 0.716 0.71 Post-prompt verification 1,000 40.927 0.934 0.893 0.74 Judge validation 500 3——0.916 0.78
+
+Table 6: Data-pipeline quality-gate results. For the post-pair-generation audit, Rubric A and Rubric B denote video quality and prompt validity; for the post-prompt-verification audit, they denote target-event inferability and target-video faithfulness. Composite is the rate of pairs passing both rubrics. For judge validation, Agreement is the rate of judge decisions matching human consensus. κ denotes Fleiss’ inter-annotator agreement for the two audits and Cohen’s κ between the judge and human consensus for judge validation. features or latents. It generates 49 -frame clips at 480 ×832 
+
+resolution and 16 fps using 50 denoising steps. 
+
+VANS (Cheng et al. 2026). The adapted VANS uses the target-event description produced by its VLM from the three inputs and VAE tokens of frames sampled from the context video. Because the original model does not support starting-frame conditioning, we replace its original video backbone with the same 14 B image-to-video generator used in Lo-giShot. The adapted model first undergoes supervised warm-up to align with our three-input format and is then trained using VANS’s two-stage Joint-GRPO pipeline. It generates 
+
+49 -frame clips at 480 ×832 resolution and 16 fps using 50 
+
+denoising steps. 
+
+StoryMem (Zhang et al. 2025). StoryMem generates se-quential shots from a text prompt and a memory bank of previously seen frames. To adapt it, Qwen2.5-VL (Bai et al. 2025) processes the context video, prompt instruc-tion, and starting frame to produce a target-event description, while StoryMem’s official semantic selection algorithm with HPSv3 filtering (Ma et al. 2025) selects up to three context frames for its memory bank. The starting frame is provided as the image condition for target-video generation. The adapted StoryMem model generates 49 -frame clips at 480 ×832 res-olution and 16 fps to match the other methods. 
+
+B.3 Evaluation Metrics 
+
+We evaluate the generated videos along two primary di-mensions, Logical Correctness (LC) and Visual Consistency (VC), each defined as the unweighted mean of three sub-metrics. A single VLM judge with a fixed evaluation prompt and deterministic decoding scores every generated video on all six sub-metrics using a 1–5 scale. 
+
+Logical Correctness. Three sub-metrics jointly evaluate whether the generated video depicts the event implied by the inputs, follows the logical relation, and completes the event. 
+
+Event Match assesses whether the generated video accurately depicts this event; a score of 5 indicates that the target event is clearly and correctly depicted, 3 indicates that the event is partially correct but missing key information, and 1 signifies that the video depicts an entirely incorrect event. Relation Match evaluates whether the generated event satisfies the cross-shot relation specified by the prompt instruction; 5
+
+means the relation clearly follows from the joint context of the three inputs, 3 means the relation is only partially satisfied, and 1 denotes that the depicted relation is invalid or unrelated. 
+
+Completion verifies whether the target event is fully realized, including its essential action and outcome, rather than merely being initiated or partially shown; 5 indicates that the event is completed and its outcome is clearly visible, 3 means the event is partially shown but its outcome is not reached, and 
+
+1 signifies that the event is absent. 
+
+Visual Consistency. Three sub-metrics evaluate whether the context-relevant participants, their roles, and their states remain visually and semantically coherent between the context and generated videos. Participant Match assesses whether the correct context-relevant people, objects, and tools are present; a score of 5 indicates that every relevant participant is clearly present, 3 means the main participants are present but a task-relevant one is either missing or hal-lucinated, and 1 signifies that the relevant participants are absent or replaced. Role Match evaluates whether each rele-vant participant plays the correct semantic role (e.g., actor, tool, target, or affected object); 5 means the role assignments are unambiguously correct, 3 means some assignments are ambiguous or incorrect, and 1 denotes that the role assign-ments are absent or entirely incorrect. State Match verifies whether the task-relevant appearances, attributes, postures, object states, and spatial layouts are compatible with the context video and the specified relation; 5 indicates clear compatibility across appearance and state, 3 means the rele-vant elements are present but a key detail conflicts with the context or relation, and 1 signifies that the appearance or state is directly contradicted or absent. 
+
+Score Normalization and Aggregation. Across all six sub-metrics, a score of 2 indicates a generation that is largely incorrect but retains a recognizable semantic connection, while a score of 4 indicates a case that is mostly correct but exhibits minor ambiguity or drift. Each raw sub-metric score 
+
+r ∈ { 1, . . . , 5} is normalized to s = ( r − 1) /4 ∈ [0 , 1] .Sample-level LC and VC are computed as the means of their respective three normalized sub-metrics. Each sub-metric reported in Tabs. 1 and 2 is averaged over the 800 -sample held-out evaluation set. The two dimensions are not com-bined into a single global metric and are reported separately to preserve their distinct interpretations. 
+
+Visual-Quality Metrics. We additionally report three visual-quality diagnostics computed using VBench (Huang et al. 2024) implementations on the 800 outputs generated by each method. Subject consistency (Subj. ) averages co-sine similarities between the DINO (Caron et al. 2021) fea-tures of each noninitial frame and those of its preceding and first frames. Motion smoothness (Mot. ) uses AMT (Li et al. 2023b) to interpolate intermediate frames from their temporal neighbors and compares the predictions with the corresponding generated frames. To preserve a paired com-parison with identical sample composition across meth-ods, we compute temporal flickering (Tmp. ) by applying VBench’s normalized adjacent-frame pixel-difference score to the same 800 samples for every method. Higher temporal-flickering scores indicate less frame-to-frame variation. The unweighted mean of the three metrics ( Avg. ) is reported as a compact summary. 
+
+## C Additional Results and Analysis 
+
+Complementing the evaluation in Sec. 5, this section presents the user study, the validation and residual analysis of the VLM judge, additional ablations of MCG’s dense multi-modal cues, and the qualitative failure analysis. 
+
+C.1 User Study 
+
+Fig. 8 presents the pairwise A/B win rates from a blind user study involving 20 annotators. The compared pairs are drawn from the same held-out evaluation set. Each annotator eval-uated 90 anonymized video pairs ( 30 comparing LogiShot with each of the three baselines). For each pair, the annotator provided separate judgments for Logical Correctness, Vi-sual Consistency, and overall preference, yielding 600 judg-ments per baseline for each criterion. Ties were scored as 
+
+0.5. LogiShot was preferred over all three baselines across all criteria. 0% 25% 50% 75% 100%           
+
+> LC VC Pref.
+> MLLM+I2V
+> LC VC Pref.
+> VANS
+> LC VC Pref.
+> StoryMem
+> LogiShot Preferred Baseline Preferred
+> 73.8% 26.2% 79.5% 20.5% 76.3% 23.7% 70.6% 29.4% 76.8% 23.2% 73.0% 27.0% 76.3% 23.7% 74.3% 25.7% 75.5% 24.5%
+
+Figure 8: User study win rates. Pairwise A/B win rates for LogiShot against each baseline on Logical Correctness (LC), Visual Consistency (VC), and overall preference (Pref.). 
+
+C.2 VLM Judge Validation and Residual Analysis 
+
+We validate the VLM judge through three complementary analyses on a stratified 150 -case validation subset ( 30 per relation type). For each case, the outputs of all four meth-ods are independently scored by two blinded annotators on both dimensions, resulting in 600 evaluation units. We re-port (i) rank correlation between the judge and human scores for each dimension; (ii) per-method human means, provid-ing a judge-independent view of the performance ordering reported in Tab. 1; and (iii) per-method residuals between the judge scores and the mean human scores, to examine whether the judge systematically favors any particular method. Each annotator applied five-point rubrics aligned with the two evaluation dimensions. Method identities were blinded, and case ordering was randomized independently for each an-notator. Tab. 8 reports Spearman’s ρ and quadratic-weighted Cohen’s κ for the judge–human comparison on each dimen-sion, together with the quadratic-weighted inter-annotator κ
+
+computed after pooling the paired LC and VC ratings. For judge–human κ, the normalized judge score s is mapped back to the five-point scale as 1 + 4 s. Both this value and the mean of the two human ratings are then assigned to the nearest integer category using round-to-nearest with ties to even. Aggregated across all 600 units, ρ=0 .68 for LC and 
+
+ρ=0 .59 for VC indicate positive rank correlations between the judge and human scores. The correlation is higher for LC than for VC, consistent with the greater subjectivity of Visual Consistency judgments. Quadratic-weighted Cohen’s 
+
+κ further measures category-level agreement, reaching 0.84 
+
+for LC and 0.76 for VC. The inter-annotator κ=0 .81 indi-cates strong consensus between the human raters. In Tab. 8, 
+
+n denotes the number of (case, method) evaluation units. Tab. 7 reports the per-method mean human score on this subset alongside 95% bootstrap confidence intervals ( 10 ,000 
+
+resamples), as well as the paired LogiShot-minus-baseline gap with its corresponding CI. We average the two annotators for each case and bootstrap the paired gaps by case. LogiShot ranks first on both dimensions under human evaluation. The 
+
+95% confidence intervals for all six paired gaps have non-negative lower bounds; five are strictly positive, while the sixth (StoryMem VC) has a lower bound at zero. LogiShot’s top ranking is therefore reproduced under judge-independent human evaluation. Among the baselines, the ordering repro-duces the automated results in Tab. 1, with the exception of a minor swap between StoryMem and MLLM+I2V on Logical Correctness—a variation that falls well within the overlapping CIs of the two weakest methods on that axis. Paired gaps are computed from unrounded case-level differ-ences and rounded only for display; they may therefore differ slightly from differences between the displayed means. Tab. 9 reports the mean judge–human residual for each method, computed per case as the score assigned by the VLM judge minus the mean score of the two human an-notators, together with 95% confidence intervals obtained through case-level bootstrap resampling. For each method, the judge and human scores are evaluated on the same 150 
+
+cases. Across methods, the mean residual ranges from 0.06 
+
+to 0.12 on Logical Correctness and from 0.05 to 0.07 on Vi-sual Consistency, indicating a consistent positive offset in the judge scores. LogiShot does not exhibit the largest residual on either dimension: MLLM+I2V has the largest LC residual at +0 .124 , while StoryMem has the largest VC residual at 
+
++0 .069 . LogiShot’s residuals remain within the range ob-served for the three baselines, providing no indication of a method-specific positive offset in favor of LogiShot. Method n Human LC ↑ [95% CI] Human VC ↑ [95% CI] ∆LC [95% CI] ∆VC [95% CI] MLLM+I2V 150 0.693 [0.640, 0.745] 0.784 [0.738, 0.825] +0 .152 [+0 .091 , +0 .213 ] +0 .087 [+0 .040 , +0 .135 ]VANS 150 0.773 [0.723, 0.819] 0.814 [0.771, 0.854] +0 .073 [+0 .013 , +0 .134 ] +0 .057 [+0 .008 , +0 .107 ]StoryMem 150 0.728 [0.670, 0.784] 0.825 [0.783, 0.865] +0 .117 [+0 .058 , +0 .178 ] +0 .046 [+0 .000 , +0 .093 ]       
+
+> LogiShot 150 0.845 [0.805, 0.883] 0.871 [0.840, 0.899] ——
+
+Table 7: Per-method mean human scores on the 150 -case validation subset.                                            
+
+> Relation nρκVLM–hum κinter
+> LC VC LC VC Progression 120 0.66 0.65 0.81 0.76 0.79 Parallel 120 0.63 0.63 0.85 0.78 0.78 Causal 120 0.70 0.42 0.83 0.65 0.80 Conditional 120 0.76 0.72 0.89 0.84 0.85 Overview/Detail 120 0.65 0.49 0.81 0.69 0.79 All 600 0.68 0.59 0.84 0.76 0.81
+
+Table 8: Judge–human correlation and agreement by relation type, reported for Logical Correctness and Visual Consis-tency.                   
+
+> Method nLC residual [95% CI] VC residual [95% CI] MLLM+I2V 150 +0 .124
+> [+0 .101 ,+0 .149 ]
+> +0 .057
+> [+0 .031 ,+0 .084 ]VANS 150 +0 .064
+> [+0 .043 ,+0 .085 ]
+> +0 .048
+> [+0 .026 ,+0 .070 ]StoryMem 150 +0 .061
+> [+0 .039 ,+0 .083 ]
+> +0 .069
+> [+0 .045 ,+0 .093 ]
+> LogiShot 150 +0 .064
+> [+0 .046 ,+0 .083 ]
+> +0 .065
+> [+0 .042 ,+0 .089 ]
+
+Table 9: Per-method judge–human residuals on the 150 -case validation subset. 
+
+C.3 Ablations on MCG’s Dense Multimodal Cues 
+
+While Tab. 2 evaluates MCG and VM, we introduce two ad-ditional experiments here to specifically analyze the dense multimodal cues used by MCG. All cue-specific variants disable VM to isolate MCG. Text-only disables both MCG and VM, retaining the decoded target-event description and starting-frame conditioning while removing the dense mul-timodal cues. Matched cues enables MCG with cues derived from the corresponding (V, p, I 0) while keeping VM dis-abled. The Full model enables both MCG and VM and is included only as a reference. First, to test whether these cues carry context-specific rela-tional information from (V, p, I 0) rather than serving merely as a generic dense signal, we replace P (H) with P (Hshuf ),where Hshuf is computed by the same VLM using an un-related context video drawn uniformly at random from the 800-sample held-out evaluation set together with the orig-inal prompt instruction and starting frame. The replace-ment preserves the sequence length and data type, while                                   
+
+> Logical Correctness ↑Visual Consistency ↑
+> Variant EvMt RelMt Comp PartMt RoleMt StMt Text-only 0.790 0.804 0.791 0.850 0.845 0.830 Matched cues 0.833 0.849 0.828 0.882 0.879 0.875 Shuffled cues 0.771 0.789 0.766 0.846 0.840 0.828 Dense cues only N/A (no recognizable target event)
+> Full 0.901 0.939 0.887 0.938 0.931 0.931
+
+Table 10: Additional ablations of MCG’s dense multimodal cues. The variant using only dense cues does not produce recognizable target events, so its evaluation metrics are not applicable. [Input Prompt] The context video shows the room before the move. Show the room after the move when the door is opened. 
+
+> …
+> …
+
+Figure 9: Failure case. The prompt relates the room before and after the move, requiring the target video to preserve the wall layout and object placement in the newly visible interior. Red boxes mark inconsistencies with the context video: an extra door appears, the television wall becomes a plain surface, and unrelated boxes remain on the floor. the decoded target-event description, starting-frame condi-tioning, and sampling protocol remain unchanged. Tab. 10 demonstrates that introducing mismatched dense cues fails to recover the +0 .042 Logical Correctness gain produced by matched dense cues. In fact, the shuffled variant drops 
+
+0.020 below the Text-only variant on Logical Correctness and 0.004 below on Visual Consistency. This result indicates that MCG’s dense cues carry context-specific information and that mismatched cues can degrade generation. Second, we test whether the dense cues can replace the decoded target-event description. The Dense cues only vari-ant keeps VM disabled and removes the decoded description while retaining the matched dense cues and starting-frame conditioning. It fails to generate evaluable target videos be-cause its outputs do not depict recognizable target events. Ac-cordingly, all evaluation metrics for this variant are marked as N/A in Tab. 10. These results suggest that, under the cur-rent conditioning setup, dense cues alone are insufficient to reliably specify the target event. This finding supports retain-ing the decoded target-event description as explicit semantic guidance and using the dense cues as complementary visual-semantic information. 
+
+C.4 Qualitative Failure Analysis 
+
+LogiShot can fail when generation requires resolving com-plex cross-shot relations and integrating spatially dispersed details from visually noisy contexts. Fig. 9 presents one such case. Although the door-opening action is generated cor-rectly, the target video does not fully preserve the scene structure from the context video: an extra door appears on the wall, the television wall becomes a plain surface, and un-related boxes remain on the floor. These errors suggest that the combination of visual clutter and relational complexity can limit scene-level visual consistency.

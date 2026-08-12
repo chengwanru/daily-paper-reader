@@ -1,0 +1,551 @@
+Title: Stream Forcing: Constructing Unified Training Trajectory for Robust Streaming Video Generation
+
+URL Source: https://arxiv.org/pdf/2608.10439v1
+
+Published Time: Wed, 12 Aug 2026 00:32:39 GMT
+
+Number of Pages: 15
+
+Markdown Content:
+# Stream Forcing: Constructing Unified Training Trajectory for Robust Streaming Video Generation 
+
+## Yueting Zhu 1,∗ Yuehao Song 1,∗ Kaicheng Zhang 3 Bao Tang 1
+
+## Shaoyu Chen 2 Qian Zhang 2 Wenyu Liu 1 Xinggang Wang 1,B 
+
+> 1
+
+## Huazhong University of Science & Technology 2 Horizon Robotics 3 Anyverse Dynamics 
+
+## Abstract 
+
+Streaming video generation holds strong potential for world modeling, where future frames must be inferred online se-quentially to form a continuous video stream. However, streaming video diffusion models introduce a fundamen-tal train-inference mismatch: inference follows a special-ized denoising order, whereas advanced training strategies typically require diverse noise-level configurations. To ad-dress this trade-off between train-inference consistency and training coverage, we reformulate the video diffusion sam-pling as a frame-indexed stochastic process over noise lev-els. Within this stochastic process space, we construct a continuous training trajectory along which the sampling schedule progressively evolves from independent sampling to inference-consistent sampling. We further introduce a joint calibration algorithm and a temporal correlative sam-pling algorithm to ensure trajectory smoothness and cross-frame correlation. Building on these designs, we propose Stream Forcing, a unified training framework for streaming video generation that balances training sufficiency and in-ference efficiency. Extensive experiments demonstrate that Stream Forcing significantly improves generation quality with a 36.6% FVD improvement on the UCF-101 bench-mark. Furthermore, our method facilitates robust zero-shot extrapolation to long-horizon video generation with a 27.9% FVD improvement on the UCF-101 benchmark. 
+
+# 1 Introduction 
+
+Recent advances in video generation, particularly video dif-fusion models [36, 43, 47], have made remarkable progress in visual fidelity and temporal consistency. Beyond content creation, such models can serve as generative world models [3, 15] for reasoning about future observations in sequen-tial planning, such as embodied AI [8, 34] and autonomous driving [11, 52]. In these settings, the generative model must operate online sequentially, i.e., perform streaming in-ference using partial temporal context.   
+
+> ∗Equal contribution. BCorresponding author.
+
+Unlike standard bidirectional generation [2, 18, 31], streaming inference requires progressively generating new frames to form a video stream in a causal setting. Recent approaches [22, 35, 41] introduce streamlined generation by overlapping denoising across frames to reduce the high inter-frame latency. To support this inference strategy, two training paradigms have been explored. Progressive sam-pling, e.g., rolling diffusion models [35], improves training-inference consistency while restricting the coverage of the training distribution. Alternatively, independent sampling, e.g., diffusion forcing [6], enables diverse training config-urations while breaking the temporal structure assumed at inference time. Noting the complementary nature of the two paradigms, we reformulate training-time noise level sampling as a frame-indexed stochastic process. Specifically, the per-frame noise level distribution is modeled using the widely adopted Logit-normal distribution [1, 10]. We parameterize this process with the two inherent parameters, which con-trol temporal bias and sampling diversity, together with a temporal correlation parameter that captures dependencies between video frames. Within this parameterized space, in-dependent sampling is characterized by frame-invariant dis-tribution parameters and zero temporal correlation, whereas progressive sampling exhibits frame-dependent bias and strong temporal correlation. Taking these two configura-tions as endpoints, we construct a continuous training tra-jectory that gradually transforms the independent into the progressive configuration, thereby reconciling broad train-ing coverage with inference consistency. Building on this parameterization, we propose Stream Forcing, a unified training paradigm for progressively align-ing training-time sampling with the inference schedule. To ensure a smooth transition along the trajectory, we develop a joint calibration algorithm to heuristically determine the distribution parameters at each training step. Meanwhile, we introduce a temporal correlative sampling algorithm to generate noise levels with the prescribed inter-frame depen-dencies. These components enable training to proceed from independent per-frame sampling, through intermediate cal-arXiv:2608.10439v1 [cs.CV] 11 Aug 2026 ibrated configurations, to inference-consistent sampling. Experimental results demonstrate that Stream Forcing achieves high video generation quality with FVD improve-ments of 36.6% on UCF-101 and 4.7% on Taichi-HD, while also generalizing effectively to zero-shot long-horizon gen-eration in a zero-shot setting, yielding FVD improvements of 27.9% and 10.9%, respectively. We further demon-strate that Stream Forcing can be effectively applied to au-tonomous driving world modeling, improving both FID and FVD on the nuScenes [4] dataset. Our contributions can be summarized as follows: • We reformulate training-time noise-level sampling as a frame-indexed stochastic process, establishing a unified space that encompasses mainstream training paradigms. • We propose Stream Forcing, a unified training framework that combines joint calibration and temporal correlative sampling to construct a continuous training trajectory, en-abling smooth transitions throughout training while rec-onciling diverse coverage with inference consistency. • Extensive experiments demonstrate that Stream Forcing achieves superior generation quality and generalizes ef-fectively to long-horizon generation and world modeling. 
+
+# 2 Background 
+
+## 2.1 Inference Strategy for Streaming Video Generation 
+
+Existing streaming video inference strategies mainly in-clude chunk-based generation [12, 39] and streamlined gen-eration [22, 41]. As shown in Fig. 1, for a diffusion model with S denoising steps over a T -frame window, chunk-based methods generate each chunk sequentially, incurring an inter-frame latency of up to S denoising steps. In con-trast, streamlined methods interleave denoising within the sliding window, jointly processing frames at progressive noise levels and reducing the latency to S/T steps. We adopt streamlined inference and develop a corresponding training paradigm to improve train–inference consistency. 
+
+## 2.2 Trade-off in Training 
+
+During training, the input clip x = {x1, x 2, . . . , x T } of 
+
+T frames is corrupted by Gaussian noise at frame-specific noise levels kt , resulting in a noisy observation 
+
+x(kt) 
+
+> t
+
+= p¯αkt xt + p1 − ¯αkt ϵt, ϵt ∼ N (0 , I), (1) where ¯αkt denotes the cumulative variance. Under this for-mulation, two training strategies have been explored. Progressive sampling [35] enforces monotonically in-creasing noise levels across frames within each training  
+
+> There are two equivalent ways to represent the noise level: using dis-crete denoising steps or a continuous noise level defined in the range [0,1]. In this paper, we adopt the latter. … … … … … …
+> Frames
+> Sampling Step
+> …
+> … … … … … … …
+> Frames
+> Sampling Step
+> …
+> …
+> Initial Noise
+> Clean Frame
+> Denoising Steps
+> (a) Chunk-based Generation (b) Streamlined Generation
+> Initial Noise
+> Clean Frame
+> Denoising Steps
+
+Figure 1. Comparison of streaming inference methods. (a) Chunk-based Generation.(b) Streamlined Generation. 
+
+window in which the noise levels {kt}Tt=1 satisfy 
+
+kt ≤ kt+1 , ∀ t ∈ { 1, . . . , T − 1}. (2) While such a strictly increasing design improves consis-tency with inference, it confines training to a narrow sub-set of noise schedules and reduces coverage of the training distribution. Alternatively, independent sampling [6] assigns noise levels independently to frames within the training window. Formally, the noise levels {kt}Tt=1 satisfy 
+
+kt ∼ p(k1), i.i.d. for t ∈ { 1, . . . , T }. (3) This design enables diverse noise configurations in train-ing, while independent noise levels across frames ignore the structured noise progression assumed at inference time, which leads to a mismatch between training and inference. 
+
+# 3 Method 
+
+Motivated by the trade-off in training, we reformulate per-frame noise level sampling as a frame-indexed stochastic process to unify both training strategies. We further con-struct a continuous training trajectory using the joint cali-bration and temporal correlative sampling algorithms. By combining them, we develop Stream Forcing, a unified cur-riculum training procedure for streaming video generation. 
+
+## 3.1 Reformulation of Training Sampling 
+
+3.1.1 Preliminary: Logit-Normal Distribution 
+
+Logit-normal distribution [1, 10] is widely used to sample the diffusion noise level, which is formulated with a proba-bility density function (PDF) 
+
+f (k) = 1
+
+σ√2πk (1 − k) exp 
+
+−
+
+
+
+log  k/ (1 − k) − μ
+
+2
+
+2σ2
+
+ ,
+
+(4) 
+
+where μ and σ denote the location and scale parameters. Uneven   
+
+> Density
+> Unsmooth
+> Transition
+> Mode
+> Adjustment
+> Density
+> Timestep
+> Density Density
+> Density
+> Timestep
+> Density
+> Reassignment
+> Timestep
+> Timestep
+> (a) (b)
+> (c) (d) Adjusted Mode
+> Reassigned Density
+> Adjusted Mode
+> Reassigned Density
+> Adjusted Mode
+> Reassigned Density
+
+Figure 2. Illustration of trajectory constraints. Each subfigure shows marginals for a three-frame sampling process. (a) Neither Constraint 1 nor Constraint 2 is satisfied. (b) Only Constraint 1 is satisfied. (c) Only Constraint 2 is satisfied. (d) Both Constraints are satisfied. 
+
+3.1.2 Training Sampling as a Stochastic Process with Logit-Normal Marginals 
+
+At each step, we sample one noise level for every frame t in the training window. This noise level sequence constitutes a stochastic process with Logit-normal marginals, parame-terized by θt = ( μt, σ t, ρ ), where • μt and σt: the location parameter and the scale parameter in logit space at frame t that specifies mean and standard deviation of the underlying Gaussian distribution. • ρ: the inter-frame correlation parameter that characterizes the temporal dependence of the stochastic process. Within this parameterized framework, the two aforemen-tioned training strategies correspond to special cases. Inde-pendent sampling corresponds to 
+
+μt = μ0, σt = σ0, ρ = 0 , (5) where all frames share an identical marginal f (k; μ0, σ 0),while noise levels are sampled independently across frames. Ideal progressive sampling arises as a limiting case when 
+
+μt → logit 
+
+ tT
+
+
+
+, σt → 0, ρ → 1, (6) where the per-frame marginals in the denoising window of 
+
+T frames collapse to a time-ordered deterministic sched-ule with strong inter-frame dependence. This formulation unifies existing paradigms and reveals the tension between noise-level coverage and training–inference consistency. 
+
+3.1.3 Constrained Training Trajectory 
+
+We construct a continuous training trajectory from inde-pendent sampling to progressive sampling in the parame-terized sampling-process space. At each training step s, the 
+
+Algorithm 1 Joint Calibration 
+
+Require: Initialization (μinit , σ init ), target modes 
+
+{ζ∗ 
+
+> t
+
+}Tt=1 
+
+Ensure: Joint parameters {μt, σ t}Tt=1                                                                          
+
+> /*Calculate reference density*/
+> for t= 1 to Tdo
+> Initialize σt←σinit ,μt←μinit
+> ht←f(ζ∗
+> t;μt, σ t)/* Eq. 4 */
+> end for
+> H←median( {ht}Tt=1 )
+> /* Grid search for σ*/
+> for t= 1 to Tdo
+> Set ∆σ←0.05 ,∆h← ∞
+> for n= 0 to N−1do
+> ˆσ←n∆σ
+> ˆμ←ψ(ζ∗
+> t,ˆσ)/* Eq. 9 */
+> ˆh←f(ζ∗
+> t; ˆ μ, ˆσ)/* Eq. 4 */
+> if || ˆh−H|| <∆hthen
+> Set σt←ˆσ,∆h←|| ˆh−H||
+> end if end for
+> Compute μt←ψ(ζ∗
+> t, σ t)/* Eq. 9 */
+> end for return {(μt, σ t)}Tt=1
+
+sampling configuration is specified by θst = ( μst , σ st , ρ s).As training progresses, these parameters gradually evolve along the trajectory rather than remaining fixed. A valid tra-jectory should provide a smooth curriculum while preserv-ing comparable sampling coverage and appropriate tem-poral dependence. Accordingly, we impose the following three constraints, illustrated in Fig. 2. 
+
+Constraint 1: Smooth trajectory transition. Per-frame marginal distribution should evolve continuously across training steps. We therefore require the modes of the per-frame PDFs (i.e., the peak location of the PDF) to shift at an approximately uniform rate along the trajectory, avoid-ing abrupt changes in the sampling configuration (cf. the comparison between Fig. 2(b) and (a)). 
+
+Constraint 2: Consistent per-frame coverage. Within each training step, the marginal distributions of different frames should exhibit comparable degrees of dispersion, so that all frames receive similarly broad coverage over noise levels. Otherwise, some frames may be trained repeatedly within a narrow noise range, while others receive broader but sparser supervision, resulting in imbalanced per-frame optimization. We approximate this condition by matching the densities at their modes (compare Fig. 2(c) and (a)).      
+
+> Throughout this paper, we adopt notational conventions that super-scripts denote the training step index, while subscripts indicate the frame index within a video clip. When both are present, xstrefers to the quantity at frame tof the clip at training step s.
+
+Independent Training  Inference-aligned Training 
+
+Full distribution coverage? 
+
+Consistent with inference? 
+
+Direct Transition 
+
+Curriculum Transition along the Smooth Training Trajectory 
+
+Joint Calibration of 𝜇 and 𝜎 
+
+Temporal Correlated Sampling Figure 3. Overview of the curriculum training. Our method builds a continuous curriculum transition between independent training and inference-aligned training that balances full distribution coverage with consistency at inference time. 
+
+Constraint 3: Inter-frame correlation. The correlation coefficient ρs should also evolve as training progresses, such that the sampled noise levels preserve the temporal de-pendence between successive frames throughout training. More discussions on the motivations for these constraints can be referred to Appendix A.1. 
+
+## 3.2 Training Trajectory Implementation 
+
+We introduce a joint calibration algorithm to satisfy Con-straint 1 and Constraint 2 , and a temporal correlative sam-pling algorithm to satisfy Constraint 3 .
+
+3.2.1 Joint Calibration of Logit-Normal Parameters 
+
+We optimize the two Logit-normal parameters jointly to sat-isfy Constraints 1 and 2 . Specifically, Constraint 1 is en-forced by uniformly interpolating the marginal modes be-tween the two endpoint configurations (Eqs. 5 & 6). We set 
+
+μ0 = 0 for the initial setting in Eq. 5, yielding the target modes {ζst }∗
+
+(
+
+ζst ∗ = (1 − s) · ζ0 
+
+> t
+> ∗
+
++ s · ζ1
+
+> t
+> ∗
+
+,ζ0 
+
+> t
+> ∗
+
+= 0 .5, ζ1 
+
+> t
+> ∗
+
+= tT . (7) To ensure Constraint 2 , we enforce a global reference peak density Hs and solve the scale parameter σst that minimize the differences between real peak densities and Hs. Then, we formulate the optimization objective as 
+
+min  
+
+> ζst,σ st
+
+|| ζst − ζst 
+
+> ∗
+
+|| + || f (ζst ; ψ(ζst , σ st ), σ st ) − Hs || , (8) where ψ(ζ, σ ) is the mode equation that determines the lo-cation parameter using the mode ζ and the scale σ:
+
+ψ(ζ, σ ) = logit( ζ) + σ2(1 − 2ζ). (9) We provide a proof of Eq. 9 in Appendix A.4. We introduce a joint calibration algorithm to solve the optimization problem in Eq. 8, as detailed in Alg. 1. Since all parameters are independent of the training step once the target modes are set, we omit the superscript s. The joint calibration consists of two steps: estimating a global ref-erence peak density and calibrating the marginal param-eters of each frame. First, we initialize each frame with 
+
+μt = μinit and σt = σinit , and compute its peak density ht.The global reference density H is then defined as the me-dian of {ht}Tt=1 . Then, we calibrate (μt, σ t) for each target mode ζ∗ 
+
+> t
+
+. We perform a grid search over candidate values ˆσ,compute the corresponding ˆμ using Eq. 9, and select the pair whose peak density at ζ∗ 
+
+> t
+
+is closest to H. Applying this pro-cedure at each training step yields the per-frame marginal parameters {μst , σ st }Tt=1 satisfying Constraints 1 and 2. 
+
+3.2.2 Temporal Correlated Sampling Strategy 
+
+Given the calibrated per-frame marginals, we further in-troduce temporal correlation without altering their distribu-tions to satisfy Constraint 3 . To this end, we use a Gaussian Copula-based [33] correlative sampling algorithm to decou-ple the temporal dependence structure from the marginal distributions and implement the coefficient ρs gradually Table 1. 16-frame unconditional generation results on UCF-101 [40] and Taichi-HD [37]. Methods marked with * are trained on both the training and test splits, while the remaining methods are trained on the training split only. Methods marked with † are obtained under the experimental setting of AR-Diffusion [41] for a controlled comparison.                                  
+
+> Methods UCF-101 Taichi-HD VideoGPT* [54] 2880.6 –DIGAN* [59] 1630.2 156.7 StyleGAN-V* [38] 1431.0 143.5 LVDM* [16] 372.0 99.0 PVDM [60] 343.6 267.0 FVDM [29] –194.6 Latte [31] –159.6 HVDM [23] 303.1 77.0 Diffusion Forcing [6] 349.4 150.5 AR-Diffusion †[41] 181.9 100.9 MAGI* [64] 297.8 –FAR* [13] 279.0 –FrameDiT [26] –95.5
+> Ours †146.9 76.1 Ours 177.0 73.4
+
+increasing from independent sampling with ρs = 0 to strongly correlated sampling with ρs → 1.Specifically, for a given training step s, we first generate a correlated latent sequence {z1, z 2, . . . , z T } in the standard normal space using a first-order autoregressive process: 
+
+zt = ρ · zt−1 + p1 − ρ2 · ϵt, (10) where ρ ∈ [0 , 1] is the inter-frame correlation coefficient and ϵt ∼ N (0 , 1) . This construction preserves the standard normal marginal of each zt while introducing temporal cor-relation across the sequence. We then convert each zt into a uniform quantile using the standard normal CDF. Finally, the quantile is mapped through the inverse CDF of the cali-brated marginal distribution for frame t.
+
+yt = μt + σt · Φ−1 Φ( zt) = μt + σt · zt, (11) where Φ presents the standard normal CDF. The noise levels are finally generated through a sigmoid function, 
+
+kt = Sigmoid( yt). (12) As a result, each frame retains its prescribed marginal distri-bution, while the dependence induced in the Gaussian space is transferred to the sampled noise levels. 
+
+## 3.3 Stream Forcing: A Curriculum Training Procedure 
+
+Build on the above design, we propose a unified curriculum learning process that continuously evolves the training noise configuration from independent sampling toward inference-aligned progressive sampling, as illustrated in Fig. 3. For 
+
+Table 2. 128-frame unconditional generation results on UCF-101 [40] and Taichi-HD [37], evaluated on the full datasets at a resolution of 256 × 256 .              
+
+> Methods UCF-101 Taichi-HD StyleGAN-V [38] 1773.4 691.1 PVDM [60] 648.4 339.2 HVDM [23] 549.7 258.5 Diffusion Forcing [6] 447.3 340.2 AR-Diffusion [41] 572.3 376.3
+> Ours 322.5 230.4
+
+implementation, we organize this continuous process into three successive phases: independent diffusion training, curriculum transition, and streaming-noise aligned training. 
+
+Independent Training. The training process begins with independent noise sampling to preserve broad noise-level coverage. Specifically, the noise level of each frame is sam-pled independently according to Eq. 5. 
+
+Curriculum Transition. Following the training trajec-tory, we construct a smooth training trajectory transitioning from independent sampling to training-inference consistent sampling. For practical implementation, we discretize the trajectory into uniformly-spaced points, each defining a spe-cific training configuration, resulting in a curriculum learn-ing schedule. Specifically, we discretize the interval (0 , 1) 
+
+in Eq. 7 into 10 uniformly-spaced configurations, and per-form sequential training along this curriculum from 0 to 1. 
+
+Inference-Aligned Training. Upon the convergence of the curriculum, the training focuses exclusively on the inference-aligned noise level defined in Eq. 6. This process aligns the model with the streamlined inference schedules. 
+
+# 4 Experiments 
+
+## 4.1 Comparison with Existing Baselines 
+
+We conduct a comparison with existing baselines on UCF-101 [40], and Taichi-HD [37] at a resolution of 256×256. For unconditional generation, we conduct short-term video generation (16 frames) as outlined in Tab. 1, and zero-shot long video extrapolation (128 frames) as outlined in Tab. 2. Results for conditional video generation and experimental settings are provided in Appendix A.3 and Appendix A.2. 
+
+4.1.1 Video Generation Performance 
+
+For UCF-101 [40], as shown in Tab. 1, our method achieves the superior performance in unconditional video generation, with an FVD score of 177.0, improving upon the state-of-the-art by 36.6% under the same evaluation setting. Sim-ilarly, on Taichi-HD [37], our approach achieves an FVD Table 3. Comparison of driving video generation methods on the nuScenes [4] test set.                                                  
+
+> Methods FID FVD DriveGAN [24] 73.4 502.3 DriveDreamer [48] 52.6 452.0 WoVoGen [30] 27.6 417.7 Drive-WM [49] 15.8 122.7 GenAD [56] 15.4 184.0
+> Ours 9.4 105.0
+> Table 4. Ablation study on the trajectory constraints. TS, DCC, and IFC denote trajectory transition smoothness ( C1 ), per-frame distribution coverage consistency ( C2 ), and inter-frame correla-tion ( C3 ), respectively.
+> TS DCC IFC FVD
+> ✗397.9
+> ✗577.0
+> ✗466.1
+> ✓✓✓334.4
+> Table 5. Ablation study on the impact of Independent Training( IT ), Curriculum Transition( CT ), and Inference-Aligned Training( IAT ).
+> IT CT IAT FVD
+> ✓✗✗394.2
+> ✗✗✓359.4
+> ✓✗✓380.9
+> ✓✓✗343.3
+> ✓✓✓334.4
+
+of 73.4, surpassing existing methods. Compared to repre-sentative methods of both progressive sampling (e.g., AR-Diffusion [41]) and independent sampling (e.g., Diffusion Forcing [6]), our method achieves superior performance. 
+
+4.1.2 Zero-Shot Long Video Extrapolation 
+
+To assess the model’s capability for streaming generation, we perform zero-shot long-horizon extrapolation on 128-frame sequences, which are significantly longer than those seen during training. Our method achieves consistently strong extrapolation performance across both datasets. As shown in Tab. 2, our method achieves a 27.9% and 10.9% improvement in FVD score on UCF-101 [40] and Taichi-HD [37], respectively. Together, these results confirm the strong zero-shot extrapolation capability of our method for long-horizon streaming generation. 
+
+## 4.2 Application to Autonomous Driving World Models 
+
+To assess the applicability of our method for world mod-eling, we conduct experiments on the nuPlan [5] and          
+
+> Table 6. Ablation of the tempo-ral correlation coefficient.
+> ρFVD Fixed = 0.00 466.1 Fixed = 1.00 368.3
+> Linear Schedule 334.4
+> Table 7. Ablation of the ratio be-tween independent training and curriculum transition.
+> Ratio FVD 1:1 334.4 1:2 348.7
+> 2:1 318.4
+> 3:1 348.8
+
+nuScenes [4] datasets, two widely-used large-scale au-tonomous driving datasets. The model is trained on 25-frame clips at a resolution of 512 × 256 and evaluated on the nuScenes test set. As shown in Tab. 3, we compare with existing driving video generation methods using FID and FVD. The results demonstrate that our training paradigm can be effectively transferred to autonomous driving scenar-ios, highlighting its potential as a general training strategy for driving world models. 
+
+## 4.3 Ablation study 
+
+4.3.1 Trajectory Constraints 
+
+We conduct ablation studies to assess the impact of the proposed design constraints, including trajectory transition smoothness (TS), per-frame distribution coverage consis-tency (DCC), and Inter-frame correlation (IFC), as summa-rized in Tab. 4. Violating any individual principle leads to a notable increase in FVD. Among them, removing DCC causes the most severe performance degradation, underscor-ing the importance of maintaining smooth transitions across the training procedure. When all three principles are jointly enforced, the model achieves the best performance, demon-strating that these principles are complementary and essen-tial for high-quality video generation. 
+
+4.3.2 Curriculum Training 
+
+Tab. 5 reports an ablation study on the contribution of our training framework. Training only with the initial indepen-dent sampling (Row 1) yields inferior results compared to using only the inference-aligned sampling (Row 2), high-lighting the importance of training–inference consistency. Moreover, directly combining them without a smooth tran-sition (Row 3) degrades performance. In contrast, introduc-ing the curriculum transition establishes a smooth training trajectory and results in performance gains (Row 4). The complete training procedure achieves the best performance. 
+
+4.3.3 Inter-frame correlation coefficient 
+
+We present an ablation study on the scheduling strategy of the correlation coefficient ρ in Tab. 6. Gradually increasing 
+
+ρ achieves the best FVD, indicating that a smooth transition (a) Visualization of unconditional 16-frame video generation results on the UCF-101 dataset. 
+
+> (b) Visualization of unconditional 128-frame video generation results on the UCF-101 dataset.
+> AR-D
+> Ours
+> DF
+> AR-D
+> Ours
+> DF
+
+Figure 4. Visualization of unconditional video generation on UCF-101 dataset. DF: Diffusion Forcing [6]. AR-D: AR-Diffusion [41]. Our method presents higher visual quality and more robust long-horizontal extrapolation. 
+
+from independent sampling to strongly correlated sampling better balances training diversity and temporal consistency. 
+
+4.3.4 Ratio between independent training and curricu-lum transition 
+
+We conduct an ablation study on the ratio between indepen-dent training and curriculum transition, as shown in Tab. 7. The model performs best at a 2:1 ratio, which balances training coverage with a smooth transition toward train-inference consistency. 
+
+## 4.4 Qualitative Results 
+
+As shown in Fig. 4, we compare the visualization of the in-dependent sampling method Diffusion Forcing [6], progres-sive sampling method AR-Diffusion [41], and our method. As illustrated in Fig. 4a, Diffusion Forcing [6] suffers from unstable jitter and AR-Diffusion [41] produces minimal motion in 16-frame generation, while our approach achieves both stable motion and high-quality details. Fig. 4b shows the visualization of 128-frame generation. Our method ex-hibits more coherent and realistic motion for highly dy-namic actions, and remains stable in low-motion scenes. 
+
+# 5 Related Work 
+
+## 5.1 Video Generation 
+
+Video generation has recently advanced along two main paradigms: diffusion models [18] and autoregressive archi-tectures [42, 45]. Diffusion-based approaches [2, 16, 18, 31, 63] perform iterative denoising to achieve high visual fi-delity, while autoregressive methods [19, 25, 50, 54] model videos as token sequences through causal next-token pre-diction. By modeling spatiotemporal dynamics, these ap-proaches exhibit strong potential as world models [3, 15]. 5.2 Streaming Video Generation 
+
+Driven by the growing demand for real-time long-horizon video modeling, streaming video generation [12–14, 17, 20, 27, 41, 51, 57] has recently attracted significant atten-tion. Independent sampling approaches [6, 29, 39, 57] in-ject independent random noise into each frame, allowing the model to be trained flexibly under diverse noise condi-tions. Progressive sampling methods sample a base noise level [35, 41, 53] during training for a specific frame and construct a strictly increasing noise sequence over all video frames. Furthermore, self forcing [9, 21] and rolling forc-ing [28] employ knowledge distillation to perform closed-loop consistent training. These approaches are orthogonal to ours and could potentially be combined, which will be explored in future work. 
+
+# 6 Conclusion 
+
+We propose Stream Forcing, a unified training paradigm for streaming video generation that preserves diverse noise-level coverage while aligning training with inference. The core idea is to construct a smooth training trajectory that connects independent and progressive sampling, allowing the model to leverage the strengths of both approaches. To realize this, we reformulate the training sampling process within a Logit-Normal parameterized stochastic process space. We introduce joint calibration to enforce smooth-ness constraints and a Gaussian Copula to enforce inter-frame correlation. By explicitly enforcing these constraints, the training trajectory achieves a smooth transition between distribution coverage and inference alignment. Extensive experiments demonstrate that Stream Forcing outperforms both single-stage and straightforward sequential training. On two benchmark datasets, it achieves superior video gen-eration quality and shows robust zero-shot extrapolation. These results confirm that constructing a smooth training trajectory with the proposed constraints effectively balances distribution coverage and training–inference consistency, yielding high-quality, temporally coherent streaming video generation. 
+
+# References 
+
+[1] Jhon Atchison and Sheng M Shen. Logistic-normal distribu-tions: Some properties and uses. Biometrika , 67(2):261–272, 1980. 1, 2 [2] Andreas Blattmann, Tim Dockhorn, Sumith Kulal, Daniel Mendelevitch, Maciej Kilian, Dominik Lorenz, Yam Levi, Zion English, Vikram Voleti, Adam Letts, et al. Stable video diffusion: Scaling latent video diffusion models to large datasets. arXiv preprint arXiv:2311.15127 , 2023. 1, 7 [3] Tim Brooks, Bill Peebles, Connor Holmes, Will DePue, Yufei Guo, Li Jing, David Schnurr, Joe Taylor, Troy Luh-man, Eric Luhman, Clarence Ng, Ricky Wang, and Aditya Ramesh. Video generation models as world simulators. 2024. 1, 7 [4] Holger Caesar, Varun Bankiti, Alex H Lang, Sourabh Vora, Venice Erin Liong, Qiang Xu, Anush Krishnan, Yu Pan, Gi-ancarlo Baldan, and Oscar Beijbom. nuscenes: A multi-modal dataset for autonomous driving. In Proceedings of the IEEE/CVF conference on computer vision and pattern recognition , pages 11621–11631, 2020. 2, 6, 1 [5] Holger Caesar, Juraj Kabzan, Kok Seang Tan, Whye Kit Fong, Eric Wolff, Alex Lang, Luke Fletcher, Oscar Beijbom, and Sammy Omari. nuplan: A closed-loop ml-based plan-ning benchmark for autonomous vehicles. arXiv preprint arXiv:2106.11810 , 2021. 6, 1 [6] Boyuan Chen, Diego Mart´ ı Mons´ o, Yilun Du, Max Sim-chowitz, Russ Tedrake, and Vincent Sitzmann. Diffusion forcing: Next-token prediction meets full-sequence diffu-sion. Advances in Neural Information Processing Systems ,37:24081–24125, 2024. 1, 2, 5, 6, 7, 8 [7] Junyu Chen, Han Cai, Junsong Chen, Enze Xie, Shang Yang, Haotian Tang, Muyang Li, and Song Han. Deep compres-sion autoencoder for efficient high-resolution diffusion mod-els. In International Conference on Learning Representa-tions , pages 96539–96560, 2025. 1 [8] Xiaowei Chi, Chun-Kai Fan, Hengyuan Zhang, Xingqun Qi, Rongyu Zhang, Anthony Chen, Chi-Min Chan, Wei Xue, Qifeng Liu, Shanghang Zhang, and Yike Guo. Empower-ing world models with reflection for embodied video predic-tion. In Forty-second International Conference on Machine Learning , 2025. 1 [9] Justin Cui, Jie Wu, Ming Li, Tao Yang, Xiaojie Li, Rui Wang, Andrew Bai, Yuanhao Ban, and Cho-Jui Hsieh. Self-forcing++: Towards minute-scale high-quality video genera-tion. arXiv preprint arXiv:2510.02283 , 2025. 8, 3 [10] Patrick Esser, Sumith Kulal, Andreas Blattmann, Rahim Entezari, Jonas M¨ uller, Harry Saini, Yam Levi, Dominik Lorenz, Axel Sauer, Frederic Boesel, et al. Scaling recti-fied flow transformers for high-resolution image synthesis. In Forty-first international conference on machine learning ,2024. 1, 2 [11] Hao Gao, Shaoyu Chen, Yifan Zhu, Yuehao Song, Wenyu Liu, Qian Zhang, and Xinggang Wang. Rad-2: Scaling rein-forcement learning in a generator-discriminator framework. 
+
+arXiv preprint arXiv:2604.15308 , 2026. 1 [12] Kaifeng Gao, Jiaxin Shi, Hanwang Zhang, Chunping Wang, Jun Xiao, and Long Chen. Ca2-vdm: Efficient autoregres-sive video diffusion model with causal generation and cache sharing. arXiv preprint arXiv:2411.16375 , 2024. 2, 8 [13] Yuchao Gu, Weijia Mao, and Mike Zheng Shou. Long-context autoregressive video modeling with next-frame pre-diction. arXiv preprint arXiv:2503.19325 , 2025. 5 [14] Yuwei Guo, Ceyuan Yang, Ziyan Yang, Zhibei Ma, Zhi-jie Lin, Zhenheng Yang, Dahua Lin, and Lu Jiang. Long context tuning for video generation. arXiv preprint arXiv:2503.10589 , 2025. 8 [15] David Ha and J¨ urgen Schmidhuber. World models. arXiv preprint arXiv:1803.10122 , 2(3), 2018. 1, 7 [16] Yingqing He, Tianyu Yang, Yong Zhang, Ying Shan, and Qifeng Chen. Latent video diffusion models for high-fidelity long video generation. arXiv preprint arXiv:2211.13221 ,2022. 5, 7 [17] Roberto Henschel, Levon Khachatryan, Hayk Poghosyan, Daniil Hayrapetyan, Vahram Tadevosyan, Zhangyang Wang, Shant Navasardyan, and Humphrey Shi. Streamingt2v: Con-sistent, dynamic, and extendable long video generation from text. In Proceedings of the Computer Vision and Pattern Recognition Conference , pages 2568–2577, 2025. 8 [18] Jonathan Ho, Tim Salimans, Alexey Gritsenko, William Chan, Mohammad Norouzi, and David J Fleet. Video dif-fusion models. Advances in neural information processing systems , 35:8633–8646, 2022. 1, 7 [19] Wenyi Hong, Ming Ding, Wendi Zheng, Xinghan Liu, and Jie Tang. Cogvideo: Large-scale pretraining for text-to-video generation via transformers. arXiv preprint arXiv:2205.15868 , 2022. 7 [20] Jinyi Hu, Shengding Hu, Yuxuan Song, Yufei Huang, Mingxuan Wang, Hao Zhou, Zhiyuan Liu, Wei-Ying Ma, and Maosong Sun. Acdit: Interpolating autoregressive con-ditional modeling and diffusion transformer. arXiv preprint arXiv:2412.07720 , 2024. 8 [21] Xun Huang, Zhengqi Li, Guande He, Mingyuan Zhou, and Eli Shechtman. Self forcing: Bridging the train-test gap in autoregressive video diffusion. arXiv preprint arXiv:2506.08009 , 2025. 8, 3 [22] Jihwan Kim, Junoh Kang, Jinyoung Choi, and Bohyung Han. Fifo-diffusion: Generating infinite videos from text without training. Advances in Neural Information Processing Sys-tems , 37:89834–89868, 2024. 1, 2 [23] Kihong Kim, Haneol Lee, Jihye Park, Seyeon Kim, Kwanghee Lee, Seungryong Kim, and Jaejun Yoo. Hybrid video diffusion models with 2d triplane and 3d wavelet rep-resentation. In European Conference on Computer Vision ,pages 148–165. Springer, 2024. 5 [24] Seung Wook Kim, Jonah Philion, Antonio Torralba, and Sanja Fidler. Drivegan: Towards a controllable high-quality neural simulation. In Proceedings of the IEEE/CVF Con-ference on Computer Vision and Pattern Recognition , pages 5820–5829, 2021. 6 [25] Dan Kondratyuk, Lijun Yu, Xiuye Gu, Jose Lezama, Jonathan Huang, Grant Schindler, Rachel Hornung, Vigh-nesh Birodkar, Jimmy Yan, Ming-Chang Chiu, et al. Videopoet: A large language model for zero-shot video gen-eration. In International Conference on Machine Learning ,pages 25105–25124. PMLR, 2024. 7 [26] Minh Khoa Le, Kien Do, Duc Thanh Nguyen, and Truyen Tran. Framedit: Diffusion transformer with matrix at-tention for efficient video generation. arXiv preprint arXiv:2603.09721 , 2026. 5, 2 [27] Haozhe Liu, Shikun Liu, Zijian Zhou, Mengmeng Xu, Yan-ping Xie, Xiao Han, Juan C P´ erez, Ding Liu, Kumara Ka-hatapitiya, Menglin Jia, et al. Mardini: Masked autoregres-sive diffusion for video generation at scale. arXiv preprint arXiv:2410.20280 , 2024. 8 [28] Kunhao Liu, Wenbo Hu, Jiale Xu, Ying Shan, and Shijian Lu. Rolling forcing: Autoregressive long video diffusion in real time. arXiv preprint arXiv:2509.25161 , 2025. 8, 3 [29] Yaofang Liu, Yumeng Ren, Xiaodong Cun, Aitor Artola, Yang Liu, Tieyong Zeng, Raymond H Chan, and Jean-michel Morel. Redefining temporal modeling in video dif-fusion: The vectorized timestep approach. arXiv preprint arXiv:2410.03160 , 2024. 5, 8, 2 [30] Jiachen Lu, Ze Huang, Zeyu Yang, Jiahui Zhang, and Li Zhang. Wovogen: World volume-aware diffusion for con-trollable multi-camera driving scene generation. In Eu-ropean conference on computer vision , pages 329–345. Springer, 2024. 6 [31] Xin Ma, Yaohui Wang, Xinyuan Chen, Gengyun Jia, Zi-wei Liu, Yuan-Fang Li, Cunjian Chen, and Yu Qiao. Latte: Latent diffusion transformer for video generation. arXiv preprint arXiv:2401.03048 , 2024. 1, 5, 7, 2 [32] Zhiyuan Ma, Liangliang Zhao, Biqing Qi, and Bowen Zhou. Neural residual diffusion models for deep scalable vision generation. Advances in Neural Information Processing Sys-tems , 37:117456–117480, 2024. 2 [33] R. B. Nelsen. An Introduction to Copulas . Springer-Verlag, New York, 2nd edition, 2006. 4 [34] Yiran Qin, Zhelun Shi, Jiwen Yu, Xijun Wang, Enshen Zhou, Lijun Li, Zhenfei Yin, Xihui Liu, Lu Sheng, Jing Shao, LEI BAI, and Ruimao Zhang. Worldsimbench: Towards video generation models as world simulators. In Forty-second In-ternational Conference on Machine Learning , 2025. 1 [35] David Ruhe, Jonathan Heek, Tim Salimans, and Emiel Hoogeboom. Rolling diffusion models. In Proceedings of the International Conference on Machine Learning (ICML) ,2024. 1, 2, 8 [36] Team Seedance, De Chen, Liyang Chen, Xin Chen, Ying Chen, Zhuo Chen, Zhuowei Chen, Feng Cheng, Tianheng Cheng, Yufeng Cheng, et al. Seedance 2.0: Advanc-ing video generation for world complexity. arXiv preprint arXiv:2604.14148 , 2026. 1 [37] Aliaksandr Siarohin, St´ ephane Lathuili` ere, Sergey Tulyakov, Elisa Ricci, and Nicu Sebe. First order motion model for image animation. Advances in neural information processing systems , 32, 2019. 5, 6, 1, 2, 3 [38] Ivan Skorokhodov, Sergey Tulyakov, and Mohamed Elho-seiny. Stylegan-v: A continuous video generator with the price, image quality and perks of stylegan2. In Proceedings of the IEEE/CVF conference on computer vision and pattern recognition , pages 3626–3636, 2022. 5 [39] Kiwhan Song, Boyuan Chen, Max Simchowitz, Yilun Du, Russ Tedrake, and Vincent Sitzmann. History-guided video diffusion. arXiv preprint arXiv:2502.06764 , 2025. 2, 8, 1 [40] Khurram Soomro, Amir Roshan Zamir, and Mubarak Shah. Ucf101: A dataset of 101 human actions classes from videos in the wild. arXiv preprint arXiv:1212.0402 , 2012. 5, 6, 1, 2, 3 [41] Mingzhen Sun, Weining Wang, Gen Li, Jiawei Liu, Jiahui Sun, Wanquan Feng, Shanshan Lao, SiYu Zhou, Qian He, and Jing Liu. Ar-diffusion: Asynchronous video genera-tion with auto-regressive diffusion. In Proceedings of the Computer Vision and Pattern Recognition Conference , pages 7364–7373, 2025. 1, 2, 5, 6, 7, 8 [42] Peize Sun, Yi Jiang, Shoufa Chen, Shilong Zhang, Bingyue Peng, Ping Luo, and Zehuan Yuan. Autoregressive model beats diffusion: Llama for scalable image generation. arXiv preprint arXiv:2406.06525 , 2024. 7 [43] Kling Team, Jialu Chen, Yuanzheng Ci, Xiangyu Du, Zipeng Feng, Kun Gai, Sainan Guo, Feng Han, Jingbin He, Kang He, et al. Kling-omni technical report. arXiv preprint arXiv:2512.16776 , 2025. 1 [44] Hansi Teng, Hongyu Jia, Lei Sun, Lingzhi Li, Maolin Li, Mingqiu Tang, Shuai Han, Tianning Zhang, WQ Zhang, Weifeng Luo, et al. Magi-1: Autoregressive video genera-tion at scale. arXiv preprint arXiv:2505.13211 , 2025. 3 [45] Keyu Tian, Yi Jiang, Zehuan Yuan, Bingyue Peng, and Li-wei Wang. Visual autoregressive modeling: Scalable image generation via next-scale prediction. Advances in neural in-formation processing systems , 37:84839–84865, 2024. 7 [46] Thomas Unterthiner, Sjoerd Van Steenkiste, Karol Kurach, Raphael Marinier, Marcin Michalski, and Sylvain Gelly. To-wards accurate generative models of video: A new metric & challenges. arXiv preprint arXiv:1812.01717 , 2018. 1 [47] Team Wan, Ang Wang, Baole Ai, Bin Wen, Chaojie Mao, Chen-Wei Xie, Di Chen, Feiwu Yu, Haiming Zhao, Jianx-iao Yang, et al. Wan: Open and advanced large-scale video generative models. arXiv preprint arXiv:2503.20314 , 2025. 1[48] Xiaofeng Wang, Zheng Zhu, Guan Huang, Xinze Chen, Jia-gang Zhu, and Jiwen Lu. Drivedreamer: Towards real-world-drive world models for autonomous driving. In European conference on computer vision , pages 55–72. Springer, 2024. 6[49] Yuqi Wang, Jiawei He, Lue Fan, Hongxin Li, Yuntao Chen, and Zhaoxiang Zhang. Driving into the future: Multiview visual forecasting and planning with world model for au-tonomous driving. In Proceedings of the IEEE/CVF Con-ference on Computer Vision and Pattern Recognition , pages 14749–14759, 2024. 6 [50] Yuqing Wang, Tianwei Xiong, Daquan Zhou, Zhijie Lin, Yang Zhao, Bingyi Kang, Jiashi Feng, and Xihui Liu. Loong: Generating minute-level long videos with autoregressive lan-guage models. arXiv preprint arXiv:2410.02757 , 2024. 7 [51] Wenming Weng, Ruoyu Feng, Yanhui Wang, Qi Dai, Chunyu Wang, Dacheng Yin, Zhiyuan Zhao, Kai Qiu, Jian-min Bao, Yuhui Yuan, et al. Art-v: Auto-regressive text-to-video generation with diffusion models. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 7395–7405, 2024. 8 [52] Tianze Xia, Yongkang Li, Lijun Zhou, Jingfeng Yao, Kaixin Xiong, Haiyang Sun, Bing Wang, Kun Ma, Hangjun Ye, Wenyu Liu, et al. Drivelaw: Unifying planning and video generation in a latent driving world. arXiv preprint arXiv:2512.23421 , 2025. 1 [53] Desai Xie, Zhan Xu, Yicong Hong, Hao Tan, Difan Liu, Feng Liu, Arie Kaufman, and Yang Zhou. Progressive au-toregressive video diffusion models. In Proceedings of the Computer Vision and Pattern Recognition Conference , pages 6322–6332, 2025. 8 [54] Wilson Yan, Yunzhi Zhang, Pieter Abbeel, and Aravind Srinivas. Videogpt: Video generation using vq-vae and trans-formers. arXiv preprint arXiv:2104.10157 , 2021. 5, 7 [55] Haolin Yang, Feilong Tang, Ming Hu, Qingyu Yin, Yulong Li, Yexin Liu, Zelin Peng, Peng Gao, Junjun He, Zongyuan Ge, et al. Scalingnoise: Scaling inference-time search for generating infinite videos. arXiv preprint arXiv:2503.16400 ,2025. 2 [56] Jiazhi Yang, Shenyuan Gao, Yihang Qiu, Li Chen, Tianyu Li, Bo Dai, Kashyap Chitta, Penghao Wu, Jia Zeng, Ping Luo, et al. Generalized predictive model for autonomous driving. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pages 14662–14672, 2024. 6[57] Tianwei Yin, Qiang Zhang, Richard Zhang, William T Free-man, Fredo Durand, Eli Shechtman, and Xun Huang. From slow bidirectional to fast autoregressive video diffusion mod-els. In Proceedings of the Computer Vision and Pattern Recognition Conference , pages 22963–22974, 2025. 8 [58] Qihang Yu, Mark Weber, Xueqing Deng, Xiaohui Shen, Daniel Cremers, and Liang-Chieh Chen. An image is worth 32 tokens for reconstruction and generation. Advances in Neural Information Processing Systems , 37:128940– 128966, 2024. 1 [59] Sihyun Yu, Jihoon Tack, Sangwoo Mo, Hyunsu Kim, Junho Kim, Jung-Woo Ha, and Jinwoo Shin. Generating videos with dynamics-aware implicit generative adversarial net-works. arXiv preprint arXiv:2202.10571 , 2022. 5 [60] Sihyun Yu, Kihyuk Sohn, Subin Kim, and Jinwoo Shin. Video probabilistic diffusion models in projected latent space. In Proceedings of the IEEE/CVF conference on com-puter vision and pattern recognition , pages 18456–18466, 2023. 5 [61] Lvmin Zhang and Maneesh Agrawala. Packing input frame context in next-frame prediction models for video genera-tion. arXiv preprint arXiv:2504.12626 , 2025. 3 [62] Lvmin Zhang, Shengqu Cai, Muyang Li, Chong Zeng, Bei-jia Lu, Anyi Rao, Song Han, Gordon Wetzstein, and Ma-neesh Agrawala. Pretraining frame preservation in au-toregressive video memory compression. arXiv preprint arXiv:2512.23851 , 2025. 3 [63] Shuai Zhang, Bao Tang, Siyuan Yu, Yueting Zhu, Jingfeng Yao, Ya Zou, Shanglin Yuan, Li Yu, Wenyu Liu, and Xing-gang Wang. Mobilei2v: Fast and high-resolution image-to-video on mobile devices. arXiv preprint arXiv:2511.21475 ,2025. 7 [64] Deyu Zhou, Quan Sun, Yuang Peng, Kun Yan, Runpei Dong, Duomin Wang, Zheng Ge, Nan Duan, and Xiangyu Zhang. Taming teacher forcing for masked autoregressive video gen-eration. In Proceedings of the Computer Vision and Pattern Recognition Conference , pages 7374–7384, 2025. 5 Appendices A.1 Motivation 
+
+The fundamental objective is to construct a structured tran-sition from high-entropy independent sampling toward a more concentrated, inference-aligned sampling distribution. Since diffusion noise levels are bounded within (0 , 1) , we parameterize their frame-wise distributions using the Logit-Normal family, which naturally respects this support and can flexibly represent distributions with varying locations, dispersions, and degrees of skewness. To characterize and control the resulting transition, we use mode dynamics as the primary frame-wise distribution indicator and the corre-lation coefficient as the measure of inter-frame dependency. We focus on the mode rather than conventional moments such as the mean because, for skewed Logit-Normal dis-tributions, the mode directly identifies the most frequently sampled noise level. As these high-density regions are en-countered more often during training, controlling the mode provides a practical reference for regulating the curriculum trajectory. Accordingly, Constraints 1 and 2 govern the evo-lution of the mode location and peak density, respectively, while Constraint 3 controls inter-frame correlation. 1. Trajectory transition smoothness: This constraint pro-motes stable optimization across training steps. Abrupt changes in the sampling distribution may introduce sud-den shifts in training difficulty and destabilize the cur-riculum. We therefore enforce a uniform evolution of the mode location along the training trajectory, ensuring that adjacent training configurations change gradually. 2. Per-frame distribution coverage consistency: It promotes balanced optimization across frames within each train-ing step. If the distribution of one frame is sharply con-centrated while that of another is overly dispersed, their dominant noise-level regions are sampled with substan-tially different frequencies, resulting in uneven training emphasis across the sequence. We therefore match the mode probability densities of all frame-wise distribu-tions to maintain comparable sampling concentration. 3. Inter-frame correlation: In the initial diffusion-forcing configuration, frame-wise noise levels are sampled in-dependently, so their inter-frame dependencies are not explicitly modeled. In contrast, inference follows an or-dered denoising process in which the noise levels of ad-jacent frames are strongly correlated. We thus progres-sively introduce inter-frame correlation along the train-ing trajectory, explicitly aligning the joint training distri-bution with the sequential structure of inference. 
+
+# A.2 Experimental Setup 
+
+## A.2.1 Dataset 
+
+UCF-101 [40]. The UCF-101 dataset [40] is a large-scale human motion dataset that consists of 13,320 videos with 9,624 clips in the training set and 3,696 clips in the test set across 101 action classes. We train only on the train set. 
+
+Taichi-HD [37]. The Taichi-HD dataset [37] is a human motion dataset containing 3,103 videos with 2,818 clips in the training set and 285 clips in the test set. We train only on the train set. 
+
+NuPlan [5]. NuPlan is a large-scale autonomous driving dataset containing diverse real-world driving scenarios. The training set includes 1,310 driving logs and 18,104 driv-ing segments, covering approximately 3.49 million frames sampled at 10 Hz, with an average duration of 20 seconds. In our experiments, we only utilize the front-view camera stream among the eight available cameras. 
+
+NuScenes [4]. NuScenes consists of 1,000 driving scenes with temporally consistent sensor streams and vehicle mo-tion annotations. The official split contains 700 training scenes, 150 validation scenes, and 150 testing scenes. We train our model on the training split and evaluate its perfor-mance on the testing split. 
+
+## A.2.2 Metrics 
+
+For experiments on the UCF-101 dataset and the Taichi-HD dataset, we evaluate the quality of generated videos by com-puting the Fr´ echet Video Distance (FVD) [46]. We evaluate both qualities of unconditional and conditional generation on the UCF-101 dataset, and unconditional generation on the Taichi-HD dataset. To validate the generalizability of our method to long-horizon tasks, we provide results with video lengths of both 16 and 128 frames. For experiments on the nuPlan [5] dataset and the nuScenes [4] dataset, we evaluate future video generation with 25-frame clips and measure the generation quality us-ing Fr´ echet Inception Distance (FID) and Fr´ echet Video Distance (FVD). 
+
+## A.2.3 Model 
+
+For experiments on UCF-101 [40] and Taichi-HD [37], we use DFoT [39] DiT as the backbone for the diffusion model, and AR-VAE introduced in AR-Diffusion [41], which is a Transformer-based 1D tokenizer [58], producing a token se-quence of length 32. The backbone DiT contains 674M pa-rameters. For experiments on nuScenes [4], we use the Wan 2.1 DiT [47] as the backbone for the diffusion model, and a Deep Compression Autoencoder (DCAE) [7] fine-tuned on driving data, which produces a 16-channel latent with 8×
+
+spatial and 1× temporal compression. The detailed model configuration is provided in Tab. A1. Table A1. Architecture configurations.                           
+
+> Configuration DFoT Wan
+> #Parameters 674M 1.3B Transformer Blocks 28 32 Hidden Size 1152 2048 Attention Heads 16 16 Resolution 256 ×256 512 ×256
+> Frames 16 25 VAE Channels 416 VAE Downsample [1 ,8] [1 ,8]
+> VAE Tokens / Frame 32 512
+
+## A.2.4 Training Details 
+
+All experiments are conducted on 8 NVIDIA H20 GPUs. For experiments on UCF-101 [40] and Taichi-HD [37], training is performed with a batch size of 40 per GPU. The model is optimized using AdamW with β1 = 0.9,
+
+β2 = 0 .99 , and ϵ = 10 −8. The learning rate is set to 
+
+2×10 −5 with a 10k-step warmup. We adopt v-prediction as the training objective and use 50-step DDIM sampling with a CFG scale of 2.0 during inference. The maximum corre-lation coefficient is set to ρmax = 0 .95 . The full training schedule consists of 600k steps, including 300k steps of in-dependent training, 150k steps of curriculum transition, and 150k steps of inference-aligned training. For ablation stud-ies, we train models for 450k steps and evaluate them on 16-frame unconditional generation on UCF-101 [40]. More de-tails are provided in Tab. A2. For experiments on nuScenes [4], training is performed with a batch size of 4 per GPU. The model is optimized using AdamW with β1 = 0.9,
+
+β2 = 0 .99 , ϵ = 10 −8, and weight decay 0.01 . The learning rate is set to 5 × 10 −5 with a 2.5k-step cosine warmup. We adopt flow matching with velocity prediction as the train-ing objective and use 50-step sampling with a CFG scale of 6.0 during inference. The Copula-based scheduling uses 
+
+ρmax = 0 .95 . The training schedule consists of 10k steps. We evaluate 25-frame conditional video generation, using the first frame as the visual condition and generating the subsequent 24 frames. 
+
+# A.3 Conditional video generation 
+
+We conduct conditional generation experiments on the UCF-101 dataset [40]. We train the model on 16-frame clips at a resolution of 256 ×256 . Our method presents significant improvements over prior approaches as shown in Tab. A3. We further evaluate the long-horizon extrapolation capabil-ity on 128-frame generation, as shown in Tab. A4. These results confirm that our method maintains strong zero-shot extrapolation capability in the conditional setting for long-horizon streaming generation. 
+
+Table A2. Training and sampling configurations for experiments on UCF-101 [40] and Taichi-HD [37].                   
+
+> Configuration Value
+> Training Objective v-prediction Diffusion Timesteps 1000 Sampling Steps 50
+> ρmax 0.95 Optimizer AdamW
+> β1, β 20.9, 0.99 Learning Rate 2×10 −5
+> Warmup Steps 10k Gradient Clipping 1.0 Batch Size 40 EMA Decay 0.9999 CFG Scale 2.0 Independent Training 300k steps Curriculum Transition 150k steps Inference-Aligned Training 150k steps
+
+Table A3. Comparison on conditional video generation on UCF-101. * indicates training on train + test split, while methods with-out * are trained only on train. ‡ indicates results evaluated on the test split, while all other results are evaluated on the full dataset. All methods generate videos at 256×256 resolution and 16 frames.           
+
+> Methods FVD Latte* [31] 478.0 FVDM* [29] 468.2 Neural-RDM* [32] 461.0 Diffusion Forcing [6] 157.8 Ca2-VDM ‡[12] 184.5 FrameDiT* [26] 170.1
+> Ours ‡158.3 Ours 121.0
+
+Table A4. Comparison of methods on UCF-101 [40] for condi-tional generation, evaluated on the full dataset. All methods gen-erate videos at 256×256 resolution and 128 frames.      
+
+> Methods FVD FIFO-Diffusion [22] 596.6 Diffusion Forcing [6] 272.3 ScalingNoise [55] 539.2
+> Ours 232.4
+
+# A.4 Proof of the Mode Equation 
+
+In this section, we provide a brief proof of Eq. 9. Assume that X ∈ (0 , 1) follows a Logit-Normal distri-bution with parameters (μ, σ 2), whose density is given by 
+
+f (x) = 1
+
+x(1 − x)σ√2π exp 
+
+
+
+− (logit (x) − μ)2
+
+2σ2
+
+
+
+.
+
+Taking the logarithm of the density and discarding additive constants yields 
+
+ℓ(x) = − log x − log(1 − x) − (logit (x) − μ)2
+
+2σ2 .Differentiating ℓ(x) with respect to x gives 
+
+ℓ′(x) = 2x − 1
+
+x(1 − x) − logit (x) − μσ2 x(1 − x) .
+
+Since x(1 − x) > 0 for all x ∈ (0 , 1) , the stationary points of the density satisfy 
+
+(2 x − 1) − logit (x) − μσ2 = 0 ,
+
+which can be rearranged as 
+
+logit (x) − μ = σ2(2 x − 1) .
+
+If the density attains its maximum at x = ζ ∈ (0 , 1) , sub-stituting x = ζ into the above condition yields 
+
+μ = logit (ζ) + σ2(1 − 2ζ).
+
+Moreover, the density vanishes as x → 0+ and x → 1− and admits a unique stationary point in (0 , 1) , ensuring that this solution corresponds to the unique global maximum of the density. 
+
+# A.5 Why Mode-Density Matching for Constraint 2 
+
+Constraint 2 is implemented through a mode-based heuris-tic rather than a global dispersion statistic such as differen-tial entropy. Although entropy quantifies the overall uncer-tainty of a distribution, it does not directly govern the sam-pling density near its dominant noise level. Consequently, frame-wise distributions with similar or smoothly varying entropy may still exhibit substantially different peak densi-ties, leading to uneven training emphasis across the tempo-ral sequence. To examine this distinction, we replace the proposed mode-density consistency constraint with two linear en-tropy schedules. Specifically, the entropy is gradually de-creased from −0.2 nats to −7 nats in Ent 1 and to −3 nats in Ent 2 , as reported in Tab. A5. Both entropy-based vari-ants yield higher FVD than our mode-based design. These results indicate that controlling global distributional uncer-tainty alone is insufficient. Instead, directly matching the dominant sampling density across frames provides a more effective mechanism for balancing training emphasis and improving temporal generation quality.     
+
+> Table A5. Comparison between entropy and mode DCC.
+> Setting FVD Ent 1 675 Ent 2 590
+> Ours 334
+
+# A.6 Limitation and Future Work 
+
+## A.6.1 Limitation 
+
+Due to computational and data constraints, experiments are conducted on small- to medium-scale datasets. While suf-ficient to demonstrate the effectiveness and robustness of Stream Forcing, this setting does not fully reflect its behav-ior under large-scale training. We leave a systematic study of scaling to future work. 
+
+## A.6.2 Future Work 
+
+Several orthogonal directions, such as memory compres-sion techniques [61, 62] and closed-loop distillation meth-ods [9, 21, 28], remain to be jointly explored, and their in-teractions with the proposed framework have not yet been systematically studied. Extending the method to large-scale training on top of pretrained models [44] is a promising di-rection. 
+
+# A.7 More Visualization 
+
+In this section, we present additional visualizations of our method. Specifically, we show unconditional video genera-tion on the Taichi-HD dataset [37] for 16-frame sequences (Fig. A1a) and long-horizon extrapolation to 128 frames (Fig. A1b). We also show conditional video generation on the UCF-101 dataset [40] for 16-frame sequences Fig. A2a) and extrapolation to 128 frames (Fig. A2a). These results demonstrate that our method maintains temporal consis-tency and generates visually coherent sequences across both datasets and time horizons. (a) Visualization of unconditional 16-frame video generation results on the Taichi-HD dataset. 
+
+(b) Visualization of unconditional 128-frame video generation results on the Taichi-HD dataset. 
+
+AR-Diffusion 
+
+Stream Forcing (ours) 
+
+Diffusion Forcing 
+
+AR-Diffusion 
+
+Stream Forcing (ours) 
+
+Diffusion Forcing Figure A1. Visualization of unconditional video generation on Taichi-HD dataset. (a) Visualization of conditional 16-frame video generation results on the UCF-101 dataset. 
+
+(b) Visualization of conditional 128-frame video generation results on the UCF-101 dataset. 
+
+AR-Diffusion 
+
+Stream Forcing (ours) 
+
+Diffusion Forcing 
+
+AR-Diffusion 
+
+Stream Forcing (ours) 
+
+Diffusion Forcing Figure A2. Visualization of conditional video generation on UCF-101 dataset.
